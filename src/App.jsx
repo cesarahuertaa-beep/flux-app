@@ -371,23 +371,23 @@ function ProgramarCliente({ clientes, selected, setSelected, setMsg }) {
   const updComida = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return {...p,comidas:cs}; });
   const remComida = (i) => setDiaForm(p => ({ ...p, comidas: p.comidas.filter((_,x)=>x!==i) }));
 
-  const openNewRutina = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, ejercicios:[{nombre:"",series:""}] }); setShowRutinaModal(true); };
-  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, ejercicios:r.ejercicios.map(e=>({...e})) }); setShowRutinaModal(true); };
+  const openNewRutina = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio: new Date().toISOString().split("T")[0], ejercicios:[{nombre:"", num_series:4, reps_sugeridas:10}] }); setShowRutinaModal(true); };
+  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio: r.fecha_inicio || new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e})) }); setShowRutinaModal(true); };
 
   const saveRutina = async () => {
     setSaving(true);
     try {
       let rid;
-      if (editRutina) { await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas }); rid=editRutina.id; await dbDel(`ejercicios?rutina_id=eq.${rid}`); }
-      else { const r = await dbPost("rutinas", { cliente_id:selected.id, nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, orden:rutinas.length }); rid=r[0].id; }
-      for (let i=0; i<rutinaForm.ejercicios.length; i++) await dbPost("ejercicios", { rutina_id:rid, nombre:rutinaForm.ejercicios[i].nombre, series:rutinaForm.ejercicios[i].series, orden:i });
+      if (editRutina) { await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio }); rid=editRutina.id; await dbDel(`ejercicios?rutina_id=eq.${rid}`); }
+      else { const r = await dbPost("rutinas", { cliente_id:selected.id, nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio, orden:rutinas.length }); rid=r[0].id; }
+      for (let i=0; i<rutinaForm.ejercicios.length; i++) await dbPost("ejercicios", { rutina_id:rid, nombre:rutinaForm.ejercicios[i].nombre, num_series:+rutinaForm.ejercicios[i].num_series||4, reps_sugeridas:+rutinaForm.ejercicios[i].reps_sugeridas||10, orden:i });
       setShowRutinaModal(false); setMsg("✅ Rutina guardada"); await loadData();
     } catch (e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
   const deleteRutina = async (r) => { await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
-  const addEj = () => setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios,{nombre:"",series:""}] }));
+  const addEj = () => setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios,{nombre:"", num_series:4, reps_sugeridas:10}] }));
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return {...p,ejercicios:es}; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
 
@@ -506,18 +506,26 @@ function ProgramarCliente({ clientes, selected, setSelected, setMsg }) {
 
       {showRutinaModal && (
         <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)}>
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
-            <Field label="Nombre"><input value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Pecho y Tríceps" /></Field>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:10 }}>
+            <Field label="Nombre"><input value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1" /></Field>
             <Field label="Semanas"><input type="number" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))} /></Field>
+            <Field label="Fecha inicio"><input type="date" value={rutinaForm.fecha_inicio} onChange={e=>setRutinaForm(p=>({...p,fecha_inicio:e.target.value}))} /></Field>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
             <span style={{ fontWeight:600, fontSize:14 }}>Ejercicios</span>
             <Btn small outline color={C.accentDark} onClick={addEj}>+ Ejercicio</Btn>
           </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 80px 32px", gap:6, marginBottom:6 }}>
+            <span style={{ fontSize:11, color:C.muted, fontWeight:600 }}>NOMBRE</span>
+            <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>SERIES</span>
+            <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>REPS</span>
+            <span/>
+          </div>
           {rutinaForm.ejercicios.map((e,i)=>(
-            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 100px 32px", gap:8, marginBottom:8, alignItems:"center" }}>
+            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 80px 32px", gap:6, marginBottom:8, alignItems:"center" }}>
               <input value={e.nombre} onChange={ev=>updEj(i,"nombre",ev.target.value)} placeholder={`Ejercicio ${i+1}`} />
-              <input value={e.series} onChange={ev=>updEj(i,"series",ev.target.value)} placeholder="4x10" />
+              <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{ textAlign:"center" }} />
+              <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{ textAlign:"center" }} />
               <button onClick={()=>remEj(i)} style={{ background:"#ef444430", color:"#ef4444", borderRadius:6, padding:6, cursor:"pointer", fontSize:14, border:"none" }}>×</button>
             </div>
           ))}
@@ -569,15 +577,27 @@ function ClienteView({ session, onLogout }) {
 
   const commitEdit = async () => {
     if (!editCell) return;
-    const [ejId, semana] = editCell.split("__");
-    setProgreso(p => ({ ...p, [`${ejId}-${semana}`]: editVal }));
-    await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, valor:editVal, updated_at:new Date().toISOString() });
+    const [ejId, semana, serie, tipo] = editCell.split("__");
+    const key = `${ejId}-${semana}-${serie}-${tipo}`;
+    setProgreso(p => ({ ...p, [key]: editVal }));
+    await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:editVal, updated_at:new Date().toISOString() });
     setEditCell(null); setEditVal("");
+  };
+
+  const getSemanasConFecha = (rutina) => {
+    if (!rutina) return [];
+    const inicio = rutina.fecha_inicio ? new Date(rutina.fecha_inicio) : new Date();
+    return Array.from({ length: rutina.semanas }, (_, i) => {
+      const start = new Date(inicio); start.setDate(start.getDate() + i*7);
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      const fmt = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+      return { label: `${fmt(start)}-${fmt(end)}`, idx: i };
+    });
   };
 
   const rutina = rutinas[rutinaIdx];
   const diaActual = dias[diaIdx];
-  const semanas = rutina ? Array.from({ length: rutina.semanas }, (_,i) => `S${i+1}`) : [];
+  const semanas = getSemanasConFecha(rutina);
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
@@ -659,35 +679,64 @@ function ClienteView({ session, onLogout }) {
                   <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Toca cualquier celda para registrar tu avance 💪</div>
                   {rutina && (
                     <div style={{ overflowX:"auto" }}>
-                      <table style={{ width:"100%", borderCollapse:"separate", borderSpacing:"0 6px" }}>
+                      <table style={{ borderCollapse:"collapse", fontSize:12, minWidth:"100%" }}>
                         <thead>
                           <tr>
-                            <th style={{ textAlign:"left", fontSize:11, color:C.muted, padding:"0 10px 6px", minWidth:140, fontWeight:600 }}>Ejercicio</th>
-                            <th style={{ textAlign:"center", fontSize:11, color:C.muted, padding:"0 8px 6px", minWidth:70, fontWeight:600 }}>Series</th>
-                            {semanas.map(s=><th key={s} style={{ textAlign:"center", fontSize:11, color:C.muted, padding:"0 4px 6px", minWidth:58, fontWeight:600 }}>{s}</th>)}
+                            <th rowSpan={2} style={{ background:C.accentDeep, color:C.text, padding:"8px 12px", border:`1px solid ${C.border}`, minWidth:140, textAlign:"left" }}>Ejercicio</th>
+                            <th rowSpan={2} style={{ background:C.accentDeep, color:C.text, padding:"8px 8px", border:`1px solid ${C.border}`, minWidth:50, textAlign:"center" }}>Serie</th>
+                            {semanas.map((s,i)=>(
+                              <th key={i} colSpan={2} style={{ background:C.accentDeep, color:C.accent, padding:"6px 4px", border:`1px solid ${C.border}`, textAlign:"center", whiteSpace:"nowrap", fontSize:11 }}>{s.label}</th>
+                            ))}
+                          </tr>
+                          <tr>
+                            {semanas.map((_,i)=>(
+                              <>
+                                <th key={`p${i}`} style={{ background:C.card, color:C.muted, padding:"5px 4px", border:`1px solid ${C.border}`, textAlign:"center", fontSize:10, minWidth:52 }}>Peso</th>
+                                <th key={`r${i}`} style={{ background:C.card, color:C.muted, padding:"5px 4px", border:`1px solid ${C.border}`, textAlign:"center", fontSize:10, minWidth:52 }}>Reps</th>
+                              </>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {rutina.ejercicios.map(ej=>(
-                            <tr key={ej.id}>
-                              <td style={{ background:C.card, borderRadius:"10px 0 0 10px", padding:"10px 12px", fontSize:13, fontWeight:500, border:`1px solid ${C.border}`, borderRight:"none" }}>{ej.nombre}</td>
-                              <td style={{ background:C.card, padding:"10px 8px", fontSize:12, color:C.accent, textAlign:"center", fontWeight:700, border:`1px solid ${C.border}`, borderLeft:"none", borderRight:"none" }}>{ej.series}</td>
-                              {semanas.map((s,si)=>{
-                                const cellKey=`${ej.id}__${si}`;
-                                const val=progreso[`${ej.id}-${si}`]||"";
-                                const isEdit=editCell===cellKey;
-                                const hasVal=val&&val.trim()!=="";
-                                return (
-                                  <td key={si} onClick={()=>{if(!isEdit){setEditCell(cellKey);setEditVal(val);}}}
-                                    style={{ background:hasVal?C.accentDeep+"60":C.card, padding:"6px 3px", textAlign:"center", border:`1px solid ${hasVal?C.accent+"50":C.border}`, borderLeft:"none", borderRight:si===semanas.length-1?`1px solid ${hasVal?C.accent+"50":C.border}`:"none", borderRadius:si===semanas.length-1?"0 10px 10px 0":0, cursor:"pointer" }}>
-                                    {isEdit
-                                      ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={{ width:52, padding:"4px 2px", fontSize:12, borderRadius:6, border:`1px solid ${C.accent}`, textAlign:"center", background:C.surface }} />
-                                      : <span style={{ fontSize:12, color:hasVal?C.accent:C.dim, fontWeight:hasVal?700:400 }}>{hasVal?val:"—"}</span>}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
+                          {rutina.ejercicios.map((ej, eji)=>{
+                            const numSeries = ej.num_series || 4;
+                            return Array.from({ length: numSeries }, (_, si)=>{
+                              const isFirst = si === 0;
+                              const isLast = si === numSeries - 1;
+                              return (
+                                <tr key={`${ej.id}-${si}`} style={{ background: eji%2===0 ? C.card : C.surface }}>
+                                  {isFirst && (
+                                    <td rowSpan={numSeries} style={{ background: eji%2===0 ? C.card : C.surface, padding:"8px 12px", border:`1px solid ${C.border}`, fontWeight:600, verticalAlign:"middle", textAlign:"center", borderBottom: isLast ? `2px solid ${C.accentDeep}` : `1px solid ${C.border}` }}>
+                                      <div>{ej.nombre}</div>
+                                      <div style={{ fontSize:10, color:C.muted, marginTop:2 }}>{ej.reps_sugeridas} reps sugeridas</div>
+                                    </td>
+                                  )}
+                                  <td style={{ padding:"6px 8px", border:`1px solid ${C.border}`, textAlign:"center", color:C.accent, fontWeight:700, borderBottom: isLast ? `2px solid ${C.accentDeep}` : `1px solid ${C.border}` }}>{si+1}</td>
+                                  {semanas.map((_,wi)=>{
+                                    const pKey=`${ej.id}__${wi}__${si}__peso`;
+                                    const rKey=`${ej.id}__${wi}__${si}__reps`;
+                                    const pVal=progreso[`${ej.id}-${wi}-${si}-peso`]||"";
+                                    const rVal=progreso[`${ej.id}-${wi}-${si}-reps`]||"";
+                                    const cellStyle = { padding:"4px 2px", border:`1px solid ${C.border}`, textAlign:"center", cursor:"pointer", borderBottom: isLast ? `2px solid ${C.accentDeep}` : `1px solid ${C.border}` };
+                                    return (
+                                      <>
+                                        <td key={pKey} onClick={()=>{setEditCell(pKey);setEditVal(pVal);}} style={{ ...cellStyle, background: pVal ? C.accentDeep+"80" : "transparent" }}>
+                                          {editCell===pKey
+                                            ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={{ width:46, padding:"2px", fontSize:11, borderRadius:4, border:`1px solid ${C.accent}`, textAlign:"center", background:C.surface }} />
+                                            : <span style={{ fontSize:11, color: pVal ? C.accent : C.dim }}>{pVal||"—"}</span>}
+                                        </td>
+                                        <td key={rKey} onClick={()=>{setEditCell(rKey);setEditVal(rVal);}} style={{ ...cellStyle, background: rVal ? C.accentDeep+"50" : "transparent" }}>
+                                          {editCell===rKey
+                                            ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={{ width:46, padding:"2px", fontSize:11, borderRadius:4, border:`1px solid ${C.accent}`, textAlign:"center", background:C.surface }} />
+                                            : <span style={{ fontSize:11, color: rVal ? C.accentDark : C.dim }}>{rVal||"—"}</span>}
+                                        </td>
+                                      </>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            });
+                          })}
                         </tbody>
                       </table>
                     </div>
