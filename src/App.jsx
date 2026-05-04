@@ -9,6 +9,47 @@ const getAdminCreds = () => {
 };
 const setAdminCreds = (c) => { try { localStorage.setItem(ADMIN_KEY, JSON.stringify(c)); } catch {} };
 
+// Supabase Auth helpers
+const authSignIn = async (email, password) => {
+  const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error_description || d.msg || "Error de autenticación");
+  return d;
+};
+
+const authInvite = async (email) => {
+  const r = await fetch(`${SUPA_URL}/auth/v1/invite`, {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.msg || "Error al invitar usuario");
+  return d;
+};
+
+const authResetPassword = async (email) => {
+  const r = await fetch(`${SUPA_URL}/auth/v1/recover`, {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  if (!r.ok) throw new Error("Error al enviar email de recuperación");
+};
+
+const authUpdatePassword = async (token, password) => {
+  const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password })
+  });
+  if (!r.ok) throw new Error("Error al actualizar contraseña");
+};
+
 const C = {
   bg: "#000000", surface: "#05192b", card: "#071f33", border: "#0a3050",
   accent: "#56CCF2", accentDark: "#2D9CDB", accentDeep: "#05447A",
@@ -162,34 +203,117 @@ const TabBar = ({ tabs, active, onChange }) => (
 );
 
 function Login({ onLogin }) {
-  const [u, setU] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("login"); // login | reset | set_password
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+
+  // Detectar si viene de link de invitación o reset
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.replace("#", "?"));
+      const token = params.get("access_token");
+      const type = params.get("type");
+      if (token && (type === "invite" || type === "recovery")) {
+        setAccessToken(token);
+        setMode("set_password");
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
+  }, []);
+
   const submit = async () => {
-    setLoading(true); setErr("");
+    setLoading(true); setErr(""); setInfo("");
     const creds = getAdminCreds();
-    if (u.trim() === creds.user && p === creds.pass) { onLogin({ role: "admin" }); return; }
+    // Check admin
+    if (email.trim() === creds.user && pass === creds.pass) { onLogin({ role: "admin" }); return; }
     try {
-      const rows = await dbGet(`clientes?usuario=eq.${encodeURIComponent(u.trim())}&activo=eq.true`);
-      if (!rows.length || rows[0].password !== p) { setErr("Usuario o contraseña incorrectos"); setLoading(false); return; }
-      onLogin({ role: "client", data: rows[0] });
-    } catch { setErr("Error de conexión"); setLoading(false); }
+      const data = await authSignIn(email.trim(), pass);
+      const token = data.access_token;
+      // Buscar cliente por auth_id o email
+      const rows = await dbGet(`clientes?email=eq.${encodeURIComponent(email.trim())}&activo=eq.true`);
+      if (!rows.length) { setErr("No se encontró tu cuenta de cliente."); setLoading(false); return; }
+      onLogin({ role: "client", data: rows[0], token });
+    } catch (e) { setErr(e.message); setLoading(false); }
   };
+
+  const sendReset = async () => {
+    if (!email) { setErr("Escribe tu email"); return; }
+    setLoading(true); setErr("");
+    try {
+      await authResetPassword(email.trim());
+      setInfo("✅ Te enviamos un email para restablecer tu contraseña.");
+      setMode("login");
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
+  };
+
+  const setPassword = async () => {
+    if (!newPass || newPass.length < 6) { setErr("La contraseña debe tener al menos 6 caracteres"); return; }
+    if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
+    setLoading(true); setErr("");
+    try {
+      await authUpdatePassword(accessToken, newPass);
+      setInfo("✅ Contraseña establecida. Ya puedes iniciar sesión.");
+      setMode("login");
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
       <style>{css}</style>
-      <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", background: C.accentDeep + "30", top: -100, right: -100, filter: "blur(80px)" }} />
-      <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", background: C.accentDark + "20", bottom: -80, left: -80, filter: "blur(60px)" }} />
-      <div style={{ width: 380, padding: "44px 36px", background: C.surface, borderRadius: 24, border: `1px solid ${C.border}`, position: "relative", boxShadow: `0 0 60px ${C.accentDeep}40` }}>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
+      <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%", background:C.accentDeep+"30", top:-100, right:-100, filter:"blur(80px)" }} />
+      <div style={{ position:"absolute", width:300, height:300, borderRadius:"50%", background:C.accentDark+"20", bottom:-80, left:-80, filter:"blur(60px)" }} />
+      <div style={{ width:380, padding:"44px 36px", background:C.surface, borderRadius:24, border:`1px solid ${C.border}`, position:"relative", boxShadow:`0 0 60px ${C.accentDeep}40` }}>
+        <div style={{ textAlign:"center", marginBottom:32 }}>
           <FluxLogo size={36} />
-          <div style={{ marginTop: 16, fontSize: 13, color: C.muted }}>Tu programa personalizado</div>
+          <div style={{ marginTop:16, fontSize:13, color:C.muted }}>
+            {mode==="login" && "Tu programa personalizado"}
+            {mode==="reset" && "Recuperar contraseña"}
+            {mode==="set_password" && "Crear tu contraseña"}
+          </div>
         </div>
-        <Field label="Usuario"><input value={u} onChange={e => setU(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Tu usuario" /></Field>
-        <Field label="Contraseña"><input type="password" value={p} onChange={e => setP(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="••••••" /></Field>
-        {err && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12, textAlign: "center" }}>{err}</div>}
-        <button onClick={submit} disabled={loading} style={{ width: "100%", padding: 13, background: C.gradBtn, border: "none", borderRadius: 10, fontWeight: 800, fontSize: 15, color: "#000", cursor: "pointer" }}>
-          {loading ? "Entrando…" : "ENTRAR"}
-        </button>
-        <div style={{ marginTop: 16, textAlign: "center", fontSize: 11, color: C.dim }}>Keep Going 💪</div>
+
+        {info && <div style={{ background:C.accentDeep+"40", border:`1px solid ${C.accent}40`, borderRadius:8, padding:"10px 14px", fontSize:13, color:C.accent, marginBottom:14 }}>{info}</div>}
+        {err && <div style={{ color:"#f87171", fontSize:13, marginBottom:12, textAlign:"center" }}>{err}</div>}
+
+        {mode === "login" && <>
+          <Field label="Email o usuario admin"><input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="tu@email.com" /></Field>
+          <Field label="Contraseña"><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••" /></Field>
+          <button onClick={submit} disabled={loading} style={{ width:"100%", padding:13, background:C.gradBtn, border:"none", borderRadius:10, fontWeight:800, fontSize:15, color:"#000", cursor:"pointer", marginBottom:12 }}>
+            {loading ? "Entrando…" : "ENTRAR"}
+          </button>
+          <div style={{ textAlign:"center" }}>
+            <button onClick={()=>{setMode("reset");setErr("");}} style={{ background:"none", border:"none", color:C.muted, fontSize:12, cursor:"pointer", textDecoration:"underline" }}>¿Olvidaste tu contraseña?</button>
+          </div>
+        </>}
+
+        {mode === "reset" && <>
+          <Field label="Tu email"><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com" /></Field>
+          <button onClick={sendReset} disabled={loading} style={{ width:"100%", padding:13, background:C.gradBtn, border:"none", borderRadius:10, fontWeight:800, fontSize:15, color:"#000", cursor:"pointer", marginBottom:12 }}>
+            {loading ? "Enviando…" : "Enviar email de recuperación"}
+          </button>
+          <div style={{ textAlign:"center" }}>
+            <button onClick={()=>{setMode("login");setErr("");}} style={{ background:"none", border:"none", color:C.muted, fontSize:12, cursor:"pointer", textDecoration:"underline" }}>Volver al login</button>
+          </div>
+        </>}
+
+        {mode === "set_password" && <>
+          <Field label="Nueva contraseña"><input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" /></Field>
+          <Field label="Confirmar contraseña"><input type="password" value={confirmPass} onChange={e=>setConfirmPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setPassword()} placeholder="Repite tu contraseña" /></Field>
+          <button onClick={setPassword} disabled={loading} style={{ width:"100%", padding:13, background:C.gradBtn, border:"none", borderRadius:10, fontWeight:800, fontSize:15, color:"#000", cursor:"pointer" }}>
+            {loading ? "Guardando…" : "Establecer contraseña"}
+          </button>
+        </>}
+
+        <div style={{ marginTop:16, textAlign:"center", fontSize:11, color:C.dim }}>Keep Going 💪</div>
       </div>
     </div>
   );
@@ -202,7 +326,7 @@ function Admin({ onLogout }) {
   const [loading, setLoading] = useState(true);
   const [showNewClient, setShowNewClient] = useState(false);
   const [showCreds, setShowCreds] = useState(false);
-  const [newClient, setNewClient] = useState({ usuario: "", password: "", nombre: "", objetivo: "" });
+  const [newClient, setNewClient] = useState({ nombre:"", email:"", objetivo:"" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [creds, setCreds] = useState(getAdminCreds());
@@ -223,12 +347,23 @@ function Admin({ onLogout }) {
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
 
   const createClient = async () => {
-    if (!newClient.usuario || !newClient.password || !newClient.nombre) { setMsg("⚠️ Completa todos los campos"); return; }
+    if (!newClient.email || !newClient.nombre) { setMsg("⚠️ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
-      await dbPost("clientes", { ...newClient, activo: true });
-      setShowNewClient(false); setNewClient({ usuario: "", password: "", nombre: "", objetivo: "" });
-      await loadClientes(); setMsg("✅ Cliente creado");
+      // 1. Invitar usuario via Supabase Auth
+      const authUser = await authInvite(newClient.email);
+      // 2. Crear registro en tabla clientes
+      await dbPost("clientes", {
+        nombre: newClient.nombre,
+        objetivo: newClient.objetivo,
+        email: newClient.email,
+        auth_id: authUser.id,
+        activo: true
+      });
+      setShowNewClient(false);
+      setNewClient({ nombre:"", email:"", objetivo:"" });
+      await loadClientes();
+      setMsg("✅ Cliente creado — se le envió email de invitación");
     } catch (e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
