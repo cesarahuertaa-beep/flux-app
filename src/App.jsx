@@ -489,9 +489,15 @@ function Biblioteca({ biblioteca, onUpdate, setMsg }) {
                 : <div>
                     <div style={{ fontSize:32, marginBottom:8 }}>🎬</div>
                     <div style={{ fontSize:13, color:C.muted, marginBottom:10 }}>Sube un GIF o video MP4</div>
-                    <label style={{ cursor:"pointer" }}>
-                      <Btn small grad onClick={()=>{}} style={{ pointerEvents:"none" }}>{uploading?"Subiendo…":"Seleccionar archivo"}</Btn>
-                      <input type="file" accept="image/gif,video/mp4,image/png,image/jpg,image/jpeg" style={{ display:"none" }} onChange={e=>e.target.files[0]&&uploadGif(e.target.files[0])} />
+                    <input
+                      id="gif-upload"
+                      type="file"
+                      accept="image/gif,video/mp4,image/png,image/jpg,image/jpeg"
+                      style={{ display:"none" }}
+                      onChange={e=>e.target.files[0]&&uploadGif(e.target.files[0])}
+                    />
+                    <label htmlFor="gif-upload" style={{ display:"inline-block", padding:"6px 14px", background:C.gradBtn, borderRadius:8, fontWeight:700, fontSize:12, color:"#000", cursor:"pointer" }}>
+                      {uploading ? "Subiendo…" : "Seleccionar archivo"}
                     </label>
                   </div>}
             </div>
