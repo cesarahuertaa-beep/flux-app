@@ -208,13 +208,19 @@ function Admin({ onLogout }) {
   const [creds, setCreds] = useState(getAdminCreds());
   const [newCreds, setNewCreds] = useState({ user: "", pass: "", confirm: "" });
   const [credsErr, setCredsErr] = useState("");
+  const [biblioteca, setBiblioteca] = useState([]);
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
     try { const r = await dbGet("clientes?order=created_at.asc"); setClientes(r); } catch {}
     setLoading(false);
   }, []);
-  useEffect(() => { loadClientes(); }, [loadClientes]);
+
+  const loadBiblioteca = useCallback(async () => {
+    try { const r = await dbGet("biblioteca_ejercicios?order=nombre.asc"); setBiblioteca(r); } catch {}
+  }, []);
+
+  useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
 
   const createClient = async () => {
     if (!newClient.usuario || !newClient.password || !newClient.nombre) { setMsg("⚠️ Completa todos los campos"); return; }
@@ -244,7 +250,7 @@ function Admin({ onLogout }) {
       <Header role="admin" onLogout={onLogout} extra={
         <Btn small outline color={C.accentDark} onClick={() => { setShowCreds(true); setNewCreds({ user: creds.user, pass: "", confirm: "" }); }}>🔐 Credenciales</Btn>
       } />
-      <TabBar tabs={[["clientes","👥","Clientes"],["programar","📋","Programar"]]} active={tab} onChange={setTab} />
+      <TabBar tabs={[["clientes","👥","Clientes"],["biblioteca","📚","Biblioteca"],["programar","📋","Programar"]]} active={tab} onChange={setTab} />
       <div style={{ padding: "20px 16px", maxWidth: 900, margin: "0 auto" }}>
         {msg && <div onClick={() => setMsg("")} style={{ background: C.accentDeep + "40", border: `1px solid ${C.accent}40`, borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14, cursor: "pointer", color: C.accent }}>{msg}</div>}
         {tab === "clientes" && (
@@ -270,7 +276,8 @@ function Admin({ onLogout }) {
               ))}
           </div>
         )}
-        {tab === "programar" && <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} />}
+        {tab === "biblioteca" && <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} />}
+        {tab === "programar" && <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />}
       </div>
 
       {showNewClient && (
@@ -305,7 +312,216 @@ function Admin({ onLogout }) {
   );
 }
 
-function ProgramarCliente({ clientes, selected, setSelected, setMsg }) {
+const GRUPOS = ["Pecho","Espalda","Piernas","Hombros","Bíceps","Tríceps","Core","Cardio"];
+const TIPOS = ["Empuje","Jale","Sentadilla","Bisagra","Cargada","Aislamiento"];
+
+function EjercicioSelector({ biblioteca, onSelect, selected }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroGrupo, setFiltroGrupo] = useState("Todos");
+  const [filtroTipo, setFiltroTipo] = useState("Todos");
+
+  const filtrados = biblioteca.filter(e => {
+    const yaEsta = selected.find(s => s.biblioteca_id === e.id);
+    if (yaEsta) return false;
+    const matchGrupo = filtroGrupo === "Todos" || e.grupo_muscular === filtroGrupo;
+    const matchTipo = filtroTipo === "Todos" || e.tipo_movimiento === filtroTipo;
+    const matchBusq = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return matchGrupo && matchTipo && matchBusq;
+  });
+
+  return (
+    <div style={{ background:C.bg, borderRadius:10, border:`1px solid ${C.border}`, padding:12, marginBottom:8 }}>
+      <div style={{ fontSize:12, color:C.muted, marginBottom:8, fontWeight:600 }}>AGREGAR EJERCICIO DE LA BIBLIOTECA</div>
+      <div style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar…" style={{ maxWidth:160, padding:"6px 10px", fontSize:12 }} />
+        <select value={filtroGrupo} onChange={e=>setFiltroGrupo(e.target.value)} style={{ fontSize:12, padding:"6px 8px" }}>
+          <option>Todos</option>
+          {GRUPOS.map(g=><option key={g}>{g}</option>)}
+        </select>
+        <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{ fontSize:12, padding:"6px 8px" }}>
+          <option>Todos</option>
+          {TIPOS.map(t=><option key={t}>{t}</option>)}
+        </select>
+      </div>
+      {biblioteca.length === 0
+        ? <div style={{ color:C.muted, fontSize:12, textAlign:"center", padding:10 }}>La biblioteca está vacía. Agrega ejercicios primero en la pestaña Biblioteca.</div>
+        : filtrados.length === 0
+          ? <div style={{ color:C.muted, fontSize:12, textAlign:"center", padding:10 }}>No hay más ejercicios que coincidan.</div>
+          : <div style={{ display:"flex", flexWrap:"wrap", gap:6, maxHeight:160, overflowY:"auto" }}>
+            {filtrados.map(e=>(
+              <button key={e.id} onClick={()=>onSelect(e)} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", background:C.card, border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", color:C.text, fontSize:12 }}>
+                <div style={{ width:24, height:24, borderRadius:4, overflow:"hidden", background:C.surface, flexShrink:0 }}>
+                  {e.gif_url ? <img src={e.gif_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <span style={{ fontSize:14, lineHeight:"24px", display:"block", textAlign:"center" }}>🏋️</span>}
+                </div>
+                <span>{e.nombre}</span>
+                <Tag color={C.accent}>{e.grupo_muscular}</Tag>
+              </button>
+            ))}
+          </div>}
+    </div>
+  );
+}
+
+function Biblioteca({ biblioteca, onUpdate, setMsg }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editEj, setEditEj] = useState(null);
+  const [form, setForm] = useState({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [filtroGrupo, setFiltroGrupo] = useState("Todos");
+  const [filtroTipo, setFiltroTipo] = useState("Todos");
+  const [busqueda, setBusqueda] = useState("");
+  const [preview, setPreview] = useState(null);
+
+  const openNew = () => { setEditEj(null); setForm({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" }); setShowModal(true); };
+  const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, tipo_movimiento:e.tipo_movimiento, gif_url:e.gif_url||"" }); setShowModal(true); };
+
+  const uploadGif = async (file) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fname = `${Date.now()}.${ext}`;
+      const res = await fetch(`${SUPA_URL}/storage/v1/object/ejercicios/${fname}`, {
+        method: "POST",
+        headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, "Content-Type": file.type },
+        body: file
+      });
+      if (!res.ok) throw new Error("Error al subir archivo");
+      const url = `${SUPA_URL}/storage/v1/object/public/ejercicios/${fname}`;
+      setForm(p => ({ ...p, gif_url: url }));
+      setMsg("✅ Archivo subido");
+    } catch (e) { setMsg("❌ " + e.message); }
+    setUploading(false);
+  };
+
+  const save = async () => {
+    if (!form.nombre) { setMsg("⚠️ Escribe el nombre del ejercicio"); return; }
+    setSaving(true);
+    try {
+      if (editEj) await dbPatch(`biblioteca_ejercicios?id=eq.${editEj.id}`, form);
+      else await dbPost("biblioteca_ejercicios", form);
+      setShowModal(false); setMsg("✅ Ejercicio guardado"); onUpdate();
+    } catch (e) { setMsg("❌ " + e.message); }
+    setSaving(false);
+  };
+
+  const deleteEj = async (e) => {
+    await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
+    setMsg("🗑️ Ejercicio eliminado"); onUpdate();
+  };
+
+  const filtrados = biblioteca.filter(e => {
+    const matchGrupo = filtroGrupo === "Todos" || e.grupo_muscular === filtroGrupo;
+    const matchTipo = filtroTipo === "Todos" || e.tipo_movimiento === filtroTipo;
+    const matchBusq = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return matchGrupo && matchTipo && matchBusq;
+  });
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <span style={{ fontWeight:700, fontSize:18 }}>Biblioteca <span style={{ fontSize:13, color:C.muted, fontWeight:400 }}>({biblioteca.length} ejercicios)</span></span>
+        <Btn small grad onClick={openNew}>+ Nuevo ejercicio</Btn>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar ejercicio…" style={{ maxWidth:200, padding:"7px 12px" }} />
+        <select value={filtroGrupo} onChange={e=>setFiltroGrupo(e.target.value)} style={{ maxWidth:150 }}>
+          <option>Todos</option>
+          {GRUPOS.map(g=><option key={g}>{g}</option>)}
+        </select>
+        <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{ maxWidth:160 }}>
+          <option>Todos</option>
+          {TIPOS.map(t=><option key={t}>{t}</option>)}
+        </select>
+      </div>
+
+      {/* Lista */}
+      {filtrados.length === 0
+        ? <div style={{ color:C.muted, textAlign:"center", padding:40 }}>No hay ejercicios que coincidan.</div>
+        : <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:10 }}>
+          {filtrados.map(e => (
+            <div key={e.id} style={{ background:C.card, borderRadius:12, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+              <div onClick={()=>e.gif_url&&setPreview(e)} style={{ height:120, background:C.surface, display:"flex", alignItems:"center", justifyContent:"center", cursor:e.gif_url?"pointer":"default", overflow:"hidden" }}>
+                {e.gif_url
+                  ? <img src={e.gif_url} alt={e.nombre} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  : <span style={{ fontSize:32 }}>🏋️</span>}
+              </div>
+              <div style={{ padding:"10px 12px" }}>
+                <div style={{ fontWeight:600, fontSize:13, marginBottom:4 }}>{e.nombre}</div>
+                <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:8 }}>
+                  <Tag color={C.accent}>{e.grupo_muscular}</Tag>
+                  <Tag color={C.accentDark}>{e.tipo_movimiento}</Tag>
+                </div>
+                <div style={{ display:"flex", gap:6 }}>
+                  <Btn small outline color={C.accent} onClick={()=>openEdit(e)}>Editar</Btn>
+                  <Btn small danger onClick={()=>deleteEj(e)}>Borrar</Btn>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>}
+
+      {/* Modal nuevo/editar */}
+      {showModal && (
+        <Modal title={editEj?"Editar ejercicio":"Nuevo ejercicio"} onClose={()=>setShowModal(false)}>
+          <Field label="Nombre del ejercicio"><input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Press de banca inclinado" /></Field>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Field label="Grupo muscular">
+              <select value={form.grupo_muscular} onChange={e=>setForm(p=>({...p,grupo_muscular:e.target.value}))}>
+                {GRUPOS.map(g=><option key={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Tipo de movimiento">
+              <select value={form.tipo_movimiento} onChange={e=>setForm(p=>({...p,tipo_movimiento:e.target.value}))}>
+                {TIPOS.map(t=><option key={t}>{t}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="GIF / Video del ejercicio">
+            <div style={{ border:`2px dashed ${C.border}`, borderRadius:10, padding:16, textAlign:"center" }}>
+              {form.gif_url
+                ? <div>
+                    <img src={form.gif_url} alt="preview" style={{ maxHeight:140, borderRadius:8, marginBottom:8 }} />
+                    <div><Btn small outline color={C.muted} onClick={()=>setForm(p=>({...p,gif_url:""}))}>Cambiar</Btn></div>
+                  </div>
+                : <div>
+                    <div style={{ fontSize:32, marginBottom:8 }}>🎬</div>
+                    <div style={{ fontSize:13, color:C.muted, marginBottom:10 }}>Sube un GIF o video MP4</div>
+                    <label style={{ cursor:"pointer" }}>
+                      <Btn small grad onClick={()=>{}} style={{ pointerEvents:"none" }}>{uploading?"Subiendo…":"Seleccionar archivo"}</Btn>
+                      <input type="file" accept="image/gif,video/mp4,image/png,image/jpg,image/jpeg" style={{ display:"none" }} onChange={e=>e.target.files[0]&&uploadGif(e.target.files[0])} />
+                    </label>
+                  </div>}
+            </div>
+          </Field>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+            <Btn outline color={C.muted} onClick={()=>setShowModal(false)}>Cancelar</Btn>
+            <Btn grad onClick={save} disabled={saving||uploading}>{saving?"Guardando…":"Guardar"}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Preview GIF */}
+      {preview && (
+        <div onClick={()=>setPreview(null)} style={{ position:"fixed", inset:0, background:"#000d", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ background:C.surface, borderRadius:16, padding:20, maxWidth:400, width:"90%", textAlign:"center" }}>
+            <img src={preview.gif_url} alt={preview.nombre} style={{ width:"100%", borderRadius:10, marginBottom:12 }} />
+            <div style={{ fontWeight:700, fontSize:16 }}>{preview.nombre}</div>
+            <div style={{ display:"flex", gap:6, justifyContent:"center", marginTop:8 }}>
+              <Tag color={C.accent}>{preview.grupo_muscular}</Tag>
+              <Tag color={C.accentDark}>{preview.tipo_movimiento}</Tag>
+            </div>
+            <div style={{ marginTop:14, fontSize:12, color:C.muted }}>Toca para cerrar</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca }) {
   const [subtab, setSubtab] = useState("nutri");
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
@@ -387,7 +603,10 @@ function ProgramarCliente({ clientes, selected, setSelected, setMsg }) {
   };
 
   const deleteRutina = async (r) => { await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
-  const addEj = () => setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios,{nombre:"", num_series:4, reps_sugeridas:10}] }));
+  const addEj = (ej) => {
+    if (rutinaForm.ejercicios.find(e => e.biblioteca_id === ej.id)) return;
+    setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
+  };
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return {...p,ejercicios:es}; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
 
@@ -505,31 +724,44 @@ function ProgramarCliente({ clientes, selected, setSelected, setMsg }) {
       )}
 
       {showRutinaModal && (
-        <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)}>
+        <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)} wide>
           <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:10 }}>
             <Field label="Nombre"><input value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1" /></Field>
             <Field label="Semanas"><input type="number" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))} /></Field>
             <Field label="Fecha inicio"><input type="date" value={rutinaForm.fecha_inicio} onChange={e=>setRutinaForm(p=>({...p,fecha_inicio:e.target.value}))} /></Field>
           </div>
+
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <span style={{ fontWeight:600, fontSize:14 }}>Ejercicios</span>
-            <Btn small outline color={C.accentDark} onClick={addEj}>+ Ejercicio</Btn>
+            <span style={{ fontWeight:600, fontSize:14 }}>Ejercicios seleccionados ({rutinaForm.ejercicios.length})</span>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 80px 32px", gap:6, marginBottom:6 }}>
-            <span style={{ fontSize:11, color:C.muted, fontWeight:600 }}>NOMBRE</span>
-            <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>SERIES</span>
-            <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>REPS</span>
-            <span/>
-          </div>
-          {rutinaForm.ejercicios.map((e,i)=>(
-            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 80px 32px", gap:6, marginBottom:8, alignItems:"center" }}>
-              <input value={e.nombre} onChange={ev=>updEj(i,"nombre",ev.target.value)} placeholder={`Ejercicio ${i+1}`} />
-              <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{ textAlign:"center" }} />
-              <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{ textAlign:"center" }} />
-              <button onClick={()=>remEj(i)} style={{ background:"#ef444430", color:"#ef4444", borderRadius:6, padding:6, cursor:"pointer", fontSize:14, border:"none" }}>×</button>
+
+          {/* Selector de biblioteca */}
+          <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios} />
+
+          {/* Lista de ejercicios agregados */}
+          {rutinaForm.ejercicios.length > 0 && (
+            <div style={{ marginTop:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"40px 1fr 80px 80px 32px", gap:6, marginBottom:6, alignItems:"center" }}>
+                <span/><span style={{ fontSize:11, color:C.muted, fontWeight:600 }}>EJERCICIO</span>
+                <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>SERIES</span>
+                <span style={{ fontSize:11, color:C.muted, fontWeight:600, textAlign:"center" }}>REPS</span>
+                <span/>
+              </div>
+              {rutinaForm.ejercicios.map((e,i)=>(
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"40px 1fr 80px 80px 32px", gap:6, marginBottom:8, alignItems:"center" }}>
+                  <div style={{ width:36, height:36, borderRadius:6, overflow:"hidden", background:C.surface, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {e.gif_url ? <img src={e.gif_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <span style={{ fontSize:18 }}>🏋️</span>}
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:500 }}>{e.nombre}<br/><span style={{ fontSize:10, color:C.muted }}>{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
+                  <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{ textAlign:"center" }} />
+                  <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{ textAlign:"center" }} />
+                  <button onClick={()=>remEj(i)} style={{ background:"#ef444430", color:"#ef4444", borderRadius:6, padding:6, cursor:"pointer", fontSize:14, border:"none" }}>×</button>
+                </div>
+              ))}
             </div>
-          ))}
-          <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:8 }}>
+          )}
+
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:12 }}>
             <Btn outline color={C.muted} onClick={()=>setShowRutinaModal(false)}>Cancelar</Btn>
             <Btn grad onClick={saveRutina} disabled={saving}>{saving?"Guardando…":"Guardar rutina"}</Btn>
           </div>
@@ -552,6 +784,7 @@ function ClienteView({ session, onLogout }) {
   const [editCell, setEditCell] = useState(null);
   const [editVal, setEditVal] = useState("");
   const [loading, setLoading] = useState(true);
+  const [gifPreview, setGifPreview] = useState(null);
 
   useEffect(() => {
     (async () => {
