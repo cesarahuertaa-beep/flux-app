@@ -51,6 +51,16 @@ export function Nutriologos({ setMsg }) {
     setSaving(false);
   };
 
+  const toggleActivo = async (n) => {
+    try {
+      // Si n.activo es null o undefined, asumimos true porque por defecto están activos.
+      const newState = n.activo === false ? true : false;
+      await updateProfile(n.id, { activo: newState });
+      setMsg(`✅ Nutriólogo ${newState ? "activado" : "suspendido"}`);
+      await load();
+    } catch(e) { setMsg("❌ Error: " + e.message); }
+  };
+
   return (
     <div className="animate-in">
       {/* Header */}
@@ -114,9 +124,15 @@ export function Nutriologos({ setMsg }) {
                   <span style={{ fontSize:11, color:C.muted }}>{n.color_primario || "#56CCF2"}</span>
                 </div>
               </div>
-              <div style={{ display:"flex", gap:8 }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+                <Tag color={n.activo !== false ? C.accent : "#f87171"} size="md">
+                  {n.activo !== false ? "● Activo" : "○ Suspendido"}
+                </Tag>
                 <Btn small outline color={C.accentMid} onClick={() => { setShowEdit(n); setEditForm({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"" }); }}>
                   Editar marca
+                </Btn>
+                <Btn small outline color={n.activo !== false ? "#ef4444" : C.accent} onClick={() => toggleActivo(n)}>
+                  {n.activo !== false ? "Suspender" : "Activar"}
                 </Btn>
               </div>
             </div>

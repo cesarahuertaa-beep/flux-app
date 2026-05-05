@@ -50,12 +50,24 @@ export default function Login({ onLogin }) {
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
       if (role === "admin" || role === "superadmin" || role === "nutriologo") {
+        if (role === "nutriologo" && profiles[0].activo === false) {
+          setAuthToken(null); setProfileId(null); setErr("Tu cuenta está suspendida. Contacta a soporte."); setLoading(false); return;
+        }
         onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
         return;
       }
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
-      if (!rows.length) { setAuthToken(null); setProfileId(null); setErr("No se encontr\u00f3 tu cuenta activa."); setLoading(false); return; }
-      onLogin({ role:"client", data:rows[0], token:data.access_token });
+      if (!rows.length) { setAuthToken(null); setProfileId(null); setErr("No se encontró tu cuenta activa."); setLoading(false); return; }
+      
+      const clientData = rows[0];
+      if (clientData.nutriologo_id) {
+        const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
+        if (nut.length && nut[0].activo === false) {
+          setAuthToken(null); setProfileId(null); setErr("El servicio de tu clínica está suspendido temporalmente."); setLoading(false); return;
+        }
+      }
+      
+      onLogin({ role:"client", data:clientData, token:data.access_token });
     } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
