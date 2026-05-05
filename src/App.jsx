@@ -216,7 +216,7 @@ function Login({onLogin}) {
     if (email.trim()===creds.user && pass===creds.pass) { onLogin({role:"admin"}); return; }
     try {
       const data = await authSignIn(email.trim(), pass);
-      const rows = await dbGet(`clientes?email=eq.${encodeURIComponent(email.trim())}&activo=eq.true`);
+      const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
       if (!rows.length) { setErr("No se encontró tu cuenta de cliente."); setLoading(false); return; }
       onLogin({role:"client", data:rows[0], token:data.access_token});
     } catch(e) { setErr(e.message); setLoading(false); }
@@ -330,7 +330,7 @@ function Admin({onLogout}) {
       await dbPatch(`clientes?id=eq.${c.id}`, {activo:!c.activo});
       await loadClientes();
       setMsg(`✅ Cliente ${!c.activo ? "activado" : "desactivado"}`);
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { setMsg("❌ Error: " + e.message); }
   };
 
   const saveCreds = () => {
