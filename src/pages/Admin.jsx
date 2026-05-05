@@ -3,27 +3,39 @@ import { C, css } from "../styles/theme";
 import { Btn, Modal, Field, Tag, Header, TabBar } from "../components/ui";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { authInvite, dbGet, dbPost, dbPatch } from "../lib/supabase";
+import { Nutriologos } from "../components/admin/Nutriologos";
+import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
-export default function Admin({ onLogout }) {
-  const [tab, setTab] = useState("clientes");
-  const [clientes, setClientes] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showNewClient, setShowNewClient] = useState(false);
-  const [newClient, setNewClient] = useState({ nombre:"", email:"", objetivo:"" });
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [biblioteca, setBiblioteca] = useState([]);
+export default function Admin({ onLogout, isSuperadmin, profileId }) {
+  const [tab, setTab]                       = useState("clientes");
+  const [clientes, setClientes]             = useState([]);
+  const [selected, setSelected]             = useState(null);
+  const [loading, setLoading]               = useState(true);
+  const [showNewClient, setShowNewClient]   = useState(false);
+  const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"" });
+  const [saving, setSaving]                 = useState(false);
+  const [msg, setMsg]                       = useState("");
+  const [biblioteca, setBiblioteca]         = useState([]);
+
+  // Filtro por nutriologo_id — superadmin ve todo, nutriólogo ve los suyos
+  const myId = profileId || getProfileId();
+  const clientesFilter = isSuperadmin
+    ? "clientes?order=created_at.asc"
+    : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
+  const bibliotecaFilter = isSuperadmin
+    ? "biblioteca_ejercicios?order=nombre.asc"
+    : `biblioteca_ejercicios?nutriologo_id=eq.${myId}&order=nombre.asc`;
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
-    try { const r = await dbGet("clientes?order=created_at.asc"); setClientes(r); } catch{}
+    try { const r = await dbGet(clientesFilter); setClientes(r); } catch{}
     setLoading(false);
-  }, []);
+  }, [clientesFilter]);
+
   const loadBiblioteca = useCallback(async () => {
-    try { const r = await dbGet("biblioteca_ejercicios?order=nombre.asc"); setBiblioteca(r); } catch{}
-  }, []);
+    try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch{}
+  }, [bibliotecaFilter]);
+
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
 
   const createClient = async () => {
@@ -31,7 +43,14 @@ export default function Admin({ onLogout }) {
     setSaving(true);
     try {
       const authUser = await authInvite(newClient.email);
-      await dbPost("clientes", { nombre:newClient.nombre, objetivo:newClient.objetivo, email:newClient.email, auth_id:authUser.id, activo:true });
+      await dbPost("clientes", {
+        nombre: newClient.nombre,
+        objetivo: newClient.objetivo,
+        email: newClient.email,
+        auth_id: authUser.id,
+        activo: true,
+        nutriologo_id: myId   // ← asignar al nutriólogo que lo crea
+      });
       setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"" });
       await loadClientes(); setMsg("✅ Cliente creado — se le envió email de invitación");
     } catch(e) { setMsg("❌ "+e.message); }
@@ -48,17 +67,21 @@ export default function Admin({ onLogout }) {
 
   const activeCount = clientes.filter(c=>c.activo).length;
 
+  // Tabs: nutriólogo normal tiene 3, superadmin tiene 4
+  const tabs = [
+    ["clientes","👥","Clientes"],
+    ["biblioteca","📚","Biblioteca"],
+    ["programar","📋","Programar"],
+    ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
+  ];
+
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
       <style>{css}</style>
 
-      <Header role="admin" onLogout={onLogout}/>
+      <Header role={isSuperadmin ? "superadmin" : "admin"} onLogout={onLogout}/>
 
-      <TabBar
-        tabs={[["clientes","👥","Clientes"],["biblioteca","📚","Biblioteca"],["programar","📋","Programar"]]}
-        active={tab}
-        onChange={setTab}
-      />
+      <TabBar tabs={tabs} active={tab} onChange={setTab}/>
 
       <div style={{ padding:"24px 20px", maxWidth:960, margin:"0 auto" }}>
 
@@ -85,7 +108,6 @@ export default function Admin({ onLogout }) {
         {/* ── TAB CLIENTES ── */}
         {tab==="clientes" && (
           <div className="animate-in">
-            {/* Header de sección + Stats */}
             <div style={{
               display:"flex", justifyContent:"space-between",
               alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12
@@ -103,12 +125,8 @@ export default function Admin({ onLogout }) {
               <Btn grad onClick={()=>setShowNewClient(true)}>+ Nuevo cliente</Btn>
             </div>
 
-            {/* Lista de clientes */}
             {loading ? (
-              <div style={{
-                textAlign:"center", padding:"60px 0",
-                color:C.muted, fontSize:14
-              }}>
+              <div style={{ textAlign:"center", padding:"60px 0", color:C.muted, fontSize:14 }}>
                 <div style={{
                   width:40, height:40, borderRadius:"50%",
                   border:`3px solid ${C.border}`,
@@ -119,10 +137,7 @@ export default function Admin({ onLogout }) {
                 Cargando clientes…
               </div>
             ) : clientes.length===0 ? (
-              <div style={{
-                textAlign:"center", padding:"80px 0",
-                color:C.muted
-              }}>
+              <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
                 <div style={{fontSize:48, marginBottom:16}}>👥</div>
                 <div style={{fontSize:16, fontWeight:600, marginBottom:8}}>Sin clientes aún</div>
                 <div style={{fontSize:13}}>Crea el primer cliente para comenzar</div>
@@ -145,21 +160,15 @@ export default function Admin({ onLogout }) {
                       position:"relative", overflow:"hidden"
                     }}
                   >
-                    {/* Línea de acento izquierda */}
                     <div style={{
                       position:"absolute", left:0, top:"20%", bottom:"20%",
                       width:3, borderRadius:"0 2px 2px 0",
                       background:c.activo ? C.gradBtn : "#ef444460"
                     }}/>
                     <div style={{paddingLeft:8}}>
-                      <div style={{
-                        fontWeight:600, fontSize:15,
-                        color:C.text, marginBottom:3
-                      }}>
+                      <div style={{ fontWeight:600, fontSize:15, color:C.text, marginBottom:3 }}>
                         {c.nombre}{" "}
-                        <span style={{fontSize:12,color:C.muted,fontWeight:400}}>
-                          {c.email}
-                        </span>
+                        <span style={{fontSize:12,color:C.muted,fontWeight:400}}>{c.email}</span>
                       </div>
                       <div style={{fontSize:12,color:C.muted}}>
                         {c.objetivo||"Sin objetivo definido"}
@@ -185,7 +194,7 @@ export default function Admin({ onLogout }) {
 
         {tab==="biblioteca" && (
           <div className="animate-in">
-            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg}/>
+            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} nutriologoId={myId}/>
           </div>
         )}
         {tab==="programar" && (
@@ -197,6 +206,11 @@ export default function Admin({ onLogout }) {
               setMsg={setMsg}
               biblioteca={biblioteca}
             />
+          </div>
+        )}
+        {tab==="nutriologos" && isSuperadmin && (
+          <div className="animate-in">
+            <Nutriologos setMsg={setMsg}/>
           </div>
         )}
       </div>

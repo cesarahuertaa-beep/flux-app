@@ -30,6 +30,18 @@ export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), 
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
 export const dbUpsert = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers:{Prefer:"resolution=merge-duplicates,return=representation"} });
 
+// ── Multi-tenancy: Profile del usuario logueado ──
+let _profileId = null;
+export const setProfileId   = (id) => { _profileId = id; };
+export const getProfileId   = ()   => _profileId;
+
+// Obtener lista de nutriólogos (solo superadmin)
+export const getNutriologos = () =>
+  dbGet("profiles?role=eq.nutriologo&select=id,nombre,nombre_marca,email,color_primario,logo_url&order=nombre.asc");
+
+// Actualizar perfil (nombre, marca, color, rol)
+export const updateProfile  = (id, data) => dbPatch(`profiles?id=eq.${id}`, data);
+
 // ── Autenticación ──
 export const authSignIn = async (email, password) => {
   const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
@@ -41,11 +53,12 @@ export const authSignIn = async (email, password) => {
   return d;
 };
 
-export const authInvite = async (email) => {
+// Invitar usuario — extraData: { role, nombre, nombre_marca, color_primario }
+export const authInvite = async (email, extraData={}) => {
   const r = await fetch(`${SUPA_URL}/functions/v1/invite-user`, {
     method:"POST",
     headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`, "Content-Type":"application/json" },
-    body:JSON.stringify({email})
+    body:JSON.stringify({email, ...extraData})
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "Error al invitar usuario");

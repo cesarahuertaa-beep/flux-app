@@ -46,16 +46,17 @@ export default function Login({ onLogin }) {
     try {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
+      setProfileId(data.user.id);
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
-      if (role === "admin" || role === "superadmin") {
-        onLogin({ role: role === "superadmin" ? "superadmin" : "admin", token: data.access_token });
+      if (role === "admin" || role === "superadmin" || role === "nutriologo") {
+        onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
         return;
       }
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
-      if (!rows.length) { setAuthToken(null); setErr("No se encontró tu cuenta activa."); setLoading(false); return; }
+      if (!rows.length) { setAuthToken(null); setProfileId(null); setErr("No se encontró tu cuenta activa."); setLoading(false); return; }
       onLogin({ role:"client", data:rows[0], token:data.access_token });
-    } catch(e) { setAuthToken(null); setErr(e.message); setLoading(false); }
+    } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
   const sendReset = async () => {

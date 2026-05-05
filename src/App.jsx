@@ -11,6 +11,7 @@ export default function App() {
   const handleLogout = ()  => { setAuthToken(null); setSession(null); };
 
   if (!session)                                    return <Login onLogin={handleLogin}/>;
-  if (session.role==="admin" || session.role==="superadmin") return <Admin isSuperadmin={session.role==="superadmin"} onLogout={handleLogout}/>;
+  if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo")
+    return <Admin isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout}/>;
   return <ClienteView session={session} onLogout={handleLogout}/>;
 }
