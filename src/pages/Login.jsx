@@ -47,8 +47,9 @@ export default function Login({ onLogin }) {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
-      if (profiles.length && profiles[0].role === "admin") {
-        onLogin({ role:"admin", token:data.access_token });
+      const role = profiles.length ? profiles[0].role : null;
+      if (role === "admin" || role === "superadmin") {
+        onLogin({ role: role === "superadmin" ? "superadmin" : "admin", token: data.access_token });
         return;
       }
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);

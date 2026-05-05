@@ -10,7 +10,7 @@ export default function App() {
   const handleLogin  = (s) => { if (s.token) setAuthToken(s.token); setSession(s); };
   const handleLogout = ()  => { setAuthToken(null); setSession(null); };
 
-  if (!session)             return <Login onLogin={handleLogin}/>;
-  if (session.role==="admin") return <Admin onLogout={handleLogout}/>;
+  if (!session)                                    return <Login onLogin={handleLogin}/>;
+  if (session.role==="admin" || session.role==="superadmin") return <Admin isSuperadmin={session.role==="superadmin"} onLogout={handleLogout}/>;
   return <ClienteView session={session} onLogout={handleLogout}/>;
 }
