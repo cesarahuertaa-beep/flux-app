@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { C, css } from "../styles/theme";
 import { FluxLogo, Field } from "../components/ui";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, dbGet } from "../lib/supabase";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
 
 // Partícula animada de fondo
 function Particle({ style }) {
@@ -54,7 +54,7 @@ export default function Login({ onLogin }) {
         return;
       }
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
-      if (!rows.length) { setAuthToken(null); setProfileId(null); setErr("No se encontró tu cuenta activa."); setLoading(false); return; }
+      if (!rows.length) { setAuthToken(null); setProfileId(null); setErr("No se encontr\u00f3 tu cuenta activa."); setLoading(false); return; }
       onLogin({ role:"client", data:rows[0], token:data.access_token });
     } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
