@@ -101,37 +101,33 @@ export const Tag = ({ children, color, size="sm" }) => (
   }}>{children}</span>
 );
 
-export const FluxLogo = ({ size=28, animated=false }) => (
-  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-    <div
+export const FluxLogo = ({ size=28, animated=false, large=false }) => (
+  large ? (
+    /* Versión grande para Login */
+    <img
+      src="/logo.png"
+      alt="FLUX Sport Supplements"
       className={animated ? "float" : ""}
       style={{
-        width:size*1.4, height:size*1.4,
-        borderRadius:"50%",
-        background:C.gradBtn,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:size*0.6,
-        boxShadow:`0 0 ${size}px ${C.accentMid}50`,
-        flexShrink:0
+        height: 180,
+        objectFit: "contain",
+        filter: `drop-shadow(0 0 24px ${C.accentMid}60)`,
       }}
-    >💪</div>
-    <div>
-      <div style={{
-        fontFamily:"'Rajdhani', sans-serif",
-        fontWeight:700, fontSize:size*0.9,
-        background:C.grad,
-        WebkitBackgroundClip:"text",
-        WebkitTextFillColor:"transparent",
-        letterSpacing:size*0.08,
-        lineHeight:1, textTransform:"uppercase"
-      }}>FLUX</div>
-      <div style={{
-        fontSize:size*0.25, color:C.muted,
-        letterSpacing:size*0.05, lineHeight:1,
-        textTransform:"uppercase", fontWeight:500
-      }}>Sport Supplements</div>
+    />
+  ) : (
+    /* Versión compacta para Header */
+    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+      <img
+        src="/logo.png"
+        alt="FLUX"
+        style={{
+          height: size * 1.8,
+          objectFit: "contain",
+          filter: `drop-shadow(0 0 8px ${C.accentMid}50)`,
+        }}
+      />
     </div>
-  </div>
+  )
 );
 
 export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (

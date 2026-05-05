@@ -171,14 +171,13 @@ export default function Login({ onLogin }) {
         }}/>
 
         {/* Logo */}
-        <div style={{textAlign:"center", marginBottom:36}}>
-          <FluxLogo size={38} animated/>
+        <div style={{textAlign:"center", marginBottom:28}}>
+          <FluxLogo size={38} animated large/>
           <div style={{
-            marginTop:12,
-            fontSize:13, color:C.muted,
+            marginTop:8,
+            fontSize:12, color:C.muted,
             letterSpacing:"0.5px"
           }}>
-            {mode==="login" && "Tu programa personalizado"}
             {mode==="reset" && "Recuperar contraseña"}
             {mode==="set_password" && "Crea tu nueva contraseña"}
           </div>
