@@ -7,15 +7,17 @@ export const setAuthToken = (t) => { _authToken = t; };
 
 // ── Función base de petición ──
 const q = async (path, opts={}) => {
+  // Separamos headers del resto para evitar que ...opts sobreescriba los headers de auth
+  const { headers: extraHeaders, ...restOpts } = opts;
   const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
     headers: {
       apikey: SUPA_KEY,
       Authorization: `Bearer ${_authToken || SUPA_KEY}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
-      ...opts.headers
+      ...extraHeaders
     },
-    ...opts
+    ...restOpts
   });
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
   const t = await r.text(); return t ? JSON.parse(t) : [];
