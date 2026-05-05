@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 const SUPA_URL = "https://mciyywpqihnxhvqbznmq.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jaXl5d3BxaWhueGh2cWJ6bm1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MzMzNzIsImV4cCI6MjA5MzMwOTM3Mn0.nbPJ8Fa8fVG-Y7O3hj8P7sYKXXzr63T40OQVWNBwCR8";
-const SUPA_SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_KEY;
+const SUPA_SERVICE_KEY = import.meta.env.SUPABASE_SERVICE_KEY;
 const ADMIN_KEY = "flux_admin_creds";
 const GRUPOS = ["Pecho","Espalda","Piernas","Hombros","Bíceps","Tríceps","Core","Cardio"];
 const TIPOS = ["Empuje","Jale","Sentadilla","Bisagra","Cargada","Aislamiento"];
