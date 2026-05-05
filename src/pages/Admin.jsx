@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { C, css } from "../styles/theme";
-import { Btn, Modal, Field, Tag, Header, TabBar } from "../components/ui";
+import { Btn, Modal, Field, Tag, Header, TabBar, OrbBackground } from "../components/ui";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
@@ -40,7 +40,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
     if (!newClient.email||!newClient.nombre) { setMsg("⚠️ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
-      const authUser = await authInvite(newClient.email);
+      const authUser = await authInvite(newClient.email, { role: "cliente", nombre: newClient.nombre });
       await dbPost("clientes", {
         nombre: newClient.nombre,
         objetivo: newClient.objetivo,
@@ -74,14 +74,15 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
   ];
 
   return (
-    <div style={{ minHeight:"100vh", background:C.bg }}>
+    <div style={{ minHeight:"100vh", background:"#03050a", position:"relative", overflow:"hidden" }}>
       <style>{css}</style>
+      <OrbBackground/>
 
       <Header role={isSuperadmin ? "superadmin" : "admin"} onLogout={onLogout}/>
 
       <TabBar tabs={tabs} active={tab} onChange={setTab}/>
 
-      <div style={{ padding:"24px 20px", maxWidth:960, margin:"0 auto" }}>
+      <div style={{ padding:"28px 24px", maxWidth:980, margin:"0 auto", position:"relative", zIndex:1 }}>
 
         {/* Toast de mensajes */}
         {msg && (
@@ -108,79 +109,94 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
           <div className="animate-in">
             <div style={{
               display:"flex", justifyContent:"space-between",
-              alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12
+              alignItems:"center", marginBottom:24, flexWrap:"wrap", gap:12
             }}>
               <div>
                 <h2 style={{
-                  fontFamily:"'Rajdhani',sans-serif",
+                  fontFamily:"'Space Grotesk',sans-serif",
                   fontWeight:700, fontSize:24,
-                  color:C.text, letterSpacing:"0.5px"
+                  color:"#e2eeff", letterSpacing:"0.3px", marginBottom:4
                 }}>Clientes</h2>
-                <div style={{fontSize:13,color:C.muted,marginTop:2}}>
-                  {activeCount} activos · {clientes.length - activeCount} inactivos
+                <div style={{fontSize:13,color:"#64748b"}}>
+                  {activeCount} activos· {clientes.length - activeCount} inactivos
                 </div>
               </div>
               <Btn grad onClick={()=>setShowNewClient(true)}>+ Nuevo cliente</Btn>
             </div>
 
             {loading ? (
-              <div style={{ textAlign:"center", padding:"60px 0", color:C.muted, fontSize:14 }}>
+              <div style={{ textAlign:"center", padding:"80px 0", color:"#64748b", fontSize:14 }}>
                 <div style={{
-                  width:40, height:40, borderRadius:"50%",
-                  border:`3px solid ${C.border}`,
-                  borderTopColor:C.accent,
+                  width:44, height:44, borderRadius:"50%",
+                  border:"2px solid rgba(56,189,248,0.1)",
+                  borderTopColor:"#38bdf8",
                   animation:"rotateSlow 0.8s linear infinite",
-                  margin:"0 auto 16px"
+                  margin:"0 auto 16px",
+                  boxShadow:"0 0 20px rgba(56,189,248,0.2)"
                 }}/>
                 Cargando clientes…
               </div>
             ) : clientes.length===0 ? (
-              <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
-                <div style={{fontSize:48, marginBottom:16}}>👥</div>
-                <div style={{fontSize:16, fontWeight:600, marginBottom:8}}>Sin clientes aún</div>
-                <div style={{fontSize:13}}>Crea el primer cliente para comenzar</div>
+              <div style={{
+                textAlign:"center", padding:"80px 0", color:"#475569",
+                background:"rgba(7,13,24,0.4)", borderRadius:16,
+                border:"1px solid rgba(56,189,248,0.05)"
+              }}>
+                <div style={{fontSize:48, marginBottom:16, opacity:0.3}}>👥</div>
+                <div style={{fontSize:16, fontWeight:600, marginBottom:8, color:"#64748b"}}>Sin clientes aún</div>
+                <div style={{fontSize:13, color:"#475569"}}>Invita al primer cliente para comenzar</div>
               </div>
             ) : (
-              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+              <div style={{display:"flex", flexDirection:"column", gap:10}}>
                 {clientes.map((c, i) => (
                   <div
                     key={c.id}
                     className="card-hover animate-in"
                     style={{
-                      background:`linear-gradient(135deg, ${C.card}, ${C.surfaceAlt})`,
-                      borderRadius:14,
-                      border:`1px solid ${C.border}`,
-                      padding:"14px 18px",
+                      background:"linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
+                      borderRadius:16,
+                      border:"1px solid rgba(56,189,248,0.07)",
+                      padding:"16px 20px",
                       display:"flex", alignItems:"center",
                       justifyContent:"space-between",
                       flexWrap:"wrap", gap:12,
-                      animationDelay:`${i*0.04}s`,
-                      position:"relative", overflow:"hidden"
+                      animationDelay:`${i*0.05}s`,
+                      position:"relative", overflow:"hidden",
+                      backdropFilter:"blur(12px)"
                     }}
                   >
+                    {/* Left accent bar */}
                     <div style={{
-                      position:"absolute", left:0, top:"20%", bottom:"20%",
-                      width:3, borderRadius:"0 2px 2px 0",
-                      background:c.activo ? C.gradBtn : "#ef444460"
+                      position:"absolute", left:0, top:"15%", bottom:"15%",
+                      width:3, borderRadius:"0 3px 3px 0",
+                      background: c.activo
+                        ? "linear-gradient(180deg, #38bdf8, #818cf8)"
+                        : "rgba(239,68,68,0.6)",
+                      boxShadow: c.activo ? "0 0 12px rgba(56,189,248,0.4)" : "0 0 8px rgba(239,68,68,0.3)"
                     }}/>
-                    <div style={{paddingLeft:8}}>
-                      <div style={{ fontWeight:600, fontSize:15, color:C.text, marginBottom:3 }}>
-                        {c.nombre}{" "}
-                        <span style={{fontSize:12,color:C.muted,fontWeight:400}}>{c.email}</span>
+                    <div style={{paddingLeft:12}}>
+                      <div style={{ fontWeight:700, fontSize:15, color:"#e2eeff", marginBottom:3, fontFamily:"'Space Grotesk',sans-serif" }}>
+                        {c.nombre}
+                        <span style={{fontSize:12, color:"#475569", fontWeight:400, fontFamily:"'Inter',sans-serif", marginLeft:8}}>{c.email}</span>
                       </div>
-                      <div style={{fontSize:12,color:C.muted}}>
+                      <div style={{fontSize:12, color:"#64748b"}}>
                         {c.objetivo||"Sin objetivo definido"}
                       </div>
                     </div>
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <Tag color={c.activo?C.accent:"#f87171"} size="md">
-                        {c.activo?"● Activo":"○ Inactivo"}
-                      </Tag>
-                      <Btn small outline color={C.accentMid} onClick={()=>{setSelected(c);setTab("programar");}}>
+                      <span style={{
+                        fontSize:11, fontWeight:700, letterSpacing:"0.5px",
+                        padding:"4px 12px", borderRadius:20,
+                        background: c.activo ? "rgba(56,189,248,0.12)" : "rgba(239,68,68,0.12)",
+                        border: `1px solid ${c.activo ? "rgba(56,189,248,0.25)" : "rgba(239,68,68,0.25)"}`,
+                        color: c.activo ? "#38bdf8" : "#f87171",
+                        fontFamily:"'Inter',sans-serif"
+                      }}>{c.activo ? "● Activo" : "○ Inactivo"}</span>
+                      <Btn small outline color="rgba(129,140,248,0.8)" onClick={()=>{setSelected(c);setTab("programar");}}>
                         Programar
                       </Btn>
-                      <Btn small outline color={c.activo?"#ef4444":C.accent} onClick={()=>toggleActivo(c)}>
-                        {c.activo?"Desactivar":"Activar"}
+                      <Btn small outline color={c.activo ? "rgba(239,68,68,0.8)" : "rgba(56,189,248,0.8)"} onClick={()=>toggleActivo(c)}>
+                        {c.activo ? "Desactivar" : "Activar"}
                       </Btn>
                     </div>
                   </div>

@@ -1,202 +1,328 @@
 import { C } from "../../styles/theme";
 import { useBrand } from "../BrandContext";
 
-export const Btn = ({ children, onClick, grad, color, outline, small, danger, disabled, style={}, className="" }) => (
-  <button
-    disabled={disabled}
-    onClick={onClick}
-    className={`btn-hover ${className}`}
-    style={{
-      padding: small ? "6px 16px" : "10px 22px",
-      borderRadius: 10,
-      background: danger
-        ? "linear-gradient(135deg,#ef4444,#dc2626)"
-        : outline ? "transparent"
-        : grad ? C.gradBtn
-        : (color || C.accentMid),
-      color: danger ? "#fff" : outline ? (color || C.accent) : "#000",
-      border: `1px solid ${danger ? "#ef4444" : outline ? (color || C.accent) : "transparent"}`,
-      fontWeight: 700,
-      fontSize: small ? 12 : 14,
-      cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.5 : 1,
-      letterSpacing: "0.3px",
-      fontFamily: "'Inter', sans-serif",
-      boxShadow: grad && !disabled ? `0 4px 15px color-mix(in srgb, ${C.accentDeep} 50%, transparent)` : "none",
-      ...style
-    }}
-  >{children}</button>
+/* ─────────────────────────────────────────────
+   ORB BACKGROUND  — ambient light spheres
+───────────────────────────────────────────── */
+export const OrbBackground = ({ variant = "default" }) => (
+  <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+    {/* Orb 1 — cyan principal */}
+    <div style={{
+      position: "absolute",
+      width: 600, height: 600,
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(8,47,73,0.7) 0%, transparent 70%)",
+      top: "-10%", left: "-5%",
+      animation: "orb-drift 18s ease-in-out infinite",
+      filter: "blur(1px)"
+    }}/>
+    {/* Orb 2 — violet */}
+    <div style={{
+      position: "absolute",
+      width: 500, height: 500,
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(30,27,75,0.6) 0%, transparent 70%)",
+      top: "20%", right: "-8%",
+      animation: "orb-drift-reverse 22s ease-in-out infinite",
+    }}/>
+    {/* Orb 3 — cyan sutil en bottom */}
+    <div style={{
+      position: "absolute",
+      width: 400, height: 400,
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(8,47,73,0.5) 0%, transparent 70%)",
+      bottom: "-5%", left: "30%",
+      animation: "orb-drift 26s ease-in-out infinite reverse",
+    }}/>
+    {/* Grid sutil */}
+    <div style={{
+      position: "absolute", inset: 0, opacity: 0.025,
+      backgroundImage: `linear-gradient(rgba(56,189,248,1) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,1) 1px, transparent 1px)`,
+      backgroundSize: "80px 80px"
+    }}/>
+    {/* Noise grain overlay */}
+    <div style={{
+      position: "absolute", inset: 0, opacity: 0.03,
+      backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")"
+    }}/>
+  </div>
 );
 
+/* ─────────────────────────────────────────────
+   BUTTON — premium with glow
+───────────────────────────────────────────── */
+export const Btn = ({ children, onClick, grad, color, outline, small, danger, disabled, style = {}, className = "" }) => {
+  const isGrad = grad && !danger && !outline;
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className={`btn-hover ${className}`}
+      style={{
+        padding: small ? "6px 16px" : "11px 24px",
+        borderRadius: 10,
+        background: danger
+          ? "linear-gradient(135deg, #ef4444, #dc2626)"
+          : outline ? "rgba(10,20,40,0.5)"
+          : isGrad ? C.gradBtn
+          : (color || C.accentMid),
+        color: danger ? "#fff" : outline ? (color || C.accent) : "#000",
+        border: `1px solid ${danger ? "#ef4444" : outline ? (color || "rgba(56,189,248,0.35)") : "transparent"}`,
+        fontWeight: 700,
+        fontSize: small ? 12 : 13,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1,
+        letterSpacing: "0.4px",
+        fontFamily: "'Inter', sans-serif",
+        backdropFilter: outline ? "blur(8px)" : "none",
+        boxShadow: isGrad && !disabled
+          ? `0 4px 20px rgba(14,165,233,0.35), 0 1px 0 rgba(255,255,255,0.15) inset`
+          : danger && !disabled
+            ? "0 4px 16px rgba(239,68,68,0.35)"
+            : "none",
+        transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+        whiteSpace: "nowrap",
+        ...style
+      }}
+    >{children}</button>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   MODAL — cinematic glass
+───────────────────────────────────────────── */
 export const Modal = ({ title, onClose, children, wide }) => (
   <div
     style={{
-      position:"fixed", inset:0,
-      background:"rgba(0,0,0,0.85)",
-      backdropFilter:"blur(8px)",
-      zIndex:100, display:"flex",
-      alignItems:"center", justifyContent:"center", padding:16
+      position: "fixed", inset: 0,
+      background: "rgba(3,5,10,0.8)",
+      backdropFilter: "blur(16px)",
+      zIndex: 100, display: "flex",
+      alignItems: "center", justifyContent: "center", padding: 16
     }}
-    onClick={e => e.target===e.currentTarget && onClose()}
+    onClick={e => e.target === e.currentTarget && onClose()}
   >
     <div
-      className="animate-in"
+      className="animate-in-scale"
       style={{
-        background:`linear-gradient(145deg, ${C.card}, ${C.surface})`,
-        borderRadius:20,
-        border:`1px solid ${C.border}`,
-        width:"100%", maxWidth:wide?720:580,
-        maxHeight:"92vh", overflow:"auto",
-        boxShadow:`0 24px 80px color-mix(in srgb, ${C.accentDeep} 38%, transparent), 0 0 0 1px ${C.borderGlow}`
+        background: "linear-gradient(145deg, rgba(10,20,40,0.95), rgba(7,13,24,0.98))",
+        borderRadius: 20,
+        border: "1px solid rgba(56,189,248,0.12)",
+        width: "100%", maxWidth: wide ? 720 : 560,
+        maxHeight: "92vh", overflow: "auto",
+        boxShadow: `
+          0 0 0 1px rgba(56,189,248,0.06),
+          0 32px 100px rgba(0,0,0,0.6),
+          0 0 80px rgba(8,47,73,0.3),
+          inset 0 1px 0 rgba(56,189,248,0.08)
+        `,
+        position: "relative"
       }}
     >
+      {/* Top accent line */}
       <div style={{
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-        padding:"18px 24px",
-        borderBottom:`1px solid ${C.border}`,
-        background:`linear-gradient(90deg, color-mix(in srgb, ${C.accentDeep} 13%, transparent), transparent)`,
-        borderRadius:"20px 20px 0 0"
+        position: "absolute", top: 0, left: "10%", right: "10%", height: 1,
+        background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.6), rgba(129,140,248,0.4), transparent)",
+        borderRadius: "0 0 4px 4px"
+      }}/>
+      {/* Header */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "20px 24px",
+        borderBottom: "1px solid rgba(56,189,248,0.07)",
       }}>
-        <span style={{ fontWeight:700, fontSize:16, color:C.accent, letterSpacing:"0.3px" }}>{title}</span>
+        <span style={{
+          fontWeight: 700, fontSize: 15,
+          background: "linear-gradient(135deg, #38bdf8, #818cf8)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
+          fontFamily: "'Space Grotesk', sans-serif",
+          letterSpacing: "0.3px"
+        }}>{title}</span>
         <button
           onClick={onClose}
+          className="btn-hover"
           style={{
-            background:`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`,
-            color:C.muted, fontSize:18, cursor:"pointer",
-            border:`1px solid ${C.border}`,
-            borderRadius:8, width:32, height:32,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            transition:"all 0.2s"
+            background: "rgba(56,189,248,0.06)", color: C.muted,
+            fontSize: 18, cursor: "pointer",
+            border: "1px solid rgba(56,189,248,0.1)",
+            borderRadius: 8, width: 32, height: 32,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s",
+            fontFamily: "monospace"
           }}
-          onMouseEnter={e=>{e.target.style.color=C.accent; e.target.style.borderColor=C.accent;}}
-          onMouseLeave={e=>{e.target.style.color=C.muted; e.target.style.borderColor=C.border;}}
+          onMouseEnter={e => { e.currentTarget.style.color = "#38bdf8"; e.currentTarget.style.borderColor = "rgba(56,189,248,0.3)"; e.currentTarget.style.background = "rgba(56,189,248,0.1)"; }}
+          onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{padding:"20px 24px"}}>{children}</div>
+      <div style={{ padding: "22px 24px" }}>{children}</div>
     </div>
   </div>
 );
 
+/* ─────────────────────────────────────────────
+   FIELD — label + input wrapper
+───────────────────────────────────────────── */
 export const Field = ({ label, children, hint }) => (
-  <div style={{marginBottom:16}}>
+  <div style={{ marginBottom: 18 }}>
     <div style={{
-      fontSize:11, color:C.muted, marginBottom:6,
-      fontWeight:600, textTransform:"uppercase",
-      letterSpacing:"0.8px"
+      fontSize: 11, color: "#64748b", marginBottom: 7,
+      fontWeight: 600, textTransform: "uppercase",
+      letterSpacing: "1px", fontFamily: "'Inter', sans-serif"
     }}>{label}</div>
     {children}
-    {hint && <div style={{fontSize:11,color:C.dim,marginTop:4}}>{hint}</div>}
+    {hint && <div style={{ fontSize: 11, color: C.dim, marginTop: 5, lineHeight: 1.5 }}>{hint}</div>}
   </div>
 );
 
-export const Tag = ({ children, color, size="sm" }) => (
+/* ─────────────────────────────────────────────
+   TAG — pill badge
+───────────────────────────────────────────── */
+export const Tag = ({ children, color, size = "sm" }) => (
   <span style={{
-    fontSize: size==="md" ? 12 : 11,
-    padding: size==="md" ? "4px 12px" : "3px 10px",
-    borderRadius:20,
-    background:`${color||C.accent}18`,
-    color:color||C.accent,
-    border:`1px solid ${color||C.accent}30`,
-    fontWeight:600, letterSpacing:"0.3px",
-    whiteSpace:"nowrap"
+    fontSize: size === "md" ? 12 : 11,
+    padding: size === "md" ? "4px 12px" : "3px 10px",
+    borderRadius: 20,
+    background: `${color || "#38bdf8"}14`,
+    color: color || "#38bdf8",
+    border: `1px solid ${color || "#38bdf8"}28`,
+    fontWeight: 600, letterSpacing: "0.2px",
+    whiteSpace: "nowrap",
+    fontFamily: "'Inter', sans-serif"
   }}>{children}</span>
 );
 
-export const FluxLogo = ({ size=28, animated=false, large=false }) => {
+/* ─────────────────────────────────────────────
+   LOGO
+───────────────────────────────────────────── */
+export const FluxLogo = ({ size = 28, animated = false, large = false }) => {
   const brand = useBrand();
   const logo = brand?.logo_url || "/logo.png";
   const nombre = brand?.nombre_marca || "FLUX Sport Supplements";
   return large ? (
-    /* Versión grande para Login */
     <img
-      src={logo}
-      alt={nombre}
+      src={logo} alt={nombre}
       className={animated ? "float" : ""}
       style={{
-        height: 180,
-        objectFit: "contain",
-        filter: `drop-shadow(0 0 24px color-mix(in srgb, ${C.accentMid} 38%, transparent))`,
+        height: 160, objectFit: "contain",
+        filter: "drop-shadow(0 0 32px rgba(56,189,248,0.4)) drop-shadow(0 0 60px rgba(56,189,248,0.15))",
       }}
     />
   ) : (
-    /* Versión compacta para Header */
-    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <img
-        src={logo}
-        alt={nombre}
+        src={logo} alt={nombre}
         style={{
-          height: size * 1.8,
-          objectFit: "contain",
-          filter: `drop-shadow(0 0 8px color-mix(in srgb, ${C.accentMid} 31%, transparent))`,
+          height: size * 1.8, objectFit: "contain",
+          filter: "drop-shadow(0 0 10px rgba(56,189,248,0.35))",
         }}
       />
     </div>
   );
 };
 
+/* ─────────────────────────────────────────────
+   HEADER — glass navbar
+───────────────────────────────────────────── */
 export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
   <div style={{
-    background:`linear-gradient(90deg, ${C.surface}, ${C.surfaceAlt})`,
-    borderBottom:`1px solid ${C.border}`,
-    padding:"14px 24px",
-    display:"flex", alignItems:"center", justifyContent:"space-between",
-    position:"sticky", top:0, zIndex:10,
-    backdropFilter:"blur(12px)",
-    boxShadow:`0 4px 24px color-mix(in srgb, ${C.accentDeep} 19%, transparent)`
+    background: "rgba(3,5,10,0.7)",
+    borderBottom: "1px solid rgba(56,189,248,0.08)",
+    padding: "12px 28px",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    position: "sticky", top: 0, zIndex: 50,
+    backdropFilter: "blur(24px) saturate(160%)",
+    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+    boxShadow: "0 4px 32px rgba(0,0,0,0.3), 0 1px 0 rgba(56,189,248,0.05) inset",
   }}>
-    <FluxLogo size={24}/>
-    <div style={{display:"flex", alignItems:"center", gap:12}}>
+    <FluxLogo size={24} />
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       {extra}
-      {role==="admin" && (
-        <Tag color={C.accentMid} size="md">⚡ Admin</Tag>
+      {role === "admin" && (
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "1px",
+          padding: "4px 12px", borderRadius: 20,
+          background: "linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15))",
+          border: "1px solid rgba(56,189,248,0.2)",
+          color: "#38bdf8",
+          fontFamily: "'Inter', sans-serif"
+        }}>⚡ ADMIN</div>
+      )}
+      {role === "superadmin" && (
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "1px",
+          padding: "4px 12px", borderRadius: 20,
+          background: "linear-gradient(135deg, rgba(129,140,248,0.2), rgba(56,189,248,0.15))",
+          border: "1px solid rgba(129,140,248,0.3)",
+          color: "#818cf8",
+          fontFamily: "'Inter', sans-serif"
+        }}>✦ SUPERADMIN</div>
       )}
       {nombre && (
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:13, fontWeight:600, color:C.text}}>{nombre}</div>
-          {objetivo && <div style={{fontSize:11, color:C.muted}}>{objetivo}</div>}
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{nombre}</div>
+          {objetivo && <div style={{ fontSize: 11, color: C.muted }}>{objetivo}</div>}
         </div>
       )}
-      <Btn small outline color={C.muted} onClick={onLogout}>Salir</Btn>
+      <button
+        onClick={onLogout}
+        className="btn-hover"
+        style={{
+          padding: "7px 16px", borderRadius: 9,
+          background: "rgba(56,189,248,0.06)",
+          border: "1px solid rgba(56,189,248,0.15)",
+          color: C.mutedLight, fontSize: 13, fontWeight: 600,
+          cursor: "pointer", fontFamily: "'Inter', sans-serif",
+          transition: "all 0.2s",
+          letterSpacing: "0.2px"
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = "rgba(56,189,248,0.12)"; e.currentTarget.style.color = "#38bdf8"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "rgba(56,189,248,0.06)"; e.currentTarget.style.color = C.mutedLight; }}
+      >Salir</button>
     </div>
   </div>
 );
 
+/* ─────────────────────────────────────────────
+   TABBAR — premium sliding indicator
+───────────────────────────────────────────── */
 export const TabBar = ({ tabs, active, onChange }) => (
   <div style={{
-    display:"flex",
-    background:C.surfaceAlt,
-    borderBottom:`1px solid ${C.border}`,
-    overflowX:"auto",
-    scrollbarWidth:"none"
+    display: "flex",
+    background: "rgba(7,13,24,0.6)",
+    borderBottom: "1px solid rgba(56,189,248,0.07)",
+    overflowX: "auto", scrollbarWidth: "none",
+    backdropFilter: "blur(12px)",
+    padding: "0 8px",
   }}>
     {tabs.map(([k, ic, lb]) => (
       <button
         key={k}
         onClick={() => onChange(k)}
-        className="tab-btn"
+        className={`tab-btn ${active === k ? "active" : ""}`}
         style={{
-          flex:1, maxWidth:240,
-          padding:"14px 0",
-          background:"none",
-          color: active===k ? C.accent : C.muted,
-          fontWeight: active===k ? 700 : 500,
-          fontSize:14,
-          border:"none",
-          borderBottom: active===k ? `2px solid ${C.accent}` : "2px solid transparent",
-          cursor:"pointer",
-          letterSpacing:"0.3px",
-          fontFamily:"'Inter', sans-serif",
-          position:"relative",
-          whiteSpace:"nowrap",
-          flexShrink:0
+          flex: 1, maxWidth: 200,
+          padding: "15px 8px 14px",
+          background: "none",
+          color: active === k ? "#38bdf8" : "#64748b",
+          fontWeight: active === k ? 700 : 500,
+          fontSize: 13,
+          border: "none",
+          cursor: "pointer",
+          letterSpacing: "0.3px",
+          fontFamily: "'Inter', sans-serif",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          transition: "color 0.25s ease",
         }}
       >
-        {active===k && (
+        {active === k && (
           <span style={{
-            position:"absolute", top:0, left:"20%", right:"20%", height:2,
-            background:`linear-gradient(90deg, transparent, color-mix(in srgb, ${C.accent} 38%, transparent), transparent)`,
-            borderRadius:"0 0 4px 4px"
-          }}/>
+            display: "inline-block", marginRight: 6, fontSize: 8,
+            background: "linear-gradient(135deg, #38bdf8, #818cf8)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text", verticalAlign: "middle"
+          }}>●</span>
         )}
         {ic} {lb}
       </button>
@@ -204,28 +330,29 @@ export const TabBar = ({ tabs, active, onChange }) => (
   </div>
 );
 
+/* ─────────────────────────────────────────────
+   STAT CARD
+───────────────────────────────────────────── */
 export const StatCard = ({ icon, label, value, unit, color }) => (
   <div className="card-hover" style={{
-    background:C.gradCard,
-    borderRadius:16,
-    padding:"16px 14px",
-    textAlign:"center",
-    border:`1px solid ${C.border}`,
-    position:"relative",
-    overflow:"hidden"
+    background: "linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
+    borderRadius: 16, padding: "18px 14px", textAlign: "center",
+    border: "1px solid rgba(56,189,248,0.08)",
+    position: "relative", overflow: "hidden",
+    backdropFilter: "blur(12px)"
   }}>
     <div style={{
-      position:"absolute", top:0, left:0, right:0, height:2,
-      background:`linear-gradient(90deg, transparent, ${color||C.accent}, transparent)`
+      position: "absolute", top: 0, left: 0, right: 0, height: 1,
+      background: `linear-gradient(90deg, transparent, ${color || "#38bdf8"}90, transparent)`
     }}/>
-    <div style={{fontSize:24, marginBottom:6}}>{icon}</div>
+    <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
     <div style={{
-      fontSize:26, fontWeight:800,
-      color: color || C.accent,
-      fontFamily:"'Rajdhani', sans-serif",
-      lineHeight:1
+      fontSize: 28, fontWeight: 800,
+      color: color || "#38bdf8",
+      fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1,
+      filter: `drop-shadow(0 0 8px ${color || "#38bdf8"}60)`
     }}>{value}</div>
-    <div style={{fontSize:11, color:C.muted, marginTop:2}}>{unit}</div>
-    <div style={{fontSize:11, color:C.muted, marginTop:4, fontWeight:500}}>{label}</div>
+    {unit && <div style={{ fontSize: 10, color: "#64748b", marginTop: 2, letterSpacing: "0.5px", textTransform: "uppercase" }}>{unit}</div>}
+    <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, fontWeight: 500 }}>{label}</div>
   </div>
 );
