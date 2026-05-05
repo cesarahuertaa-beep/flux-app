@@ -91,7 +91,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
             className="animate-in"
             onClick={()=>setMsg("")}
             style={{
-              background: msg.startsWith("❌") ? "#ef444420" : `${C.accentDeep}60`,
+              background: msg.startsWith("❌") ? "#ef444420" : `color-mix(in srgb, ${C.accentDeep} 38%, transparent)`,
               border:`1px solid ${msg.startsWith("❌") ? "#ef444440" : C.accent+"40"}`,
               borderRadius:12, padding:"12px 18px",
               fontSize:13, marginBottom:20,
@@ -228,8 +228,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
             <input value={newClient.objetivo} onChange={e=>setNewClient(p=>({...p,objetivo:e.target.value}))} placeholder="Pérdida de peso, ganancia muscular…"/>
           </Field>
           <div style={{
-            background:`${C.accentDeep}30`,
-            border:`1px solid ${C.accent}25`,
+            background:`color-mix(in srgb, ${C.accentDeep} 19%, transparent)`,
+            border:`1px solid color-mix(in srgb, ${C.accent} 15%, transparent)`,
             borderRadius:10, padding:"11px 14px",
             fontSize:12, color:C.muted, marginBottom:20, lineHeight:1.6
           }}>

@@ -115,9 +115,9 @@ export default function Login({ onLogin }) {
       <div style={{
         position:"absolute", inset:0,
         background:`
-          radial-gradient(ellipse at 15% 50%, ${C.accentDeep}25 0%, transparent 55%),
-          radial-gradient(ellipse at 85% 20%, ${C.accentMid}12 0%, transparent 45%),
-          radial-gradient(ellipse at 50% 90%, ${C.accentDeep}15 0%, transparent 50%)
+          radial-gradient(ellipse at 15% 50%, color-mix(in srgb, ${C.accentDeep} 15%, transparent) 0%, transparent 55%),
+          radial-gradient(ellipse at 85% 20%, color-mix(in srgb, ${C.accentMid} 7%, transparent) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 90%, color-mix(in srgb, ${C.accentDeep} 8%, transparent) 0%, transparent 50%)
         `
       }}/>
 
@@ -146,7 +146,7 @@ export default function Login({ onLogin }) {
         position:"absolute",
         width:700, height:700,
         borderRadius:"50%",
-        border:`1px solid ${C.accentDeep}40`,
+        border:`1px solid color-mix(in srgb, ${C.accentDeep} 25%, transparent)`,
         top:"50%", left:"50%",
         transform:"translate(-50%,-50%)",
         pointerEvents:"none"
@@ -155,7 +155,7 @@ export default function Login({ onLogin }) {
         position:"absolute",
         width:500, height:500,
         borderRadius:"50%",
-        border:`1px solid ${C.accentDeep}30`,
+        border:`1px solid color-mix(in srgb, ${C.accentDeep} 19%, transparent)`,
         top:"50%", left:"50%",
         transform:"translate(-50%,-50%)",
         pointerEvents:"none"
@@ -165,15 +165,15 @@ export default function Login({ onLogin }) {
       <div className="animate-in glow-pulse" style={{
         width:"100%", maxWidth:420,
         padding:"44px 40px",
-        background:`linear-gradient(145deg, ${C.card}f0, ${C.surface}e0)`,
+        background:`linear-gradient(145deg, color-mix(in srgb, ${C.card} 94%, transparent), color-mix(in srgb, ${C.surface} 88%, transparent))`,
         borderRadius:24,
         border:`1px solid ${C.border}`,
         position:"relative",
         backdropFilter:"blur(20px)",
         boxShadow:`
           0 0 0 1px ${C.borderGlow},
-          0 24px 80px ${C.accentDeep}50,
-          inset 0 1px 0 ${C.accentDeep}60
+          0 24px 80px color-mix(in srgb, ${C.accentDeep} 31%, transparent),
+          inset 0 1px 0 color-mix(in srgb, ${C.accentDeep} 38%, transparent)
         `,
         zIndex:1
       }}>
@@ -200,8 +200,8 @@ export default function Login({ onLogin }) {
         {/* Mensajes */}
         {info && (
           <div style={{
-            background:`${C.accentDeep}50`,
-            border:`1px solid ${C.accent}40`,
+            background:`color-mix(in srgb, ${C.accentDeep} 31%, transparent)`,
+            border:`1px solid color-mix(in srgb, ${C.accent} 25%, transparent)`,
             borderRadius:10, padding:"11px 14px",
             fontSize:13, color:C.accent,
             marginBottom:16, lineHeight:1.5
@@ -250,7 +250,7 @@ export default function Login({ onLogin }) {
               marginBottom:14, marginTop:4,
               letterSpacing:"1px",
               fontFamily:"'Rajdhani', sans-serif",
-              boxShadow:loading ? "none" : `0 4px 20px ${C.accentMid}50`,
+              boxShadow:loading ? "none" : `0 4px 20px color-mix(in srgb, ${C.accentMid} 31%, transparent)`,
               transition:"all 0.2s"
             }}
           >
@@ -274,7 +274,7 @@ export default function Login({ onLogin }) {
           <Field label="Tu email">
             <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
           </Field>
-          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{width:"100%",padding:"13px",background:C.gradBtn,border:"none",borderRadius:12,fontWeight:800,fontSize:15,color:"#000",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"0.5px",fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 4px 20px ${C.accentMid}50`}}>
+          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{width:"100%",padding:"13px",background:C.gradBtn,border:"none",borderRadius:12,fontWeight:800,fontSize:15,color:"#000",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"0.5px",fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 4px 20px color-mix(in srgb, ${C.accentMid} 31%, transparent)`}}>
             {loading ? "Enviando…" : "Enviar instrucciones"}
           </button>
           <div style={{textAlign:"center"}}>
@@ -292,7 +292,7 @@ export default function Login({ onLogin }) {
           <Field label="Confirmar contraseña">
             <input type="password" value={confirmPass} onChange={e=>setConfirmPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setPassword()} placeholder="Repite tu contraseña"/>
           </Field>
-          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{width:"100%",padding:"13px",background:C.gradBtn,border:"none",borderRadius:12,fontWeight:800,fontSize:15,color:"#000",cursor:loading?"not-allowed":"pointer",letterSpacing:"0.5px",fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 4px 20px ${C.accentMid}50`}}>
+          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{width:"100%",padding:"13px",background:C.gradBtn,border:"none",borderRadius:12,fontWeight:800,fontSize:15,color:"#000",cursor:loading?"not-allowed":"pointer",letterSpacing:"0.5px",fontFamily:"'Rajdhani',sans-serif",boxShadow:`0 4px 20px color-mix(in srgb, ${C.accentMid} 31%, transparent)`}}>
             {loading ? "Guardando…" : "Establecer contraseña"}
           </button>
         </>}

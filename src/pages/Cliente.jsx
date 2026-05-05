@@ -145,7 +145,7 @@ export default function ClienteView({ session, onLogout }) {
                         border:`1px solid ${diaIdx===i ? C.accent : C.border}`,
                         cursor:"pointer",
                         fontFamily:"'Inter',sans-serif",
-                        boxShadow: diaIdx===i ? `0 4px 16px ${C.accentDeep}60` : "none",
+                        boxShadow: diaIdx===i ? `0 4px 16px color-mix(in srgb, ${C.accentDeep} 38%, transparent)` : "none",
                         transition:"all 0.2s"
                       }}
                     >{d.dia}</button>
@@ -169,7 +169,7 @@ export default function ClienteView({ session, onLogout }) {
                         justifyContent:"space-between",
                         padding:"12px 16px",
                         borderBottom:`1px solid ${C.border}`,
-                        background:`linear-gradient(90deg, ${C.accentDeep}25, transparent)`
+                        background:`linear-gradient(90deg, color-mix(in srgb, ${C.accentDeep} 15%, transparent), transparent)`
                       }}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
                           <span style={{
@@ -266,7 +266,7 @@ export default function ClienteView({ session, onLogout }) {
                       fontWeight:rutinaIdx===i?700:500, fontSize:13,
                       border:`1px solid ${rutinaIdx===i?C.accent:C.border}`,
                       cursor:"pointer", fontFamily:"'Inter',sans-serif",
-                      boxShadow:rutinaIdx===i?`0 4px 16px ${C.accentDeep}60`:"none",
+                      boxShadow:rutinaIdx===i?`0 4px 16px color-mix(in srgb, ${C.accentDeep} 38%, transparent)`:"none",
                       transition:"all 0.2s"
                     }}>{r.nombre}</button>
                   ))}
@@ -274,7 +274,7 @@ export default function ClienteView({ session, onLogout }) {
 
                 {/* Tip */}
                 <div style={{
-                  background:`${C.accentDeep}20`,
+                  background:`color-mix(in srgb, ${C.accentDeep} 13%, transparent)`,
                   border:`1px solid ${C.border}`,
                   borderRadius:10, padding:"10px 14px",
                   fontSize:12, color:C.muted,
@@ -396,9 +396,9 @@ export default function ClienteView({ session, onLogout }) {
                                     <>
                                       <td key={pKey}
                                         onClick={()=>{setEditCell(pKey);setEditVal(pVal);}}
-                                        style={{...cellBase,background:pVal?`${C.accentDeep}60`:"transparent"}}
+                                        style={{...cellBase,background:pVal?`color-mix(in srgb, ${C.accentDeep} 38%, transparent)`:"transparent"}}
                                         onMouseEnter={e=>{if(editCell!==pKey)e.currentTarget.style.background=C.faint;}}
-                                        onMouseLeave={e=>{e.currentTarget.style.background=pVal?`${C.accentDeep}60`:"transparent";}}
+                                        onMouseLeave={e=>{e.currentTarget.style.background=pVal?`color-mix(in srgb, ${C.accentDeep} 38%, transparent)`:"transparent";}}
                                       >
                                         {editCell===pKey
                                           ?<input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={inputStyle}/>
@@ -406,9 +406,9 @@ export default function ClienteView({ session, onLogout }) {
                                       </td>
                                       <td key={rKey}
                                         onClick={()=>{setEditCell(rKey);setEditVal(rVal);}}
-                                        style={{...cellBase,background:rVal?`${C.accentDeep}40`:"transparent"}}
+                                        style={{...cellBase,background:rVal?`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`:"transparent"}}
                                         onMouseEnter={e=>{if(editCell!==rKey)e.currentTarget.style.background=C.faint;}}
-                                        onMouseLeave={e=>{e.currentTarget.style.background=rVal?`${C.accentDeep}40`:"transparent";}}
+                                        onMouseLeave={e=>{e.currentTarget.style.background=rVal?`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`:"transparent";}}
                                       >
                                         {editCell===rKey
                                           ?<input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={inputStyle}/>
@@ -452,7 +452,7 @@ export default function ClienteView({ session, onLogout }) {
               maxWidth:400, width:"100%",
               textAlign:"center",
               border:`1px solid ${C.border}`,
-              boxShadow:`0 24px 80px ${C.accentDeep}80`
+              boxShadow:`0 24px 80px color-mix(in srgb, ${C.accentDeep} 50%, transparent)`
             }}
           >
             <img

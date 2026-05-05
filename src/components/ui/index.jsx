@@ -1,4 +1,5 @@
 import { C } from "../../styles/theme";
+import { useBrand } from "../BrandContext";
 
 export const Btn = ({ children, onClick, grad, color, outline, small, danger, disabled, style={}, className="" }) => (
   <button
@@ -21,7 +22,7 @@ export const Btn = ({ children, onClick, grad, color, outline, small, danger, di
       opacity: disabled ? 0.5 : 1,
       letterSpacing: "0.3px",
       fontFamily: "'Inter', sans-serif",
-      boxShadow: grad && !disabled ? `0 4px 15px ${C.accentDeep}80` : "none",
+      boxShadow: grad && !disabled ? `0 4px 15px color-mix(in srgb, ${C.accentDeep} 50%, transparent)` : "none",
       ...style
     }}
   >{children}</button>
@@ -46,21 +47,21 @@ export const Modal = ({ title, onClose, children, wide }) => (
         border:`1px solid ${C.border}`,
         width:"100%", maxWidth:wide?720:580,
         maxHeight:"92vh", overflow:"auto",
-        boxShadow:`0 24px 80px ${C.accentDeep}60, 0 0 0 1px ${C.borderGlow}`
+        boxShadow:`0 24px 80px color-mix(in srgb, ${C.accentDeep} 38%, transparent), 0 0 0 1px ${C.borderGlow}`
       }}
     >
       <div style={{
         display:"flex", justifyContent:"space-between", alignItems:"center",
         padding:"18px 24px",
         borderBottom:`1px solid ${C.border}`,
-        background:`linear-gradient(90deg, ${C.accentDeep}20, transparent)`,
+        background:`linear-gradient(90deg, color-mix(in srgb, ${C.accentDeep} 13%, transparent), transparent)`,
         borderRadius:"20px 20px 0 0"
       }}>
         <span style={{ fontWeight:700, fontSize:16, color:C.accent, letterSpacing:"0.3px" }}>{title}</span>
         <button
           onClick={onClose}
           style={{
-            background:`${C.accentDeep}40`,
+            background:`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`,
             color:C.muted, fontSize:18, cursor:"pointer",
             border:`1px solid ${C.border}`,
             borderRadius:8, width:32, height:32,
@@ -101,34 +102,37 @@ export const Tag = ({ children, color, size="sm" }) => (
   }}>{children}</span>
 );
 
-export const FluxLogo = ({ size=28, animated=false, large=false }) => (
-  large ? (
+export const FluxLogo = ({ size=28, animated=false, large=false }) => {
+  const brand = useBrand();
+  const logo = brand?.logo_url || "/logo.png";
+  const nombre = brand?.nombre_marca || "FLUX Sport Supplements";
+  return large ? (
     /* Versión grande para Login */
     <img
-      src="/logo.png"
-      alt="FLUX Sport Supplements"
+      src={logo}
+      alt={nombre}
       className={animated ? "float" : ""}
       style={{
         height: 180,
         objectFit: "contain",
-        filter: `drop-shadow(0 0 24px ${C.accentMid}60)`,
+        filter: `drop-shadow(0 0 24px color-mix(in srgb, ${C.accentMid} 38%, transparent))`,
       }}
     />
   ) : (
     /* Versión compacta para Header */
     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
       <img
-        src="/logo.png"
-        alt="FLUX"
+        src={logo}
+        alt={nombre}
         style={{
           height: size * 1.8,
           objectFit: "contain",
-          filter: `drop-shadow(0 0 8px ${C.accentMid}50)`,
+          filter: `drop-shadow(0 0 8px color-mix(in srgb, ${C.accentMid} 31%, transparent))`,
         }}
       />
     </div>
-  )
-);
+  );
+};
 
 export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
   <div style={{
@@ -138,7 +142,7 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
     display:"flex", alignItems:"center", justifyContent:"space-between",
     position:"sticky", top:0, zIndex:10,
     backdropFilter:"blur(12px)",
-    boxShadow:`0 4px 24px ${C.accentDeep}30`
+    boxShadow:`0 4px 24px color-mix(in srgb, ${C.accentDeep} 19%, transparent)`
   }}>
     <FluxLogo size={24}/>
     <div style={{display:"flex", alignItems:"center", gap:12}}>
@@ -190,7 +194,7 @@ export const TabBar = ({ tabs, active, onChange }) => (
         {active===k && (
           <span style={{
             position:"absolute", top:0, left:"20%", right:"20%", height:2,
-            background:`linear-gradient(90deg, transparent, ${C.accent}60, transparent)`,
+            background:`linear-gradient(90deg, transparent, color-mix(in srgb, ${C.accent} 38%, transparent), transparent)`,
             borderRadius:"0 0 4px 4px"
           }}/>
         )}

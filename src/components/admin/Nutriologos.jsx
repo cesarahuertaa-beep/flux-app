@@ -167,7 +167,7 @@ export function Nutriologos({ setMsg }) {
                 title="Color personalizado"/>
             </div>
           </Field>
-          <div style={{ background:`${C.accentDeep}30`, border:`1px solid ${C.accent}25`, borderRadius:10, padding:"11px 14px", fontSize:12, color:C.muted, marginBottom:20, lineHeight:1.6 }}>
+          <div style={{ background:`color-mix(in srgb, ${C.accentDeep} 19%, transparent)`, border:`1px solid color-mix(in srgb, ${C.accent} 15%, transparent)`, borderRadius:10, padding:"11px 14px", fontSize:12, color:C.muted, marginBottom:20, lineHeight:1.6 }}>
             📧 El nutriólogo recibirá un email para crear su contraseña. Su panel ya estará configurado con su branding.
           </div>
           <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>

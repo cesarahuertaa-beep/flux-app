@@ -9,12 +9,12 @@ export const C = {
   card:        "#071525",
   cardHover:   "#0a1e33",
 
-  // Azules (tomados del logo)
-  accent:      "#56CCF2",
-  accentMid:   "#2D9CDB",
-  accentDark:  "#1a6fa8",
-  accentDeep:  "#05447A",
-  accentGlow:  "#56CCF240",
+  // Azules (por defecto, reemplazables vía CSS vars)
+  accent:      "var(--brand-accent, #56CCF2)",
+  accentMid:   "var(--brand-accent-mid, #2D9CDB)",
+  accentDark:  "var(--brand-accent-dark, #1a6fa8)",
+  accentDeep:  "var(--brand-accent-deep, #05447A)",
+  accentGlow:  "color-mix(in srgb, var(--brand-accent, #56CCF2) 25%, transparent)",
 
   // Texto
   text:        "#F0F8FF",
@@ -24,13 +24,13 @@ export const C = {
 
   // Bordes
   border:      "#0e2d47",
-  borderGlow:  "#2D9CDB40",
+  borderGlow:  "color-mix(in srgb, var(--brand-accent-mid, #2D9CDB) 25%, transparent)",
 
   // Gradientes
-  grad:        "linear-gradient(135deg, #56CCF2 0%, #2D9CDB 50%, #05447A 100%)",
-  gradBtn:     "linear-gradient(135deg, #56CCF2, #2D9CDB)",
+  grad:        "linear-gradient(135deg, var(--brand-accent, #56CCF2) 0%, var(--brand-accent-mid, #2D9CDB) 50%, var(--brand-accent-deep, #05447A) 100%)",
+  gradBtn:     "linear-gradient(135deg, var(--brand-accent, #56CCF2), var(--brand-accent-mid, #2D9CDB))",
   gradCard:    "linear-gradient(145deg, #071525, #040f1c)",
-  gradBg:      "radial-gradient(ellipse at 20% 50%, #05447A18 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, #2D9CDB10 0%, transparent 50%)",
+  gradBg:      "radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--brand-accent-deep, #05447A) 10%, transparent) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--brand-accent-mid, #2D9CDB) 6%, transparent) 0%, transparent 50%)",
 };
 
 export const css = `
@@ -61,7 +61,7 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   border-color:${C.accentMid};
-  box-shadow: 0 0 0 3px ${C.accentMid}25, 0 0 20px ${C.accentMid}10;
+  box-shadow: 0 0 0 3px color-mix(in srgb, ${C.accentMid} 15%, transparent), 0 0 20px color-mix(in srgb, ${C.accentMid} 6%, transparent);
 }
 select option { background:${C.card}; }
 textarea { resize:vertical; min-height:72px; }
@@ -76,8 +76,8 @@ textarea { resize:vertical; min-height:72px; }
   to   { opacity:1; transform:translateY(0); }
 }
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 20px ${C.accentDeep}60; }
-  50%       { box-shadow: 0 0 40px ${C.accentMid}40; }
+  0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, ${C.accentDeep} 38%, transparent); }
+  50%       { box-shadow: 0 0 40px color-mix(in srgb, ${C.accentMid} 25%, transparent); }
 }
 @keyframes shimmer {
   0%   { background-position: -200% center; }
@@ -101,8 +101,8 @@ textarea { resize:vertical; min-height:72px; }
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  border-color: ${C.accentMid}60 !important;
-  box-shadow: 0 8px 32px ${C.accentDeep}40 !important;
+  border-color: color-mix(in srgb, ${C.accentMid} 38%, transparent) !important;
+  box-shadow: 0 8px 32px color-mix(in srgb, ${C.accentDeep} 25%, transparent) !important;
 }
 
 .btn-hover {

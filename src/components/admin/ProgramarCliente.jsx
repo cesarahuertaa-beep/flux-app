@@ -110,7 +110,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-        <div style={{background:C.accentDeep+"50",border:`1px solid ${C.accent}40`,borderRadius:10,padding:"8px 16px"}}>
+        <div style={{background:C.accentDeep+"50",border:`1px solid color-mix(in srgb, ${C.accent} 25%, transparent)`,borderRadius:10,padding:"8px 16px"}}>
           <span style={{fontWeight:700,color:C.accent}}>{selected.nombre}</span>
           <span style={{fontSize:12,color:C.muted,marginLeft:8}}>{selected.email}</span>
         </div>
