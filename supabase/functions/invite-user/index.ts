@@ -7,30 +7,43 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { email } = await req.json();
+    const { email, role, nombre, nombre_marca, color_primario } = await req.json();
 
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email requerido" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
+    if (!email) throw new Error("Email requerido");
 
-    // Usar service_role desde variables de entorno del servidor (seguro)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: { role, nombre, nombre_marca, color_primario },
       redirectTo: "https://flux-app-xi.vercel.app",
     });
 
     if (error) throw error;
+
+    // Ya creado en auth.users, ahora forzamos la creación/actualización del perfil.
+    // Usamos upsert para que si el trigger lo insertó, solo lo actualice.
+    // Si el trigger falló, esto lo insertará y si ESTO falla, veremos el error exacto.
+    if (data.user) {
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email: data.user.email,
+        role: role || 'nutriologo',
+        nombre: nombre || email.split('@')[0],
+        nombre_marca: nombre_marca || nombre || email.split('@')[0],
+        color_primario: color_primario,
+        activo: true
+      });
+
+      if (profileError) {
+        throw new Error(`Error en tabla profiles: ${profileError.message} (Detalles: ${profileError.details})`);
+      }
+    }
 
     return new Response(JSON.stringify(data.user), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }

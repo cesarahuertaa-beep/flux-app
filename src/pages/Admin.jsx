@@ -22,9 +22,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
   const clientesFilter = isSuperadmin
     ? "clientes?order=created_at.asc"
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
-  const bibliotecaFilter = isSuperadmin
-    ? "biblioteca_ejercicios?order=nombre.asc"
-    : `biblioteca_ejercicios?nutriologo_id=eq.${myId}&order=nombre.asc`;
+  const bibliotecaFilter = "biblioteca_ejercicios?order=nombre.asc";
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
@@ -194,7 +192,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
 
         {tab==="biblioteca" && (
           <div className="animate-in">
-            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} nutriologoId={myId}/>
+            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin}/>
           </div>
         )}
         {tab==="programar" && (
@@ -246,3 +244,5 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
     </div>
   );
 }
+
+

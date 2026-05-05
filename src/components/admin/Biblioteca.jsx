@@ -3,7 +3,7 @@ import { C, GRUPOS, TIPOS } from "../../styles/theme";
 import { Btn, Modal, Field, Tag } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
 
-export function Biblioteca({ biblioteca, onUpdate, setMsg }) {
+export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
   const [editEj, setEditEj] = useState(null);
   const [form, setForm] = useState({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" });
@@ -59,7 +59,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg }) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <span style={{fontWeight:700,fontSize:18}}>Biblioteca <span style={{fontSize:13,color:C.muted,fontWeight:400}}>({biblioteca.length} ejercicios)</span></span>
-        <Btn small grad onClick={openNew}>+ Nuevo ejercicio</Btn>
+        {isSuperadmin && <Btn small grad onClick={openNew}>+ Nuevo ejercicio</Btn>}
       </div>
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar ejercicio…" style={{maxWidth:200,padding:"7px 12px"}}/>
@@ -84,10 +84,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg }) {
                   <Tag color={C.accent}>{e.grupo_muscular}</Tag>
                   <Tag color={C.accentDark}>{e.tipo_movimiento}</Tag>
                 </div>
-                <div style={{display:"flex",gap:6}}>
-                  <Btn small outline color={C.accent} onClick={()=>openEdit(e)}>Editar</Btn>
-                  <Btn small danger onClick={()=>deleteEj(e)}>Borrar</Btn>
-                </div>
+                {isSuperadmin && (
+                  <div style={{display:"flex",gap:6}}>
+                    <Btn small outline color={C.accent} onClick={()=>openEdit(e)}>Editar</Btn>
+                    <Btn small danger onClick={()=>deleteEj(e)}>Borrar</Btn>
+                  </div>
+                )}
               </div>
             </div>
           ))}
