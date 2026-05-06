@@ -97,19 +97,21 @@ export const Modal = ({ title, onClose, children, wide }) => (
       position: "fixed", inset: 0,
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
-      zIndex: 100, display: "flex",
-      alignItems: "center", justifyContent: "center", padding: "16px"
+      zIndex: 100, 
+      overflowY: "auto", 
+      padding: "5vh 16px",
+      display: "block"
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
     <div
       className="animate-in-scale"
       style={{
+        margin: "0 auto",
         background: "linear-gradient(145deg, rgba(10,20,40,0.95), rgba(7,13,24,0.98))",
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
-        maxHeight: "90vh",
         display: "flex", flexDirection: "column",
         boxShadow: `
           0 0 0 1px rgba(56,189,248,0.06),
