@@ -98,13 +98,15 @@ export const Modal = ({ title, onClose, children, wide }) => (
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
       zIndex: 100, display: "flex",
-      alignItems: "center", justifyContent: "center", padding: 16
+      flexDirection: "column", padding: "20px 16px",
+      overflowY: "auto"
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
     <div
       className="animate-in-scale"
       style={{
+        margin: "auto",
         background: "linear-gradient(145deg, rgba(10,20,40,0.95), rgba(7,13,24,0.98))",
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
