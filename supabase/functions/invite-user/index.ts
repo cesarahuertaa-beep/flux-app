@@ -21,7 +21,7 @@ serve(async (req) => {
 
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { role, nombre, nombre_marca, color_primario },
-      redirectTo: "https://flux-app-xi.vercel.app",
+      redirectTo: "https://flux-sport.com",
     });
 
     if (error) throw error;
