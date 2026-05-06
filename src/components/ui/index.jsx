@@ -52,26 +52,22 @@ export const Modal = ({ title, onClose, children, wide }) => (
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
-        minHeight: wide ? "85vh" : "auto",
         display: "flex", flexDirection: "column",
         boxShadow: `0 0 0 1px rgba(56,189,248,0.06), 0 32px 100px rgba(0,0,0,0.6), 0 0 80px rgba(8,47,73,0.3), inset 0 1px 0 rgba(56,189,248,0.08)`,
         position: "relative",
         overflow: "clip",
-        flexShrink: 0,
       }}
     >
       <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: 1, background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.6), rgba(129,140,248,0.4), transparent)", borderRadius: "0 0 4px 4px", zIndex: 2 }}/>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid rgba(56,189,248,0.07)", flexShrink: 0, background: "rgba(7,13,24,0.4)", backdropFilter: "blur(8px)", position: "sticky", top: 0, zIndex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid rgba(56,189,248,0.07)", flexShrink: 0, background: "rgba(7,13,24,0.4)", backdropFilter: "blur(8px)", zIndex: 1 }}>
         <span style={{ fontWeight: 700, fontSize: 15, background: "linear-gradient(135deg, #38bdf8, #818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "0.3px" }}>{title}</span>
         <button onClick={onClose} className="btn-hover" style={{ background: "rgba(56,189,248,0.06)", color: C.muted, fontSize: 18, cursor: "pointer", border: "1px solid rgba(56,189,248,0.1)", borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s", fontFamily: "monospace" }}
           onMouseEnter={e => { e.currentTarget.style.color = "#38bdf8"; e.currentTarget.style.borderColor = "rgba(56,189,248,0.3)"; e.currentTarget.style.background = "rgba(56,189,248,0.1)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", flexGrow: 1, overflowY: "auto", maxHeight: "calc(90vh - 70px)" }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {children}
-        </div>
+      <div style={{ padding: "22px 24px" }}>
+        {children}
       </div>
     </div>
   </div>
