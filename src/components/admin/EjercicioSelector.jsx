@@ -32,7 +32,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
         ?<div style={{color:C.muted,fontSize:12,textAlign:"center",padding:10}}>La biblioteca está vacía. Agrega ejercicios primero.</div>
         :filtrados.length===0
           ?<div style={{color:C.muted,fontSize:12,textAlign:"center",padding:10}}>No hay más ejercicios que coincidan.</div>
-          :<div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:160,overflowY:"auto"}}>
+          :<div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:400,overflowY:"auto"}}>
             {filtrados.map(e=>(
               <button key={e.id} onClick={()=>onSelect(e)} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",color:C.text,fontSize:12}}>
                 <div style={{width:24,height:24,borderRadius:4,overflow:"hidden",background:C.surface,flexShrink:0}}>
