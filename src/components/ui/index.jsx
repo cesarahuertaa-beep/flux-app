@@ -48,6 +48,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
+        minHeight: wide ? "60vh" : "auto",
         display: "flex", flexDirection: "column",
         boxShadow: `0 0 0 1px rgba(56,189,248,0.06), 0 32px 100px rgba(0,0,0,0.6), 0 0 80px rgba(8,47,73,0.3), inset 0 1px 0 rgba(56,189,248,0.08)`,
         position: "relative",
