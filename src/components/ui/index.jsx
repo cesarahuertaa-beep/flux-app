@@ -111,7 +111,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
-        minHeight: wide ? 2000 : "auto",
+        minHeight: wide ? "85vh" : "60vh",
         display: "flex", flexDirection: "column",
         boxShadow: `
           0 0 0 1px rgba(56,189,248,0.06),
@@ -164,7 +164,11 @@ export const Modal = ({ title, onClose, children, wide }) => (
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", flexGrow: 1 }}>{children}</div>
+      <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <div style={{ flex: "1 0 auto", display: "flex", flexDirection: "column" }}>
+          {children}
+        </div>
+      </div>
     </div>
   </div>
 );
