@@ -235,7 +235,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               ))}
             </div>
           )}
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:"auto",paddingTop:16}}>
             <Btn outline color={C.muted} onClick={()=>setShowRutinaModal(false)}>Cancelar</Btn>
             <Btn grad onClick={saveRutina} disabled={saving}>{saving?"Guardando…":"Guardar rutina"}</Btn>
           </div>
