@@ -74,7 +74,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
   ];
 
   return (
-    <div style={{ minHeight:"100vh", background:"#03050a", position:"relative", overflow:"hidden" }}>
+    <div style={{ minHeight:"100vh", background:"#03050a", position:"relative" }}>
       <style>{css}</style>
       <OrbBackground/>
 
