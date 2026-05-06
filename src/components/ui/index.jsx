@@ -68,8 +68,8 @@ export const Modal = ({ title, onClose, children, wide }) => (
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", flexGrow: 1 }}>
-        <div style={{ flex: "1 0 auto", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", flexGrow: 1, overflowY: "auto", maxHeight: "calc(90vh - 70px)" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {children}
         </div>
       </div>
