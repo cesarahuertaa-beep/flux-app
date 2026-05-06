@@ -2,37 +2,26 @@ export const GRUPOS = ["Pecho","Espalda","Piernas","Hombros","Bíceps","Tríceps
 export const TIPOS  = ["Empuje","Jale","Sentadilla","Bisagra","Cargada","Aislamiento"];
 
 export const C = {
-  // ── Fondos
   bg:          "#03050a",
   surface:     "#070d18",
   surfaceAlt:  "#080f1c",
   card:        "#0a1428",
   cardHover:   "#0d1a32",
-
-  // ── Acento principal (dynamic via CSS vars)
   accent:      "var(--brand-accent, #38bdf8)",
   accentMid:   "var(--brand-accent-mid, #0ea5e9)",
   accentDark:  "var(--brand-accent-dark, #0369a1)",
   accentDeep:  "var(--brand-accent-deep, #082f49)",
   accentGlow:  "color-mix(in srgb, var(--brand-accent, #38bdf8) 22%, transparent)",
-
-  // ── Color secundario (violet para profundidad)
   violet:      "#818cf8",
   violetDeep:  "#1e1b4b",
   violetGlow:  "rgba(129,140,248,0.15)",
-
-  // ── Texto
   text:        "#e2eeff",
   muted:       "#64748b",
   mutedLight:  "#94a3b8",
   dim:         "#1e293b",
-
-  // ── Bordes
   border:      "rgba(56,189,248,0.08)",
   borderMid:   "rgba(56,189,248,0.15)",
   borderGlow:  "rgba(56,189,248,0.25)",
-
-  // ── Gradientes
   gradBtn:     "linear-gradient(135deg, var(--brand-accent, #38bdf8) 0%, var(--brand-accent-mid, #0ea5e9) 100%)",
   gradCard:    "linear-gradient(145deg, rgba(10,20,40,0.9), rgba(7,13,24,0.95))",
   gradBg:      "radial-gradient(ellipse at 20% 50%, rgba(8,47,73,0.5) 0%, transparent 60%), radial-gradient(ellipse at 80% 10%, rgba(30,27,75,0.4) 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, rgba(8,47,73,0.3) 0%, transparent 55%)",
@@ -64,7 +53,6 @@ body {
 
 .brand-font { font-family: 'Space Grotesk', sans-serif; }
 
-/* ── Inputs premium ── */
 input, select, textarea {
   background: rgba(7,13,24,0.8);
   color: ${C.text};
@@ -90,13 +78,11 @@ input::placeholder { color: ${C.muted}; }
 select option { background: ${C.card}; }
 textarea { resize: vertical; min-height: 80px; }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: ${C.surface}; }
 ::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,0.4); }
 
-/* ── Animaciones ── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -152,17 +138,14 @@ textarea { resize: vertical; min-height: 80px; }
   75%, 100% { transform: scale(2); opacity: 0; }
 }
 
-/* ── Utility classes ── */
 .animate-in       { animation: fadeInUp 0.45s cubic-bezier(0.16,1,0.3,1) forwards; }
 .animate-in-scale { animation: fadeInScale 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }
 .float            { animation: float 6s ease-in-out infinite; }
 .glow-pulse       { animation: glowPulse 3s ease-in-out infinite; }
 .border-glow      { animation: borderGlow 4s ease-in-out infinite; }
 
-/* ── Card hover premium ── */
 .card-hover {
   transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease, box-shadow 0.3s ease;
-  will-change: transform;
 }
 .card-hover:hover {
   transform: translateY(-4px);
@@ -173,10 +156,8 @@ textarea { resize: vertical; min-height: 80px; }
     0 0 40px rgba(56,189,248,0.06) !important;
 }
 
-/* ── Button hover premium ── */
 .btn-hover {
   transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease, filter 0.2s ease;
-  will-change: transform;
 }
 .btn-hover:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -186,7 +167,6 @@ textarea { resize: vertical; min-height: 80px; }
   transform: translateY(0px) scale(0.98);
 }
 
-/* ── Tab button ── */
 .tab-btn {
   transition: color 0.25s ease, background 0.25s ease;
   position: relative;
@@ -205,7 +185,6 @@ textarea { resize: vertical; min-height: 80px; }
   right: 16%;
 }
 
-/* ── Glass surface ── */
 .glass {
   background: rgba(10,20,40,0.6);
   backdrop-filter: blur(20px) saturate(180%);
@@ -213,10 +192,8 @@ textarea { resize: vertical; min-height: 80px; }
   border: 1px solid rgba(56,189,248,0.08);
 }
 
-/* ── Exercise card ── */
 .ex-card {
   transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s ease;
-  will-change: transform;
 }
 .ex-card:hover {
   transform: translateY(-6px) scale(1.01);
