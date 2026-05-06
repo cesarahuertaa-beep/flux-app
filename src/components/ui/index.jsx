@@ -97,8 +97,9 @@ export const Modal = ({ title, onClose, children, wide }) => (
       position: "fixed", inset: 0,
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
-      zIndex: 100, display: "flex",
-      alignItems: "center", justifyContent: "center", padding: 16
+      zIndex: 100, display: "grid",
+      placeItems: "center", padding: 20,
+      overflowY: "auto"
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
@@ -109,27 +110,34 @@ export const Modal = ({ title, onClose, children, wide }) => (
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
-        maxHeight: "92vh", overflow: "auto",
+        maxHeight: "92vh",
+        display: "flex", flexDirection: "column",
         boxShadow: `
           0 0 0 1px rgba(56,189,248,0.06),
           0 32px 100px rgba(0,0,0,0.6),
           0 0 80px rgba(8,47,73,0.3),
           inset 0 1px 0 rgba(56,189,248,0.08)
         `,
-        position: "relative"
+        position: "relative",
+        overflow: "hidden"
       }}
     >
       {/* Top accent line */}
       <div style={{
         position: "absolute", top: 0, left: "10%", right: "10%", height: 1,
         background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.6), rgba(129,140,248,0.4), transparent)",
-        borderRadius: "0 0 4px 4px"
+        borderRadius: "0 0 4px 4px",
+        zIndex: 2
       }}/>
       {/* Header */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "20px 24px",
         borderBottom: "1px solid rgba(56,189,248,0.07)",
+        flexShrink: 0,
+        background: "rgba(7,13,24,0.4)",
+        backdropFilter: "blur(8px)",
+        position: "relative", zIndex: 1
       }}>
         <span style={{
           fontWeight: 700, fontSize: 15,
@@ -155,7 +163,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px" }}>{children}</div>
+      <div style={{ padding: "22px 24px", overflowY: "auto", flex: 1 }}>{children}</div>
     </div>
   </div>
 );
