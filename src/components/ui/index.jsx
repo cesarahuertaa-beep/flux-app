@@ -97,9 +97,8 @@ export const Modal = ({ title, onClose, children, wide }) => (
       position: "fixed", inset: 0,
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
-      zIndex: 100, display: "grid",
-      placeItems: "center", padding: 20,
-      overflowY: "auto"
+      zIndex: 100, display: "flex",
+      alignItems: "center", justifyContent: "center", padding: 16
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
@@ -163,7 +162,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px", overflowY: "auto", flex: 1 }}>{children}</div>
+      <div style={{ padding: "22px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>{children}</div>
     </div>
   </div>
 );
