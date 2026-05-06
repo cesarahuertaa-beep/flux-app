@@ -6,41 +6,26 @@ import { useBrand } from "../BrandContext";
 ───────────────────────────────────────────── */
 export const OrbBackground = ({ variant = "default" }) => (
   <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-    {/* Orb 1 — cyan principal */}
     <div style={{
-      position: "absolute",
-      width: 600, height: 600,
-      borderRadius: "50%",
+      position: "absolute", width: 600, height: 600, borderRadius: "50%",
       background: "radial-gradient(circle, rgba(8,47,73,0.7) 0%, transparent 70%)",
-      top: "-10%", left: "-5%",
-      animation: "orb-drift 18s ease-in-out infinite",
-      filter: "blur(1px)"
+      top: "-10%", left: "-5%", animation: "orb-drift 18s ease-in-out infinite", filter: "blur(1px)"
     }}/>
-    {/* Orb 2 — violet */}
     <div style={{
-      position: "absolute",
-      width: 500, height: 500,
-      borderRadius: "50%",
+      position: "absolute", width: 500, height: 500, borderRadius: "50%",
       background: "radial-gradient(circle, rgba(30,27,75,0.6) 0%, transparent 70%)",
-      top: "20%", right: "-8%",
-      animation: "orb-drift-reverse 22s ease-in-out infinite",
+      top: "20%", right: "-8%", animation: "orb-drift-reverse 22s ease-in-out infinite",
     }}/>
-    {/* Orb 3 — cyan sutil en bottom */}
     <div style={{
-      position: "absolute",
-      width: 400, height: 400,
-      borderRadius: "50%",
+      position: "absolute", width: 400, height: 400, borderRadius: "50%",
       background: "radial-gradient(circle, rgba(8,47,73,0.5) 0%, transparent 70%)",
-      bottom: "-5%", left: "30%",
-      animation: "orb-drift 26s ease-in-out infinite reverse",
+      bottom: "-5%", left: "30%", animation: "orb-drift 26s ease-in-out infinite reverse",
     }}/>
-    {/* Grid sutil */}
     <div style={{
       position: "absolute", inset: 0, opacity: 0.025,
       backgroundImage: `linear-gradient(rgba(56,189,248,1) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,1) 1px, transparent 1px)`,
       backgroundSize: "80px 80px"
     }}/>
-    {/* Noise grain overlay */}
     <div style={{
       position: "absolute", inset: 0, opacity: 0.03,
       backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")"
@@ -68,21 +53,14 @@ export const Btn = ({ children, onClick, grad, color, outline, small, danger, di
           : (color || C.accentMid),
         color: danger ? "#fff" : outline ? (color || C.accent) : "#000",
         border: `1px solid ${danger ? "#ef4444" : outline ? (color || "rgba(56,189,248,0.35)") : "transparent"}`,
-        fontWeight: 700,
-        fontSize: small ? 12 : 13,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.45 : 1,
-        letterSpacing: "0.4px",
-        fontFamily: "'Inter', sans-serif",
+        fontWeight: 700, fontSize: small ? 12 : 13, cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1, letterSpacing: "0.4px", fontFamily: "'Inter', sans-serif",
         backdropFilter: outline ? "blur(8px)" : "none",
         boxShadow: isGrad && !disabled
           ? `0 4px 20px rgba(14,165,233,0.35), 0 1px 0 rgba(255,255,255,0.15) inset`
-          : danger && !disabled
-            ? "0 4px 16px rgba(239,68,68,0.35)"
-            : "none",
+          : danger && !disabled ? "0 4px 16px rgba(239,68,68,0.35)" : "none",
         transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-        whiteSpace: "nowrap",
-        ...style
+        whiteSpace: "nowrap", ...style
       }}
     >{children}</button>
   );
@@ -97,7 +75,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
       position: "fixed", inset: 0,
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
-      zIndex: 100, 
+      zIndex: 100,
       display: "block", overflowY: "auto",
       padding: "5vh 16px"
     }}
@@ -120,15 +98,14 @@ export const Modal = ({ title, onClose, children, wide }) => (
           inset 0 1px 0 rgba(56,189,248,0.08)
         `,
         position: "relative",
-        overflow: "hidden"
+        overflow: "auto"
       }}
     >
       {/* Top accent line */}
       <div style={{
         position: "absolute", top: 0, left: "10%", right: "10%", height: 1,
         background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.6), rgba(129,140,248,0.4), transparent)",
-        borderRadius: "0 0 4px 4px",
-        zIndex: 2
+        borderRadius: "0 0 4px 4px", zIndex: 2
       }}/>
       {/* Header */}
       <div style={{
@@ -138,27 +115,22 @@ export const Modal = ({ title, onClose, children, wide }) => (
         flexShrink: 0,
         background: "rgba(7,13,24,0.4)",
         backdropFilter: "blur(8px)",
-        position: "relative", zIndex: 1
+        position: "sticky", top: 0, zIndex: 1
       }}>
         <span style={{
           fontWeight: 700, fontSize: 15,
           background: "linear-gradient(135deg, #38bdf8, #818cf8)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          backgroundClip: "text",
-          fontFamily: "'Space Grotesk', sans-serif",
-          letterSpacing: "0.3px"
+          backgroundClip: "text", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "0.3px"
         }}>{title}</span>
         <button
           onClick={onClose}
           className="btn-hover"
           style={{
-            background: "rgba(56,189,248,0.06)", color: C.muted,
-            fontSize: 18, cursor: "pointer",
-            border: "1px solid rgba(56,189,248,0.1)",
-            borderRadius: 8, width: 32, height: 32,
+            background: "rgba(56,189,248,0.06)", color: C.muted, fontSize: 18, cursor: "pointer",
+            border: "1px solid rgba(56,189,248,0.1)", borderRadius: 8, width: 32, height: 32,
             display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.2s",
-            fontFamily: "monospace"
+            transition: "all 0.2s", fontFamily: "monospace"
           }}
           onMouseEnter={e => { e.currentTarget.style.color = "#38bdf8"; e.currentTarget.style.borderColor = "rgba(56,189,248,0.3)"; e.currentTarget.style.background = "rgba(56,189,248,0.1)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
@@ -179,9 +151,8 @@ export const Modal = ({ title, onClose, children, wide }) => (
 export const Field = ({ label, children, hint }) => (
   <div style={{ marginBottom: 18 }}>
     <div style={{
-      fontSize: 11, color: "#64748b", marginBottom: 7,
-      fontWeight: 600, textTransform: "uppercase",
-      letterSpacing: "1px", fontFamily: "'Inter', sans-serif"
+      fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600,
+      textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Inter', sans-serif"
     }}>{label}</div>
     {children}
     {hint && <div style={{ fontSize: 11, color: C.dim, marginTop: 5, lineHeight: 1.5 }}>{hint}</div>}
@@ -199,8 +170,7 @@ export const Tag = ({ children, color, size = "sm" }) => (
     background: `${color || "#38bdf8"}14`,
     color: color || "#38bdf8",
     border: `1px solid ${color || "#38bdf8"}28`,
-    fontWeight: 600, letterSpacing: "0.2px",
-    whiteSpace: "nowrap",
+    fontWeight: 600, letterSpacing: "0.2px", whiteSpace: "nowrap",
     fontFamily: "'Inter', sans-serif"
   }}>{children}</span>
 );
@@ -213,23 +183,16 @@ export const FluxLogo = ({ size = 28, animated = false, large = false }) => {
   const logo = brand?.logo_url || "/logo.png";
   const nombre = brand?.nombre_marca || "FLUX Sport Supplements";
   return large ? (
-    <img
-      src={logo} alt={nombre}
-      className={animated ? "float" : ""}
-      style={{
-        height: 160, objectFit: "contain",
-        filter: "drop-shadow(0 0 32px rgba(56,189,248,0.4)) drop-shadow(0 0 60px rgba(56,189,248,0.15))",
-      }}
-    />
+    <img src={logo} alt={nombre} className={animated ? "float" : ""} style={{
+      height: 160, objectFit: "contain",
+      filter: "drop-shadow(0 0 32px rgba(56,189,248,0.4)) drop-shadow(0 0 60px rgba(56,189,248,0.15))",
+    }}/>
   ) : (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <img
-        src={logo} alt={nombre}
-        style={{
-          height: size * 1.8, objectFit: "contain",
-          filter: "drop-shadow(0 0 10px rgba(56,189,248,0.35))",
-        }}
-      />
+      <img src={logo} alt={nombre} style={{
+        height: size * 1.8, objectFit: "contain",
+        filter: "drop-shadow(0 0 10px rgba(56,189,248,0.35))",
+      }}/>
     </div>
   );
 };
@@ -239,13 +202,10 @@ export const FluxLogo = ({ size = 28, animated = false, large = false }) => {
 ───────────────────────────────────────────── */
 export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
   <div style={{
-    background: "rgba(3,5,10,0.7)",
-    borderBottom: "1px solid rgba(56,189,248,0.08)",
-    padding: "12px 28px",
-    display: "flex", alignItems: "center", justifyContent: "space-between",
+    background: "rgba(3,5,10,0.7)", borderBottom: "1px solid rgba(56,189,248,0.08)",
+    padding: "12px 28px", display: "flex", alignItems: "center", justifyContent: "space-between",
     position: "sticky", top: 0, zIndex: 50,
-    backdropFilter: "blur(24px) saturate(160%)",
-    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+    backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)",
     boxShadow: "0 4px 32px rgba(0,0,0,0.3), 0 1px 0 rgba(56,189,248,0.05) inset",
   }}>
     <FluxLogo size={24} />
@@ -253,22 +213,16 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
       {extra}
       {role === "admin" && (
         <div style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: "1px",
-          padding: "4px 12px", borderRadius: 20,
+          fontSize: 11, fontWeight: 700, letterSpacing: "1px", padding: "4px 12px", borderRadius: 20,
           background: "linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15))",
-          border: "1px solid rgba(56,189,248,0.2)",
-          color: "#38bdf8",
-          fontFamily: "'Inter', sans-serif"
+          border: "1px solid rgba(56,189,248,0.2)", color: "#38bdf8", fontFamily: "'Inter', sans-serif"
         }}>⚡ ADMIN</div>
       )}
       {role === "superadmin" && (
         <div style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: "1px",
-          padding: "4px 12px", borderRadius: 20,
+          fontSize: 11, fontWeight: 700, letterSpacing: "1px", padding: "4px 12px", borderRadius: 20,
           background: "linear-gradient(135deg, rgba(129,140,248,0.2), rgba(56,189,248,0.15))",
-          border: "1px solid rgba(129,140,248,0.3)",
-          color: "#818cf8",
-          fontFamily: "'Inter', sans-serif"
+          border: "1px solid rgba(129,140,248,0.3)", color: "#818cf8", fontFamily: "'Inter', sans-serif"
         }}>✦ SUPERADMIN</div>
       )}
       {nombre && (
@@ -281,13 +235,10 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
         onClick={onLogout}
         className="btn-hover"
         style={{
-          padding: "7px 16px", borderRadius: 9,
-          background: "rgba(56,189,248,0.06)",
-          border: "1px solid rgba(56,189,248,0.15)",
-          color: C.mutedLight, fontSize: 13, fontWeight: 600,
-          cursor: "pointer", fontFamily: "'Inter', sans-serif",
-          transition: "all 0.2s",
-          letterSpacing: "0.2px"
+          padding: "7px 16px", borderRadius: 9, background: "rgba(56,189,248,0.06)",
+          border: "1px solid rgba(56,189,248,0.15)", color: C.mutedLight, fontSize: 13,
+          fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', sans-serif",
+          transition: "all 0.2s", letterSpacing: "0.2px"
         }}
         onMouseEnter={e => { e.currentTarget.style.background = "rgba(56,189,248,0.12)"; e.currentTarget.style.color = "#38bdf8"; }}
         onMouseLeave={e => { e.currentTarget.style.background = "rgba(56,189,248,0.06)"; e.currentTarget.style.color = C.mutedLight; }}
@@ -301,31 +252,20 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
 ───────────────────────────────────────────── */
 export const TabBar = ({ tabs, active, onChange }) => (
   <div style={{
-    display: "flex",
-    background: "rgba(7,13,24,0.6)",
+    display: "flex", background: "rgba(7,13,24,0.6)",
     borderBottom: "1px solid rgba(56,189,248,0.07)",
     overflowX: "auto", scrollbarWidth: "none",
-    backdropFilter: "blur(12px)",
-    padding: "0 8px",
+    backdropFilter: "blur(12px)", padding: "0 8px",
   }}>
     {tabs.map(([k, ic, lb]) => (
       <button
-        key={k}
-        onClick={() => onChange(k)}
+        key={k} onClick={() => onChange(k)}
         className={`tab-btn ${active === k ? "active" : ""}`}
         style={{
-          flex: 1, maxWidth: 200,
-          padding: "15px 8px 14px",
-          background: "none",
-          color: active === k ? "#38bdf8" : "#64748b",
-          fontWeight: active === k ? 700 : 500,
-          fontSize: 13,
-          border: "none",
-          cursor: "pointer",
-          letterSpacing: "0.3px",
-          fontFamily: "'Inter', sans-serif",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
+          flex: 1, maxWidth: 200, padding: "15px 8px 14px", background: "none",
+          color: active === k ? "#38bdf8" : "#64748b", fontWeight: active === k ? 700 : 500,
+          fontSize: 13, border: "none", cursor: "pointer", letterSpacing: "0.3px",
+          fontFamily: "'Inter', sans-serif", whiteSpace: "nowrap", flexShrink: 0,
           transition: "color 0.25s ease",
         }}
       >
@@ -350,9 +290,8 @@ export const StatCard = ({ icon, label, value, unit, color }) => (
   <div className="card-hover" style={{
     background: "linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
     borderRadius: 16, padding: "18px 14px", textAlign: "center",
-    border: "1px solid rgba(56,189,248,0.08)",
-    position: "relative", overflow: "hidden",
-    backdropFilter: "blur(12px)"
+    border: "1px solid rgba(56,189,248,0.08)", position: "relative",
+    overflow: "hidden", backdropFilter: "blur(12px)"
   }}>
     <div style={{
       position: "absolute", top: 0, left: 0, right: 0, height: 1,
@@ -360,8 +299,7 @@ export const StatCard = ({ icon, label, value, unit, color }) => (
     }}/>
     <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
     <div style={{
-      fontSize: 28, fontWeight: 800,
-      color: color || "#38bdf8",
+      fontSize: 28, fontWeight: 800, color: color || "#38bdf8",
       fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1,
       filter: `drop-shadow(0 0 8px ${color || "#38bdf8"}60)`
     }}>{value}</div>
