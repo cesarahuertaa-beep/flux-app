@@ -97,20 +97,20 @@ export const Modal = ({ title, onClose, children, wide }) => (
       position: "fixed", inset: 0,
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
-      zIndex: 100, display: "flex",
-      alignItems: "center", justifyContent: "center", padding: "16px"
+      zIndex: 100, 
+      display: "block", overflowY: "auto",
+      padding: "5vh 16px"
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
     <div
       className="animate-in-scale"
       style={{
+        margin: "0 auto",
         background: "linear-gradient(145deg, rgba(10,20,40,0.95), rgba(7,13,24,0.98))",
         borderRadius: 20,
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
-        maxHeight: "92vh",
-        minHeight: 0,
         display: "flex", flexDirection: "column",
         boxShadow: `
           0 0 0 1px rgba(56,189,248,0.06),
@@ -163,7 +163,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
           onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = "rgba(56,189,248,0.1)"; e.currentTarget.style.background = "rgba(56,189,248,0.06)"; }}
         >×</button>
       </div>
-      <div style={{ padding: "22px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>{children}</div>
+      <div style={{ padding: "22px 24px" }}>{children}</div>
     </div>
   </div>
 );
