@@ -110,6 +110,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
         border: "1px solid rgba(56,189,248,0.12)",
         width: "100%", maxWidth: wide ? 720 : 560,
         maxHeight: "92vh",
+        minHeight: 0,
         display: "flex", flexDirection: "column",
         boxShadow: `
           0 0 0 1px rgba(56,189,248,0.06),
