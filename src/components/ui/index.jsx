@@ -35,12 +35,8 @@ export const Modal = ({ title, onClose, children, wide }) => (
       background: "rgba(3,5,10,0.8)",
       backdropFilter: "blur(16px)",
       zIndex: 100,
-      display: "flex",
-      alignItems: "flex-start",
-      justifyContent: "center",
       overflowY: "auto",
-      padding: "5vh 16px",
-      minHeight: "100vh",
+      padding: "5vh 16px 10vh",
     }}
     onClick={e => e.target === e.currentTarget && onClose()}
   >
