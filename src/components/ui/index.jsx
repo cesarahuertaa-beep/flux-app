@@ -1,5 +1,6 @@
 import { C } from "../../styles/theme";
 import { useBrand } from "../BrandContext";
+import { createPortal } from "react-dom";
 
 export const OrbBackground = ({ variant = "default" }) => (
   <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
@@ -28,7 +29,7 @@ export const Btn = ({ children, onClick, grad, color, outline, small, danger, di
   );
 };
 
-export const Modal = ({ title, onClose, children, wide }) => (
+export const Modal = ({ title, onClose, children, wide }) => createPortal(
   <div
     style={{
       position: "fixed", inset: 0,
@@ -67,7 +68,8 @@ export const Modal = ({ title, onClose, children, wide }) => (
         {children}
       </div>
     </div>
-  </div>
+  </div>,
+  document.body
 );
 
 export const Field = ({ label, children, hint }) => (
