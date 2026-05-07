@@ -3,9 +3,11 @@ import { C, css } from "../styles/theme";
 import { Btn, Tag, Header, TabBar, StatCard } from "../components/ui";
 import { generateNutriPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
+import { useBrand } from "../components/BrandContext";
 
 export default function ClienteView({ session, onLogout }) {
   const { data:cliente } = session;
+  const brand = useBrand();
   const [tab, setTab] = useState("nutricion");
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
@@ -74,7 +76,7 @@ export default function ClienteView({ session, onLogout }) {
         objetivo={cliente.objetivo}
         onLogout={onLogout}
         extra={dias.length>0 && tab==="nutricion"
-          ? <Btn small outline color={C.accentMid} onClick={()=>generateNutriPDF(cliente,nutri,dias)}>📄 PDF</Btn>
+          ? <Btn small outline color={C.accentMid} onClick={()=>generateNutriPDF(cliente,nutri,dias,brand)}>📄 PDF</Btn>
           : null}
       />
 
