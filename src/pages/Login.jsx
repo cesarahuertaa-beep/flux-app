@@ -21,7 +21,7 @@ export default function Login({ onLogin }) {
       const params = new URLSearchParams(hash.replace("#","?"));
       const token = params.get("access_token");
       const type  = params.get("type");
-      if (token && (type==="invite"||type==="recovery")) {
+      if (token && (type==="invite"||type==="recovery"||type==="signup")) {
         setAccessToken(token); setMode("set_password");
         window.history.replaceState(null,"",window.location.pathname);
       }
