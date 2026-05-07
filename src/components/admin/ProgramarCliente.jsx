@@ -4,8 +4,10 @@ import { Btn, Modal, Field } from "../ui";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca }) {
+  const brand = useBrand();
   const [subtab, setSubtab] = useState("nutri");
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
@@ -115,7 +117,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           <span style={{fontSize:12,color:C.muted,marginLeft:8}}>{selected.email}</span>
         </div>
         <Btn small outline color={C.muted} onClick={()=>setSelected(null)}>Cambiar</Btn>
-        {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias)}>📄 PDF Nutrición</Btn>}
+        {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias,brand)}>📄 PDF Nutrición</Btn>}
       </div>
       <div style={{display:"flex",gap:8,marginBottom:16}}>
         {[["nutri","🥗","Nutrición"],["deporte","🏋️","Rutinas"]].map(([k,ic,lb])=>(
