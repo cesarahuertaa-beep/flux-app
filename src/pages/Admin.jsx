@@ -16,6 +16,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
   const [saving, setSaving]                 = useState(false);
   const [msg, setMsg]                       = useState("");
   const [biblioteca, setBiblioteca]         = useState([]);
+  const [nutriologoMap, setNutrioMap]       = useState({});
 
   // Filtro por nutriologo_id — superadmin ve todo, nutriólogo ve los suyos
   const myId = profileId || getProfileId();
@@ -35,6 +36,16 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
   }, [bibliotecaFilter]);
 
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
+
+  // Cargar mapa id→nombre de nutriólogos (solo superadmin)
+  useEffect(() => {
+    if (!isSuperadmin) return;
+    dbGet("profiles?role=eq.nutriologo&select=id,nombre").then(rows => {
+      const map = {};
+      rows.forEach(r => { map[r.id] = r.nombre; });
+      setNutrioMap(map);
+    }).catch(() => {});
+  }, [isSuperadmin]);
 
   const createClient = async () => {
     if (!newClient.email||!newClient.nombre) { setMsg("⚠️ Nombre y email son obligatorios"); return; }
@@ -182,6 +193,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
                       <div style={{fontSize:12, color:"#64748b"}}>
                         {c.objetivo||"Sin objetivo definido"}
                       </div>
+                      {isSuperadmin && c.nutriologo_id && (
+                        <div style={{fontSize:11, color:"#818cf8", marginTop:3, fontWeight:500}}>
+                          👤 {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
+                        </div>
+                      )}
                     </div>
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span style={{
