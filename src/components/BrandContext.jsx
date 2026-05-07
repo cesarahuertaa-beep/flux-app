@@ -12,8 +12,14 @@ export function BrandProvider({ children, session }) {
     logo_url: "/logo.png"
   });
 
+  const FLUX_DEFAULT = { nombre_marca: "FLUX", color_primario: "#56CCF2", logo_url: "/logo.png" };
+
   useEffect(() => {
-    if (!session) return;
+    // Sin sesión o superadmin/admin → siempre FLUX
+    if (!session || session.role === "superadmin" || session.role === "admin") {
+      setBrand(FLUX_DEFAULT);
+      return;
+    }
 
     const fetchBrand = async () => {
       try {
