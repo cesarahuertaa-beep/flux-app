@@ -90,9 +90,16 @@ export function ProgresoCliente({ selected, setMsg }) {
     setSaving(true);
     try {
       const data = { cliente_id: selected.id };
+      const STRING_KEYS = new Set(["fecha","presion_arterial","notas"]);
       Object.entries(form).forEach(([k, v]) => {
-        if (v !== "" && v !== null && v !== undefined)
-          data[k] = (k === "presion_arterial" || k === "notas") ? v : (parseFloat(v) || v);
+        if (v !== "" && v !== null && v !== undefined) {
+          if (STRING_KEYS.has(k)) {
+            data[k] = v;
+          } else {
+            const n = parseFloat(v);
+            data[k] = isNaN(n) ? v : n;
+          }
+        }
       });
       await dbPost("metricas_progreso", data);
       setShowModal(false); setForm(emptyForm());
