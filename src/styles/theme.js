@@ -2,30 +2,31 @@ export const GRUPOS = ["Pecho","Espalda","Piernas","Hombros","Bíceps","Tríceps
 export const TIPOS  = ["Empuje","Jale","Sentadilla","Bisagra","Cargada","Aislamiento"];
 
 export const C = {
-  bg:          "#03050a",
-  surface:     "#070d18",
-  surfaceAlt:  "#080f1c",
-  card:        "#0a1428",
-  cardHover:   "#0d1a32",
-  accent:      "var(--brand-accent, #38bdf8)",
-  accentMid:   "var(--brand-accent-mid, #0ea5e9)",
-  accentDark:  "var(--brand-accent-dark, #0369a1)",
-  accentDeep:  "var(--brand-accent-deep, #082f49)",
-  accentGlow:  "color-mix(in srgb, var(--brand-accent, #38bdf8) 22%, transparent)",
-  violet:      "#818cf8",
-  violetDeep:  "#1e1b4b",
-  violetGlow:  "rgba(129,140,248,0.15)",
-  text:        "#e2eeff",
-  muted:       "#64748b",
-  mutedLight:  "#94a3b8",
-  dim:         "#1e293b",
-  border:      "rgba(56,189,248,0.08)",
-  borderMid:   "rgba(56,189,248,0.15)",
-  borderGlow:  "rgba(56,189,248,0.25)",
-  gradBtn:     "linear-gradient(135deg, var(--brand-accent, #38bdf8) 0%, var(--brand-accent-mid, #0ea5e9) 100%)",
-  gradCard:    "linear-gradient(145deg, rgba(10,20,40,0.9), rgba(7,13,24,0.95))",
-  gradBg:      "radial-gradient(ellipse at 20% 50%, rgba(8,47,73,0.5) 0%, transparent 60%), radial-gradient(ellipse at 80% 10%, rgba(30,27,75,0.4) 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, rgba(8,47,73,0.3) 0%, transparent 55%)",
-  gradAccent:  "linear-gradient(135deg, var(--brand-accent, #38bdf8), #818cf8)",
+  bg:          "#04080f",
+  surface:     "#07101d",
+  surfaceAlt:  "#0b1522",
+  card:        "#0f1c2e",
+  cardHover:   "#132236",
+  faint:       "#162843",
+  accent:      "var(--brand-accent, #2e5cb8)",
+  accentMid:   "var(--brand-accent-mid, #3d6fd0)",
+  accentDark:  "var(--brand-accent-dark, #1a3a6e)",
+  accentDeep:  "var(--brand-accent-deep, #0d1e3c)",
+  accentGlow:  "color-mix(in srgb, var(--brand-accent, #2e5cb8) 18%, transparent)",
+  violet:      "#7c8ef5",
+  violetDeep:  "#1a1d4b",
+  violetGlow:  "rgba(124,142,245,0.12)",
+  text:        "#e8edf5",
+  muted:       "#6e87a2",
+  mutedLight:  "#9baec5",
+  dim:         "#1c2d44",
+  border:      "rgba(46,92,184,0.14)",
+  borderMid:   "rgba(46,92,184,0.24)",
+  borderGlow:  "rgba(46,92,184,0.40)",
+  gradBtn:     "linear-gradient(135deg, var(--brand-accent, #2e5cb8) 0%, var(--brand-accent-mid, #3d6fd0) 100%)",
+  gradCard:    "linear-gradient(145deg, rgba(15,28,46,0.9), rgba(7,16,29,0.95))",
+  gradBg:      "radial-gradient(ellipse at 20% 50%, rgba(13,30,60,0.6) 0%, transparent 60%), radial-gradient(ellipse at 80% 10%, rgba(26,29,75,0.35) 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, rgba(13,30,60,0.3) 0%, transparent 55%)",
+  gradAccent:  "linear-gradient(135deg, var(--brand-accent, #2e5cb8), #7c8ef5)",
 };
 
 export const css = `
@@ -34,10 +35,10 @@ export const css = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --brand-accent:      #38bdf8;
-  --brand-accent-mid:  #0ea5e9;
-  --brand-accent-dark: #0369a1;
-  --brand-accent-deep: #082f49;
+  --brand-accent:      #2e5cb8;
+  --brand-accent-mid:  #3d6fd0;
+  --brand-accent-dark: #1a3a6e;
+  --brand-accent-deep: #0d1e3c;
 }
 
 html { scroll-behavior: smooth; }
@@ -54,7 +55,7 @@ body {
 .brand-font { font-family: 'Space Grotesk', sans-serif; }
 
 input, select, textarea {
-  background: rgba(7,13,24,0.8);
+  background: rgba(7,16,29,0.8);
   color: ${C.text};
   border: 1px solid ${C.border};
   border-radius: 12px;
@@ -67,12 +68,12 @@ input, select, textarea {
   backdrop-filter: blur(8px);
 }
 input:focus, select:focus, textarea:focus {
-  border-color: var(--brand-accent, #38bdf8);
-  background: rgba(10,20,40,0.9);
+  border-color: var(--brand-accent, #2e5cb8);
+  background: rgba(15,28,46,0.9);
   box-shadow:
-    0 0 0 3px rgba(56,189,248,0.12),
-    0 0 24px rgba(56,189,248,0.08),
-    inset 0 1px 0 rgba(56,189,248,0.05);
+    0 0 0 3px rgba(46,92,184,0.16),
+    0 0 24px rgba(46,92,184,0.10),
+    inset 0 1px 0 rgba(46,92,184,0.06);
 }
 input::placeholder { color: ${C.muted}; }
 select option { background: ${C.card}; }
@@ -80,8 +81,8 @@ textarea { resize: vertical; min-height: 80px; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: ${C.surface}; }
-::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,0.4); }
+::-webkit-scrollbar-thumb { background: rgba(46,92,184,0.25); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(46,92,184,0.45); }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
@@ -127,8 +128,8 @@ textarea { resize: vertical; min-height: 80px; }
   to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 @keyframes borderGlow {
-  0%, 100% { border-color: rgba(56,189,248,0.1); box-shadow: 0 0 0 rgba(56,189,248,0); }
-  50%       { border-color: rgba(56,189,248,0.3); box-shadow: 0 0 30px rgba(56,189,248,0.08); }
+  0%, 100% { border-color: rgba(46,92,184,0.12); box-shadow: 0 0 0 rgba(46,92,184,0); }
+  50%       { border-color: rgba(46,92,184,0.35); box-shadow: 0 0 30px rgba(46,92,184,0.10); }
 }
 @keyframes tabSlide {
   from { transform: scaleX(0); }
@@ -149,11 +150,11 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .card-hover:hover {
   transform: translateY(-4px);
-  border-color: rgba(56,189,248,0.25) !important;
+  border-color: rgba(46,92,184,0.30) !important;
   box-shadow:
-    0 16px 48px rgba(0,0,0,0.4),
-    0 0 0 1px rgba(56,189,248,0.1),
-    0 0 40px rgba(56,189,248,0.06) !important;
+    0 16px 48px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(46,92,184,0.14),
+    0 0 40px rgba(46,92,184,0.08) !important;
 }
 
 .btn-hover {
@@ -176,7 +177,7 @@ textarea { resize: vertical; min-height: 80px; }
   position: absolute;
   bottom: 0; left: 50%; right: 50%;
   height: 2px;
-  background: linear-gradient(90deg, var(--brand-accent,#38bdf8), #818cf8);
+  background: linear-gradient(90deg, var(--brand-accent,#2e5cb8), #7c8ef5);
   border-radius: 2px 2px 0 0;
   transition: left 0.3s cubic-bezier(0.16,1,0.3,1), right 0.3s cubic-bezier(0.16,1,0.3,1);
 }
@@ -186,10 +187,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 
 .glass {
-  background: rgba(10,20,40,0.6);
+  background: rgba(15,28,46,0.6);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(56,189,248,0.08);
+  border: 1px solid rgba(46,92,184,0.12);
 }
 
 .ex-card {
@@ -199,8 +200,8 @@ textarea { resize: vertical; min-height: 80px; }
   transform: translateY(-6px) scale(1.01);
   box-shadow:
     0 24px 60px rgba(0,0,0,0.5),
-    0 0 0 1px rgba(56,189,248,0.15),
-    0 0 50px rgba(56,189,248,0.08) !important;
+    0 0 0 1px rgba(46,92,184,0.20),
+    0 0 50px rgba(46,92,184,0.10) !important;
 }
 .ex-card:hover .ex-img-overlay {
   opacity: 1 !important;
