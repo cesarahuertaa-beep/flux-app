@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { C, css } from "../styles/theme";
 import { Btn, Tag, Header, TabBar, StatCard } from "../components/ui";
-import { generateNutriPDF } from "../utils/pdf";
+import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 
@@ -445,6 +445,9 @@ export default function ClienteView({ session, onLogout }) {
                 </div>
               ):(
                 <div>
+                  <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+                    <Btn small outline color={C.accent} onClick={() => generateProgresoPDF(cliente, metricas, brand)}>📄 Descargar Reporte de Progreso</Btn>
+                  </div>
                   {/* Mini-chart de peso */}
                   {metricas.filter(m=>m.peso).length>=2&&(()=>{
                     const pts=[...metricas].reverse().filter(m=>m.peso);

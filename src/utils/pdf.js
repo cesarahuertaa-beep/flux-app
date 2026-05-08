@@ -74,3 +74,94 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   win.document.close();
   setTimeout(() => win.print(), 500);
 };
+
+export const generateProgresoPDF = (cliente, metricas, brand) => {
+  if (!cliente) return;
+  const win = window.open("", "_blank");
+  
+  const logoUrl = brand?.logo_url;
+  const nombre  = brand?.nombre_marca || "FLUX";
+  const accent  = brand?.color_primario || "#38bdf8";
+  const { dark, light } = getDarkAndLight(accent);
+
+  const fmtDate = d => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"long", day:"numeric" });
+  
+  const latest = metricas.length > 0 ? metricas[0] : null;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progreso_${cliente.nombre}</title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:30px;max-width:800px;margin:0 auto}
+    .header{text-align:center;border-bottom:3px solid ${accent};padding-bottom:20px;margin-bottom:24px}
+    .brand-logo{max-height:80px;max-width:240px;object-fit:contain;margin-bottom:6px}
+    .brand-name{font-size:32px;font-weight:900;color:${dark};letter-spacing:4px}
+    .brand-sub{font-size:12px;color:${accent};letter-spacing:2px;margin-top:2px}
+    .client-info{background:${light};border-left:4px solid ${accent};padding:12px 16px;border-radius:4px;margin-bottom:24px}
+    .title-sec{font-size:16px;font-weight:700;color:${dark};margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
+    .macros{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:30px}
+    .macro-box{background:${dark};color:white;border-radius:10px;padding:14px;text-align:center}
+    .macro-val{font-size:24px;font-weight:900}
+    .macro-lbl{font-size:11px;opacity:.8;margin-top:4px}
+    table{width:100%;border-collapse:collapse;margin-bottom:30px}
+    th{background:${light};padding:10px;text-align:center;font-size:12px;color:${dark};border:1px solid #ddd}
+    td{padding:10px;border:1px solid #ddd;font-size:12px;text-align:center;vertical-align:middle}
+    .date-col{font-weight:700;text-align:left}
+    .footer{text-align:center;margin-top:40px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:14px}
+  </style></head><body>
+  
+  <div class="header">
+    ${logoUrl ? `<img src="${logoUrl}" class="brand-logo" alt="${nombre}"/>` : `<div class="brand-name">${nombre}</div>`}
+    <div class="brand-sub">Reporte de Progreso y Evaluaciones</div>
+  </div>
+  
+  <div class="client-info">
+    <strong style="font-size:16px">${cliente.nombre}</strong><br>
+    <span style="color:#666;font-size:13px">Objetivo: ${cliente.objetivo||"\u2014"}</span>
+    <span style="float:right;color:#999;font-size:12px">Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span>
+  </div>
+
+  ${latest ? `
+    <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)})</div>
+    <div class="macros">
+      <div class="macro-box"><div class="macro-val">${latest.peso||"--"}</div><div class="macro-lbl">Peso (kg)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.grasa_pct||"--"}</div><div class="macro-lbl">Grasa (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.musculo_pct||"--"}</div><div class="macro-lbl">Músculo (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.imc||"--"}</div><div class="macro-lbl">IMC</div></div>
+    </div>
+  ` : `<div style="text-align:center;padding:40px;color:#999">No hay evaluaciones registradas aún.</div>`}
+
+  ${metricas.length > 0 ? `
+    <div class="title-sec">Historial Evolutivo</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left">Fecha</th>
+          <th>Peso (kg)</th>
+          <th>Grasa (%)</th>
+          <th>Músculo (%)</th>
+          <th>Cintura (cm)</th>
+          <th>Cadera (cm)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${metricas.map(m => `
+          <tr>
+            <td class="date-col">${fmtDate(m.fecha)}</td>
+            <td>${m.peso||"--"}</td>
+            <td>${m.grasa_pct||"--"}</td>
+            <td>${m.musculo_pct||"--"}</td>
+            <td>${m.cintura||"--"}</td>
+            <td>${m.cadera||"--"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  ` : ""}
+
+  <div class="footer">Reporte generado por ${nombre} · Keep Going 💪</div>
+  </body></html>`;
+
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+};
+

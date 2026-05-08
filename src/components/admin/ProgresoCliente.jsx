@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
+import { generateProgresoPDF } from "../../utils/pdf";
 
 const METRIC_GROUPS = [
   { label:"Básicas", icon:"⚖️", fields:[
@@ -53,6 +55,7 @@ export function ProgresoCliente({ selected, setMsg }) {
   const [pendingFotos, setPendingFotos] = useState([]);   // File objects
   const [previewUrls,  setPreviewUrls]  = useState([]);   // object URLs
   const [lightbox,     setLightbox]     = useState(null); // URL shown fullscreen
+  const brand = useBrand();
 
   const load = useCallback(async () => {
     if (!selected) return;
@@ -190,7 +193,10 @@ export function ProgresoCliente({ selected, setMsg }) {
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
             <span style={{fontWeight:600}}>Evaluaciones corporales <span style={{color:C.muted,fontWeight:400}}>({metricas.length})</span></span>
-            <Btn small grad onClick={()=>{setForm(emptyForm());setShowModal(true);}}>+ Nueva evaluación</Btn>
+            <div style={{display:"flex",gap:8}}>
+              <Btn small outline color={C.accent} onClick={() => generateProgresoPDF(selected, metricas, brand)}>📄 PDF Progreso</Btn>
+              <Btn small grad onClick={()=>{setForm(emptyForm());setShowModal(true);}}>+ Nueva evaluación</Btn>
+            </div>
           </div>
           {metricas.length===0?(
             <div style={{textAlign:"center",padding:"60px 0",color:C.muted}}>
