@@ -25,7 +25,7 @@ export const C = {
   borderGlow:  "rgba(46,92,184,0.40)",
   gradBtn:     "linear-gradient(135deg, var(--brand-accent, #2e5cb8) 0%, var(--brand-accent-mid, #3d6fd0) 100%)",
   gradCard:    "linear-gradient(145deg, rgba(15,28,46,0.9), rgba(7,16,29,0.95))",
-  gradBg:      "radial-gradient(ellipse at 20% 50%, rgba(13,30,60,0.6) 0%, transparent 60%), radial-gradient(ellipse at 80% 10%, rgba(26,29,75,0.35) 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, rgba(13,30,60,0.3) 0%, transparent 55%)",
+  gradBg:      "none",
   gradAccent:  "linear-gradient(135deg, var(--brand-accent, #2e5cb8), #7c8ef5)",
 };
 

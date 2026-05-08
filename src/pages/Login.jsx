@@ -88,86 +88,21 @@ export default function Login({ onLogin }) {
   };
 
   const inputStyle = (field) => ({
-    background: focused === field ? "rgba(10,20,40,0.95)" : "rgba(7,13,24,0.8)",
-    color: "#e2eeff",
-    border: `1px solid ${focused === field ? "rgba(56,189,248,0.5)" : "rgba(56,189,248,0.1)"}`,
-    borderRadius: 12,
-    padding: "13px 16px",
-    fontSize: 14,
-    width: "100%",
-    outline: "none",
-    fontFamily: "'Inter', sans-serif",
+    background: focused === field ? "rgba(15,28,46,0.95)" : "rgba(7,16,29,0.85)",
+    color: C.text,
+    border: `1px solid ${focused === field ? "rgba(46,92,184,0.55)" : "rgba(46,92,184,0.14)"}`,
+    borderRadius: 12, padding: "13px 16px", fontSize: 14,
+    width: "100%", outline: "none", fontFamily: "'Inter',sans-serif",
     transition: "all 0.25s ease",
-    boxShadow: focused === field
-      ? "0 0 0 3px rgba(56,189,248,0.1), 0 0 20px rgba(56,189,248,0.06)"
-      : "none",
+    boxShadow: focused === field ? "0 0 0 3px rgba(46,92,184,0.14)" : "none",
   });
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#03050a",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      position: "relative", overflow: "hidden",
-      fontFamily: "'Inter', sans-serif"
-    }}>
+    <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
       <style>{css}</style>
 
-      {/* ── Ambient orbs ── */}
-      <OrbBackground />
-
-      {/* ── Extra decorative rings ── */}
-      <div style={{
-        position: "absolute",
-        width: 800, height: 800, borderRadius: "50%",
-        border: "1px solid rgba(56,189,248,0.04)",
-        top: "50%", left: "50%",
-        transform: "translate(-50%,-50%)",
-        pointerEvents: "none", animation: "spinRing 60s linear infinite"
-      }}/>
-      <div style={{
-        position: "absolute",
-        width: 550, height: 550, borderRadius: "50%",
-        border: "1px solid rgba(129,140,248,0.05)",
-        top: "50%", left: "50%",
-        transform: "translate(-50%,-50%)",
-        pointerEvents: "none", animation: "spinRing 40s linear infinite reverse"
-      }}/>
-
       {/* ── Login Card ── */}
-      <div
-        className="animate-in"
-        style={{
-          width: "100%", maxWidth: 420,
-          padding: "44px 40px 36px",
-          background: "linear-gradient(160deg, rgba(12,24,48,0.85) 0%, rgba(7,13,24,0.95) 100%)",
-          borderRadius: 24,
-          border: "1px solid rgba(56,189,248,0.1)",
-          position: "relative",
-          backdropFilter: "blur(32px) saturate(180%)",
-          WebkitBackdropFilter: "blur(32px) saturate(180%)",
-          boxShadow: `
-            0 0 0 1px rgba(56,189,248,0.05),
-            0 32px 100px rgba(0,0,0,0.6),
-            0 0 80px rgba(8,47,73,0.4),
-            inset 0 1px 0 rgba(56,189,248,0.1),
-            inset 0 -1px 0 rgba(0,0,0,0.2)
-          `,
-          zIndex: 1,
-        }}
-      >
-        {/* Top shimmer line */}
-        <div style={{
-          position: "absolute", top: 0, left: "12%", right: "12%", height: 1,
-          background: "linear-gradient(90deg, transparent, rgba(56,189,248,0.7), rgba(129,140,248,0.5), transparent)",
-          borderRadius: "0 0 2px 2px"
-        }}/>
-
-        {/* Corner accents */}
-        <div style={{ position:"absolute", top:16, left:16, width:20, height:20, borderTop:"1px solid rgba(56,189,248,0.3)", borderLeft:"1px solid rgba(56,189,248,0.3)", borderRadius:"4px 0 0 0" }}/>
-        <div style={{ position:"absolute", top:16, right:16, width:20, height:20, borderTop:"1px solid rgba(56,189,248,0.3)", borderRight:"1px solid rgba(56,189,248,0.3)", borderRadius:"0 4px 0 0" }}/>
-        <div style={{ position:"absolute", bottom:16, left:16, width:20, height:20, borderBottom:"1px solid rgba(56,189,248,0.3)", borderLeft:"1px solid rgba(56,189,248,0.3)", borderRadius:"0 0 0 4px" }}/>
-        <div style={{ position:"absolute", bottom:16, right:16, width:20, height:20, borderBottom:"1px solid rgba(56,189,248,0.3)", borderRight:"1px solid rgba(56,189,248,0.3)", borderRadius:"0 0 4px 0" }}/>
+      <div className="animate-in" style={{ width:"100%",maxWidth:420,padding:"44px 40px 36px",background:"rgba(15,28,46,0.95)",borderRadius:24,border:"1px solid rgba(46,92,184,0.15)",position:"relative",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",boxShadow:"0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(46,92,184,0.08)",zIndex:1 }}>
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -230,27 +165,7 @@ export default function Login({ onLogin }) {
             />
           </div>
 
-          <button
-            onClick={submit}
-            disabled={loading}
-            className="btn-hover"
-            style={{
-              width: "100%", padding: "14px",
-              background: loading
-                ? "rgba(8,47,73,0.6)"
-                : "linear-gradient(135deg, #38bdf8 0%, #0ea5e9 60%, #818cf8 100%)",
-              border: "none", borderRadius: 12,
-              fontWeight: 800, fontSize: 14,
-              color: loading ? "#64748b" : "#030a14",
-              cursor: loading ? "not-allowed" : "pointer",
-              marginBottom: 16,
-              letterSpacing: "1.5px",
-              fontFamily: "'Space Grotesk', sans-serif",
-              boxShadow: loading ? "none" : "0 8px 32px rgba(56,189,248,0.35), 0 2px 0 rgba(255,255,255,0.1) inset",
-              transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
-              position: "relative", overflow: "hidden"
-            }}
-          >
+          <button onClick={submit} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:loading?"rgba(15,28,46,0.7)":"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:loading?"#6e87a2":"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:16,letterSpacing:"1.5px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none",transition:"all 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
             {loading ? "Verificando…" : "ENTRAR"}
           </button>
 
@@ -265,7 +180,7 @@ export default function Login({ onLogin }) {
                 textDecoration: "none",
                 letterSpacing: "0.2px"
               }}
-              onMouseEnter={e => e.currentTarget.style.color = "#38bdf8"}
+              onMouseEnter={e => e.currentTarget.style.color = "var(--brand-accent,#2e5cb8)"}
               onMouseLeave={e => e.currentTarget.style.color = "#475569"}
             >¿Olvidaste tu contraseña?</button>
           </div>
@@ -283,11 +198,11 @@ export default function Login({ onLogin }) {
               style={inputStyle("resetEmail")}
             />
           </div>
-          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{ width: "100%", padding: "14px", background: "linear-gradient(135deg, #38bdf8, #818cf8)", border: "none", borderRadius: 12, fontWeight: 800, fontSize: 14, color: "#030a14", cursor: loading ? "not-allowed" : "pointer", marginBottom: 14, letterSpacing: "1px", fontFamily: "'Space Grotesk', sans-serif", boxShadow: "0 8px 28px rgba(56,189,248,0.3)" }}>
+          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
             {loading ? "Enviando…" : "Enviar instrucciones"}
           </button>
           <div style={{ textAlign: "center" }}>
-            <button onClick={() => { setMode("login"); setErr(""); }} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif" }} onMouseEnter={e => e.currentTarget.style.color = "#38bdf8"} onMouseLeave={e => e.currentTarget.style.color = "#475569"}>
+            <button onClick={() => { setMode("login"); setErr(""); }} style={{ background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer",fontFamily:"'Inter',sans-serif" }} onMouseEnter={e=>e.currentTarget.style.color="var(--brand-accent,#2e5cb8)"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>
               Volver al login
             </button>
           </div>
@@ -303,7 +218,7 @@ export default function Login({ onLogin }) {
             <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Confirmar contraseña</div>
             <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" onFocus={() => setFocused("cp")} onBlur={() => setFocused(null)} style={inputStyle("cp")} />
           </div>
-          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{ width: "100%", padding: "14px", background: "linear-gradient(135deg, #38bdf8, #818cf8)", border: "none", borderRadius: 12, fontWeight: 800, fontSize: 14, color: "#030a14", cursor: loading ? "not-allowed" : "pointer", letterSpacing: "1px", fontFamily: "'Space Grotesk', sans-serif", boxShadow: "0 8px 28px rgba(56,189,248,0.3)" }}>
+          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
             {loading ? "Guardando…" : "Establecer contraseña"}
           </button>
         </>}
