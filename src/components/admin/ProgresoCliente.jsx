@@ -55,6 +55,8 @@ export function ProgresoCliente({ selected, setMsg }) {
   const [pendingFotos, setPendingFotos] = useState([]);   // File objects
   const [previewUrls,  setPreviewUrls]  = useState([]);   // object URLs
   const [lightbox,     setLightbox]     = useState(null); // URL shown fullscreen
+  const [editingId,    setEditingId]    = useState(null); // null=new, ID=editing
+  const [existingFotos,setExistingFotos]= useState([]);   // fotos ya guardadas al editar
   const brand = useBrand();
 
   const load = useCallback(async () => {
@@ -107,7 +109,8 @@ export function ProgresoCliente({ selected, setMsg }) {
   const saveMetrica = async () => {
     setSaving(true);
     try {
-      const data = { cliente_id: selected.id };
+      const data = {};
+      if (!editingId) data.cliente_id = selected.id;
       const STRING_KEYS = new Set(["fecha","presion_arterial","notas"]);
       Object.entries(form).forEach(([k, v]) => {
         if (v !== "" && v !== null && v !== undefined) {
@@ -115,20 +118,46 @@ export function ProgresoCliente({ selected, setMsg }) {
           else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
         }
       });
-      // Upload photos first
+      // Upload new photos
       const uploadedUrls = [];
       for (const file of pendingFotos) {
         const path = `${selected.id}/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
         const url = await storageUpload("progress-photos", path, file);
         uploadedUrls.push(url);
       }
-      if (uploadedUrls.length) data.fotos = uploadedUrls;
-      await dbPost("metricas_progreso", data);
-      setShowModal(false); setForm(emptyForm());
-      setPendingFotos([]); setPreviewUrls([]);
-      setMsg("✅ Evaluación guardada"); await load();
+      // Merge existing + new photos
+      const allFotos = [...existingFotos, ...uploadedUrls];
+      if (allFotos.length) data.fotos = allFotos;
+
+      if (editingId) {
+        await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
+        setMsg("✅ Evaluación actualizada");
+      } else {
+        await dbPost("metricas_progreso", data);
+        setMsg("✅ Evaluación guardada");
+      }
+      closeModal();
+      await load();
     } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
+  };
+
+  const closeModal = () => {
+    setShowModal(false); setForm(emptyForm());
+    setPendingFotos([]); setPreviewUrls([]);
+    setEditingId(null); setExistingFotos([]);
+  };
+
+  const startEdit = (m) => {
+    const filled = emptyForm();
+    Object.keys(filled).forEach(k => {
+      if (m[k] !== null && m[k] !== undefined && m[k] !== "") filled[k] = String(m[k]);
+    });
+    setForm(filled);
+    setEditingId(m.id);
+    setExistingFotos(m.fotos || []);
+    setPendingFotos([]); setPreviewUrls([]);
+    setShowModal(true);
   };
 
   const deleteFoto = async (metrica, fotoUrl) => {
@@ -213,7 +242,10 @@ export function ProgresoCliente({ selected, setMsg }) {
                     <span style={{fontWeight:700,color:C.accent,fontSize:15}}>📅 {fmtDate(m.fecha)}</span>
                     {idx===0&&<span style={{marginLeft:8,background:C.accentDeep+"50",color:C.accent,fontSize:11,padding:"2px 10px",borderRadius:20,fontWeight:600}}>Más reciente</span>}
                   </div>
-                  <Btn small danger onClick={()=>deleteMetrica(m.id)}>Borrar</Btn>
+                  <div style={{display:"flex",gap:6}}>
+                    <Btn small outline color={C.accentMid} onClick={()=>startEdit(m)}>✏️ Editar</Btn>
+                    <Btn small danger onClick={()=>deleteMetrica(m.id)}>Borrar</Btn>
+                  </div>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:10,marginBottom:m.notas?12:0}}>
                   {DISPLAY_KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
@@ -329,7 +361,7 @@ export function ProgresoCliente({ selected, setMsg }) {
 
       {/* ── MODAL NUEVA EVALUACIÓN ── */}
       {showModal&&(
-        <Modal title="Nueva evaluación corporal" onClose={()=>setShowModal(false)} wide>
+        <Modal title={editingId ? "Editar evaluación" : "Nueva evaluación corporal"} onClose={closeModal} wide>
           <Field label="Fecha de evaluación">
             <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)}/>
           </Field>
@@ -358,9 +390,24 @@ export function ProgresoCliente({ selected, setMsg }) {
             <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…"/>
           </Field>
 
+          {/* Fotos existentes cuando se edita */}
+          {editingId && existingFotos.length > 0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos actuales</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {existingFotos.map((url,i) => (
+                  <div key={i} style={{position:"relative",width:72,height:72}}>
+                    <img src={url} onClick={()=>setLightbox(url)} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:`2px solid ${C.border}`,cursor:"zoom-in"}} alt=""/>
+                    <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",textAlign:"center",cursor:"pointer",border:"none",fontWeight:700}}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Foto upload */}
           <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos de progreso</div>
+            <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
             <label style={{display:"inline-flex",alignItems:"center",gap:8,background:C.card,border:`1px dashed ${C.accent}`,borderRadius:10,padding:"10px 16px",cursor:"pointer",fontSize:13,color:C.accent,fontWeight:600}}>
               + Agregar fotos
               <input type="file" accept="image/*" multiple onChange={handleFotos} style={{display:"none"}}/>
@@ -382,8 +429,8 @@ export function ProgresoCliente({ selected, setMsg }) {
           </div>
 
           <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <Btn outline color={C.muted} onClick={()=>{setShowModal(false);setPendingFotos([]);setPreviewUrls([]); }}>Cancelar</Btn>
-            <Btn grad onClick={saveMetrica} disabled={saving}>{saving?"Subiendo…":"Guardar evaluación"}</Btn>
+            <Btn outline color={C.muted} onClick={closeModal}>Cancelar</Btn>
+            <Btn grad onClick={saveMetrica} disabled={saving}>{saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}</Btn>
           </div>
         </Modal>
       )}
