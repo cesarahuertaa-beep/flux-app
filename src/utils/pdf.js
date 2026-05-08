@@ -125,36 +125,46 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
     <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)})</div>
     <div class="macros">
       <div class="macro-box"><div class="macro-val">${latest.peso||"--"}</div><div class="macro-lbl">Peso (kg)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.imc||"--"}</div><div class="macro-lbl">IMC</div></div>
       <div class="macro-box"><div class="macro-val">${latest.grasa_pct||"--"}</div><div class="macro-lbl">Grasa (%)</div></div>
       <div class="macro-box"><div class="macro-val">${latest.musculo_pct||"--"}</div><div class="macro-lbl">Músculo (%)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.imc||"--"}</div><div class="macro-lbl">IMC</div></div>
+    </div>
+    <div class="macros" style="grid-template-columns:repeat(4,1fr);margin-bottom:30px">
+      <div class="macro-box"><div class="macro-val">${latest.agua_pct||"--"}</div><div class="macro-lbl">Agua (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.cintura||"--"}</div><div class="macro-lbl">Cintura (cm)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.glucosa||"--"}</div><div class="macro-lbl">Glucosa (mg/dL)</div></div>
+      <div class="macro-box"><div class="macro-val">${latest.presion_arterial||"--"}</div><div class="macro-lbl">Presión</div></div>
     </div>
   ` : `<div style="text-align:center;padding:40px;color:#999">No hay evaluaciones registradas aún.</div>`}
 
   ${metricas.length > 0 ? `
-    <div class="title-sec">Historial Evolutivo</div>
+    <div class="title-sec">Composición Corporal</div>
     <table>
-      <thead>
-        <tr>
-          <th style="text-align:left">Fecha</th>
-          <th>Peso (kg)</th>
-          <th>Grasa (%)</th>
-          <th>Músculo (%)</th>
-          <th>Cintura (cm)</th>
-          <th>Cadera (cm)</th>
-        </tr>
-      </thead>
+      <thead><tr>
+        <th style="text-align:left">Fecha</th>
+        <th>Peso (kg)</th><th>IMC</th><th>Grasa (%)</th><th>Músculo (%)</th><th>Agua (%)</th>
+      </tr></thead>
       <tbody>
-        ${metricas.map(m => `
-          <tr>
-            <td class="date-col">${fmtDate(m.fecha)}</td>
-            <td>${m.peso||"--"}</td>
-            <td>${m.grasa_pct||"--"}</td>
-            <td>${m.musculo_pct||"--"}</td>
-            <td>${m.cintura||"--"}</td>
-            <td>${m.cadera||"--"}</td>
-          </tr>
-        `).join("")}
+        ${metricas.map(m => `<tr>
+          <td class="date-col">${fmtDate(m.fecha)}</td>
+          <td>${m.peso||"--"}</td><td>${m.imc||"--"}</td>
+          <td>${m.grasa_pct||"--"}</td><td>${m.musculo_pct||"--"}</td><td>${m.agua_pct||"--"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+
+    <div class="title-sec">Medidas y Clínicos</div>
+    <table>
+      <thead><tr>
+        <th style="text-align:left">Fecha</th>
+        <th>Cintura (cm)</th><th>Cadera (cm)</th><th>Glucosa</th><th>Colesterol</th><th>Presión</th>
+      </tr></thead>
+      <tbody>
+        ${metricas.map(m => `<tr>
+          <td class="date-col">${fmtDate(m.fecha)}</td>
+          <td>${m.cintura||"--"}</td><td>${m.cadera||"--"}</td>
+          <td>${m.glucosa||"--"}</td><td>${m.colesterol||"--"}</td><td>${m.presion_arterial||"--"}</td>
+        </tr>`).join("")}
       </tbody>
     </table>
   ` : ""}
