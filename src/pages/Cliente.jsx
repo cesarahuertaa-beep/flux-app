@@ -54,7 +54,7 @@ export default function ClienteView({ session, onLogout }) {
 
   const getSemanasConFecha = (rutina) => {
     if (!rutina) return [];
-    const inicio = rutina.fecha_inicio ? new Date(rutina.fecha_inicio) : new Date();
+    const inicio = rutina.fecha_inicio ? new Date(rutina.fecha_inicio + "T12:00:00") : new Date();
     return Array.from({length:rutina.semanas}, (_,i) => {
       const start=new Date(inicio); start.setDate(start.getDate()+i*7);
       const end=new Date(start); end.setDate(end.getDate()+6);
