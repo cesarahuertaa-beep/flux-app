@@ -78,11 +78,13 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
 export const generateProgresoPDF = (cliente, metricas, brand) => {
   if (!cliente) return;
   const win = window.open("", "_blank");
+  if (!win) { alert("Por favor permite las ventanas emergentes (pop-ups) para generar el PDF."); return; }
   
-  const logoUrl = brand?.logo_url;
+  const logoUrl = brand?.logo_url && brand.logo_url !== "/logo.png" ? brand.logo_url : null;
   const nombre  = brand?.nombre_marca || "FLUX";
   const accent  = brand?.color_primario || "#38bdf8";
-  const { dark, light } = getDarkAndLight(accent);
+  const dark    = darken(accent, 60);
+  const light   = tint(accent, 210);
 
   const fmtDate = d => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"long", day:"numeric" });
   
