@@ -5,6 +5,7 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
+import { ProgresoCliente } from "./ProgresoCliente";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca }) {
   const brand = useBrand();
@@ -120,7 +121,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias,brand)}>📄 PDF Nutrición</Btn>}
       </div>
       <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["nutri","🥗","Nutrición"],["deporte","🏋️","Rutinas"]].map(([k,ic,lb])=>(
+        {[["nutri","🥗","Nutrición"],["deporte","🏋️","Rutinas"],["progreso","📊","Progreso"]].map(([k,ic,lb])=>(
           <button key={k} onClick={()=>setSubtab(k)} style={{padding:"8px 20px",borderRadius:20,background:subtab===k?C.gradBtn:C.card,color:subtab===k?"#000":C.muted,fontWeight:subtab===k?700:400,fontSize:13,border:`1px solid ${subtab===k?C.accent:C.border}`,cursor:"pointer"}}>
             {ic} {lb}
           </button>
@@ -172,6 +173,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </div>
             ))}
           </div>
+        )}
+        {subtab==="progreso"&&(
+          <ProgresoCliente selected={selected} setMsg={setMsg}/>
         )}
       </>}
 

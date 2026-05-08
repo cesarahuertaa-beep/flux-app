@@ -20,6 +20,7 @@ export default function ClienteView({ session, onLogout }) {
   const [editVal, setEditVal] = useState("");
   const [loading, setLoading] = useState(true);
   const [gifPreview, setGifPreview] = useState(null);
+  const [metricas, setMetricas] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -38,6 +39,8 @@ export default function ClienteView({ session, onLogout }) {
           const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
           const pm={}; ps.forEach(p=>{pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`]=p.valor;}); setProgreso(pm);
         }
+        const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`);
+        setMetricas(ms);
       } catch(e){ console.error(e); }
       setLoading(false);
     })();
@@ -81,7 +84,7 @@ export default function ClienteView({ session, onLogout }) {
       />
 
       <TabBar
-        tabs={[["nutricion","🥗","Nutrición"],["deporte","🏋️","Entrenamiento"]]}
+        tabs={[["nutricion","🥗","Nutrición"],["deporte","🏋️","Entrenamiento"],["progreso","📊","Progreso"]]}
         active={tab}
         onChange={setTab}
       />
@@ -428,6 +431,81 @@ export default function ClienteView({ session, onLogout }) {
                   </div>
                 )}
               </>}
+            </div>
+          )}
+
+          {/* ── PROGRESO ── */}
+          {tab==="progreso"&&(
+            <div className="animate-in">
+              {metricas.length===0?(
+                <div style={{textAlign:"center",padding:"70px 0",color:C.muted}}>
+                  <div style={{fontSize:48,marginBottom:16}}>📊</div>
+                  <div style={{fontSize:16,fontWeight:600,marginBottom:8,color:C.text}}>Sin evaluaciones aún</div>
+                  <div style={{fontSize:13}}>Tu nutriólogo registrará tus métricas en cada consulta.</div>
+                </div>
+              ):(
+                <div>
+                  {/* Mini-chart de peso */}
+                  {metricas.filter(m=>m.peso).length>=2&&(()=>{
+                    const pts=[...metricas].reverse().filter(m=>m.peso);
+                    const vals=pts.map(m=>parseFloat(m.peso));
+                    const mn=Math.min(...vals),mx=Math.max(...vals),rng=mx-mn||1;
+                    const W=320,H=80,PAD=12;
+                    const coords=pts.map((m,i)=>({
+                      x:PAD+(i/Math.max(pts.length-1,1))*(W-PAD*2),
+                      y:PAD+(1-(parseFloat(m.peso)-mn)/rng)*(H-PAD*2),
+                      v:m.peso
+                    }));
+                    const path=coords.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+                    return (
+                      <div style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:20}}>
+                        <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:10}}>Evolución de peso (kg)</div>
+                        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible"}}>
+                          <path d={path} fill="none" stroke={C.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
+                          {coords.map((p,i)=>(
+                            <g key={i}>
+                              <circle cx={p.x} cy={p.y} r={5} fill={C.accent} stroke={C.card} strokeWidth={2}/>
+                              <text x={p.x} y={p.y-8} textAnchor="middle" fontSize={9} fill={C.muted}>{p.v}kg</text>
+                            </g>
+                          ))}
+                        </svg>
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{fontSize:13,fontWeight:600,color:C.muted,marginBottom:12,textTransform:"uppercase",letterSpacing:"0.5px"}}>Historial de evaluaciones</div>
+                  {metricas.map((m,idx)=>{
+                    const prev=metricas[idx+1];
+                    const fmtD=d=>new Date(d+"T12:00:00").toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
+                    const KEYS=[
+                      {key:"peso",label:"Peso",unit:"kg",icon:"⚖️"},{key:"imc",label:"IMC",unit:"",icon:"📐"},
+                      {key:"grasa_pct",label:"Grasa",unit:"%",icon:"🔴"},{key:"musculo_pct",label:"Músculo",unit:"%",icon:"💪"},
+                      {key:"cintura",label:"Cintura",unit:"cm",icon:"📏"},{key:"cadera",label:"Cadera",unit:"cm",icon:"📏"},
+                    ];
+                    return (
+                      <div key={m.id} className="animate-in" style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:12,animationDelay:`${idx*0.05}s`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                          <span style={{fontWeight:700,color:C.accent}}>📅 {fmtD(m.fecha)}</span>
+                          {idx===0&&<span style={{background:C.accentDeep+"50",color:C.accent,fontSize:11,padding:"2px 10px",borderRadius:20,fontWeight:600}}>Más reciente</span>}
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:10}}>
+                          {KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
+                            const d=prev&&prev[f.key]!=null&&prev[f.key]!==""?parseFloat(m[f.key])-parseFloat(prev[f.key]):null;
+                            return (
+                              <div key={f.key} style={{background:C.bg,borderRadius:10,padding:"10px 8px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+                                <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{f.icon} {f.label}</div>
+                                <div style={{fontSize:20,fontWeight:800,color:C.text,fontFamily:"'Rajdhani',sans-serif"}}>{m[f.key]}{f.unit&&<span style={{fontSize:10,fontWeight:400,color:C.muted}}> {f.unit}</span>}</div>
+                                {d!==null&&d!==0&&<div style={{fontSize:10,color:d<0?"#4ade80":"#f87171",marginTop:2,fontWeight:600}}>{d>0?"↑":"↓"} {Math.abs(d).toFixed(1)}{f.unit}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {m.notas&&<div style={{fontSize:12,color:C.muted,marginTop:10,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`}}>📝 {m.notas}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </>}
