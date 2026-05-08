@@ -30,6 +30,16 @@ export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), 
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
 export const dbUpsert = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers:{Prefer:"resolution=merge-duplicates,return=representation"} });
 
+export const storageUpload = async (bucket, path, file) => {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
+    method:"POST",
+    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":file.type },
+    body:file
+  });
+  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
+};
+
 // ── Multi-tenancy: Profile del usuario logueado ──
 let _profileId = null;
 export const setProfileId   = (id) => { _profileId = id; };

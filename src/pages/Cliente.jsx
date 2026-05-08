@@ -501,6 +501,18 @@ export default function ClienteView({ session, onLogout }) {
                           })}
                         </div>
                         {m.notas&&<div style={{fontSize:12,color:C.muted,marginTop:10,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`}}>📝 {m.notas}</div>}
+                        {m.fotos&&m.fotos.length>0&&(
+                          <div style={{marginTop:12}}>
+                            <div style={{fontSize:10,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({m.fotos.length})</div>
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                              {m.fotos.map((url,fi)=>(
+                                <img key={fi} src={url} onClick={()=>setGifPreview(url)}
+                                  style={{width:72,height:72,objectFit:"cover",borderRadius:10,cursor:"zoom-in",border:`2px solid ${C.border}`}}
+                                  alt={`foto ${fi+1}`}/>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

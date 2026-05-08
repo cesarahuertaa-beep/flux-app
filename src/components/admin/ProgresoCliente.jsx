@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field } from "../ui";
-import { dbGet, dbPost, dbDel } from "../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 
 const METRIC_GROUPS = [
   { label:"Básicas", icon:"⚖️", fields:[
@@ -42,14 +42,17 @@ const emptyForm = () => ({
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 
 export function ProgresoCliente({ selected, setMsg }) {
-  const [metricas, setMetricas] = useState([]);
-  const [rutinas,  setRutinas]  = useState([]);
-  const [progreso, setProgreso] = useState({});
-  const [loading,  setLoading]  = useState(false);
-  const [saving,   setSaving]   = useState(false);
-  const [showModal,setShowModal]= useState(false);
-  const [form,     setForm]     = useState(emptyForm());
-  const [sub,      setSub]      = useState("evaluaciones");
+  const [metricas,     setMetricas]     = useState([]);
+  const [rutinas,      setRutinas]      = useState([]);
+  const [progreso,     setProgreso]     = useState({});
+  const [loading,      setLoading]      = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [showModal,    setShowModal]    = useState(false);
+  const [form,         setForm]         = useState(emptyForm());
+  const [sub,          setSub]          = useState("evaluaciones");
+  const [pendingFotos, setPendingFotos] = useState([]);   // File objects
+  const [previewUrls,  setPreviewUrls]  = useState([]);   // object URLs
+  const [lightbox,     setLightbox]     = useState(null); // URL shown fullscreen
 
   const load = useCallback(async () => {
     if (!selected) return;
@@ -86,6 +89,18 @@ export function ProgresoCliente({ selected, setMsg }) {
     });
   };
 
+  const handleFotos = (e) => {
+    const files = Array.from(e.target.files);
+    setPendingFotos(prev => [...prev, ...files]);
+    setPreviewUrls(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
+  };
+
+  const removePendingFoto = (idx) => {
+    URL.revokeObjectURL(previewUrls[idx]);
+    setPendingFotos(prev => prev.filter((_,i) => i !== idx));
+    setPreviewUrls(prev => prev.filter((_,i) => i !== idx));
+  };
+
   const saveMetrica = async () => {
     setSaving(true);
     try {
@@ -93,19 +108,30 @@ export function ProgresoCliente({ selected, setMsg }) {
       const STRING_KEYS = new Set(["fecha","presion_arterial","notas"]);
       Object.entries(form).forEach(([k, v]) => {
         if (v !== "" && v !== null && v !== undefined) {
-          if (STRING_KEYS.has(k)) {
-            data[k] = v;
-          } else {
-            const n = parseFloat(v);
-            data[k] = isNaN(n) ? v : n;
-          }
+          if (STRING_KEYS.has(k)) { data[k] = v; }
+          else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
         }
       });
+      // Upload photos first
+      const uploadedUrls = [];
+      for (const file of pendingFotos) {
+        const path = `${selected.id}/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
+        const url = await storageUpload("progress-photos", path, file);
+        uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length) data.fotos = uploadedUrls;
       await dbPost("metricas_progreso", data);
       setShowModal(false); setForm(emptyForm());
+      setPendingFotos([]); setPreviewUrls([]);
       setMsg("✅ Evaluación guardada"); await load();
     } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
+  };
+
+  const deleteFoto = async (metrica, fotoUrl) => {
+    const newFotos = (metrica.fotos || []).filter(u => u !== fotoUrl);
+    await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
+    await load();
   };
 
   const deleteMetrica = async (id) => {
@@ -201,7 +227,27 @@ export function ProgresoCliente({ selected, setMsg }) {
                     );
                   })}
                 </div>
-                {m.notas&&<div style={{fontSize:12,color:C.muted,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`}}>📝 {m.notas}</div>}
+                {m.notas&&<div style={{fontSize:12,color:C.muted,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,marginTop:10}}>📝 {m.notas}</div>}
+                {/* Fotos de progreso */}
+                {m.fotos&&m.fotos.length>0&&(
+                  <div style={{marginTop:12}}>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({m.fotos.length})</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {m.fotos.map((url,fi)=>(
+                        <div key={fi} style={{position:"relative",width:80,height:80}}>
+                          <img src={url} onClick={()=>setLightbox(url)}
+                            style={{width:80,height:80,objectFit:"cover",borderRadius:10,cursor:"zoom-in",border:`2px solid ${C.border}`}}
+                            alt={`foto ${fi+1}`}/>
+                          <button onClick={()=>deleteFoto(m,url)} style={{
+                            position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",
+                            borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",
+                            textAlign:"center",cursor:"pointer",border:"none",fontWeight:700
+                          }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -305,11 +351,46 @@ export function ProgresoCliente({ selected, setMsg }) {
           <Field label="Notas">
             <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…"/>
           </Field>
+
+          {/* Foto upload */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos de progreso</div>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,background:C.card,border:`1px dashed ${C.accent}`,borderRadius:10,padding:"10px 16px",cursor:"pointer",fontSize:13,color:C.accent,fontWeight:600}}>
+              + Agregar fotos
+              <input type="file" accept="image/*" multiple onChange={handleFotos} style={{display:"none"}}/>
+            </label>
+            {previewUrls.length>0&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}>
+                {previewUrls.map((url,i)=>(
+                  <div key={i} style={{position:"relative",width:72,height:72}}>
+                    <img src={url} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:`2px solid ${C.accent}`}} alt=""/>
+                    <button onClick={()=>removePendingFoto(i)} style={{
+                      position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",
+                      borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",
+                      textAlign:"center",cursor:"pointer",border:"none",fontWeight:700
+                    }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <Btn outline color={C.muted} onClick={()=>setShowModal(false)}>Cancelar</Btn>
-            <Btn grad onClick={saveMetrica} disabled={saving}>{saving?"Guardando…":"Guardar evaluación"}</Btn>
+            <Btn outline color={C.muted} onClick={()=>{setShowModal(false);setPendingFotos([]);setPreviewUrls([]); }}>Cancelar</Btn>
+            <Btn grad onClick={saveMetrica} disabled={saving}>{saving?"Subiendo…":"Guardar evaluación"}</Btn>
           </div>
         </Modal>
+      )}
+      {/* Lightbox */}
+      {lightbox&&(
+        <div onClick={()=>setLightbox(null)} style={{
+          position:"fixed",top:0,left:0,width:"100%",height:"100%",
+          background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",
+          justifyContent:"center",zIndex:9999,cursor:"zoom-out"
+        }}>
+          <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,objectFit:"contain",boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} alt=""/>
+          <div style={{position:"absolute",top:20,right:24,color:"#fff",fontSize:28,cursor:"pointer",fontWeight:700}} onClick={()=>setLightbox(null)}>✕</div>
+        </div>
       )}
     </div>
   );
