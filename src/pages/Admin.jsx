@@ -15,6 +15,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
   const [loading, setLoading]               = useState(true);
   const [showNewClient, setShowNewClient]   = useState(false);
   const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
+  const [editClient, setEditClient]         = useState(null);
+  const [editClientForm, setEditClientForm] = useState({ nombre:"", telefono:"", objetivo:"" });
   const [saving, setSaving]                 = useState(false);
   const [msg, setMsg]                       = useState("");
   const [biblioteca, setBiblioteca]         = useState([]);
@@ -76,6 +78,17 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       await loadClientes();
       setMsg(`✅ Cliente ${!c.activo ? "activado" : "desactivado"}`);
     } catch(e) { setMsg("❌ Error: "+e.message); }
+  };
+
+  const saveEditClient = async () => {
+    setSaving(true);
+    try {
+      await dbPatch(`clientes?id=eq.${editClient.id}`, editClientForm);
+      setMsg("✅ Cliente actualizado");
+      setEditClient(null);
+      loadClientes();
+    } catch(e) { setMsg("❌ " + e.message); }
+    setSaving(false);
   };
 
   const activarModoAtleta = async () => {
@@ -295,6 +308,12 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
                           Programar
                         </Btn>
                       )}
+                      <Btn small outline color={C.muted} onClick={()=>{
+                        setEditClient(c);
+                        setEditClientForm({ nombre:c.nombre||"", telefono:c.telefono||"", objetivo:c.objetivo||"" });
+                      }}>
+                        ✏️ Editar
+                      </Btn>
                       <Btn small outline color={c.activo ? "rgba(239,68,68,0.8)" : "rgba(56,189,248,0.8)"} onClick={()=>toggleActivo(c)}>
                         {c.activo ? "Desactivar" : "Activar"}
                       </Btn>
@@ -366,6 +385,27 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
             <Btn outline color={C.muted} onClick={()=>setShowNewClient(false)}>Cancelar</Btn>
             <Btn grad onClick={createClient} disabled={saving}>
               {saving ? "Enviando invitación…" : "Crear y enviar invitación"}
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal editar cliente */}
+      {editClient && (
+        <Modal title={`✏️ Editar cliente — ${editClient.email}`} onClose={()=>setEditClient(null)}>
+          <Field label="Nombre completo">
+            <input value={editClientForm.nombre} onChange={e=>setEditClientForm(p=>({...p,nombre:e.target.value}))} />
+          </Field>
+          <Field label="Teléfono (WhatsApp)">
+            <input type="tel" value={editClientForm.telefono} onChange={e=>setEditClientForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
+          </Field>
+          <Field label="Objetivo">
+            <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} />
+          </Field>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:10}}>
+            <Btn outline color={C.muted} onClick={()=>setEditClient(null)}>Cancelar</Btn>
+            <Btn grad onClick={saveEditClient} disabled={saving}>
+              {saving ? "Guardando…" : "Guardar cambios"}
             </Btn>
           </div>
         </Modal>

@@ -14,6 +14,8 @@ export function GestionEquipo({ setMsg, profileId }) {
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving]         = useState(false);
   const [form, setForm]             = useState({ nombre: "", email: "", telefono: "" });
+  const [editUser, setEditUser]     = useState(null);
+  const [editForm, setEditForm]     = useState({ nombre: "", telefono: "" });
 
   const myId = profileId || getProfileId();
 
@@ -57,6 +59,17 @@ export function GestionEquipo({ setMsg, profileId }) {
       setMsg(p.activo ? "🔴 Acceso suspendido" : "🟢 Acceso activado");
       load();
     } catch (e) { setMsg("❌ " + e.message); }
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      await dbPatch(`profiles?id=eq.${editUser.id}`, { nombre: editForm.nombre, telefono: editForm.telefono });
+      setMsg("✅ Colaborador actualizado");
+      setEditUser(null);
+      load();
+    } catch (e) { setMsg("❌ " + e.message); }
+    setSaving(false);
   };
 
   return (
@@ -152,6 +165,12 @@ export function GestionEquipo({ setMsg, profileId }) {
 
               {/* Acciones */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <Btn small outline color={C.muted} onClick={() => {
+                  setEditUser(p);
+                  setEditForm({ nombre: p.nombre || "", telefono: p.telefono || "" });
+                }}>
+                  ✏️ Editar
+                </Btn>
                 <Btn
                   small outline
                   color={p.activo !== false ? "#ef4444" : C.accent}
@@ -206,6 +225,32 @@ export function GestionEquipo({ setMsg, profileId }) {
             <Btn outline color={C.muted} onClick={() => setShowInvite(false)}>Cancelar</Btn>
             <Btn grad onClick={invite} disabled={saving}>
               {saving ? "Enviando invitación…" : "Invitar colaborador"}
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Editar */}
+      {editUser && (
+        <Modal title={`✏️ Editar colaborador — ${editUser.email}`} onClose={() => setEditUser(null)}>
+          <Field label="Nombre completo">
+            <input
+              value={editForm.nombre}
+              onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))}
+            />
+          </Field>
+          <Field label="Teléfono (WhatsApp)">
+            <input
+              type="tel"
+              value={editForm.telefono}
+              onChange={e => setEditForm(p => ({ ...p, telefono: e.target.value }))}
+              placeholder="Ej. +525512345678"
+            />
+          </Field>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
+            <Btn outline color={C.muted} onClick={() => setEditUser(null)}>Cancelar</Btn>
+            <Btn grad onClick={saveEdit} disabled={saving}>
+              {saving ? "Guardando…" : "Guardar cambios"}
             </Btn>
           </div>
         </Modal>
