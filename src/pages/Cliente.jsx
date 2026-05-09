@@ -21,6 +21,7 @@ export default function ClienteView({ session, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [gifPreview, setGifPreview] = useState(null);
   const [metricas, setMetricas] = useState([]);
+  const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -516,7 +517,7 @@ export default function ClienteView({ session, onLogout }) {
                             <div style={{fontSize:10,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({m.fotos.length})</div>
                             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                               {m.fotos.map((url,fi)=>(
-                                <img key={fi} src={url} onClick={()=>setGifPreview(url)}
+                                <img key={fi} src={url} onClick={()=>setLightbox(url)}
                                   style={{width:72,height:72,objectFit:"cover",borderRadius:10,cursor:"zoom-in",border:`2px solid ${C.border}`}}
                                   alt={`foto ${fi+1}`}/>
                               ))}
@@ -586,6 +587,18 @@ export default function ClienteView({ session, onLogout }) {
             )}
             <Btn grad onClick={()=>setGifPreview(null)} style={{width:"100%"}}>Cerrar</Btn>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox para fotos de progreso */}
+      {lightbox&&(
+        <div onClick={()=>setLightbox(null)} style={{
+          position:"fixed",top:0,left:0,width:"100%",height:"100%",
+          background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",
+          justifyContent:"center",zIndex:9999,cursor:"zoom-out"
+        }}>
+          <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,objectFit:"contain",boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} alt=""/>
+          <div style={{position:"absolute",top:20,right:24,color:"#fff",fontSize:28,cursor:"pointer",fontWeight:700}} onClick={()=>setLightbox(null)}>✕</div>
         </div>
       )}
     </div>
