@@ -146,6 +146,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       <Header
         role={isSuperadmin ? "superadmin" : "admin"}
         onLogout={onLogout}
+        onRefresh={() => {
+          if (tab === "clientes") loadClientes();
+          else if (tab === "agenda") load();
+          else load();
+        }}
         extra={
           !isSuperadmin && (
             <button

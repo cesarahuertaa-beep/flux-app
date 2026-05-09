@@ -67,14 +67,19 @@ export const FluxLogo = ({ size=28, animated=false, large=false }) => {
   );
 };
 
-export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
+export const Header = ({ role, nombre, objetivo, onLogout, onRefresh, extra }) => (
   <div style={{ background:"rgba(4,8,15,0.88)",borderBottom:"1px solid rgba(46,92,184,0.10)",padding:"12px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50,backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",boxShadow:"0 1px 0 rgba(46,92,184,0.06)" }}>
     <FluxLogo size={24} />
     <div style={{ display:"flex",alignItems:"center",gap:12 }}>
       {extra}
       {role==="admin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(46,92,184,0.12)",border:"1px solid rgba(46,92,184,0.25)",color:"var(--brand-accent,#2e5cb8)",fontFamily:"'Inter',sans-serif" }}>⚡ ADMIN</div>}
-      {role==="superadmin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(124,142,245,0.12)",border:"1px solid rgba(124,142,245,0.25)",color:"#7c8ef5",fontFamily:"'Inter',sans-serif" }}>✦ SUPERADMIN</div>}
+      {role==="superadmin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(124,142,245,0.12)",border:"1px solid rgba(124,142,245,0.25)",color:"#7c8ef5",fontFamily:"'Inter',sans-serif" }}>❆ SUPERADMIN</div>}
       {nombre&&<div style={{ textAlign:"right" }}><div style={{ fontSize:13,fontWeight:600,color:C.text }}>{nombre}</div>{objetivo&&<div style={{ fontSize:11,color:C.muted }}>{objetivo}</div>}</div>}
+      {onRefresh && (
+        <button onClick={onRefresh} className="btn-hover" style={{ padding:"7px 14px",borderRadius:9,background:"rgba(46,92,184,0.04)",border:"1px solid rgba(46,92,184,0.12)",color:C.muted,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif",transition:"all 0.2s",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap" }}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.12)";e.currentTarget.style.color="var(--brand-accent,#2e5cb8)";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.04)";e.currentTarget.style.color=C.muted;}}>&#x21BB; Actualizar datos</button>
+      )}
       <button onClick={onLogout} className="btn-hover" style={{ padding:"7px 16px",borderRadius:9,background:"rgba(46,92,184,0.06)",border:"1px solid rgba(46,92,184,0.15)",color:C.mutedLight,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif",transition:"all 0.2s" }}
         onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.14)";e.currentTarget.style.color="var(--brand-accent,#2e5cb8)";}}
         onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.06)";e.currentTarget.style.color=C.mutedLight;}}>Salir</button>
