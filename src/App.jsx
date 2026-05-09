@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { setAuthToken } from "./lib/supabase";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
@@ -6,28 +6,11 @@ import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
 
 export default function App() {
-  const [session,    setSession]    = useState(() => {
-    const saved = localStorage.getItem("flux_session");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [session,    setSession]    = useState(null);
   const [atletaData, setAtletaData] = useState(null);
 
-  // Restaurar el token de autenticación si hay sesión guardada
-  useEffect(() => {
-    if (session?.token) setAuthToken(session.token);
-  }, [session]);
-
-  const handleLogin       = (s) => { 
-    if (s.token) setAuthToken(s.token); 
-    setSession(s); 
-    localStorage.setItem("flux_session", JSON.stringify(s));
-  };
-  const handleLogout      = ()  => { 
-    setAuthToken(null); 
-    setSession(null); 
-    setAtletaData(null); 
-    localStorage.removeItem("flux_session");
-  };
+  const handleLogin       = (s) => { if (s.token) setAuthToken(s.token); setSession(s); };
+  const handleLogout      = ()  => { setAuthToken(null); setSession(null); setAtletaData(null); };
   const handleModoAtleta  = (clienteRecord) => setAtletaData(clienteRecord);
   const handleBackToAdmin = () => setAtletaData(null);
 
