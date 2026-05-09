@@ -17,6 +17,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
   const [msg, setMsg]                       = useState("");
   const [biblioteca, setBiblioteca]         = useState([]);
   const [nutriologoMap, setNutrioMap]       = useState({});
+  const [searchClientes, setSearchClientes] = useState("");
 
   // Filtro por nutriologo_id — superadmin ve todo, nutriólogo ve los suyos
   const myId = profileId || getProfileId();
@@ -101,6 +102,10 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
   };
 
   const activeCount = clientes.filter(c=>c.activo).length;
+  const filteredClientes = clientes.filter(c =>
+    c.nombre?.toLowerCase().includes(searchClientes.toLowerCase()) ||
+    c.email?.toLowerCase().includes(searchClientes.toLowerCase())
+  );
 
   // Tabs: nutriólogo normal tiene 3, superadmin tiene 4
   const tabs = [
@@ -165,22 +170,38 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
         {/* ── TAB CLIENTES ── */}
         {tab==="clientes" && (
           <div className="animate-in">
-            <div style={{
-              display:"flex", justifyContent:"space-between",
-              alignItems:"center", marginBottom:24, flexWrap:"wrap", gap:12
-            }}>
-              <div>
-                <h2 style={{
-                  fontFamily:"'Space Grotesk',sans-serif",
-                  fontWeight:700, fontSize:24,
-                  color:"#e2eeff", letterSpacing:"0.3px", marginBottom:4
-                }}>Clientes</h2>
-                <div style={{fontSize:13,color:"#64748b"}}>
-                  {activeCount} activos· {clientes.length - activeCount} inactivos
+              <div style={{
+                display:"flex", justifyContent:"space-between",
+                alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:12
+              }}>
+                <div>
+                  <h2 style={{
+                    fontFamily:"'Space Grotesk',sans-serif",
+                    fontWeight:700, fontSize:24,
+                    color:"#e2eeff", letterSpacing:"0.3px", marginBottom:4
+                  }}>Clientes</h2>
+                  <div style={{fontSize:13,color:"#64748b"}}>
+                    {filteredClientes.filter(c=>c.activo).length} activos· {filteredClientes.filter(c=>!c.activo).length} inactivos
+                    {searchClientes && <span style={{color:"var(--brand-accent,#2e5cb8)",marginLeft:6}}>({filteredClientes.length} de {clientes.length})</span>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  <input
+                    value={searchClientes}
+                    onChange={e=>setSearchClientes(e.target.value)}
+                    placeholder="🔍 Buscar cliente…"
+                    style={{
+                      background:"rgba(7,16,29,0.7)",
+                      border:"1px solid rgba(46,92,184,0.18)",
+                      borderRadius:9, padding:"8px 14px",
+                      color:"#e2eeff", fontSize:13,
+                      fontFamily:"'Inter',sans-serif",
+                      outline:"none", width:200
+                    }}
+                  />
+                  <Btn grad onClick={()=>setShowNewClient(true)}>+ Nuevo cliente</Btn>
                 </div>
               </div>
-              <Btn grad onClick={()=>setShowNewClient(true)}>+ Nuevo cliente</Btn>
-            </div>
 
             {loading ? (
               <div style={{ textAlign:"center", padding:"80px 0", color:"#64748b", fontSize:14 }}>
@@ -194,19 +215,18 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
                 }}/>
                 Cargando clientes…
               </div>
-            ) : clientes.length===0 ? (
+            ) : filteredClientes.length === 0 ? (
               <div style={{
-                textAlign:"center", padding:"80px 0", color:"#475569",
+                textAlign:"center", padding:"60px 0", color:"#475569",
                 background:"rgba(7,13,24,0.4)", borderRadius:16,
                 border:"1px solid rgba(56,189,248,0.05)"
               }}>
-                <div style={{fontSize:48, marginBottom:16, opacity:0.3}}>👥</div>
-                <div style={{fontSize:16, fontWeight:600, marginBottom:8, color:"#64748b"}}>Sin clientes aún</div>
-                <div style={{fontSize:13, color:"#475569"}}>Invita al primer cliente para comenzar</div>
+                <div style={{fontSize:40,marginBottom:12,opacity:0.3}}>🔍</div>
+                <div style={{fontSize:15,fontWeight:600,color:"#64748b"}}>Sin resultados para "{searchClientes}"</div>
               </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:10}}>
-                {clientes.map((c, i) => (
+                {filteredClientes.map((c, i) => (
                   <div
                     key={c.id}
                     className="card-hover animate-in"

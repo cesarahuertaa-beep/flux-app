@@ -58,6 +58,7 @@ export function Nutriologos({ setMsg }) {
   const [showInvite, setShowInvite]         = useState(false);
   const [showEdit, setShowEdit]             = useState(null);
   const [saving, setSaving]                 = useState(false);
+  const [searchNutris, setSearchNutris]     = useState("");
   const [uploadingLogo, setUploadingLogo]   = useState(false);
   const [form, setForm] = useState({ nombre:"", email:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
   const [editForm, setEditForm] = useState({});
@@ -134,11 +135,32 @@ export function Nutriologos({ setMsg }) {
             {nutriologos.length} registrado{nutriologos.length !== 1 ? "s" : ""}
           </div>
         </div>
-        <Btn grad onClick={() => setShowInvite(true)}>+ Invitar nutriólogo</Btn>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <input
+            value={searchNutris}
+            onChange={e=>setSearchNutris(e.target.value)}
+            placeholder="🔍 Buscar nutriólogo…"
+            style={{
+              background:"rgba(7,16,29,0.7)",
+              border:`1px solid ${C.border}`,
+              borderRadius:9, padding:"8px 14px",
+              color:C.text, fontSize:13,
+              fontFamily:"'Inter',sans-serif",
+              outline:"none", width:200
+            }}
+          />
+          <Btn grad onClick={() => setShowInvite(true)}>+ Invitar nutriólogo</Btn>
+        </div>
       </div>
 
       {/* Lista */}
-      {loading ? (
+      {(() => {
+        const filteredNutriologos = nutriologos.filter(n =>
+          n.nombre?.toLowerCase().includes(searchNutris.toLowerCase()) ||
+          n.email?.toLowerCase().includes(searchNutris.toLowerCase())
+        );
+
+        if (loading) return (
         <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
           <div style={{ width:36, height:36, borderRadius:"50%", border:`3px solid ${C.border}`, borderTopColor:C.accent, animation:"rotateSlow 0.8s linear infinite", margin:"0 auto 14px" }}/>
           Cargando…
@@ -149,10 +171,19 @@ export function Nutriologos({ setMsg }) {
           <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Sin nutriólogos aún</div>
           <div style={{ fontSize:13 }}>Invita al primer nutriólogo para comenzar</div>
         </div>
-      ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {nutriologos.map((n, i) => (
-            <div key={n.id} className="card-hover animate-in" style={{
+        );
+
+        if (filteredNutriologos.length === 0 && searchNutris) return (
+          <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
+            <div style={{ fontSize:40, marginBottom:12, opacity:0.3 }}>🔍</div>
+            <div style={{ fontSize:15, fontWeight:600, color:C.muted }}>Sin resultados para "{searchNutris}"</div>
+          </div>
+        );
+
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {filteredNutriologos.map((n, i) => (
+              <div key={n.id} className="card-hover animate-in" style={{
               animationDelay:`${i*0.04}s`,
               background:`linear-gradient(135deg, ${C.card}, ${C.surfaceAlt})`,
               borderRadius:14, border:`1px solid ${C.border}`,
@@ -211,13 +242,14 @@ export function Nutriologos({ setMsg }) {
                 <Btn small outline color={n.activo !== false ? "#ef4444" : C.accent} onClick={() => toggleActivo(n)}>
                   {n.activo !== false ? "Suspender" : "Activar"}
                 </Btn>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
 
-      {/* Modal invitar */}
+      {/* Modal Invitar */}
       {showInvite && (
         <Modal title="🧑‍⚕️ Invitar nutriólogo" onClose={() => setShowInvite(false)}>
           <Field label="Nombre completo">

@@ -10,6 +10,7 @@ import { ProgresoCliente } from "./ProgresoCliente";
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState("nutri");
+  const [searchProg, setSearchProg] = useState("");
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -100,15 +101,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
 
-  if (!selected) return (
-    <div style={{textAlign:"center",padding:60,color:C.muted}}>
-      <div style={{fontSize:40,marginBottom:12}}>👆</div>
-      <div style={{marginBottom:16}}>Selecciona un cliente para programar su plan</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center"}}>
-        {clientes.map(c=><Btn key={c.id} small outline color={C.accentDark} onClick={()=>setSelected(c)}>{c.nombre}</Btn>)}
+  if (!selected) {
+    const clientesFiltrados = clientes.filter(c =>
+      c.nombre?.toLowerCase().includes(searchProg.toLowerCase()) ||
+      c.email?.toLowerCase().includes(searchProg.toLowerCase())
+    );
+    return (
+      <div style={{textAlign:"center",padding:60,color:C.muted}}>
+        <div style={{fontSize:40,marginBottom:12}}>👆</div>
+        <div style={{marginBottom:16}}>Selecciona un cliente para programar su plan</div>
+        <input
+          value={searchProg}
+          onChange={e=>setSearchProg(e.target.value)}
+          placeholder="🔍 Buscar cliente…"
+          style={{
+            background:"rgba(7,16,29,0.7)",
+            border:`1px solid rgba(46,92,184,0.20)`,
+            borderRadius:9, padding:"9px 16px",
+            color:"#e2eeff", fontSize:13,
+            fontFamily:"'Inter',sans-serif",
+            outline:"none", width:"100%", maxWidth:320,
+            marginBottom:16, display:"block", margin:"0 auto 16px"
+          }}
+        />
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center"}}>
+          {clientesFiltrados.length === 0
+            ? <span style={{color:C.muted,fontSize:13}}>Sin resultados para "{searchProg}"</span>
+            : clientesFiltrados.map(c=><Btn key={c.id} small outline color={C.accentDark} onClick={()=>setSelected(c)}>{c.nombre}</Btn>)
+          }
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div>
