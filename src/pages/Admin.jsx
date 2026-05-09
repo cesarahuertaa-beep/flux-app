@@ -6,7 +6,7 @@ import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
-export default function Admin({ onLogout, isSuperadmin, profileId }) {
+export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta }) {
   const [tab, setTab]                       = useState("clientes");
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
@@ -74,6 +74,32 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
     } catch(e) { setMsg("❌ Error: "+e.message); }
   };
 
+  const activarModoAtleta = async () => {
+    try {
+      // 1. Obtener email y nombre propio del nutriólogo
+      const profiles = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`);
+      if (!profiles.length) { setMsg("❌ No se encontró tu perfil"); return; }
+      const { nombre, email } = profiles[0];
+
+      // 2. Buscar registro de atleta propio ya creado
+      const existing = await dbGet(`clientes?nutriologo_id=eq.${myId}&email=ilike.${encodeURIComponent(email)}&limit=1`);
+      let clienteRecord;
+      if (existing.length) {
+        clienteRecord = existing[0];
+      } else {
+        // 3. Crear registro de cliente-atleta (sin invitación por email)
+        const created = await dbPost("clientes", {
+          nombre, email,
+          objetivo: "Mi entrenamiento personal",
+          nutriologo_id: myId,
+          activo: true,
+        });
+        clienteRecord = Array.isArray(created) ? created[0] : created;
+      }
+      onModoAtleta(clienteRecord);
+    } catch(e) { setMsg("❌ " + e.message); }
+  };
+
   const activeCount = clientes.filter(c=>c.activo).length;
 
   // Tabs: nutriólogo normal tiene 3, superadmin tiene 4
@@ -89,7 +115,28 @@ export default function Admin({ onLogout, isSuperadmin, profileId }) {
       <style>{css}</style>
       <OrbBackground/>
 
-      <Header role={isSuperadmin ? "superadmin" : "admin"} onLogout={onLogout}/>
+      <Header
+        role={isSuperadmin ? "superadmin" : "admin"}
+        onLogout={onLogout}
+        extra={
+          !isSuperadmin && (
+            <button
+              onClick={activarModoAtleta}
+              style={{
+                padding:"7px 14px", borderRadius:9,
+                background:"rgba(46,92,184,0.10)",
+                border:"1px solid rgba(46,92,184,0.25)",
+                color:"var(--brand-accent,#2e5cb8)",
+                fontSize:13, fontWeight:700,
+                cursor:"pointer", fontFamily:"'Inter',sans-serif",
+                transition:"all 0.2s", whiteSpace:"nowrap"
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.20)";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.10)";}}
+            >💪 Modo Atleta</button>
+          )
+        }
+      />
 
       <TabBar tabs={tabs} active={tab} onChange={setTab}/>
 

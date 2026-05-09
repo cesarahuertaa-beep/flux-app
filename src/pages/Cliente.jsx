@@ -5,7 +5,7 @@ import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 
-export default function ClienteView({ session, onLogout }) {
+export default function ClienteView({ session, onLogout, isAtletaMode=false, onBackToAdmin }) {
   const { data:cliente } = session;
   const brand = useBrand();
   const [tab, setTab] = useState("nutricion");
@@ -599,6 +599,31 @@ export default function ClienteView({ session, onLogout }) {
         }}>
           <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,objectFit:"contain",boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} alt=""/>
           <div style={{position:"absolute",top:20,right:24,color:"#fff",fontSize:28,cursor:"pointer",fontWeight:700}} onClick={()=>setLightbox(null)}>✕</div>
+        </div>
+      )}
+      {/* Banner Modo Atleta */}
+      {isAtletaMode && (
+        <div style={{
+          position:"fixed", bottom:20, left:"50%", transform:"translateX(-50%)",
+          background:"rgba(10,22,46,0.97)", backdropFilter:"blur(16px)",
+          border:"1px solid rgba(46,92,184,0.45)",
+          borderRadius:14, padding:"12px 20px",
+          display:"flex", alignItems:"center", gap:14,
+          zIndex:200, boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
+          fontFamily:"'Inter',sans-serif", whiteSpace:"nowrap"
+        }}>
+          <span style={{fontSize:13,color:"var(--brand-accent,#2e5cb8)",fontWeight:700,letterSpacing:"0.3px"}}>💪 Modo Atleta Activo</span>
+          <button
+            onClick={onBackToAdmin}
+            style={{
+              background:"rgba(46,92,184,0.15)", border:"1px solid rgba(46,92,184,0.35)",
+              borderRadius:8, padding:"6px 16px",
+              color:"var(--brand-accent,#2e5cb8)", fontSize:12, fontWeight:700,
+              cursor:"pointer", transition:"all 0.2s"
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.28)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.15)";}}
+          >⚡ Volver al Panel</button>
         </div>
       )}
     </div>
