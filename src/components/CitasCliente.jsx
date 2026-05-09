@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field, Tag } from "../ui";
-import { dbGet, dbPost } from "../../lib/supabase";
+import { C } from "../styles/theme";
+import { Btn, Modal, Field, Tag } from "./ui";
+import { dbGet, dbPost } from "../lib/supabase";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];

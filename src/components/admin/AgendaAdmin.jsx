@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field, Tag } from "../ui";
-import { dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../../lib/supabase";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const HORAS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
 
@@ -114,15 +113,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   const eliminarHorario = async (id) => {
     try {
-      await dbPatch(`disponibilidad?id=eq.${id}`, {});
-      // Supabase no tiene DELETE directo fácil con la lib actual — usamos un workaround
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/disponibilidad?id=eq.${id}`, {
-        method: "DELETE",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        }
-      });
+      await dbDel(`disponibilidad?id=eq.${id}`);
       setMsg("🗑️ Horario eliminado");
       loadDisponibilidad();
     } catch (e) { setMsg("❌ " + e.message); }
