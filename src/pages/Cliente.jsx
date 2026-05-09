@@ -4,6 +4,7 @@ import { Btn, Tag, Header, TabBar, StatCard } from "../components/ui";
 import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
+import { CitasCliente } from "../components/CitasCliente";
 
 export default function ClienteView({ session, onLogout, isAtletaMode=false, onBackToAdmin }) {
   const { data:cliente } = session;
@@ -85,7 +86,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
       />
 
       <TabBar
-        tabs={[["nutricion","🥗","Nutrición"],["deporte","🏋️","Entrenamiento"],["progreso","📊","Progreso"]]}
+        tabs={[
+          ["nutricion","🥗","Nutrición"],
+          ["deporte","🏋️","Entrenamiento"],
+          ["progreso","📊","Progreso"],
+          ["citas","📅","Citas"]
+        ]}
         active={tab}
         onChange={setTab}
       />
@@ -529,6 +535,16 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── CITAS ── */}
+          {tab==="citas" && (
+            <div className="animate-in">
+              <CitasCliente
+                clienteId={cliente.id}
+                nutriologoId={cliente.nutriologo_id}
+              />
             </div>
           )}
         </>}

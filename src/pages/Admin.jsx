@@ -5,6 +5,7 @@ import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
+import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
@@ -109,16 +110,17 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-  // Tabs: administrativo solo ve clientes (y pronto agenda), nutriólogo ve todo
+  // Tabs: administrativo solo ve clientes y agenda; nutriólogo ve todo
   const tabs = role === "administrativo"
     ? [
-        ["clientes","👥","Clientes"]
-        // TODO: Agregar pestaña Agenda aquí
+        ["clientes","👥","Clientes"],
+        ["agenda","📅","Agenda"]
       ]
     : [
         ["clientes","👥","Clientes"],
         ["biblioteca","📚","Biblioteca"],
         ["programar","📋","Programar"],
+        ["agenda","📅","Agenda"],
         ["equipo","🗂️","Mi Equipo"],
         ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
       ];
@@ -328,6 +330,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         {tab==="equipo" && role !== "administrativo" && (
           <div className="animate-in">
             <GestionEquipo setMsg={setMsg} profileId={myId}/>
+          </div>
+        )}
+        {tab==="agenda" && (
+          <div className="animate-in">
+            <AgendaAdmin setMsg={setMsg} profileId={myId}/>
           </div>
         )}
       </div>
