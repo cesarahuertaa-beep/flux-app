@@ -4,6 +4,7 @@ import { Btn, Modal, Field, Tag, Header, TabBar, OrbBackground } from "../compon
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
+import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
@@ -118,6 +119,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         ["clientes","👥","Clientes"],
         ["biblioteca","📚","Biblioteca"],
         ["programar","📋","Programar"],
+        ["equipo","🗂️","Mi Equipo"],
         ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
       ];
 
@@ -321,6 +323,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         {tab==="nutriologos" && isSuperadmin && (
           <div className="animate-in">
             <Nutriologos setMsg={setMsg}/>
+          </div>
+        )}
+        {tab==="equipo" && role !== "administrativo" && (
+          <div className="animate-in">
+            <GestionEquipo setMsg={setMsg} profileId={myId}/>
           </div>
         )}
       </div>
