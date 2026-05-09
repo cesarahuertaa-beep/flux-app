@@ -161,16 +161,18 @@ export function Nutriologos({ setMsg }) {
         );
 
         if (loading) return (
-        <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
-          <div style={{ width:36, height:36, borderRadius:"50%", border:`3px solid ${C.border}`, borderTopColor:C.accent, animation:"rotateSlow 0.8s linear infinite", margin:"0 auto 14px" }}/>
-          Cargando…
-        </div>
-      ) : nutriologos.length === 0 ? (
-        <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
-          <div style={{ fontSize:48, marginBottom:16 }}>🧑‍⚕️</div>
-          <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Sin nutriólogos aún</div>
-          <div style={{ fontSize:13 }}>Invita al primer nutriólogo para comenzar</div>
-        </div>
+          <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
+            <div style={{ width:36, height:36, borderRadius:"50%", border:`3px solid ${C.border}`, borderTopColor:C.accent, animation:"rotateSlow 0.8s linear infinite", margin:"0 auto 14px" }}/>
+            Cargando…
+          </div>
+        );
+
+        if (nutriologos.length === 0) return (
+          <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>🧑‍⚕️</div>
+            <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Sin nutriólogos aún</div>
+            <div style={{ fontSize:13 }}>Invita al primer nutriólogo para comenzar</div>
+          </div>
         );
 
         if (filteredNutriologos.length === 0 && searchNutris) return (
