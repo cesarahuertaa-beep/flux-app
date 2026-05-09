@@ -36,8 +36,8 @@ export default function Login({ onLogin }) {
       setProfileId(data.user.id);
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
-      if (role === "admin" || role === "superadmin" || role === "nutriologo") {
-        if (role === "nutriologo" && profiles[0].activo === false) {
+      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
+        if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
           setAuthToken(null); setProfileId(null);
           setErr("Tu cuenta está suspendida. Contacta a soporte.");
           setLoading(false); return;

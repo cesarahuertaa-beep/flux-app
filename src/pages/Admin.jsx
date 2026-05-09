@@ -6,13 +6,13 @@ import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
-export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta }) {
+export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
   const [tab, setTab]                       = useState("clientes");
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
   const [loading, setLoading]               = useState(true);
   const [showNewClient, setShowNewClient]   = useState(false);
-  const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"" });
+  const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
   const [saving, setSaving]                 = useState(false);
   const [msg, setMsg]                       = useState("");
   const [biblioteca, setBiblioteca]         = useState([]);
@@ -57,11 +57,12 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
         nombre: newClient.nombre,
         objetivo: newClient.objetivo,
         email: newClient.email,
+        telefono: newClient.telefono,
         auth_id: authUser.id,
         activo: true,
         nutriologo_id: myId   // ← asignar al nutriólogo que lo crea
       });
-      setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"" });
+      setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
       await loadClientes(); setMsg("✅ Cliente creado — se le envió email de invitación");
     } catch(e) { setMsg("❌ "+e.message); }
     setSaving(false);
@@ -107,13 +108,18 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-  // Tabs: nutriólogo normal tiene 3, superadmin tiene 4
-  const tabs = [
-    ["clientes","👥","Clientes"],
-    ["biblioteca","📚","Biblioteca"],
-    ["programar","📋","Programar"],
-    ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
-  ];
+  // Tabs: administrativo solo ve clientes (y pronto agenda), nutriólogo ve todo
+  const tabs = role === "administrativo"
+    ? [
+        ["clientes","👥","Clientes"]
+        // TODO: Agregar pestaña Agenda aquí
+      ]
+    : [
+        ["clientes","👥","Clientes"],
+        ["biblioteca","📚","Biblioteca"],
+        ["programar","📋","Programar"],
+        ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
+      ];
 
   return (
     <div style={{ minHeight:"100vh", background:"#03050a", position:"relative" }}>
@@ -259,6 +265,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
                       </div>
                       <div style={{fontSize:12, color:"#64748b"}}>
                         {c.objetivo||"Sin objetivo definido"}
+                        {c.telefono && (
+                          <a href={`https://wa.me/${c.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{marginLeft:12, color:"#22c55e", textDecoration:"none", fontWeight:600, display:"inline-flex", alignItems:"center", gap:4}}>
+                            <span style={{fontSize:14}}>💬</span> WhatsApp
+                          </a>
+                        )}
                       </div>
                       {isSuperadmin && c.nutriologo_id && (
                         <div style={{fontSize:11, color:"#818cf8", marginTop:3, fontWeight:500}}>
@@ -275,9 +286,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
                         color: c.activo ? "#38bdf8" : "#f87171",
                         fontFamily:"'Inter',sans-serif"
                       }}>{c.activo ? "● Activo" : "○ Inactivo"}</span>
-                      <Btn small outline color="rgba(129,140,248,0.8)" onClick={()=>{setSelected(c);setTab("programar");}}>
-                        Programar
-                      </Btn>
+                      {role !== "administrativo" && (
+                        <Btn small outline color="rgba(129,140,248,0.8)" onClick={()=>{setSelected(c);setTab("programar");}}>
+                          Programar
+                        </Btn>
+                      )}
                       <Btn small outline color={c.activo ? "rgba(239,68,68,0.8)" : "rgba(56,189,248,0.8)"} onClick={()=>toggleActivo(c)}>
                         {c.activo ? "Desactivar" : "Activar"}
                       </Btn>
@@ -320,6 +333,9 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta 
           </Field>
           <Field label="Email">
             <input type="email" value={newClient.email} onChange={e=>setNewClient(p=>({...p,email:e.target.value}))} placeholder="ana@email.com"/>
+          </Field>
+          <Field label="Teléfono (WhatsApp)">
+            <input type="tel" value={newClient.telefono} onChange={e=>setNewClient(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
           </Field>
           <Field label="Objetivo">
             <input value={newClient.objetivo} onChange={e=>setNewClient(p=>({...p,objetivo:e.target.value}))} placeholder="Pérdida de peso, ganancia muscular…"/>

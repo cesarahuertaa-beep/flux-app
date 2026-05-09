@@ -60,7 +60,7 @@ export function Nutriologos({ setMsg }) {
   const [saving, setSaving]                 = useState(false);
   const [searchNutris, setSearchNutris]     = useState("");
   const [uploadingLogo, setUploadingLogo]   = useState(false);
-  const [form, setForm] = useState({ nombre:"", email:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
+  const [form, setForm] = useState({ nombre:"", email:"", telefono:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
   const [editForm, setEditForm] = useState({});
 
   const load = useCallback(async () => {
@@ -91,13 +91,14 @@ export function Nutriologos({ setMsg }) {
       await authInvite(form.email, {
         role: "nutriologo",
         nombre: form.nombre,
+        telefono: form.telefono,
         nombre_marca: form.nombre_marca || form.nombre,
         color_primario: form.color_primario,
         logo_url: form.logo_url || ""
       });
       setMsg("✅ Invitación enviada — el nutriólogo recibirá un email para crear su contraseña");
       setShowInvite(false);
-      setForm({ nombre:"", email:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
+      setForm({ nombre:"", email:"", telefono:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
       setTimeout(load, 2000);
     } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
@@ -220,7 +221,14 @@ export function Nutriologos({ setMsg }) {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize:12, color:C.muted }}>{n.email || "Sin email"}</div>
+                  <div style={{ fontSize:12, color:C.muted }}>
+                    {n.email || "Sin email"}
+                    {n.telefono && (
+                      <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{marginLeft:12, color:"#22c55e", textDecoration:"none", fontWeight:600, display:"inline-flex", alignItems:"center", gap:4}}>
+                        <span style={{fontSize:14}}>💬</span> WhatsApp
+                      </a>
+                    )}
+                  </div>
                   <div style={{ marginTop:6, display:"flex", gap:6, alignItems:"center" }}>
                     <div style={{
                       width:14, height:14, borderRadius:"50%",
@@ -237,7 +245,7 @@ export function Nutriologos({ setMsg }) {
                 </Tag>
                 <Btn small outline color={C.accentMid} onClick={() => {
                   setShowEdit(n);
-                  setEditForm({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", logo_url:n.logo_url||"" });
+                  setEditForm({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
                 }}>
                   Editar marca
                 </Btn>
@@ -259,6 +267,9 @@ export function Nutriologos({ setMsg }) {
           </Field>
           <Field label="Email">
             <input type="email" value={form.email} onChange={e => setForm(p=>({...p,email:e.target.value}))} placeholder="ana@email.com"/>
+          </Field>
+          <Field label="Teléfono (WhatsApp)">
+            <input type="tel" value={form.telefono} onChange={e => setForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
           </Field>
           <Field label="Nombre de marca (opcional)">
             <input value={form.nombre_marca} onChange={e => setForm(p=>({...p,nombre_marca:e.target.value}))} placeholder="Ej. NutriMax Pro"/>
@@ -300,6 +311,9 @@ export function Nutriologos({ setMsg }) {
         <Modal title={`✏️ Editar — ${showEdit.nombre || "Nutriólogo"}`} onClose={() => setShowEdit(null)}>
           <Field label="Nombre completo">
             <input value={editForm.nombre} onChange={e => setEditForm(p=>({...p,nombre:e.target.value}))}/>
+          </Field>
+          <Field label="Teléfono (WhatsApp)">
+            <input type="tel" value={editForm.telefono} onChange={e => setEditForm(p=>({...p,telefono:e.target.value}))}/>
           </Field>
           <Field label="Nombre de marca">
             <input value={editForm.nombre_marca} onChange={e => setEditForm(p=>({...p,nombre_marca:e.target.value}))}/>

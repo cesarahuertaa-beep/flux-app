@@ -47,7 +47,7 @@ export const getProfileId   = ()   => _profileId;
 
 // Obtener lista de nutriólogos (solo superadmin)
 export const getNutriologos = () =>
-  dbGet("profiles?role=eq.nutriologo&select=id,nombre,nombre_marca,email,color_primario,logo_url,activo&order=nombre.asc");
+  dbGet("profiles?role=eq.nutriologo&select=id,nombre,nombre_marca,email,telefono,color_primario,logo_url,activo&order=nombre.asc");
 
 // Actualizar perfil (nombre, marca, color, rol)
 export const updateProfile  = (id, data) => dbPatch(`profiles?id=eq.${id}`, data);

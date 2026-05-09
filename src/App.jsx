@@ -25,8 +25,8 @@ export default function App() {
         onBackToAdmin={handleBackToAdmin}
       />
     );
-    if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo")
-      return <Admin isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta}/>;
+    if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo")
+      return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta}/>;
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };
 
