@@ -16,6 +16,12 @@ const tint = (hex, amt = 230) => {
   return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
 };
 
+const parseFotos = (fotos) => {
+  if (!fotos) return [];
+  if (Array.isArray(fotos)) return fotos;
+  try { return JSON.parse(fotos); } catch(e) { return typeof fotos === "string" && fotos.startsWith("http") ? [fotos] : []; }
+};
+
 export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   const accent  = brand.color_primario || "#2D9CDB";
   const dark    = darken(accent, 60);
@@ -168,13 +174,13 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
       </tbody>
     </table>
 
-    ${metricas.some(m => m.fotos && m.fotos.length > 0) ? `
+    ${metricas.some(m => parseFotos(m.fotos).length > 0) ? `
       <div class="title-sec" style="margin-top:40px; border-top:1px solid #ddd; padding-top:30px;">Galería de Progreso</div>
-      ${metricas.filter(m => m.fotos && m.fotos.length > 0).map(m => `
+      ${metricas.filter(m => parseFotos(m.fotos).length > 0).map(m => `
         <div style="margin-bottom:20px;">
           <div style="font-weight:700; font-size:14px; margin-bottom:10px; color:${dark};">📅 ${fmtDate(m.fecha)}</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            ${m.fotos.map(url => `
+            ${parseFotos(m.fotos).map(url => `
               <img src="${url}" style="width:160px; height:160px; object-fit:cover; border-radius:8px; border:1px solid #ddd;" alt="Foto progreso"/>
             `).join("")}
           </div>
@@ -184,10 +190,19 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   ` : ""}
 
   <div class="footer">Reporte generado por ${nombre} · Keep Going 💪</div>
+  
+  <script>
+    // Wait for all images to load before triggering print
+    Promise.all(Array.from(document.images).map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => { img.onload = img.onerror = resolve; });
+    })).then(() => {
+      setTimeout(() => window.print(), 200);
+    });
+  </script>
   </body></html>`;
 
   win.document.write(html);
   win.document.close();
-  setTimeout(() => win.print(), 500);
 };
 

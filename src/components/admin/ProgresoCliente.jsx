@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
@@ -42,6 +43,12 @@ const emptyForm = () => ({
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
+
+const parseFotos = (fotos) => {
+  if (!fotos) return [];
+  if (Array.isArray(fotos)) return fotos;
+  try { return JSON.parse(fotos); } catch(e) { return typeof fotos === "string" && fotos.startsWith("http") ? [fotos] : []; }
+};
 
 export function ProgresoCliente({ selected, setMsg }) {
   const [metricas,     setMetricas]     = useState([]);
@@ -155,13 +162,13 @@ export function ProgresoCliente({ selected, setMsg }) {
     });
     setForm(filled);
     setEditingId(m.id);
-    setExistingFotos(m.fotos || []);
+    setExistingFotos(parseFotos(m.fotos));
     setPendingFotos([]); setPreviewUrls([]);
     setShowModal(true);
   };
 
   const deleteFoto = async (metrica, fotoUrl) => {
-    const newFotos = (metrica.fotos || []).filter(u => u !== fotoUrl);
+    const newFotos = parseFotos(metrica.fotos).filter(u => u !== fotoUrl);
     await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
     await load();
   };
@@ -267,11 +274,11 @@ export function ProgresoCliente({ selected, setMsg }) {
                 </div>
                 {m.notas&&<div style={{fontSize:12,color:C.muted,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,marginTop:10}}>📝 {m.notas}</div>}
                 {/* Fotos de progreso */}
-                {m.fotos&&m.fotos.length>0&&(
+                {parseFotos(m.fotos).length>0&&(
                   <div style={{marginTop:12}}>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({m.fotos.length})</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({parseFotos(m.fotos).length})</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {m.fotos.map((url,fi)=>(
+                      {parseFotos(m.fotos).map((url,fi)=>(
                         <div key={fi} style={{position:"relative",width:80,height:80}}>
                           <img src={url} onClick={()=>setLightbox(url)}
                             style={{width:80,height:80,objectFit:"cover",borderRadius:10,cursor:"zoom-in",border:`2px solid ${C.border}`}}
@@ -435,7 +442,7 @@ export function ProgresoCliente({ selected, setMsg }) {
         </Modal>
       )}
       {/* Lightbox */}
-      {lightbox&&(
+      {lightbox&&createPortal(
         <div onClick={()=>setLightbox(null)} style={{
           position:"fixed",top:0,left:0,width:"100%",height:"100%",
           background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",
@@ -443,7 +450,8 @@ export function ProgresoCliente({ selected, setMsg }) {
         }}>
           <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,objectFit:"contain",boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} alt=""/>
           <div style={{position:"absolute",top:20,right:24,color:"#fff",fontSize:28,cursor:"pointer",fontWeight:700}} onClick={()=>setLightbox(null)}>✕</div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
