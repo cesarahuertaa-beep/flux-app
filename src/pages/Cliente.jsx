@@ -58,9 +58,22 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     if (!editCell) return;
     const [ejId,semana,serie,tipo] = editCell.split("__");
     const key=`${ejId}-${semana}-${serie}-${tipo}`;
-    setProgreso(p=>({...p,[key]:editVal}));
-    await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:editVal, updated_at:new Date().toISOString() });
+    const finalVal = editVal; // capture current state
+    
+    setProgreso(p=>({...p,[key]:finalVal}));
     setEditCell(null); setEditVal("");
+    
+    await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+  };
+
+  const handleTabChange = (newTab) => {
+    if (editCell) commitEdit();
+    setTab(newTab);
+  };
+
+  const safeLogout = () => {
+    if (editCell) commitEdit();
+    onLogout();
   };
 
   const getSemanasConFecha = (rutina) => {
@@ -85,7 +98,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
       <Header
         nombre={cliente.nombre}
         objetivo={cliente.objetivo}
-        onLogout={onLogout}
+        onLogout={safeLogout}
         extra={dias.length>0 && tab==="nutricion"
           ? <Btn small outline color={C.accentMid} onClick={()=>generateNutriPDF(cliente,nutri,dias,brand)}>📄 PDF</Btn>
           : null}
@@ -99,7 +112,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
           ["citas","📅","Citas"]
         ]}
         active={tab}
-        onChange={setTab}
+        onChange={handleTabChange}
       />
 
       <div style={{padding:"24px 16px", maxWidth:860, margin:"0 auto"}}>
@@ -410,28 +423,29 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                                     textAlign:"center",background:C.surface,
                                     color:C.text
                                   };
+                                  const renderCell = (keyName, val, isWeight) => {
+                                    return (
+                                      <td key={keyName}
+                                        onClick={()=>{if(editCell!==keyName){if(editCell)commitEdit();setEditCell(keyName);setEditVal(val);}}}
+                                        style={{...cellBase,background:val?`color-mix(in srgb, ${isWeight?C.accentDeep:C.accentDeep} ${isWeight?38:25}%, transparent)`:"transparent"}}
+                                        onMouseEnter={e=>{if(editCell!==keyName)e.currentTarget.style.background=C.faint;}}
+                                        onMouseLeave={e=>{e.currentTarget.style.background=val?`color-mix(in srgb, ${isWeight?C.accentDeep:C.accentDeep} ${isWeight?38:25}%, transparent)`:"transparent";}}
+                                      >
+                                        {editCell===keyName ? (
+                                          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>
+                                            <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={inputStyle}/>
+                                            <button onMouseDown={e=>{e.preventDefault();commitEdit();}} style={{background:C.accent,color:"#fff",border:"none",borderRadius:4,width:18,height:18,fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✓</button>
+                                          </div>
+                                        ) : (
+                                          <span style={{fontSize:11,color:val?(isWeight?C.accent:C.accentMid):C.dim,fontWeight:val?700:400}}>{val||"—"}</span>
+                                        )}
+                                      </td>
+                                    );
+                                  };
                                   return (
                                     <>
-                                      <td key={pKey}
-                                        onClick={()=>{setEditCell(pKey);setEditVal(pVal);}}
-                                        style={{...cellBase,background:pVal?`color-mix(in srgb, ${C.accentDeep} 38%, transparent)`:"transparent"}}
-                                        onMouseEnter={e=>{if(editCell!==pKey)e.currentTarget.style.background=C.faint;}}
-                                        onMouseLeave={e=>{e.currentTarget.style.background=pVal?`color-mix(in srgb, ${C.accentDeep} 38%, transparent)`:"transparent";}}
-                                      >
-                                        {editCell===pKey
-                                          ?<input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={inputStyle}/>
-                                          :<span style={{fontSize:11,color:pVal?C.accent:C.dim,fontWeight:pVal?700:400}}>{pVal||"—"}</span>}
-                                      </td>
-                                      <td key={rKey}
-                                        onClick={()=>{setEditCell(rKey);setEditVal(rVal);}}
-                                        style={{...cellBase,background:rVal?`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`:"transparent"}}
-                                        onMouseEnter={e=>{if(editCell!==rKey)e.currentTarget.style.background=C.faint;}}
-                                        onMouseLeave={e=>{e.currentTarget.style.background=rVal?`color-mix(in srgb, ${C.accentDeep} 25%, transparent)`:"transparent";}}
-                                      >
-                                        {editCell===rKey
-                                          ?<input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==="Enter")commitEdit();if(e.key==="Escape"){setEditCell(null);setEditVal("");}}} style={inputStyle}/>
-                                          :<span style={{fontSize:11,color:rVal?C.accentMid:C.dim,fontWeight:rVal?700:400}}>{rVal||"—"}</span>}
-                                      </td>
+                                      {renderCell(pKey, pVal, true)}
+                                      {renderCell(rKey, rVal, false)}
                                     </>
                                   );
                                 })}
