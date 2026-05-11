@@ -436,7 +436,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                                             <button onPointerDown={e=>{e.preventDefault();e.stopPropagation();commitEdit();}} style={{background:C.accent,color:"#fff",border:"none",borderRadius:4,width:18,height:18,fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✓</button>
                                           </div>
                                         ) : (
-                                          <div onClick={()=>{if(editCell)commitEdit();setEditCell(keyName);setEditVal(val);}} style={{width:"100%",height:"100%",minHeight:24,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                          <div onPointerDown={()=>{if(editCell)commitEdit();setEditCell(keyName);setEditVal(val);}} style={{width:"100%",height:"100%",minHeight:24,display:"flex",alignItems:"center",justifyContent:"center"}}>
                                             <span style={{fontSize:11,color:val?(isWeight?C.accent:C.accentMid):C.dim,fontWeight:val?700:400}}>{val||"—"}</span>
                                           </div>
                                         )}
