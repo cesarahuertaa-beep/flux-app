@@ -179,9 +179,11 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
       ${metricas.filter(m => parseFotos(m.fotos).length > 0).map(m => `
         <div style="margin-bottom:20px;">
           <div style="font-weight:700; font-size:14px; margin-bottom:10px; color:${dark};">📅 ${fmtDate(m.fecha)}</div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
             ${parseFotos(m.fotos).map(url => `
-              <img src="${url}" style="max-width:220px; max-height:280px; width:auto; height:auto; object-fit:contain; border-radius:8px; border:1px solid #ddd;" alt="Foto progreso"/>
+              <div style="break-inside: avoid; page-break-inside: avoid;">
+                <img src="${url}" style="max-width:280px; max-height:350px; width:auto; height:auto; display:block; border-radius:8px; border:1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" alt="Foto progreso"/>
+              </div>
             `).join("")}
           </div>
         </div>
