@@ -65,7 +65,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     setProgreso(p=>({...p,[key]:finalVal}));
     setEditCell(null); setEditVal("");
     
-    await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+    await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
   };
 
   const saveAll = async () => {
@@ -94,7 +94,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         }
       });
       if (upserts.length > 0) {
-        await Promise.all(upserts.map(u => dbUpsert("progreso", u)));
+        await Promise.all(upserts.map(u => dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", u)));
       }
       setMsg({ ok: true, text: "✅ Registros guardados correctamente" });
     } catch(e) {
