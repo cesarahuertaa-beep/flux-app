@@ -30,7 +30,20 @@ export const dbGet    = (p)   => q(p);
 export const dbPost   = (p,b) => q(p, { method:"POST", body:JSON.stringify(b) });
 export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), headers:{Prefer:"return=representation"} });
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
-export const dbUpsert = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), upsert:true });
+export const dbUpsert = async (p, b) => {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify(b)
+  });
+  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  const t = await r.text(); return t ? JSON.parse(t) : [];
+};
 
 export const storageUpload = async (bucket, path, file) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
