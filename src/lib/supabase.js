@@ -7,14 +7,16 @@ export const setAuthToken = (t) => { _authToken = t; };
 
 // ── Función base de petición ──
 const q = async (path, opts={}) => {
-  // Separamos headers del resto para evitar que ...opts sobreescriba los headers de auth
-  const { headers: extraHeaders, ...restOpts } = opts;
+  const { headers: extraHeaders, upsert, ...restOpts } = opts;
+  const prefer = upsert
+    ? "resolution=merge-duplicates,return=representation"
+    : "return=representation";
   const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
     headers: {
       apikey: SUPA_KEY,
       Authorization: `Bearer ${_authToken || SUPA_KEY}`,
       "Content-Type": "application/json",
-      Prefer: "return=representation",
+      Prefer: prefer,
       ...extraHeaders
     },
     ...restOpts
@@ -28,7 +30,7 @@ export const dbGet    = (p)   => q(p);
 export const dbPost   = (p,b) => q(p, { method:"POST", body:JSON.stringify(b) });
 export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), headers:{Prefer:"return=representation"} });
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
-export const dbUpsert = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers:{Prefer:"resolution=merge-duplicates,return=representation"} });
+export const dbUpsert = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), upsert:true });
 
 export const storageUpload = async (bucket, path, file) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
