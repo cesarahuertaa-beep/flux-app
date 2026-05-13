@@ -29,6 +29,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
   const [gifPreview, setGifPreview] = useState(null);
   const [metricas, setMetricas] = useState([]);
   const [lightbox, setLightbox] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -64,6 +66,42 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     setEditCell(null); setEditVal("");
     
     await dbUpsert("progreso", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+  };
+
+  const saveAll = async () => {
+    if (saving) return;
+    // First commit any cell that is still open
+    if (editCell) await commitEdit();
+    setSaving(true);
+    setMsg(null);
+    try {
+      const rutina = rutinas[rutinaIdx];
+      if (!rutina) { setSaving(false); return; }
+      const allEjIds = rutina.ejercicios.map(e => e.id);
+      const numSemanas = rutina.semanas || 4;
+      const upserts = [];
+      allEjIds.forEach(ejId => {
+        for (let wi = 0; wi < numSemanas; wi++) {
+          const numSeries = rutina.ejercicios.find(e => e.id === ejId)?.num_series || 4;
+          for (let si = 0; si < numSeries; si++) {
+            ["peso", "reps"].forEach(tipo => {
+              const val = progreso[`${ejId}-${wi}-${si}-${tipo}`];
+              if (val !== undefined && val !== "") {
+                upserts.push({ ejercicio_id: ejId, cliente_id: cliente.id, semana: wi, serie: si, tipo, valor: val, updated_at: new Date().toISOString() });
+              }
+            });
+          }
+        }
+      });
+      if (upserts.length > 0) {
+        await Promise.all(upserts.map(u => dbUpsert("progreso", u)));
+      }
+      setMsg({ ok: true, text: "✅ Registros guardados correctamente" });
+    } catch(e) {
+      setMsg({ ok: false, text: "❌ Error al guardar: " + e.message });
+    }
+    setSaving(false);
+    setTimeout(() => setMsg(null), 4000);
   };
 
   const handleTabChange = (newTab) => {
@@ -303,16 +341,55 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                   ))}
                 </div>
 
-                {/* Tip */}
+                {/* Tip + Save Button */}
                 <div style={{
-                  background:`color-mix(in srgb, ${C.accentDeep} 13%, transparent)`,
-                  border:`1px solid ${C.border}`,
-                  borderRadius:10, padding:"10px 14px",
-                  fontSize:12, color:C.muted,
-                  marginBottom:16, lineHeight:1.5
+                  display:"flex", alignItems:"center", justifyContent:"space-between",
+                  gap:12, marginBottom:16, flexWrap:"wrap"
                 }}>
-                  💡 Toca el ejercicio para ver la demostración · Toca las celdas para registrar tu progreso
+                  <div style={{
+                    flex:1,
+                    background:`color-mix(in srgb, ${C.accentDeep} 13%, transparent)`,
+                    border:`1px solid ${C.border}`,
+                    borderRadius:10, padding:"10px 14px",
+                    fontSize:12, color:C.muted, lineHeight:1.5
+                  }}>
+                    💡 Toca el ejercicio para ver la demostración · Toca las celdas para registrar tu progreso
+                  </div>
+                  <button
+                    onClick={saveAll}
+                    disabled={saving}
+                    className="btn-hover"
+                    style={{
+                      flexShrink:0,
+                      padding:"10px 20px", borderRadius:12,
+                      background: saving ? C.card : C.gradBtn,
+                      color: saving ? C.muted : "#000",
+                      fontWeight:700, fontSize:13,
+                      border:`1px solid ${saving ? C.border : C.accent}`,
+                      cursor: saving ? "not-allowed" : "pointer",
+                      fontFamily:"'Inter',sans-serif",
+                      boxShadow: saving ? "none" : `0 4px 16px color-mix(in srgb, ${C.accentDeep} 38%, transparent)`,
+                      transition:"all 0.2s"
+                    }}
+                  >
+                    {saving ? "⏳ Guardando…" : "💾 Guardar registros"}
+                  </button>
                 </div>
+
+                {/* Mensaje de guardado */}
+                {msg && (
+                  <div style={{
+                    padding:"10px 16px", borderRadius:10, marginBottom:12,
+                    background: msg.ok
+                      ? `color-mix(in srgb, #4ade80 20%, transparent)`
+                      : `color-mix(in srgb, #f87171 20%, transparent)`,
+                    border: `1px solid ${msg.ok ? "#4ade80" : "#f87171"}`,
+                    color: msg.ok ? "#16a34a" : "#dc2626",
+                    fontSize:13, fontWeight:600
+                  }}>
+                    {msg.text}
+                  </div>
+                )}
 
                 {/* Tabla de progreso */}
                 {rutina && (
