@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font: 18px/145% system-ui, sans-serif;
   letter-spacing: 0.18px;

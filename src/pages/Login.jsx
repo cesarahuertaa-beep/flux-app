@@ -1,41 +1,60 @@
 import { useState, useEffect } from "react";
-import { C, css } from "../styles/theme";
-import { FluxLogo, Field, OrbBackground } from "../components/ui";
+import { useBrand } from "../components/BrandContext";
 import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
 
+// Componente de Input Glassmorphism reutilizable
+const GlassInput = ({ label, ...props }) => (
+  <div className="mb-4 w-full">
+    <label className="block text-[10px] uppercase tracking-[2px] text-slate-500 font-bold mb-2 ml-1">
+      {label}
+    </label>
+    <input
+      {...props}
+      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all duration-300 backdrop-blur-sm shadow-inner"
+    />
+  </div>
+);
+
 export default function Login({ onLogin }) {
-  const [mode, setMode]           = useState("login");
-  const [email, setEmail]         = useState("");
-  const [pass, setPass]           = useState("");
-  const [newPass, setNewPass]     = useState("");
+  const [mode,        setMode]        = useState("login");
+  const [email,       setEmail]       = useState("");
+  const [pass,        setPass]        = useState("");
+  const [newPass,     setNewPass]     = useState("");
   const [confirmPass, setConfirmPass] = useState("");
-  const [err, setErr]             = useState("");
-  const [info, setInfo]           = useState("");
-  const [loading, setLoading]     = useState(false);
+  const [err,         setErr]         = useState("");
+  const [info,        setInfo]        = useState("");
+  const [loading,     setLoading]     = useState(false);
   const [accessToken, setAccessToken] = useState("");
-  const [focused, setFocused]     = useState(null);
+
+  const brand = useBrand();
+  const logoUrl   = brand?.logo_url   || "/logo.png";
+  const brandName = brand?.nombre_marca || "FLUX Sport Supplements";
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.replace("#","?"));
-      const token = params.get("access_token");
-      const type  = params.get("type");
-      if (token && (type==="invite"||type==="recovery"||type==="signup")) {
-        setAccessToken(token); setMode("set_password");
-        window.history.replaceState(null,"",window.location.pathname);
+      const params = new URLSearchParams(hash.replace("#", "?"));
+      const token  = params.get("access_token");
+      const type   = params.get("type");
+      if (token && (type === "invite" || type === "recovery" || type === "signup")) {
+        setAccessToken(token);
+        setMode("set_password");
+        window.history.replaceState(null, "", window.location.pathname);
       }
     }
   }, []);
 
+  // ── Login ───────────────────────────────────────────────────────────────────
   const submit = async () => {
     setLoading(true); setErr(""); setInfo("");
     try {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
+
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
+
       if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
         if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
           setAuthToken(null); setProfileId(null);
@@ -45,6 +64,8 @@ export default function Login({ onLogin }) {
         onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
         return;
       }
+
+      // Cliente
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
       if (!rows.length) {
         setAuthToken(null); setProfileId(null);
@@ -52,6 +73,7 @@ export default function Login({ onLogin }) {
         setLoading(false); return;
       }
       const clientData = rows[0];
+      // Verificar que la clínica del cliente esté activa
       if (clientData.nutriologo_id) {
         const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
         if (nut.length && nut[0].activo === false) {
@@ -60,10 +82,12 @@ export default function Login({ onLogin }) {
           setLoading(false); return;
         }
       }
-      onLogin({ role:"client", data:clientData, token:data.access_token });
-    } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
+      onLogin({ role: "client", data: clientData, token: data.access_token });
+
+    } catch (e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
+  // ── Reset ───────────────────────────────────────────────────────────────────
   const sendReset = async () => {
     if (!email) { setErr("Escribe tu email"); return; }
     setLoading(true); setErr("");
@@ -71,165 +95,165 @@ export default function Login({ onLogin }) {
       await authResetPassword(email.trim());
       setInfo("✅ Revisa tu email para restablecer tu contraseña.");
       setMode("login");
-    } catch(e) { setErr(e.message); }
+    } catch (e) { setErr(e.message); }
     setLoading(false);
   };
 
+  // ── Set Password ────────────────────────────────────────────────────────────
   const setPassword = async () => {
-    if (!newPass || newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
+    if (newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
     if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
     setLoading(true); setErr("");
     try {
       await authUpdatePassword(accessToken, newPass);
       setInfo("✅ Contraseña establecida. Ya puedes entrar.");
       setMode("login");
-    } catch(e) { setErr(e.message); }
+    } catch (e) { setErr(e.message); }
     setLoading(false);
   };
 
-  const inputStyle = (field) => ({
-    background: focused === field ? "rgba(15,28,46,0.95)" : "rgba(7,16,29,0.85)",
-    color: C.text,
-    border: `1px solid ${focused === field ? "rgba(46,92,184,0.55)" : "rgba(46,92,184,0.14)"}`,
-    borderRadius: 12, padding: "13px 16px", fontSize: 14,
-    width: "100%", outline: "none", fontFamily: "'Inter',sans-serif",
-    transition: "all 0.25s ease",
-    boxShadow: focused === field ? "0 0 0 3px rgba(46,92,184,0.14)" : "none",
-  });
+  const modeTitle = { login: "Bienvenido", reset: "Recuperar acceso", set_password: "Nueva contraseña" };
+  const modeSub   = { login: "Ingresa tus credenciales para continuar", reset: "Sigue los pasos para restablecer tu acceso", set_password: "Elige una contraseña segura" };
 
   return (
-    <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
-      <style>{css}</style>
+    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-indigo-500 selection:text-white">
 
-      {/* ── Login Card ── */}
-      <div className="animate-in" style={{ width:"100%",maxWidth:420,padding:"44px 40px 36px",background:"rgba(15,28,46,0.95)",borderRadius:24,border:"1px solid rgba(46,92,184,0.15)",position:"relative",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",boxShadow:"0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(46,92,184,0.08)",zIndex:1 }}>
+      {/* ── Fondo atmosférico ── */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-indigo-900/5 rounded-full blur-[150px] pointer-events-none" />
 
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <FluxLogo size={38} animated large />
-          {(mode === "reset" || mode === "set_password") && (
-            <div style={{ marginTop: 12, fontSize: 13, color: "#64748b", letterSpacing: "0.3px" }}>
-              {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
-            </div>
-          )}
+      <div className="grid lg:grid-cols-2 w-full max-w-5xl z-10 items-center gap-12">
+
+        {/* ── Columna izquierda: Branding ── */}
+        <div className="hidden lg:flex flex-col items-start space-y-8">
+          <div className="flex items-center gap-4">
+            {logoUrl && logoUrl !== "/logo.png"
+              ? <img src={logoUrl} alt={brandName} className="h-16 object-contain" />
+              : (
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <span className="text-white font-black text-3xl italic">F</span>
+                  </div>
+                  <h1 className="text-5xl font-black tracking-tighter text-white italic">FLUX</h1>
+                </div>
+              )
+            }
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-2xl text-slate-300 font-light leading-snug">
+              Tu transformación<br />
+              <span className="text-white font-semibold">comienza aquí.</span>
+            </p>
+            <p className="text-slate-500 text-sm leading-relaxed max-w-sm">
+              Plataforma integral de nutrición y entrenamiento personalizado para atletas de alto rendimiento.
+            </p>
+          </div>
+
+          <div className="h-px w-24 bg-gradient-to-r from-indigo-500 to-transparent" />
+
+          <div className="grid grid-cols-3 gap-6 pt-4">
+            {[["🥦", "Nutrición"], ["🏋️", "Rutinas"], ["📈", "Progreso"]].map(([icon, label]) => (
+              <div key={label} className="text-center space-y-2">
+                <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-2xl mx-auto">
+                  {icon}
+                </div>
+                <p className="text-slate-500 text-xs tracking-wide">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Messages */}
-        {info && (
-          <div style={{
-            background: "rgba(8,47,73,0.5)",
-            border: "1px solid rgba(56,189,248,0.2)",
-            borderRadius: 12, padding: "12px 16px",
-            fontSize: 13, color: "#38bdf8",
-            marginBottom: 18, lineHeight: 1.6,
-            backdropFilter: "blur(8px)"
-          }}>{info}</div>
-        )}
-        {err && (
-          <div style={{
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.25)",
-            borderRadius: 12, padding: "12px 16px",
-            fontSize: 13, color: "#f87171",
-            marginBottom: 18, textAlign: "center",
-            lineHeight: 1.6
-          }}>{err}</div>
-        )}
+        {/* ── Columna derecha: Card Glassmorphism ── */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-[420px] bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[32px] p-10 shadow-2xl relative overflow-hidden group">
 
-        {/* ── LOGIN FORM ── */}
-        {mode === "login" && <>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Email</div>
-            <input
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && submit()}
-              onFocus={() => setFocused("email")}
-              onBlur={() => setFocused(null)}
-              placeholder="tu@email.com"
-              type="email"
-              style={inputStyle("email")}
-            />
-          </div>
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Contraseña</div>
-            <input
-              type="password"
-              value={pass}
-              onChange={e => setPass(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && submit()}
-              onFocus={() => setFocused("pass")}
-              onBlur={() => setFocused(null)}
-              placeholder="••••••••"
-              style={inputStyle("pass")}
-            />
-          </div>
+            {/* Inner glow */}
+            <div className="absolute -top-20 -right-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/15 transition-all duration-700 pointer-events-none" />
 
-          <button onClick={submit} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:loading?"rgba(15,28,46,0.7)":"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:loading?"#6e87a2":"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:16,letterSpacing:"1.5px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none",transition:"all 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-            {loading ? "Verificando…" : "ENTRAR"}
-          </button>
+            {/* Header de la card */}
+            <div className="text-center mb-8">
+              {/* Logo compacto visible solo en móvil */}
+              <div className="lg:hidden mb-6">
+                {logoUrl && logoUrl !== "/logo.png"
+                  ? <img src={logoUrl} alt={brandName} className="h-12 object-contain mx-auto" />
+                  : <span className="text-4xl font-black text-white italic tracking-tighter">FLUX</span>
+                }
+              </div>
+              <h2 className="text-2xl font-bold text-white tracking-tight">{modeTitle[mode]}</h2>
+              <p className="text-slate-500 mt-2 text-sm">{modeSub[mode]}</p>
+            </div>
 
-          <div style={{ textAlign: "center" }}>
-            <button
-              onClick={() => { setMode("reset"); setErr(""); }}
-              style={{
-                background: "none", border: "none",
-                color: "#475569", fontSize: 12,
-                cursor: "pointer", fontFamily: "'Inter', sans-serif",
-                transition: "color 0.2s",
-                textDecoration: "none",
-                letterSpacing: "0.2px"
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = "var(--brand-accent,#2e5cb8)"}
-              onMouseLeave={e => e.currentTarget.style.color = "#475569"}
-            >¿Olvidaste tu contraseña?</button>
-          </div>
-        </>}
+            {/* Notificaciones */}
+            {err && (
+              <div className="mb-5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs text-center leading-relaxed">
+                {err}
+              </div>
+            )}
+            {info && (
+              <div className="mb-5 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs text-center leading-relaxed">
+                {info}
+              </div>
+            )}
 
-        {/* ── RESET FORM ── */}
-        {mode === "reset" && <>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Tu email</div>
-            <input
-              value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com" type="email"
-              onFocus={() => setFocused("resetEmail")}
-              onBlur={() => setFocused(null)}
-              style={inputStyle("resetEmail")}
-            />
-          </div>
-          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
-            {loading ? "Enviando…" : "Enviar instrucciones"}
-          </button>
-          <div style={{ textAlign: "center" }}>
-            <button onClick={() => { setMode("login"); setErr(""); }} style={{ background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer",fontFamily:"'Inter',sans-serif" }} onMouseEnter={e=>e.currentTarget.style.color="var(--brand-accent,#2e5cb8)"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>
-              Volver al login
-            </button>
-          </div>
-        </>}
+            {/* ── Formularios ── */}
+            <div className="space-y-1">
 
-        {/* ── SET PASSWORD FORM ── */}
-        {mode === "set_password" && <>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Nueva contraseña</div>
-            <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" onFocus={() => setFocused("np")} onBlur={() => setFocused(null)} style={inputStyle("np")} />
-          </div>
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Confirmar contraseña</div>
-            <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" onFocus={() => setFocused("cp")} onBlur={() => setFocused(null)} style={inputStyle("cp")} />
-          </div>
-          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
-            {loading ? "Guardando…" : "Establecer contraseña"}
-          </button>
-        </>}
+              {/* LOGIN */}
+              {mode === "login" && <>
+                <GlassInput id="login-email" label="Email" type="email" placeholder="ejemplo@flux.com"
+                  value={email} onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submit()} />
+                <GlassInput id="login-pass" label="Contraseña" type="password" placeholder="••••••••"
+                  value={pass} onChange={e => setPass(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submit()} />
+                <button id="btn-login" onClick={submit} disabled={loading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all duration-300 active:scale-[0.98] mt-3 uppercase tracking-widest text-xs">
+                  {loading ? "Verificando…" : "Entrar"}
+                </button>
+                <button onClick={() => { setMode("reset"); setErr(""); }}
+                  className="w-full text-slate-500 text-[11px] mt-5 hover:text-indigo-400 transition-colors py-2">
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </>}
 
-        {/* Footer */}
-        <div style={{
-          marginTop: 28, textAlign: "center",
-          fontSize: 10, color: "#1e293b",
-          letterSpacing: "2px", textTransform: "uppercase",
-          fontFamily: "'Space Grotesk', sans-serif"
-        }}>KEEP GOING 💪</div>
+              {/* RESET */}
+              {mode === "reset" && <>
+                <GlassInput id="reset-email" label="Tu email" type="email" placeholder="tu@email.com"
+                  value={email} onChange={e => setEmail(e.target.value)} />
+                <button onClick={sendReset} disabled={loading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all mt-3 uppercase tracking-widest text-xs">
+                  {loading ? "Enviando…" : "Enviar instrucciones"}
+                </button>
+                <button onClick={() => { setMode("login"); setErr(""); }}
+                  className="w-full text-slate-500 text-[11px] mt-5 hover:text-indigo-400 transition-colors py-2">
+                  Volver al login
+                </button>
+              </>}
+
+              {/* SET PASSWORD */}
+              {mode === "set_password" && <>
+                <GlassInput id="new-pass" label="Nueva contraseña" type="password" placeholder="Mínimo 6 caracteres"
+                  value={newPass} onChange={e => setNewPass(e.target.value)} />
+                <GlassInput id="confirm-pass" label="Confirmar contraseña" type="password" placeholder="Repite tu contraseña"
+                  value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && setPassword()} />
+                <button onClick={setPassword} disabled={loading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all mt-3 uppercase tracking-widest text-xs">
+                  {loading ? "Guardando…" : "Establecer contraseña"}
+                </button>
+              </>}
+
+            </div>
+
+            {/* Footer */}
+            <div className="mt-10 pt-6 border-t border-white/5 text-center">
+              <p className="text-[10px] tracking-[4px] text-slate-700 font-black uppercase">Keep Going 💪</p>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
