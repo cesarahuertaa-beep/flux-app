@@ -1,52 +1,122 @@
-import { useState, useEffect } from "react";
-import { useBrand } from "../components/BrandContext";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
+/**
+ * FLUX Login — Diseño de Stitch + Lógica de autenticación FLUX
+ */
 
-// Componente de Input Glassmorphism reutilizable
-const GlassInput = ({ label, ...props }) => (
-  <div className="mb-4 w-full">
-    <label className="block text-[10px] uppercase tracking-[2px] text-slate-500 font-bold mb-2 ml-1">
-      {label}
-    </label>
-    <input
-      {...props}
-      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all duration-300 backdrop-blur-sm shadow-inner"
-    />
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Eye, EyeOff } from 'lucide-react';
+import { useBrand } from '../components/BrandContext';
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from '../lib/supabase';
+
+// ── Componente de input con toggle de visibilidad ─────────────────────────
+const PasswordInput = ({ placeholder, value, onChange, onKeyDown }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors"
+      >
+        {show ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+    </div>
+  );
+};
+
+// ── Fondo decorativo (ondas SVG + orbes) ─────────────────────────────────
+const Background = () => (
+  <div className="absolute inset-0 z-0 overflow-hidden">
+    <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px]" />
+    <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-[128px]" />
+    <div className="absolute top-1/2 left-0 w-full h-full opacity-20 rotate-12">
+      <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="transparent" />
+            <stop offset="50%"  stopColor="#4f46e5" />
+            <stop offset="100%" stopColor="transparent" />
+          </linearGradient>
+        </defs>
+        <path d="M0,500 Q250,400 500,500 T1000,500" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.5" />
+        <path d="M0,520 Q250,420 500,520 T1000,520" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.3" />
+        <path d="M0,480 Q250,380 500,480 T1000,480" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.2" />
+      </svg>
+    </div>
   </div>
 );
 
+// ── Logo FLUX con "X" brillante (estilo Stitch) ───────────────────────────
+const FluxBranding = ({ brand }) => {
+  const hasCustomLogo = brand?.logo_url && brand.logo_url !== '/logo.png';
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 1 }}
+      className="flex flex-col items-center md:items-start text-center md:text-left"
+    >
+      {hasCustomLogo ? (
+        <img src={brand.logo_url} alt={brand.nombre_marca} className="h-24 object-contain mb-4" />
+      ) : (
+        <div className="flex items-baseline mb-2">
+          <h1 className="text-7xl md:text-9xl font-display font-bold tracking-tighter text-white">
+            FLU
+          </h1>
+          <div className="relative inline-flex items-center justify-center">
+            <span className="text-7xl md:text-9xl font-display font-bold tracking-tighter text-white/90 relative z-10 italic">X</span>
+            <div className="absolute inset-0 bg-blue-500/30 blur-2xl rounded-full z-0 animate-pulse" />
+            <div className="absolute -inset-2 bg-gradient-to-tr from-purple-600/40 to-blue-500/40 blur-xl opacity-50 rotate-45 rounded-sm" />
+          </div>
+        </div>
+      )}
+      <p className="text-xl md:text-2xl font-light text-blue-100/40 tracking-wider">
+        {brand?.nombre_marca && brand.nombre_marca !== 'FLUX' ? brand.nombre_marca : 'Fueling Your Performance'}
+      </p>
+    </motion.div>
+  );
+};
+
+// ── Login principal ───────────────────────────────────────────────────────
 export default function Login({ onLogin }) {
-  const [mode,        setMode]        = useState("login");
-  const [email,       setEmail]       = useState("");
-  const [pass,        setPass]        = useState("");
-  const [newPass,     setNewPass]     = useState("");
-  const [confirmPass, setConfirmPass] = useState("");
-  const [err,         setErr]         = useState("");
-  const [info,        setInfo]        = useState("");
+  const [mode,        setMode]        = useState('login');
+  const [email,       setEmail]       = useState('');
+  const [pass,        setPass]        = useState('');
+  const [newPass,     setNewPass]     = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [err,         setErr]         = useState('');
+  const [info,        setInfo]        = useState('');
   const [loading,     setLoading]     = useState(false);
-  const [accessToken, setAccessToken] = useState("");
+  const [accessToken, setAccessToken] = useState('');
 
   const brand = useBrand();
-  const logoUrl   = brand?.logo_url   || "/logo.png";
-  const brandName = brand?.nombre_marca || "FLUX Sport Supplements";
 
+  // Detectar token de invitación/recovery en la URL
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.replace("#", "?"));
-      const token  = params.get("access_token");
-      const type   = params.get("type");
-      if (token && (type === "invite" || type === "recovery" || type === "signup")) {
+    if (hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.replace('#', '?'));
+      const token  = params.get('access_token');
+      const type   = params.get('type');
+      if (token && (type === 'invite' || type === 'recovery' || type === 'signup')) {
         setAccessToken(token);
-        setMode("set_password");
-        window.history.replaceState(null, "", window.location.pathname);
+        setMode('set_password');
+        window.history.replaceState(null, '', window.location.pathname);
       }
     }
   }, []);
 
-  // ── Login ───────────────────────────────────────────────────────────────────
+  // ── Login ───────────────────────────────────────────────────────────────
   const submit = async () => {
-    setLoading(true); setErr(""); setInfo("");
+    setLoading(true); setErr(''); setInfo('');
     try {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
@@ -55,205 +125,223 @@ export default function Login({ onLogin }) {
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
 
-      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
-        if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
+      if (role === 'admin' || role === 'superadmin' || role === 'nutriologo' || role === 'administrativo') {
+        if ((role === 'nutriologo' || role === 'administrativo') && profiles[0].activo === false) {
           setAuthToken(null); setProfileId(null);
-          setErr("Tu cuenta está suspendida. Contacta a soporte.");
+          setErr('Tu cuenta está suspendida. Contacta a soporte.');
           setLoading(false); return;
         }
-        onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
+        onLogin({ role: role === 'admin' ? 'admin' : role, token: data.access_token, profileId: data.user.id });
         return;
       }
-
       // Cliente
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
       if (!rows.length) {
         setAuthToken(null); setProfileId(null);
-        setErr("No se encontró tu cuenta activa.");
+        setErr('No se encontró tu cuenta activa.');
         setLoading(false); return;
       }
       const clientData = rows[0];
-      // Verificar que la clínica del cliente esté activa
       if (clientData.nutriologo_id) {
         const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
         if (nut.length && nut[0].activo === false) {
           setAuthToken(null); setProfileId(null);
-          setErr("El servicio de tu clínica está suspendido temporalmente.");
+          setErr('El servicio de tu clínica está suspendido temporalmente.');
           setLoading(false); return;
         }
       }
-      onLogin({ role: "client", data: clientData, token: data.access_token });
-
+      onLogin({ role: 'client', data: clientData, token: data.access_token });
     } catch (e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
-  // ── Reset ───────────────────────────────────────────────────────────────────
+  // ── Reset ───────────────────────────────────────────────────────────────
   const sendReset = async () => {
-    if (!email) { setErr("Escribe tu email"); return; }
-    setLoading(true); setErr("");
+    if (!email) { setErr('Escribe tu email'); return; }
+    setLoading(true); setErr('');
     try {
       await authResetPassword(email.trim());
-      setInfo("✅ Revisa tu email para restablecer tu contraseña.");
-      setMode("login");
+      setInfo('✅ Revisa tu email para restablecer tu contraseña.');
+      setMode('login');
     } catch (e) { setErr(e.message); }
     setLoading(false);
   };
 
-  // ── Set Password ────────────────────────────────────────────────────────────
+  // ── Set password ────────────────────────────────────────────────────────
   const setPassword = async () => {
-    if (newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
-    if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
-    setLoading(true); setErr("");
+    if (newPass.length < 6) { setErr('Mínimo 6 caracteres'); return; }
+    if (newPass !== confirmPass) { setErr('Las contraseñas no coinciden'); return; }
+    setLoading(true); setErr('');
     try {
       await authUpdatePassword(accessToken, newPass);
-      setInfo("✅ Contraseña establecida. Ya puedes entrar.");
-      setMode("login");
+      setInfo('✅ Contraseña establecida. Ya puedes entrar.');
+      setMode('login');
     } catch (e) { setErr(e.message); }
     setLoading(false);
   };
 
-  const modeTitle = { login: "Bienvenido", reset: "Recuperar acceso", set_password: "Nueva contraseña" };
-  const modeSub   = { login: "Ingresa tus credenciales para continuar", reset: "Sigue los pasos para restablecer tu acceso", set_password: "Elige una contraseña segura" };
-
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="relative min-h-screen w-full bg-[#05070a] text-white font-sans overflow-hidden flex items-center justify-center p-4">
+      <Background />
 
-      {/* ── Fondo atmosférico ── */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-indigo-900/5 rounded-full blur-[150px] pointer-events-none" />
+      <div className="relative z-10 w-full max-w-6xl flex flex-col md:flex-row items-center justify-between gap-12 md:gap-24">
 
-      <div className="grid lg:grid-cols-2 w-full max-w-5xl z-10 items-center gap-12">
+        {/* ── Branding ── */}
+        <FluxBranding brand={brand} />
 
-        {/* ── Columna izquierda: Branding ── */}
-        <div className="hidden lg:flex flex-col items-start space-y-8">
-          <div className="flex items-center gap-4">
-            {logoUrl && logoUrl !== "/logo.png"
-              ? <img src={logoUrl} alt={brandName} className="h-16 object-contain" />
-              : (
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                    <span className="text-white font-black text-3xl italic">F</span>
+        {/* ── Card ── */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="w-full max-w-md bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-8 md:p-12 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]"
+        >
+          {/* Notificaciones */}
+          {err && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs text-center leading-relaxed">
+              {err}
+            </div>
+          )}
+          {info && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs text-center leading-relaxed">
+              {info}
+            </div>
+          )}
+
+          {/* ── MODO LOGIN ── */}
+          {mode === 'login' && (
+            <div className="space-y-8">
+              <h2 className="text-3xl font-display font-bold text-center">Bienvenido</h2>
+              <form className="space-y-6" onSubmit={e => { e.preventDefault(); submit(); }}>
+                <div>
+                  <input
+                    id="login-email"
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && submit()}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
+                  />
+                </div>
+                <PasswordInput
+                  placeholder="Contraseña"
+                  value={pass}
+                  onChange={e => setPass(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && submit()}
+                />
+                <div className="flex flex-col gap-5 pt-2">
+                  <motion.button
+                    id="btn-login"
+                    type="submit"
+                    disabled={loading}
+                    whileHover={{ scale: loading ? 1 : 1.02 }}
+                    whileTap={{ scale: loading ? 1 : 0.98 }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-40 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
+                  >
+                    {loading ? 'Verificando...' : 'Entrar'}
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('reset'); setErr(''); }}
+                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
+              </form>
+              <p className="text-[10px] tracking-[4px] text-white/10 font-bold uppercase text-center pt-2">Keep Going 💪</p>
+            </div>
+          )}
+
+          {/* ── MODO RESET ── */}
+          {mode === 'reset' && (
+            <div className="space-y-8">
+              <h2 className="text-3xl font-display font-bold text-center">Recuperar acceso</h2>
+              <form className="space-y-6" onSubmit={e => { e.preventDefault(); sendReset(); }}>
+                <input
+                  type="email"
+                  placeholder="Tu email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
+                />
+                <div className="flex flex-col gap-5 pt-2">
+                  <motion.button
+                    type="submit"
+                    disabled={loading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
+                  >
+                    {loading ? 'Enviando...' : 'Enviar instrucciones'}
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setErr(''); }}
+                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
+                  >
+                    Volver al login
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ── MODO SET PASSWORD ── */}
+          {mode === 'set_password' && (
+            <div className="space-y-8">
+              <h2 className="text-3xl font-display font-bold text-center">Nueva contraseña</h2>
+              <form className="space-y-6" onSubmit={e => { e.preventDefault(); setPassword(); }}>
+                <div className="space-y-3">
+                  <PasswordInput
+                    placeholder="Nueva contraseña"
+                    value={newPass}
+                    onChange={e => setNewPass(e.target.value)}
+                  />
+                  {/* Barra de progreso */}
+                  <div className="flex gap-1.5 h-1">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className={`flex-1 rounded-full transition-all ${newPass.length > i*2 ? 'bg-blue-500/70' : 'bg-white/10'}`} />
+                    ))}
                   </div>
-                  <h1 className="text-5xl font-black tracking-tighter text-white italic">FLUX</h1>
+                  <p className="text-[10px] text-white/30 font-medium tracking-wide">Mínimo 6 caracteres</p>
                 </div>
-              )
-            }
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-2xl text-slate-300 font-light leading-snug">
-              Tu transformación<br />
-              <span className="text-white font-semibold">comienza aquí.</span>
-            </p>
-            <p className="text-slate-500 text-sm leading-relaxed max-w-sm">
-              Plataforma integral de nutrición y entrenamiento personalizado para atletas de alto rendimiento.
-            </p>
-          </div>
-
-          <div className="h-px w-24 bg-gradient-to-r from-indigo-500 to-transparent" />
-
-          <div className="grid grid-cols-3 gap-6 pt-4">
-            {[["🥦", "Nutrición"], ["🏋️", "Rutinas"], ["📈", "Progreso"]].map(([icon, label]) => (
-              <div key={label} className="text-center space-y-2">
-                <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-2xl mx-auto">
-                  {icon}
+                <div className="space-y-3">
+                  <PasswordInput
+                    placeholder="Confirmar contraseña"
+                    value={confirmPass}
+                    onChange={e => setConfirmPass(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && setPassword()}
+                  />
+                  <div className="flex gap-1.5 h-1">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className={`flex-1 rounded-full transition-all ${confirmPass.length > i*2 && confirmPass === newPass.slice(0, confirmPass.length) ? 'bg-blue-500/30' : 'bg-white/10'}`} />
+                    ))}
+                  </div>
                 </div>
-                <p className="text-slate-500 text-xs tracking-wide">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Columna derecha: Card Glassmorphism ── */}
-        <div className="flex justify-center">
-          <div className="w-full max-w-[420px] bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[32px] p-10 shadow-2xl relative overflow-hidden group">
-
-            {/* Inner glow */}
-            <div className="absolute -top-20 -right-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/15 transition-all duration-700 pointer-events-none" />
-
-            {/* Header de la card */}
-            <div className="text-center mb-8">
-              {/* Logo compacto visible solo en móvil */}
-              <div className="lg:hidden mb-6">
-                {logoUrl && logoUrl !== "/logo.png"
-                  ? <img src={logoUrl} alt={brandName} className="h-12 object-contain mx-auto" />
-                  : <span className="text-4xl font-black text-white italic tracking-tighter">FLUX</span>
-                }
-              </div>
-              <h2 className="text-2xl font-bold text-white tracking-tight">{modeTitle[mode]}</h2>
-              <p className="text-slate-500 mt-2 text-sm">{modeSub[mode]}</p>
+                <div className="flex flex-col gap-5 pt-4">
+                  <motion.button
+                    type="submit"
+                    disabled={loading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-40 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
+                  >
+                    {loading ? 'Guardando...' : 'Establecer contraseña'}
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setErr(''); }}
+                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
+                  >
+                    Volver al login
+                  </button>
+                </div>
+              </form>
             </div>
-
-            {/* Notificaciones */}
-            {err && (
-              <div className="mb-5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs text-center leading-relaxed">
-                {err}
-              </div>
-            )}
-            {info && (
-              <div className="mb-5 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs text-center leading-relaxed">
-                {info}
-              </div>
-            )}
-
-            {/* ── Formularios ── */}
-            <div className="space-y-1">
-
-              {/* LOGIN */}
-              {mode === "login" && <>
-                <GlassInput id="login-email" label="Email" type="email" placeholder="ejemplo@flux.com"
-                  value={email} onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && submit()} />
-                <GlassInput id="login-pass" label="Contraseña" type="password" placeholder="••••••••"
-                  value={pass} onChange={e => setPass(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && submit()} />
-                <button id="btn-login" onClick={submit} disabled={loading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all duration-300 active:scale-[0.98] mt-3 uppercase tracking-widest text-xs">
-                  {loading ? "Verificando…" : "Entrar"}
-                </button>
-                <button onClick={() => { setMode("reset"); setErr(""); }}
-                  className="w-full text-slate-500 text-[11px] mt-5 hover:text-indigo-400 transition-colors py-2">
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </>}
-
-              {/* RESET */}
-              {mode === "reset" && <>
-                <GlassInput id="reset-email" label="Tu email" type="email" placeholder="tu@email.com"
-                  value={email} onChange={e => setEmail(e.target.value)} />
-                <button onClick={sendReset} disabled={loading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all mt-3 uppercase tracking-widest text-xs">
-                  {loading ? "Enviando…" : "Enviar instrucciones"}
-                </button>
-                <button onClick={() => { setMode("login"); setErr(""); }}
-                  className="w-full text-slate-500 text-[11px] mt-5 hover:text-indigo-400 transition-colors py-2">
-                  Volver al login
-                </button>
-              </>}
-
-              {/* SET PASSWORD */}
-              {mode === "set_password" && <>
-                <GlassInput id="new-pass" label="Nueva contraseña" type="password" placeholder="Mínimo 6 caracteres"
-                  value={newPass} onChange={e => setNewPass(e.target.value)} />
-                <GlassInput id="confirm-pass" label="Confirmar contraseña" type="password" placeholder="Repite tu contraseña"
-                  value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && setPassword()} />
-                <button onClick={setPassword} disabled={loading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all mt-3 uppercase tracking-widest text-xs">
-                  {loading ? "Guardando…" : "Establecer contraseña"}
-                </button>
-              </>}
-
-            </div>
-
-            {/* Footer */}
-            <div className="mt-10 pt-6 border-t border-white/5 text-center">
-              <p className="text-[10px] tracking-[4px] text-slate-700 font-black uppercase">Keep Going 💪</p>
-            </div>
-          </div>
-        </div>
-
+          )}
+        </motion.div>
       </div>
     </div>
   );
