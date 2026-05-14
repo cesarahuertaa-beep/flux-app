@@ -1,144 +1,54 @@
-/**
- * FLUX Login — Diseño de Stitch + Lógica de autenticación FLUX
- */
+import { useState, useEffect } from "react";
+import { C, css } from "../styles/theme";
+import { FluxLogo, Field, OrbBackground } from "../components/ui";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff } from 'lucide-react';
-import { useBrand } from '../components/BrandContext';
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from '../lib/supabase';
-
-// ── Componente de input con toggle de visibilidad ─────────────────────────
-const PasswordInput = ({ placeholder, value, onChange, onKeyDown }) => {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="relative">
-      <input
-        type={show ? 'text' : 'password'}
-        value={value}
-        onChange={onChange}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
-      />
-      <button
-        type="button"
-        onClick={() => setShow(s => !s)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors"
-      >
-        {show ? <EyeOff size={18} /> : <Eye size={18} />}
-      </button>
-    </div>
-  );
-};
-
-// ── Fondo decorativo (ondas SVG + orbes) ─────────────────────────────────
-const Background = () => (
-  <div className="absolute inset-0 z-0 overflow-hidden">
-    <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px]" />
-    <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-[128px]" />
-    <div className="absolute top-1/2 left-0 w-full h-full opacity-20 rotate-12">
-      <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor="transparent" />
-            <stop offset="50%"  stopColor="#4f46e5" />
-            <stop offset="100%" stopColor="transparent" />
-          </linearGradient>
-        </defs>
-        <path d="M0,500 Q250,400 500,500 T1000,500" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.5" />
-        <path d="M0,520 Q250,420 500,520 T1000,520" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.3" />
-        <path d="M0,480 Q250,380 500,480 T1000,480" fill="none" stroke="url(#wave-gradient)" strokeWidth="0.2" />
-      </svg>
-    </div>
-  </div>
-);
-
-// ── Logo FLUX con "X" brillante (estilo Stitch) ───────────────────────────
-const FluxBranding = ({ brand }) => {
-  const hasCustomLogo = brand?.logo_url && brand.logo_url !== '/logo.png';
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 1 }}
-      className="flex flex-col items-center md:items-start text-center md:text-left"
-    >
-      {hasCustomLogo ? (
-        <img src={brand.logo_url} alt={brand.nombre_marca} className="h-24 object-contain mb-4" />
-      ) : (
-        <div className="flex items-baseline mb-2">
-          <h1 className="text-7xl md:text-9xl font-display font-bold tracking-tighter text-white">
-            FLU
-          </h1>
-          <div className="relative inline-flex items-center justify-center">
-            <span className="text-7xl md:text-9xl font-display font-bold tracking-tighter text-white/90 relative z-10 italic">X</span>
-            <div className="absolute inset-0 bg-blue-500/30 blur-2xl rounded-full z-0 animate-pulse" />
-            <div className="absolute -inset-2 bg-gradient-to-tr from-purple-600/40 to-blue-500/40 blur-xl opacity-50 rotate-45 rounded-sm" />
-          </div>
-        </div>
-      )}
-      <p className="text-xl md:text-2xl font-light text-blue-100/40 tracking-wider">
-        {brand?.nombre_marca && brand.nombre_marca !== 'FLUX' ? brand.nombre_marca : 'Fueling Your Performance'}
-      </p>
-    </motion.div>
-  );
-};
-
-// ── Login principal ───────────────────────────────────────────────────────
 export default function Login({ onLogin }) {
-  const [mode,        setMode]        = useState('login');
-  const [email,       setEmail]       = useState('');
-  const [pass,        setPass]        = useState('');
-  const [newPass,     setNewPass]     = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [err,         setErr]         = useState('');
-  const [info,        setInfo]        = useState('');
-  const [loading,     setLoading]     = useState(false);
-  const [accessToken, setAccessToken] = useState('');
+  const [mode, setMode]           = useState("login");
+  const [email, setEmail]         = useState("");
+  const [pass, setPass]           = useState("");
+  const [newPass, setNewPass]     = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [err, setErr]             = useState("");
+  const [info, setInfo]           = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+  const [focused, setFocused]     = useState(null);
 
-  const brand = useBrand();
-
-  // Detectar token de invitación/recovery en la URL
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.replace('#', '?'));
-      const token  = params.get('access_token');
-      const type   = params.get('type');
-      if (token && (type === 'invite' || type === 'recovery' || type === 'signup')) {
-        setAccessToken(token);
-        setMode('set_password');
-        window.history.replaceState(null, '', window.location.pathname);
+    if (hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.replace("#","?"));
+      const token = params.get("access_token");
+      const type  = params.get("type");
+      if (token && (type==="invite"||type==="recovery"||type==="signup")) {
+        setAccessToken(token); setMode("set_password");
+        window.history.replaceState(null,"",window.location.pathname);
       }
     }
   }, []);
 
-  // ── Login ───────────────────────────────────────────────────────────────
   const submit = async () => {
-    setLoading(true); setErr(''); setInfo('');
+    setLoading(true); setErr(""); setInfo("");
     try {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
-
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       const role = profiles.length ? profiles[0].role : null;
-
-      if (role === 'admin' || role === 'superadmin' || role === 'nutriologo' || role === 'administrativo') {
-        if ((role === 'nutriologo' || role === 'administrativo') && profiles[0].activo === false) {
+      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
+        if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
           setAuthToken(null); setProfileId(null);
-          setErr('Tu cuenta está suspendida. Contacta a soporte.');
+          setErr("Tu cuenta está suspendida. Contacta a soporte.");
           setLoading(false); return;
         }
-        onLogin({ role: role === 'admin' ? 'admin' : role, token: data.access_token, profileId: data.user.id });
+        onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
         return;
       }
-      // Cliente
       const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
       if (!rows.length) {
         setAuthToken(null); setProfileId(null);
-        setErr('No se encontró tu cuenta activa.');
+        setErr("No se encontró tu cuenta activa.");
         setLoading(false); return;
       }
       const clientData = rows[0];
@@ -146,202 +56,180 @@ export default function Login({ onLogin }) {
         const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
         if (nut.length && nut[0].activo === false) {
           setAuthToken(null); setProfileId(null);
-          setErr('El servicio de tu clínica está suspendido temporalmente.');
+          setErr("El servicio de tu clínica está suspendido temporalmente.");
           setLoading(false); return;
         }
       }
-      onLogin({ role: 'client', data: clientData, token: data.access_token });
-    } catch (e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
+      onLogin({ role:"client", data:clientData, token:data.access_token });
+    } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
-  // ── Reset ───────────────────────────────────────────────────────────────
   const sendReset = async () => {
-    if (!email) { setErr('Escribe tu email'); return; }
-    setLoading(true); setErr('');
+    if (!email) { setErr("Escribe tu email"); return; }
+    setLoading(true); setErr("");
     try {
       await authResetPassword(email.trim());
-      setInfo('✅ Revisa tu email para restablecer tu contraseña.');
-      setMode('login');
-    } catch (e) { setErr(e.message); }
+      setInfo("✅ Revisa tu email para restablecer tu contraseña.");
+      setMode("login");
+    } catch(e) { setErr(e.message); }
     setLoading(false);
   };
 
-  // ── Set password ────────────────────────────────────────────────────────
   const setPassword = async () => {
-    if (newPass.length < 6) { setErr('Mínimo 6 caracteres'); return; }
-    if (newPass !== confirmPass) { setErr('Las contraseñas no coinciden'); return; }
-    setLoading(true); setErr('');
+    if (!newPass || newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
+    if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
+    setLoading(true); setErr("");
     try {
       await authUpdatePassword(accessToken, newPass);
-      setInfo('✅ Contraseña establecida. Ya puedes entrar.');
-      setMode('login');
-    } catch (e) { setErr(e.message); }
+      setInfo("✅ Contraseña establecida. Ya puedes entrar.");
+      setMode("login");
+    } catch(e) { setErr(e.message); }
     setLoading(false);
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  const inputStyle = (field) => ({
+    background: focused === field ? "rgba(15,28,46,0.95)" : "rgba(7,16,29,0.85)",
+    color: C.text,
+    border: `1px solid ${focused === field ? "rgba(46,92,184,0.55)" : "rgba(46,92,184,0.14)"}`,
+    borderRadius: 12, padding: "13px 16px", fontSize: 14,
+    width: "100%", outline: "none", fontFamily: "'Inter',sans-serif",
+    transition: "all 0.25s ease",
+    boxShadow: focused === field ? "0 0 0 3px rgba(46,92,184,0.14)" : "none",
+  });
+
   return (
-    <div className="relative min-h-screen w-full bg-[#05070a] text-white font-sans overflow-hidden flex items-center justify-center p-4">
-      <Background />
+    <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
+      <style>{css}</style>
 
-      <div className="relative z-10 w-full max-w-6xl flex flex-col md:flex-row items-center justify-between gap-12 md:gap-24">
+      {/* ── Login Card ── */}
+      <div className="animate-in" style={{ width:"100%",maxWidth:420,padding:"44px 40px 36px",background:"rgba(15,28,46,0.95)",borderRadius:24,border:"1px solid rgba(46,92,184,0.15)",position:"relative",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",boxShadow:"0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(46,92,184,0.08)",zIndex:1 }}>
 
-        {/* ── Branding ── */}
-        <FluxBranding brand={brand} />
-
-        {/* ── Card ── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="w-full max-w-md bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-8 md:p-12 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]"
-        >
-          {/* Notificaciones */}
-          {err && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs text-center leading-relaxed">
-              {err}
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <FluxLogo size={38} animated large />
+          {(mode === "reset" || mode === "set_password") && (
+            <div style={{ marginTop: 12, fontSize: 13, color: "#64748b", letterSpacing: "0.3px" }}>
+              {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
             </div>
           )}
-          {info && (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs text-center leading-relaxed">
-              {info}
-            </div>
-          )}
+        </div>
 
-          {/* ── MODO LOGIN ── */}
-          {mode === 'login' && (
-            <div className="space-y-8">
-              <h2 className="text-3xl font-display font-bold text-center">Bienvenido</h2>
-              <form className="space-y-6" onSubmit={e => { e.preventDefault(); submit(); }}>
-                <div>
-                  <input
-                    id="login-email"
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && submit()}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
-                  />
-                </div>
-                <PasswordInput
-                  placeholder="Contraseña"
-                  value={pass}
-                  onChange={e => setPass(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && submit()}
-                />
-                <div className="flex flex-col gap-5 pt-2">
-                  <motion.button
-                    id="btn-login"
-                    type="submit"
-                    disabled={loading}
-                    whileHover={{ scale: loading ? 1 : 1.02 }}
-                    whileTap={{ scale: loading ? 1 : 0.98 }}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-40 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
-                  >
-                    {loading ? 'Verificando...' : 'Entrar'}
-                  </motion.button>
-                  <button
-                    type="button"
-                    onClick={() => { setMode('reset'); setErr(''); }}
-                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-              </form>
-              <p className="text-[10px] tracking-[4px] text-white/10 font-bold uppercase text-center pt-2">Keep Going 💪</p>
-            </div>
-          )}
+        {/* Messages */}
+        {info && (
+          <div style={{
+            background: "rgba(8,47,73,0.5)",
+            border: "1px solid rgba(56,189,248,0.2)",
+            borderRadius: 12, padding: "12px 16px",
+            fontSize: 13, color: "#38bdf8",
+            marginBottom: 18, lineHeight: 1.6,
+            backdropFilter: "blur(8px)"
+          }}>{info}</div>
+        )}
+        {err && (
+          <div style={{
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: 12, padding: "12px 16px",
+            fontSize: 13, color: "#f87171",
+            marginBottom: 18, textAlign: "center",
+            lineHeight: 1.6
+          }}>{err}</div>
+        )}
 
-          {/* ── MODO RESET ── */}
-          {mode === 'reset' && (
-            <div className="space-y-8">
-              <h2 className="text-3xl font-display font-bold text-center">Recuperar acceso</h2>
-              <form className="space-y-6" onSubmit={e => { e.preventDefault(); sendReset(); }}>
-                <input
-                  type="email"
-                  placeholder="Tu email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
-                />
-                <div className="flex flex-col gap-5 pt-2">
-                  <motion.button
-                    type="submit"
-                    disabled={loading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
-                  >
-                    {loading ? 'Enviando...' : 'Enviar instrucciones'}
-                  </motion.button>
-                  <button
-                    type="button"
-                    onClick={() => { setMode('login'); setErr(''); }}
-                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
-                  >
-                    Volver al login
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+        {/* ── LOGIN FORM ── */}
+        {mode === "login" && <>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Email</div>
+            <input
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submit()}
+              onFocus={() => setFocused("email")}
+              onBlur={() => setFocused(null)}
+              placeholder="tu@email.com"
+              type="email"
+              style={inputStyle("email")}
+            />
+          </div>
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Contraseña</div>
+            <input
+              type="password"
+              value={pass}
+              onChange={e => setPass(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submit()}
+              onFocus={() => setFocused("pass")}
+              onBlur={() => setFocused(null)}
+              placeholder="••••••••"
+              style={inputStyle("pass")}
+            />
+          </div>
 
-          {/* ── MODO SET PASSWORD ── */}
-          {mode === 'set_password' && (
-            <div className="space-y-8">
-              <h2 className="text-3xl font-display font-bold text-center">Nueva contraseña</h2>
-              <form className="space-y-6" onSubmit={e => { e.preventDefault(); setPassword(); }}>
-                <div className="space-y-3">
-                  <PasswordInput
-                    placeholder="Nueva contraseña"
-                    value={newPass}
-                    onChange={e => setNewPass(e.target.value)}
-                  />
-                  {/* Barra de progreso */}
-                  <div className="flex gap-1.5 h-1">
-                    {[0,1,2,3].map(i => (
-                      <div key={i} className={`flex-1 rounded-full transition-all ${newPass.length > i*2 ? 'bg-blue-500/70' : 'bg-white/10'}`} />
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-white/30 font-medium tracking-wide">Mínimo 6 caracteres</p>
-                </div>
-                <div className="space-y-3">
-                  <PasswordInput
-                    placeholder="Confirmar contraseña"
-                    value={confirmPass}
-                    onChange={e => setConfirmPass(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && setPassword()}
-                  />
-                  <div className="flex gap-1.5 h-1">
-                    {[0,1,2,3].map(i => (
-                      <div key={i} className={`flex-1 rounded-full transition-all ${confirmPass.length > i*2 && confirmPass === newPass.slice(0, confirmPass.length) ? 'bg-blue-500/30' : 'bg-white/10'}`} />
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-5 pt-4">
-                  <motion.button
-                    type="submit"
-                    disabled={loading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-40 text-white font-semibold py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(59,130,246,0.4)] transition-all"
-                  >
-                    {loading ? 'Guardando...' : 'Establecer contraseña'}
-                  </motion.button>
-                  <button
-                    type="button"
-                    onClick={() => { setMode('login'); setErr(''); }}
-                    className="text-center text-sm font-medium text-white/40 hover:text-white underline underline-offset-4 decoration-white/10 hover:decoration-white transition-all"
-                  >
-                    Volver al login
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-        </motion.div>
+          <button onClick={submit} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:loading?"rgba(15,28,46,0.7)":"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:loading?"#6e87a2":"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:16,letterSpacing:"1.5px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none",transition:"all 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
+            {loading ? "Verificando…" : "ENTRAR"}
+          </button>
+
+          <div style={{ textAlign: "center" }}>
+            <button
+              onClick={() => { setMode("reset"); setErr(""); }}
+              style={{
+                background: "none", border: "none",
+                color: "#475569", fontSize: 12,
+                cursor: "pointer", fontFamily: "'Inter', sans-serif",
+                transition: "color 0.2s",
+                textDecoration: "none",
+                letterSpacing: "0.2px"
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = "var(--brand-accent,#2e5cb8)"}
+              onMouseLeave={e => e.currentTarget.style.color = "#475569"}
+            >¿Olvidaste tu contraseña?</button>
+          </div>
+        </>}
+
+        {/* ── RESET FORM ── */}
+        {mode === "reset" && <>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Tu email</div>
+            <input
+              value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com" type="email"
+              onFocus={() => setFocused("resetEmail")}
+              onBlur={() => setFocused(null)}
+              style={inputStyle("resetEmail")}
+            />
+          </div>
+          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
+            {loading ? "Enviando…" : "Enviar instrucciones"}
+          </button>
+          <div style={{ textAlign: "center" }}>
+            <button onClick={() => { setMode("login"); setErr(""); }} style={{ background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer",fontFamily:"'Inter',sans-serif" }} onMouseEnter={e=>e.currentTarget.style.color="var(--brand-accent,#2e5cb8)"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>
+              Volver al login
+            </button>
+          </div>
+        </>}
+
+        {/* ── SET PASSWORD FORM ── */}
+        {mode === "set_password" && <>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Nueva contraseña</div>
+            <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" onFocus={() => setFocused("np")} onBlur={() => setFocused(null)} style={inputStyle("np")} />
+          </div>
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Confirmar contraseña</div>
+            <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" onFocus={() => setFocused("cp")} onBlur={() => setFocused(null)} style={inputStyle("cp")} />
+          </div>
+          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
+            {loading ? "Guardando…" : "Establecer contraseña"}
+          </button>
+        </>}
+
+        {/* Footer */}
+        <div style={{
+          marginTop: 28, textAlign: "center",
+          fontSize: 10, color: "#1e293b",
+          letterSpacing: "2px", textTransform: "uppercase",
+          fontFamily: "'Space Grotesk', sans-serif"
+        }}>KEEP GOING 💪</div>
       </div>
     </div>
   );
