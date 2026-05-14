@@ -70,7 +70,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteDia  = async (d) => { await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
+  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"? Se borrarán todas sus comidas.`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
@@ -93,7 +93,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteRutina = async (r) => { await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
+  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"? Se borrarán todos los ejercicios de esta rutina.`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
   const addEj = (ej) => {
     if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
     setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));

@@ -112,6 +112,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   };
 
   const eliminarHorario = async (id) => {
+    if (!confirm("¿Eliminar este horario de disponibilidad?")) return;
     try {
       await dbDel(`disponibilidad?id=eq.${id}`);
       setMsg("🗑️ Horario eliminado");

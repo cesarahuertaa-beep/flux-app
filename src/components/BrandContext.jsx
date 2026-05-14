@@ -5,14 +5,10 @@ const BrandContext = createContext(null);
 
 export const useBrand = () => useContext(BrandContext);
 
-export function BrandProvider({ children, session }) {
-  const [brand, setBrand] = useState({
-    nombre_marca: "FLUX",
-    color_primario: "#2e5cb8",
-    logo_url: "/logo.png"
-  });
+const FLUX_DEFAULT = { nombre_marca: "FLUX", color_primario: "#2e5cb8", logo_url: "/logo.png" };
 
-  const FLUX_DEFAULT = { nombre_marca: "FLUX", color_primario: "#2e5cb8", logo_url: "/logo.png" };
+export function BrandProvider({ children, session }) {
+  const [brand, setBrand] = useState(FLUX_DEFAULT);
 
   useEffect(() => {
     // Sin sesión o superadmin/admin → siempre FLUX

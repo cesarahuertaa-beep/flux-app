@@ -1,22 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field, Tag } from "../ui";
-import { getNutriologos, updateProfile, authInvite } from "../../lib/supabase";
+import { getNutriologos, updateProfile, authInvite, storageUpload } from "../../lib/supabase";
 
-const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
 const uploadLogo = async (file) => {
   const ext  = file.name.split(".").pop();
   const fname = `${Date.now()}.${ext}`;
-  const res = await fetch(`${SUPA_URL}/storage/v1/object/logos/${fname}`, {
-    method: "POST",
-    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, "Content-Type": file.type },
-    body: file
-  });
-  if (!res.ok) throw new Error("Error al subir logo");
-  return `${SUPA_URL}/storage/v1/object/public/logos/${fname}`;
+  return await storageUpload("logos", fname, file);
 };
 
 const LogoPicker = ({ value, onChange, uploading }) => {

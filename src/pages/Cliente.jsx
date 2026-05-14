@@ -1,16 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { C, css } from "../styles/theme";
 import { Btn, Tag, Header, TabBar, StatCard } from "../components/ui";
 import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CitasCliente } from "../components/CitasCliente";
+import { parseFotos, getSemanasConFecha } from "../utils/helpers";
 
-const parseFotos = (fotos) => {
-  if (!fotos) return [];
-  if (Array.isArray(fotos)) return fotos;
-  try { return JSON.parse(fotos); } catch(e) { return typeof fotos === "string" && fotos.startsWith("http") ? [fotos] : []; }
-};
+
 
 export default function ClienteView({ session, onLogout, isAtletaMode=false, onBackToAdmin }) {
   const { data:cliente } = session;
@@ -65,7 +62,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     setProgreso(p=>({...p,[key]:finalVal}));
     setEditCell(null); setEditVal("");
     
-    await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+    try {
+      await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+    } catch(e) {
+      console.error("Error guardando celda:", e);
+    }
   };
 
   const saveAll = async () => {
@@ -94,7 +95,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         }
       });
       if (upserts.length > 0) {
-        await Promise.all(upserts.map(u => dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", u)));
+        // Batch: enviar todos los registros en una sola request
+        await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", upserts);
       }
       setMsg({ ok: true, text: "✅ Registros guardados correctamente" });
     } catch(e) {
@@ -104,26 +106,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     setTimeout(() => setMsg(null), 4000);
   };
 
-  const handleTabChange = (newTab) => {
-    if (editCell) commitEdit();
+  const handleTabChange = async (newTab) => {
+    if (editCell) await commitEdit();
     setTab(newTab);
   };
 
-  const safeLogout = () => {
-    if (editCell) commitEdit();
+  const safeLogout = async () => {
+    if (editCell) await commitEdit();
     onLogout();
   };
 
-  const getSemanasConFecha = (rutina) => {
-    if (!rutina) return [];
-    const inicio = rutina.fecha_inicio ? new Date(rutina.fecha_inicio + "T12:00:00") : new Date();
-    return Array.from({length:rutina.semanas}, (_,i) => {
-      const start=new Date(inicio); start.setDate(start.getDate()+i*7);
-      const end=new Date(start); end.setDate(end.getDate()+6);
-      const fmt=(d)=>`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-      return { label:`${fmt(start)}-${fmt(end)}`, idx:i };
-    });
-  };
+
 
   const rutina = rutinas[rutinaIdx];
   const diaActual = dias[diaIdx];
@@ -428,10 +421,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                         </tr>
                         <tr>
                           {semanas.map((_,i)=>(
-                            <>
+                            <Fragment key={i}>
                               <th key={`p${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10,minWidth:52,fontWeight:600}}>Peso</th>
                               <th key={`r${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10,minWidth:52,fontWeight:600}}>Reps</th>
-                            </>
+                            </Fragment>
                           ))}
                         </tr>
                       </thead>
@@ -517,10 +510,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                                     );
                                   };
                                   return (
-                                    <>
+                                    <Fragment key={`w${wi}`}>
                                       {renderCell(pKey, pVal, true)}
                                       {renderCell(rKey, rVal, false)}
-                                    </>
+                                    </Fragment>
                                   );
                                 })}
                               </tr>

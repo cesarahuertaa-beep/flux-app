@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { generateProgresoPDF } from "../../utils/pdf";
+import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
 
 const METRIC_GROUPS = [
   { label:"Básicas", icon:"⚖️", fields:[
@@ -44,11 +45,7 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 
-const parseFotos = (fotos) => {
-  if (!fotos) return [];
-  if (Array.isArray(fotos)) return fotos;
-  try { return JSON.parse(fotos); } catch(e) { return typeof fotos === "string" && fotos.startsWith("http") ? [fotos] : []; }
-};
+
 
 export function ProgresoCliente({ selected, setMsg }) {
   const [metricas,     setMetricas]     = useState([]);
@@ -174,6 +171,7 @@ export function ProgresoCliente({ selected, setMsg }) {
   };
 
   const deleteMetrica = async (id) => {
+    if (!confirm("¿Eliminar esta evaluación? Esta acción no se puede deshacer.")) return;
     await dbDel(`metricas_progreso?id=eq.${id}`);
     setMsg("🗑️ Evaluación eliminada"); await load();
   };
@@ -184,15 +182,7 @@ export function ProgresoCliente({ selected, setMsg }) {
     return d === 0 ? null : d;
   };
 
-  const getSemanasConFecha = (rutina) => {
-    const inicio = rutina.fecha_inicio ? new Date(rutina.fecha_inicio + "T12:00:00") : new Date();
-    return Array.from({ length: rutina.semanas }, (_, i) => {
-      const start = new Date(inicio); start.setDate(start.getDate() + i * 7);
-      const end   = new Date(start);  end.setDate(end.getDate() + 6);
-      const fmt = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-      return { label:`${fmt(start)}-${fmt(end)}`, idx:i };
-    });
-  };
+
 
   const DISPLAY_KEYS = [
     { key:"peso",            label:"Peso",      unit:"kg",     icon:"⚖️" },
@@ -330,8 +320,8 @@ export function ProgresoCliente({ selected, setMsg }) {
                         <tr>
                           <th colSpan={2} style={{background:C.surfaceAlt,border:`1px solid ${C.border}`}}/>
                           {semanas.map((_,i)=>(
-                            <><th key={`p${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Peso</th>
-                              <th key={`r${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Reps</th></>
+                            <Fragment key={`h${i}`}><th key={`p${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Peso</th>
+                              <th key={`r${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Reps</th></Fragment>
                           ))}
                         </tr>
                       </thead>
@@ -345,14 +335,14 @@ export function ProgresoCliente({ selected, setMsg }) {
                             {semanas.map((_,wi)=>{
                               const pVal=progreso[`${ej.id}-${wi}-${si}-peso`]||"";
                               const rVal=progreso[`${ej.id}-${wi}-${si}-reps`]||"";
-                              return (<>
+                              return (<Fragment key={`w${wi}`}>
                                 <td key={`p${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:pVal?`${C.accentDeep}40`:"transparent"}}>
                                   <span style={{fontSize:11,color:pVal?C.accent:C.dim,fontWeight:pVal?700:400}}>{pVal||"—"}</span>
                                 </td>
                                 <td key={`r${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:rVal?`${C.accentDeep}25`:"transparent"}}>
                                   <span style={{fontSize:11,color:rVal?C.accentMid:C.dim,fontWeight:rVal?700:400}}>{rVal||"—"}</span>
                                 </td>
-                              </>);
+                              </Fragment>);
                             })}
                           </tr>
                         )))}

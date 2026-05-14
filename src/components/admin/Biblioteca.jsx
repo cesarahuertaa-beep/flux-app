@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, GRUPOS, TIPOS } from "../../styles/theme";
 import { Btn, Modal, Field, Tag } from "../ui";
-import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
@@ -14,28 +14,20 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [busqueda, setBusqueda]   = useState("");
   const [preview, setPreview]     = useState(null);
 
-  const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-  const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  const openNew  = () => { setEditEj(null); setForm({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" }); setShowModal(true); };
-  const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, tipo_movimiento:e.tipo_movimiento, gif_url:e.gif_url||"" }); setShowModal(true); };
-
   const uploadGif = async (file) => {
     setUploading(true);
     try {
       const ext   = file.name.split(".").pop();
       const fname = `${Date.now()}.${ext}`;
-      const res   = await fetch(`${SUPA_URL}/storage/v1/object/ejercicios/${fname}`, {
-        method:"POST",
-        headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`, "Content-Type":file.type },
-        body:file
-      });
-      if (!res.ok) throw new Error("Error al subir archivo");
-      setForm(p => ({ ...p, gif_url:`${SUPA_URL}/storage/v1/object/public/ejercicios/${fname}` }));
+      const url = await storageUpload("ejercicios", fname, file);
+      setForm(p => ({ ...p, gif_url: url }));
       setMsg("✅ Archivo subido");
     } catch(e) { setMsg("❌ "+e.message); }
     setUploading(false);
   };
+
+  const openNew  = () => { setEditEj(null); setForm({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" }); setShowModal(true); };
+  const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, tipo_movimiento:e.tipo_movimiento, gif_url:e.gif_url||"" }); setShowModal(true); };
 
   const save = async () => {
     if (!form.nombre) { setMsg("⚠️ Escribe el nombre"); return; }
@@ -49,6 +41,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   const deleteEj = async (e) => {
+    if (!confirm(`¿Eliminar "${e.nombre}"? Esta acción no se puede deshacer.`)) return;
     await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
     setMsg("🗑️ Ejercicio eliminado"); onUpdate();
   };

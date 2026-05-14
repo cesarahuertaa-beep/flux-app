@@ -1,3 +1,5 @@
+import { escapeHtml, parseFotos } from "./helpers";
+
 // Darkens a hex color by reducing RGB values
 const darken = (hex, amt = 60) => {
   const n = parseInt((hex || "#2D9CDB").replace("#", ""), 16);
@@ -16,23 +18,29 @@ const tint = (hex, amt = 230) => {
   return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
 };
 
-const parseFotos = (fotos) => {
-  if (!fotos) return [];
-  if (Array.isArray(fotos)) return fotos;
-  try { return JSON.parse(fotos); } catch(e) { return typeof fotos === "string" && fotos.startsWith("http") ? [fotos] : []; }
+/** Escapa una URL para uso seguro en atributos src */
+const safeUrl = (url) => {
+  if (!url) return "";
+  // Solo permitir URLs http/https
+  if (!/^https?:\/\//i.test(url)) return "";
+  return escapeHtml(url);
 };
 
 export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   const accent  = brand.color_primario || "#2D9CDB";
   const dark    = darken(accent, 60);
   const light   = tint(accent, 210);
-  const nombre  = brand.nombre_marca  || "FLUX Sport Supplements";
-  const logoUrl = brand.logo_url && brand.logo_url !== "/logo.png" ? brand.logo_url : null;
+  const nombre  = escapeHtml(brand.nombre_marca || "FLUX Sport Supplements");
+  const logoUrl = brand.logo_url && brand.logo_url !== "/logo.png" ? safeUrl(brand.logo_url) : null;
 
   const win = window.open("", "_blank");
   if (!win) return;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Nutricional - ${cliente.nombre}</title>
+  const clienteNombre  = escapeHtml(cliente.nombre);
+  const clienteObjetivo = escapeHtml(cliente.objetivo || "\u2014");
+  const fechaHoy = new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Nutricional - ${clienteNombre}</title>
   <style>
     body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:30px;max-width:800px;margin:0 auto}
     .header{text-align:center;border-bottom:3px solid ${accent};padding-bottom:20px;margin-bottom:24px}
@@ -58,20 +66,20 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
     }
     <div class="brand-sub">Plan Nutricional Personalizado</div>
   </div>
-  <div class="client-info"><strong style="font-size:16px">${cliente.nombre}</strong><br>
-  <span style="color:#666;font-size:13px">Objetivo: ${cliente.objetivo||"\u2014"}</span>
-  <span style="float:right;color:#999;font-size:12px">${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span></div>
+  <div class="client-info"><strong style="font-size:16px">${clienteNombre}</strong><br>
+  <span style="color:#666;font-size:13px">Objetivo: ${clienteObjetivo}</span>
+  <span style="float:right;color:#999;font-size:12px">${fechaHoy}</span></div>
   ${nutri ? `<div class="macros">
-    <div class="macro-box"><div class="macro-val">${nutri.calorias}</div><div class="macro-lbl">Calorías (kcal)</div></div>
-    <div class="macro-box"><div class="macro-val">${nutri.proteina}g</div><div class="macro-lbl">Proteína</div></div>
-    <div class="macro-box"><div class="macro-val">${nutri.carbohidratos}g</div><div class="macro-lbl">Carbohidratos</div></div>
-    <div class="macro-box"><div class="macro-val">${nutri.grasas}g</div><div class="macro-lbl">Grasas</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.calorias)}</div><div class="macro-lbl">Calorías (kcal)</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.proteina)}g</div><div class="macro-lbl">Proteína</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.carbohidratos)}g</div><div class="macro-lbl">Carbohidratos</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.grasas)}g</div><div class="macro-lbl">Grasas</div></div>
   </div>` : ""}
-  ${dias.map(d => `<div class="dia"><div class="dia-title">${d.dia}</div>
+  ${dias.map(d => `<div class="dia"><div class="dia-title">${escapeHtml(d.dia)}</div>
   <table><thead><tr><th>Hora</th><th>Comida</th><th>Opción 1</th><th>Opción 2</th><th>Kcal</th><th>P/C/G</th></tr></thead>
-  <tbody>${d.comidas.map(c => `<tr><td>${c.hora||""}</td><td><strong>${c.nombre||""}</strong></td>
-  <td>${c.opcion1||""}</td><td>${c.opcion2||""}</td>
-  <td>${c.calorias||0}</td><td>${c.proteina||0}/${c.carbohidratos||0}/${c.grasas||0}g</td></tr>`).join("")}
+  <tbody>${d.comidas.map(c => `<tr><td>${escapeHtml(c.hora)}</td><td><strong>${escapeHtml(c.nombre)}</strong></td>
+  <td>${escapeHtml(c.opcion1)}</td><td>${escapeHtml(c.opcion2)}</td>
+  <td>${escapeHtml(c.calorias||0)}</td><td>${escapeHtml(c.proteina||0)}/${escapeHtml(c.carbohidratos||0)}/${escapeHtml(c.grasas||0)}g</td></tr>`).join("")}
   </tbody></table></div>`).join("")}
   <div class="footer">Plan generado por ${nombre} · Keep Going 💪</div>
   </body></html>`;
@@ -86,8 +94,8 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   const win = window.open("", "_blank");
   if (!win) { alert("Por favor permite las ventanas emergentes (pop-ups) para generar el PDF."); return; }
   
-  const logoUrl = brand?.logo_url && brand.logo_url !== "/logo.png" ? brand.logo_url : null;
-  const nombre  = brand?.nombre_marca || "FLUX";
+  const logoUrl = brand?.logo_url && brand.logo_url !== "/logo.png" ? safeUrl(brand.logo_url) : null;
+  const nombre  = escapeHtml(brand?.nombre_marca || "FLUX");
   const accent  = brand?.color_primario || "#38bdf8";
   const dark    = darken(accent, 60);
   const light   = tint(accent, 210);
@@ -95,8 +103,11 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   const fmtDate = d => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"long", day:"numeric" });
   
   const latest = metricas.length > 0 ? metricas[0] : null;
+  const clienteNombre = escapeHtml(cliente.nombre);
+  const clienteObjetivo = escapeHtml(cliente.objetivo || "\u2014");
+  const fechaHoy = new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progreso_${cliente.nombre}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progreso_${clienteNombre}</title>
   <style>
     body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:30px;max-width:800px;margin:0 auto}
     .header{text-align:center;border-bottom:3px solid ${accent};padding-bottom:20px;margin-bottom:24px}
@@ -122,24 +133,24 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   </div>
   
   <div class="client-info">
-    <strong style="font-size:16px">${cliente.nombre}</strong><br>
-    <span style="color:#666;font-size:13px">Objetivo: ${cliente.objetivo||"\u2014"}</span>
-    <span style="float:right;color:#999;font-size:12px">Generado: ${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"})}</span>
+    <strong style="font-size:16px">${clienteNombre}</strong><br>
+    <span style="color:#666;font-size:13px">Objetivo: ${clienteObjetivo}</span>
+    <span style="float:right;color:#999;font-size:12px">Generado: ${fechaHoy}</span>
   </div>
 
   ${latest ? `
     <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)})</div>
     <div class="macros">
-      <div class="macro-box"><div class="macro-val">${latest.peso||"--"}</div><div class="macro-lbl">Peso (kg)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.imc||"--"}</div><div class="macro-lbl">IMC</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.grasa_pct||"--"}</div><div class="macro-lbl">Grasa (%)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.musculo_pct||"--"}</div><div class="macro-lbl">Músculo (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.peso||"--")}</div><div class="macro-lbl">Peso (kg)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.imc||"--")}</div><div class="macro-lbl">IMC</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.grasa_pct||"--")}</div><div class="macro-lbl">Grasa (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.musculo_pct||"--")}</div><div class="macro-lbl">Músculo (%)</div></div>
     </div>
     <div class="macros" style="grid-template-columns:repeat(4,1fr);margin-bottom:30px">
-      <div class="macro-box"><div class="macro-val">${latest.agua_pct||"--"}</div><div class="macro-lbl">Agua (%)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.cintura||"--"}</div><div class="macro-lbl">Cintura (cm)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.glucosa||"--"}</div><div class="macro-lbl">Glucosa (mg/dL)</div></div>
-      <div class="macro-box"><div class="macro-val">${latest.presion_arterial||"--"}</div><div class="macro-lbl">Presión</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.agua_pct||"--")}</div><div class="macro-lbl">Agua (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.cintura||"--")}</div><div class="macro-lbl">Cintura (cm)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.glucosa||"--")}</div><div class="macro-lbl">Glucosa (mg/dL)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.presion_arterial||"--")}</div><div class="macro-lbl">Presión</div></div>
     </div>
   ` : `<div style="text-align:center;padding:40px;color:#999">No hay evaluaciones registradas aún.</div>`}
 
@@ -153,8 +164,8 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
       <tbody>
         ${metricas.map(m => `<tr>
           <td class="date-col">${fmtDate(m.fecha)}</td>
-          <td>${m.peso||"--"}</td><td>${m.imc||"--"}</td>
-          <td>${m.grasa_pct||"--"}</td><td>${m.musculo_pct||"--"}</td><td>${m.agua_pct||"--"}</td>
+          <td>${escapeHtml(m.peso||"--")}</td><td>${escapeHtml(m.imc||"--")}</td>
+          <td>${escapeHtml(m.grasa_pct||"--")}</td><td>${escapeHtml(m.musculo_pct||"--")}</td><td>${escapeHtml(m.agua_pct||"--")}</td>
         </tr>`).join("")}
       </tbody>
     </table>
@@ -168,8 +179,8 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
       <tbody>
         ${metricas.map(m => `<tr>
           <td class="date-col">${fmtDate(m.fecha)}</td>
-          <td>${m.cintura||"--"}</td><td>${m.cadera||"--"}</td>
-          <td>${m.glucosa||"--"}</td><td>${m.colesterol||"--"}</td><td>${m.presion_arterial||"--"}</td>
+          <td>${escapeHtml(m.cintura||"--")}</td><td>${escapeHtml(m.cadera||"--")}</td>
+          <td>${escapeHtml(m.glucosa||"--")}</td><td>${escapeHtml(m.colesterol||"--")}</td><td>${escapeHtml(m.presion_arterial||"--")}</td>
         </tr>`).join("")}
       </tbody>
     </table>
@@ -182,7 +193,7 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
           <div style="display:flex; gap:12px; flex-wrap:wrap;">
             ${parseFotos(m.fotos).map(url => `
               <div style="break-inside: avoid; page-break-inside: avoid;">
-                <img src="${url}" style="max-width:280px; max-height:350px; width:auto; height:auto; display:block; border-radius:8px; border:1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" alt="Foto progreso"/>
+                <img src="${safeUrl(url)}" style="max-width:280px; max-height:350px; width:auto; height:auto; display:block; border-radius:8px; border:1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" alt="Foto progreso"/>
               </div>
             `).join("")}
           </div>
@@ -207,4 +218,3 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   win.document.write(html);
   win.document.close();
 };
-

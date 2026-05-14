@@ -32,12 +32,12 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
-    try { const r = await dbGet(clientesFilter); setClientes(r); } catch{}
+    try { const r = await dbGet(clientesFilter); setClientes(r); } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
   }, [clientesFilter]);
 
   const loadBiblioteca = useCallback(async () => {
-    try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch{}
+    try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch(e) { console.error("Error cargando biblioteca:", e); }
   }, [bibliotecaFilter]);
 
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
