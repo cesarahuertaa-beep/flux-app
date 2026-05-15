@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
+import InstallPrompt from "./components/InstallPrompt";
 
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -100,6 +101,7 @@ export default function App() {
   return (
     <BrandProvider session={session}>
       {renderView()}
+      <InstallPrompt />
     </BrandProvider>
   );
 }
