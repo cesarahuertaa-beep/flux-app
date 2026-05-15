@@ -83,9 +83,9 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
 );
 
 export const TabBar = ({ tabs, active, onChange }) => (
-  <div style={{ display:"flex",background:"rgba(7,16,29,0.7)",borderBottom:"1px solid rgba(46,92,184,0.10)",overflowX:"auto",scrollbarWidth:"none",backdropFilter:"blur(12px)",padding:"0 8px" }}>
+  <div style={{ display:"flex",background:"rgba(7,16,29,0.7)",borderBottom:"1px solid rgba(46,92,184,0.10)",overflowX:"auto",scrollbarWidth:"none",scrollSnapType:"x mandatory",backdropFilter:"blur(12px)",padding:"0 8px" }}>
     {tabs.map(([k,ic,lb]) => (
-      <button key={k} onClick={()=>onChange(k)} className={`tab-btn ${active===k?"active":""}`} style={{ flex:1,maxWidth:200,padding:"15px 8px 14px",background:"none",color:active===k?"var(--brand-accent,#2e5cb8)":C.muted,fontWeight:active===k?700:500,fontSize:13,border:"none",cursor:"pointer",letterSpacing:"0.3px",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap",flexShrink:0,transition:"color 0.25s ease" }}>
+      <button key={k} onClick={()=>onChange(k)} className={`tab-btn ${active===k?"active":""}`} style={{ flex:1,maxWidth:200,padding:"15px 8px 14px",background:"none",color:active===k?"var(--brand-accent,#2e5cb8)":C.muted,fontWeight:active===k?700:500,fontSize:13,border:"none",cursor:"pointer",letterSpacing:"0.3px",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap",flexShrink:0,scrollSnapAlign:"start",transition:"color 0.25s ease" }}>
         {active===k&&<span style={{ display:"inline-block",marginRight:6,fontSize:8,color:"var(--brand-accent,#2e5cb8)",verticalAlign:"middle" }}>●</span>}
         {ic} {lb}
       </button>

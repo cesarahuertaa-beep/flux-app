@@ -167,7 +167,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
               {nutri && (
                 <div style={{
                   display:"grid",
-                  gridTemplateColumns:"repeat(4,1fr)",
+                  gridTemplateColumns:"repeat(auto-fit, minmax(130px, 1fr))",
                   gap:12, marginBottom:24
                 }}>
                   <StatCard icon="🔥" label="Calorías" value={nutri.calorias} unit="kcal" color={C.accent}/>
