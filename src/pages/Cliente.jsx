@@ -148,6 +148,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         ]}
         active={tab}
         onChange={handleTabChange}
+        onLogout={safeLogout}
+        nombre={cliente.nombre}
       />
 
       <div style={{padding:"24px 16px", maxWidth:860, margin:"0 auto"}}>

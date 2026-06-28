@@ -82,14 +82,11 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra, onMenuClick })
       {role==="admin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(46,92,184,0.12)",border:"1px solid rgba(46,92,184,0.25)",color:"var(--brand-accent,#2e5cb8)",fontFamily:"'Inter',sans-serif" }}>⚡ ADMIN</div>}
       {role==="superadmin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(124,142,245,0.12)",border:"1px solid rgba(124,142,245,0.25)",color:"#7c8ef5",fontFamily:"'Inter',sans-serif" }}>❆ SUPERADMIN</div>}
       {nombre&&<div style={{ textAlign:"right" }}><div style={{ fontSize:13,fontWeight:600,color:C.text }}>{nombre}</div>{objetivo&&<div style={{ fontSize:11,color:C.muted }}>{objetivo}</div>}</div>}
-      <button onClick={onLogout} className="btn-hover" style={{ padding:"7px 16px",borderRadius:9,background:"rgba(46,92,184,0.06)",border:"1px solid rgba(46,92,184,0.15)",color:C.mutedLight,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif",transition:"all 0.2s" }}
-        onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.14)";e.currentTarget.style.color="var(--brand-accent,#2e5cb8)";}}
-        onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.06)";e.currentTarget.style.color=C.mutedLight;}}>Salir</button>
     </div>
   </div>
 );
 
-export const Sidebar = ({ isOpen, onClose, tabs, active, onChange }) => {
+export const Sidebar = ({ isOpen, onClose, tabs, active, onChange, onLogout, role, nombre }) => {
   return createPortal(
     <>
       <div 
@@ -111,29 +108,60 @@ export const Sidebar = ({ isOpen, onClose, tabs, active, onChange }) => {
           boxShadow: isOpen ? "20px 0 60px rgba(0,0,0,0.5)" : "none"
         }}
       >
-        <div style={{ padding: "24px 20px", borderBottom: "1px solid rgba(46,92,184,0.1)" }}>
+        {/* Header del Sidebar */}
+        <div style={{ padding: "24px 20px", borderBottom: "1px solid rgba(46,92,184,0.1)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <FluxLogo size={24} />
+          {(role || nombre) && (
+            <div style={{ textAlign: "right" }}>
+              {nombre && <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{nombre}</div>}
+              {role === "superadmin" && <div style={{ fontSize: 10, color: "#7c8ef5", fontWeight: 700, letterSpacing: "0.5px" }}>❆ SUPERADMIN</div>}
+              {role === "admin" && <div style={{ fontSize: 10, color: "var(--brand-accent,#2e5cb8)", fontWeight: 700, letterSpacing: "0.5px" }}>⚡ ADMIN</div>}
+            </div>
+          )}
         </div>
-        <div style={{ padding: "16px 12px", display: "flex", flexDirection: "column", gap: "6px", flex: 1, overflowY: "auto" }}>
+
+        {/* Lista de secciones */}
+        <div style={{ padding: "16px 12px", display: "flex", flexDirection: "column", gap: "4px", flex: 1, overflowY: "auto" }}>
           {tabs.map(([k, ic, lb]) => (
             <button
               key={k}
               onClick={() => { onChange(k); onClose(); }}
               style={{
-                display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
-                borderRadius: "12px", border: "none", cursor: "pointer", textAlign: "left",
+                display: "flex", alignItems: "center", gap: "14px", padding: "13px 16px",
+                borderRadius: "12px", border: "none", cursor: "pointer", textAlign: "left", width: "100%",
                 background: active === k ? "rgba(46,92,184,0.15)" : "transparent",
                 color: active === k ? "var(--brand-accent,#2e5cb8)" : C.muted,
                 fontWeight: active === k ? 700 : 500, fontSize: "14px",
                 fontFamily: "'Inter', sans-serif", transition: "all 0.2s"
               }}
-              onMouseEnter={e => { if (active !== k) e.currentTarget.style.background = "rgba(46,92,184,0.05)" }}
+              onMouseEnter={e => { if (active !== k) e.currentTarget.style.background = "rgba(46,92,184,0.07)" }}
               onMouseLeave={e => { if (active !== k) e.currentTarget.style.background = "transparent" }}
             >
-              <span style={{ fontSize: "18px" }}>{ic}</span>
+              <span style={{ fontSize: "17px", width: 22, textAlign: "center" }}>{ic}</span>
               {lb}
             </button>
           ))}
+        </div>
+
+        {/* Botón Cerrar Sesión al fondo */}
+        <div style={{ padding: "16px 12px", borderTop: "1px solid rgba(239,68,68,0.12)" }}>
+          <button
+            onClick={() => { onClose(); onLogout(); }}
+            style={{
+              display: "flex", alignItems: "center", gap: "14px", padding: "13px 16px",
+              borderRadius: "12px", border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer",
+              textAlign: "left", width: "100%",
+              background: "rgba(239,68,68,0.05)",
+              color: "#f87171",
+              fontWeight: 600, fontSize: "14px",
+              fontFamily: "'Inter', sans-serif", transition: "all 0.25s"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.05)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+          >
+            <span style={{ fontSize: "17px", width: 22, textAlign: "center" }}>🚪</span>
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </>,

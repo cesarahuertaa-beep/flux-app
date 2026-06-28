@@ -174,6 +174,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         tabs={tabs} 
         active={tab} 
         onChange={setTab}
+        onLogout={onLogout}
+        role={isSuperadmin ? "superadmin" : "admin"}
       />
 
       <div style={{ padding:"28px 24px", maxWidth:980, margin:"0 auto", position:"relative", zIndex:1 }}>
