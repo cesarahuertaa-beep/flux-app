@@ -67,9 +67,16 @@ export const FluxLogo = ({ size=28, animated=false, large=false }) => {
   );
 };
 
-export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
+export const Header = ({ role, nombre, objetivo, onLogout, extra, onMenuClick }) => (
   <div style={{ background:"rgba(4,8,15,0.88)",borderBottom:"1px solid rgba(46,92,184,0.10)",padding:"12px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50,backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",boxShadow:"0 1px 0 rgba(46,92,184,0.06)" }}>
-    <FluxLogo size={24} />
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {onMenuClick && (
+        <button onClick={onMenuClick} style={{ background: "none", border: "none", color: C.text, fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", padding: 0 }}>
+          ☰
+        </button>
+      )}
+      <FluxLogo size={24} />
+    </div>
     <div style={{ display:"flex",alignItems:"center",gap:12 }}>
       {extra}
       {role==="admin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(46,92,184,0.12)",border:"1px solid rgba(46,92,184,0.25)",color:"var(--brand-accent,#2e5cb8)",fontFamily:"'Inter',sans-serif" }}>⚡ ADMIN</div>}
@@ -82,16 +89,57 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra }) => (
   </div>
 );
 
-export const TabBar = ({ tabs, active, onChange }) => (
-  <div style={{ display:"flex",background:"rgba(7,16,29,0.7)",borderBottom:"1px solid rgba(46,92,184,0.10)",overflowX:"auto",scrollbarWidth:"none",scrollSnapType:"x mandatory",backdropFilter:"blur(12px)",padding:"0 8px" }}>
-    {tabs.map(([k,ic,lb]) => (
-      <button key={k} onClick={()=>onChange(k)} className={`tab-btn ${active===k?"active":""}`} style={{ flex:1,maxWidth:200,padding:"15px 8px 14px",background:"none",color:active===k?"var(--brand-accent,#2e5cb8)":C.muted,fontWeight:active===k?700:500,fontSize:13,border:"none",cursor:"pointer",letterSpacing:"0.3px",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap",flexShrink:0,scrollSnapAlign:"start",transition:"color 0.25s ease" }}>
-        {active===k&&<span style={{ display:"inline-block",marginRight:6,fontSize:8,color:"var(--brand-accent,#2e5cb8)",verticalAlign:"middle" }}>●</span>}
-        {ic} {lb}
-      </button>
-    ))}
-  </div>
-);
+export const Sidebar = ({ isOpen, onClose, tabs, active, onChange }) => {
+  return createPortal(
+    <>
+      <div 
+        style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+          opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? "auto" : "none",
+          transition: "opacity 0.3s ease", zIndex: 1000
+        }}
+        onClick={onClose}
+      />
+      <div
+        style={{
+          position: "fixed", top: 0, bottom: 0, left: 0, width: "280px", maxWidth: "85vw",
+          background: "linear-gradient(180deg, #0f1c2e, #07101d)",
+          borderRight: "1px solid rgba(46,92,184,0.15)",
+          transform: isOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          zIndex: 1001, display: "flex", flexDirection: "column",
+          boxShadow: isOpen ? "20px 0 60px rgba(0,0,0,0.5)" : "none"
+        }}
+      >
+        <div style={{ padding: "24px 20px", borderBottom: "1px solid rgba(46,92,184,0.1)" }}>
+          <FluxLogo size={24} />
+        </div>
+        <div style={{ padding: "16px 12px", display: "flex", flexDirection: "column", gap: "6px", flex: 1, overflowY: "auto" }}>
+          {tabs.map(([k, ic, lb]) => (
+            <button
+              key={k}
+              onClick={() => { onChange(k); onClose(); }}
+              style={{
+                display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                borderRadius: "12px", border: "none", cursor: "pointer", textAlign: "left",
+                background: active === k ? "rgba(46,92,184,0.15)" : "transparent",
+                color: active === k ? "var(--brand-accent,#2e5cb8)" : C.muted,
+                fontWeight: active === k ? 700 : 500, fontSize: "14px",
+                fontFamily: "'Inter', sans-serif", transition: "all 0.2s"
+              }}
+              onMouseEnter={e => { if (active !== k) e.currentTarget.style.background = "rgba(46,92,184,0.05)" }}
+              onMouseLeave={e => { if (active !== k) e.currentTarget.style.background = "transparent" }}
+            >
+              <span style={{ fontSize: "18px" }}>{ic}</span>
+              {lb}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+};
 
 export const StatCard = ({ icon, label, value, unit, color }) => (
   <div className="card-hover" style={{ background:C.card,borderRadius:16,padding:"18px 14px",textAlign:"center",border:`1px solid ${C.border}`,position:"relative",overflow:"hidden" }}>

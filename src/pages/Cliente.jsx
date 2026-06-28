@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import { C, css } from "../styles/theme";
-import { Btn, Tag, Header, TabBar, StatCard } from "../components/ui";
+import { Btn, Tag, Header, Sidebar, StatCard } from "../components/ui";
 import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
@@ -12,7 +12,8 @@ import { parseFotos, getSemanasConFecha } from "../utils/helpers";
 export default function ClienteView({ session, onLogout, isAtletaMode=false, onBackToAdmin }) {
   const { data:cliente } = session;
   const brand = useBrand();
-  const [tab, setTab] = useState("nutricion");
+  const [tab, setTab] = useState("inicio");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -130,12 +131,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         nombre={cliente.nombre}
         objetivo={cliente.objetivo}
         onLogout={safeLogout}
+        onMenuClick={() => setMenuOpen(true)}
         extra={dias.length>0 && tab==="nutricion"
           ? <Btn small outline color={C.accentMid} onClick={()=>generateNutriPDF(cliente,nutri,dias,brand)}>📄 PDF</Btn>
           : null}
       />
 
-      <TabBar
+      <Sidebar
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
         tabs={[
           ["nutricion","🥗","Nutrición"],
           ["deporte","🏋️","Entrenamiento"],
@@ -159,6 +163,18 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
             <div>Cargando tu programa…</div>
           </div>
         ) : <>
+
+          {/* ── PANTALLA INICIO EN BLANCO ── */}
+          {tab === "inicio" && (
+            <div className="animate-in" style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              paddingTop: "15vh", textAlign: "center", opacity: 0.6
+            }}>
+              <img src={brand?.logo_url || "/logo.png"} alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
+              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: C.text, marginBottom: 8 }}>Hola, {cliente.nombre.split(" ")[0]}</h2>
+              <p style={{ color: C.muted, fontSize: 14 }}>Abre el menú superior izquierdo para ver tu plan.</p>
+            </div>
+          )}
 
           {/* ── NUTRICIÓN ── */}
           {tab==="nutricion" && (

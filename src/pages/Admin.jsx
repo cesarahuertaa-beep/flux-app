@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { C, css } from "../styles/theme";
-import { Btn, Modal, Field, Tag, Header, TabBar, OrbBackground } from "../components/ui";
+import { Btn, Modal, Field, Tag, Header, Sidebar, OrbBackground } from "../components/ui";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
@@ -9,7 +9,8 @@ import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
-  const [tab, setTab]                       = useState("clientes");
+  const [tab, setTab]                       = useState("inicio");
+  const [menuOpen, setMenuOpen]             = useState(false);
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -146,6 +147,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       <Header
         role={isSuperadmin ? "superadmin" : "admin"}
         onLogout={onLogout}
+        onMenuClick={() => setMenuOpen(true)}
         extra={
           !isSuperadmin && (
             <button
@@ -166,7 +168,13 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         }
       />
 
-      <TabBar tabs={tabs} active={tab} onChange={setTab}/>
+      <Sidebar 
+        isOpen={menuOpen} 
+        onClose={() => setMenuOpen(false)} 
+        tabs={tabs} 
+        active={tab} 
+        onChange={setTab}
+      />
 
       <div style={{ padding:"28px 24px", maxWidth:980, margin:"0 auto", position:"relative", zIndex:1 }}>
 
@@ -187,6 +195,18 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
           >
             <span>{msg}</span>
             <span style={{opacity:0.5,fontSize:16}}>×</span>
+          </div>
+        )}
+
+        {/* ── PANTALLA INICIO EN BLANCO ── */}
+        {tab === "inicio" && (
+          <div className="animate-in" style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            paddingTop: "15vh", textAlign: "center", opacity: 0.6
+          }}>
+            <img src="/logo.png" alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: C.text, marginBottom: 8 }}>Bienvenido al Panel</h2>
+            <p style={{ color: C.muted, fontSize: 14 }}>Abre el menú superior izquierdo para comenzar.</p>
           </div>
         )}
 
