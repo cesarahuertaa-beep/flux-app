@@ -100,6 +100,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSavingCiclo(false);
   };
 
+  // ── Eliminar ciclo (solo si está vacío) ──
+  const eliminarCiclo = async (ciclo, e) => {
+    e.stopPropagation(); // no seleccionar el ciclo al dar clic en borrar
+    try {
+      // Verificar si tiene datos
+      const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`);
+      const ruts   = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`);
+      if (nutris.length > 0 || ruts.length > 0) {
+        setMsg("⚠️ No puedes borrar un ciclo que tiene planes o rutinas. Primero elimina su contenido.");
+        return;
+      }
+      if (!confirm(`¿Eliminar el ciclo "${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
+
+      // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
+      if (ciclo.activo) {
+        const anteriores = ciclos.filter(c => c.id !== ciclo.id && !c.activo);
+        if (anteriores.length > 0) {
+          // El primero en la lista es el más reciente (orden desc por created_at)
+          await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
+          setMsg(`✅ Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`);
+        } else {
+          setMsg("✅ Ciclo eliminado.");
+        }
+      } else {
+        setMsg("✅ Ciclo eliminado.");
+      }
+
+      await dbDel(`ciclos?id=eq.${ciclo.id}`);
+      await loadCiclos();
+    } catch(e) { setMsg("❌ " + e.message); }
+  };
+
   // ── Operaciones de Nutrición ──
   const saveMacros = async () => {
     if (isReadOnly) return;
@@ -233,26 +265,51 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         ) : (
           <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
             {ciclos.map(c => (
-              <button key={c.id} onClick={()=>setCicloSel(c)}
-                style={{
-                  flexShrink:0, padding:"10px 18px", borderRadius:20,
-                  background: cicloSel?.id === c.id
-                    ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
-                    : (c.activo ? "rgba(46,92,184,0.12)" : "rgba(100,116,139,0.1)"),
-                  color: cicloSel?.id === c.id
-                    ? (c.activo ? "#000" : "#e2eeff")
-                    : (c.activo ? C.accent : C.muted),
-                  fontWeight: cicloSel?.id === c.id ? 700 : 500,
-                  fontSize:13, cursor:"pointer",
-                  border: cicloSel?.id === c.id
-                    ? `1px solid ${c.activo ? C.accent : "#64748b"}`
-                    : `1px solid ${c.activo ? "rgba(46,92,184,0.25)" : "rgba(100,116,139,0.2)"}`,
-                  transition:"all 0.2s", whiteSpace:"nowrap", fontFamily:"'Inter',sans-serif"
-                }}
-              >
-                {c.activo ? "🟢 " : "🗂️ "}{c.nombre}
-                {c.fecha_inicio && <span style={{fontSize:10,opacity:0.7,marginLeft:6}}>{fmtFecha(c.fecha_inicio)}</span>}
-              </button>
+              <div key={c.id} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                <button onClick={()=>setCicloSel(c)}
+                  style={{
+                    padding:"10px 18px", borderRadius:"20px 0 0 20px",
+                    background: cicloSel?.id === c.id
+                      ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
+                      : (c.activo ? "rgba(46,92,184,0.12)" : "rgba(100,116,139,0.1)"),
+                    color: cicloSel?.id === c.id
+                      ? (c.activo ? "#000" : "#e2eeff")
+                      : (c.activo ? C.accent : C.muted),
+                    fontWeight: cicloSel?.id === c.id ? 700 : 500,
+                    fontSize:13, cursor:"pointer",
+                    border: cicloSel?.id === c.id
+                      ? `1px solid ${c.activo ? C.accent : "#64748b"}`
+                      : `1px solid ${c.activo ? "rgba(46,92,184,0.25)" : "rgba(100,116,139,0.2)"}`,
+                    borderRight:"none",
+                    transition:"all 0.2s", whiteSpace:"nowrap", fontFamily:"'Inter',sans-serif"
+                  }}
+                >
+                  {c.activo ? "🟢 " : "🗂️ "}{c.nombre}
+                  {c.fecha_inicio && <span style={{fontSize:10,opacity:0.7,marginLeft:6}}>{fmtFecha(c.fecha_inicio)}</span>}
+                </button>
+                {/* Botón de borrar — solo visible al seleccionar ese ciclo */}
+                {cicloSel?.id === c.id && (
+                  <button
+                    onClick={(e) => eliminarCiclo(c, e)}
+                    title="Eliminar este ciclo"
+                    style={{
+                      padding:"10px 10px", borderRadius:"0 20px 20px 0",
+                      background: cicloSel?.id === c.id
+                        ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
+                        : "rgba(239,68,68,0.08)",
+                      border: `1px solid ${c.activo ? C.accent : "#64748b"}`,
+                      borderLeft: `1px solid ${c.activo ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)"}`,
+                      color: c.activo ? "rgba(0,0,0,0.5)" : "rgba(248,113,113,0.8)",
+                      cursor:"pointer", fontSize:12, transition:"all 0.2s",
+                      display:"flex", alignItems:"center"
+                    }}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(239,68,68,0.2)";e.currentTarget.style.color="#f87171";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background=cicloSel?.id===c.id?(c.activo?C.gradBtn:"rgba(100,116,139,0.3)"):"rgba(239,68,68,0.08)";e.currentTarget.style.color=c.activo?"rgba(0,0,0,0.5)":"rgba(248,113,113,0.8)";}}
+                  >
+                    🗑
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
