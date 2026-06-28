@@ -7,16 +7,16 @@ let _onSessionExpired = null; // callback para redirigir al login
 
 export const setAuthToken = (t) => {
   _authToken = t;
-  // Persistir en sessionStorage para sobrevivir recargas
-  if (t) sessionStorage.setItem("flux_token", t);
-  else  sessionStorage.removeItem("flux_token");
+  // Persistir en localStorage para sobrevivir cierres de navegador
+  if (t) localStorage.setItem("flux_token", t);
+  else  localStorage.removeItem("flux_token");
 };
 
 export const getAuthToken = () => _authToken;
 
 /** Restaurar token guardado (llamar al montar App) */
 export const restoreSession = () => {
-  const saved = sessionStorage.getItem("flux_token");
+  const saved = localStorage.getItem("flux_token");
   if (saved) { _authToken = saved; return saved; }
   return null;
 };
@@ -92,14 +92,14 @@ export const storageUpload = async (bucket, path, file) => {
 let _profileId = null;
 export const setProfileId   = (id) => {
   _profileId = id;
-  if (id) sessionStorage.setItem("flux_profileId", id);
-  else  sessionStorage.removeItem("flux_profileId");
+  if (id) localStorage.setItem("flux_profileId", id);
+  else  localStorage.removeItem("flux_profileId");
 };
 export const getProfileId   = ()   => _profileId;
 
 /** Restaurar profileId guardado */
 export const restoreProfileId = () => {
-  const saved = sessionStorage.getItem("flux_profileId");
+  const saved = localStorage.getItem("flux_profileId");
   if (saved) { _profileId = saved; return saved; }
   return null;
 };
