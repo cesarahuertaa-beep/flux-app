@@ -213,6 +213,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
+  const moveEj = (i, dir) => {
+    setRutinaForm(p => {
+      if ((dir===-1 && i===0) || (dir===1 && i===p.ejercicios.length-1)) return p;
+      const es = [...p.ejercicios];
+      [es[i], es[i+dir]] = [es[i+dir], es[i]];
+      return { ...p, ejercicios:es };
+    });
+  };
 
   const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) : "";
 
@@ -462,14 +470,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
           {rutinaForm.ejercicios.length>0&&(
             <div style={{marginTop:12}}>
-              <div style={{display:"grid",gridTemplateColumns:"40px 1fr 80px 80px 32px",gap:6,marginBottom:6,alignItems:"center"}}>
-                <span/><span style={{fontSize:11,color:C.muted,fontWeight:600}}>EJERCICIO</span>
+              <div style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:6,alignItems:"center"}}>
+                <span/><span/><span style={{fontSize:11,color:C.muted,fontWeight:600}}>EJERCICIO</span>
                 <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:"center"}}>SERIES</span>
                 <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:"center"}}>REPS</span>
                 <span/>
               </div>
               {rutinaForm.ejercicios.map((e,i)=>(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"40px 1fr 80px 80px 32px",gap:6,marginBottom:8,alignItems:"center"}}>
+                <div key={i} style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:8,alignItems:"center"}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                    <button onClick={()=>moveEj(i,-1)} disabled={i===0} style={{background:"transparent",border:"none",color:i===0?"transparent":C.accent,cursor:i===0?"default":"pointer",fontSize:14,padding:0,lineHeight:1}}>▲</button>
+                    <button onClick={()=>moveEj(i,1)} disabled={i===rutinaForm.ejercicios.length-1} style={{background:"transparent",border:"none",color:i===rutinaForm.ejercicios.length-1?"transparent":C.accent,cursor:i===rutinaForm.ejercicios.length-1?"default":"pointer",fontSize:14,padding:0,lineHeight:1}}>▼</button>
+                  </div>
                   <div style={{width:36,height:36,borderRadius:6,overflow:"hidden",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center"}}>
                     {e.gif_url?<img src={e.gif_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:18}}>🏋️</span>}
                   </div>
