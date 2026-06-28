@@ -248,7 +248,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           <span style={{fontSize:12,color:C.muted,marginLeft:8}}>{selected.email}</span>
         </div>
         <Btn small outline color={C.muted} onClick={()=>setSelected(null)}>Cambiar</Btn>
-        {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias,brand)}>📄 PDF</Btn>}
       </div>
 
       {/* ── Selector de Ciclos ── */}
@@ -488,6 +487,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           </div>
         </Modal>
       )}
+
+      {/* ── FAB PARA PDF ── */}
+      {subtab === "nutri" && dias.length > 0 && (
+        <div style={{
+          position: "fixed", bottom: 32, right: 24, zIndex: 50,
+          animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+        }}>
+          <button
+            onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "14px 22px", borderRadius: 30, border: "none", cursor: "pointer",
+              background: C.gradBtn, color: "#000", fontWeight: 700, fontSize: 14,
+              boxShadow: "0 8px 24px rgba(46,92,184,0.4)", fontFamily: "'Inter', sans-serif",
+              transition: "transform 0.2s, box-shadow 0.2s"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 12px 30px rgba(46,92,184,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(46,92,184,0.4)"; }}
+          >
+            <span style={{ fontSize: 18 }}>📄</span>
+            Descargar Plan PDF
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }

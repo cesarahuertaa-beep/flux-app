@@ -142,9 +142,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         objetivo={cliente.objetivo}
         onLogout={safeLogout}
         onMenuClick={() => setMenuOpen(true)}
-        extra={dias.length>0 && tab==="nutricion"
-          ? <Btn small outline color={C.accentMid} onClick={()=>generateNutriPDF(cliente,nutri,dias,brand)}>📄 PDF</Btn>
-          : null}
       />
 
       <Sidebar
@@ -580,9 +577,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                 </div>
               ):(
                 <div>
-                  <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
-                    <Btn small outline color={C.accent} onClick={() => generateProgresoPDF(cliente, metricas, brand)}>📄 Descargar Reporte de Progreso</Btn>
-                  </div>
                   {/* Mini-chart de peso */}
                   {metricas.filter(m=>m.peso).length>=2&&(()=>{
                     const pts=[...metricas].reverse().filter(m=>m.peso);
@@ -772,6 +766,34 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
           >⚡ Volver al Panel</button>
         </div>
       )}
+
+      {/* ── FAB PARA PDF ── */}
+      {(tab === "nutricion" && dias.length > 0) || (tab === "progreso" && metricas.length > 0) ? (
+        <div style={{
+          position: "fixed", bottom: 32, right: 24, zIndex: 50,
+          animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+        }}>
+          <button
+            onClick={() => {
+              if (tab === "nutricion") generateNutriPDF(cliente, nutri, dias, brand);
+              if (tab === "progreso") generateProgresoPDF(cliente, metricas, brand);
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "14px 22px", borderRadius: 30, border: "none", cursor: "pointer",
+              background: C.gradBtn, color: "#000", fontWeight: 700, fontSize: 14,
+              boxShadow: "0 8px 24px rgba(46,92,184,0.4)", fontFamily: "'Inter', sans-serif",
+              transition: "transform 0.2s, box-shadow 0.2s"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 12px 30px rgba(46,92,184,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(46,92,184,0.4)"; }}
+          >
+            <span style={{ fontSize: 18 }}>📄</span>
+            {tab === "nutricion" ? "Descargar Plan PDF" : "Descargar Progreso PDF"}
+          </button>
+        </div>
+      ) : null}
+
     </div>
   );
 }
