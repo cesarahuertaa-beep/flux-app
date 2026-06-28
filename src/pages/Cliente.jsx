@@ -14,6 +14,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
   const brand = useBrand();
   const [tab, setTab] = useState("inicio");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cicloActivo, setCicloActivo] = useState(null);
+  const [cicloLoaded, setCicloLoaded] = useState(false);
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -33,13 +35,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
   useEffect(() => {
     (async () => {
       try {
-        const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}`);
+        // Cargar ciclo activo del cliente
+        const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
+        const ciclo = cs.length ? cs[0] : null;
+        setCicloActivo(ciclo);
+        setCicloLoaded(true);
+
+        const cicloFilter = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
+
+        const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`);
         if (ns.length) {
           setNutri(ns[0]);
           const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`);
           setDias(await Promise.all(ds.map(async d => ({ ...d, comidas:await dbGet(`comidas?dia_id=eq.${d.id}&order=orden.asc`) }))));
         }
-        const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&order=orden.asc`);
+        const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&order=orden.asc`);
         const rsFull = await Promise.all(rs.map(async r => ({ ...r, ejercicios:await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) })));
         setRutinas(rsFull);
         const allIds = rsFull.flatMap(r=>r.ejercicios.map(e=>e.id));
@@ -165,6 +175,19 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
             <div>Cargando tu programa…</div>
           </div>
         ) : <>
+
+          {/* ── Badge Ciclo Activo ── */}
+          {cicloActivo && tab !== "inicio" && tab !== "progreso" && tab !== "citas" && (
+            <div style={{
+              display:"flex", alignItems:"center", gap:8, marginBottom:16,
+              padding:"8px 14px", borderRadius:10,
+              background:"rgba(46,92,184,0.08)", border:"1px solid rgba(46,92,184,0.18)",
+              fontSize:12, color:C.muted
+            }}>
+              <span style={{fontSize:14}}>📅</span>
+              <span>Ciclo activo: <strong style={{color:C.accent}}>{cicloActivo.nombre}</strong></span>
+            </div>
+          )}
 
           {/* ── PANTALLA INICIO EN BLANCO ── */}
           {tab === "inicio" && (

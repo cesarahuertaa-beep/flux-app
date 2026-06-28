@@ -11,6 +11,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const brand = useBrand();
   const [subtab, setSubtab] = useState("nutri");
   const [searchProg, setSearchProg] = useState("");
+
+  // ── Ciclos ──
+  const [ciclos, setCiclos] = useState([]);
+  const [cicloSel, setCicloSel] = useState(null); // ciclo seleccionado para ver/editar
+  const [showNuevoCiclo, setShowNuevoCiclo] = useState(false);
+  const [nuevoCicloNombre, setNuevoCicloNombre] = useState("");
+  const [nuevoCicloFecha, setNuevoCicloFecha] = useState(new Date().toISOString().split("T")[0]);
+  const [savingCiclo, setSavingCiclo] = useState(false);
+
+  // ── Datos del ciclo seleccionado ──
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -24,30 +34,88 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [editRutina, setEditRutina] = useState(null);
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[] });
 
+  const isReadOnly = cicloSel && !cicloSel.activo;
+
+  // ── Cargar ciclos del cliente ──
+  const loadCiclos = useCallback(async () => {
+    if (!selected) return;
+    try {
+      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`);
+      setCiclos(cs);
+      // Seleccionar el ciclo activo por defecto
+      const activo = cs.find(c => c.activo) || cs[0] || null;
+      setCicloSel(activo);
+    } catch(e) { setMsg("❌ " + e.message); }
+  }, [selected]);
+
+  // ── Cargar datos del ciclo seleccionado ──
   const loadData = useCallback(async () => {
     if (!selected) return;
     setLoading(true);
     try {
-      const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}`);
+      // Filtrar por ciclo si hay uno seleccionado, si no mostrar planes sin ciclo
+      const cicloFilter = cicloSel
+        ? `ciclo_id=eq.${cicloSel.id}`
+        : `ciclo_id=is.null`;
+
+      const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`);
       if (ns.length) {
-        setNutri(ns[0]); setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
+        setNutri(ns[0]);
+        setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
         const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`);
         setDias(await Promise.all(ds.map(async d => ({ ...d, comidas:await dbGet(`comidas?dia_id=eq.${d.id}&order=orden.asc`) }))));
       } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&order=orden.asc`);
-      setRutinas(await Promise.all(rs.map(async r => ({ ...r, ejercicios:await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) }))));
-    } catch(e) { setMsg("❌ "+e.message); }
-    setLoading(false);
-  }, [selected]);
-  useEffect(() => { loadData(); }, [loadData]);
 
+      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&order=orden.asc`);
+      setRutinas(await Promise.all(rs.map(async r => ({ ...r, ejercicios:await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) }))));
+    } catch(e) { setMsg("❌ " + e.message); }
+    setLoading(false);
+  }, [selected, cicloSel]);
+
+  useEffect(() => { loadCiclos(); }, [loadCiclos]);
+  useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
+
+  // ── Crear nuevo ciclo ──
+  const crearCiclo = async () => {
+    if (!nuevoCicloNombre.trim()) { setMsg("⚠️ Escribe un nombre para el ciclo"); return; }
+    setSavingCiclo(true);
+    try {
+      // Archivar ciclo activo anterior
+      if (ciclos.some(c => c.activo)) {
+        await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+      }
+      // Crear nuevo ciclo activo
+      const nuevo = await dbPost("ciclos", {
+        cliente_id: selected.id,
+        nombre: nuevoCicloNombre.trim(),
+        fecha_inicio: nuevoCicloFecha,
+        activo: true
+      });
+      setMsg("✅ Ciclo creado: " + nuevoCicloNombre);
+      setShowNuevoCiclo(false);
+      setNuevoCicloNombre("");
+      await loadCiclos();
+      setCicloSel(nuevo[0]);
+    } catch(e) { setMsg("❌ " + e.message); }
+    setSavingCiclo(false);
+  };
+
+  // ── Operaciones de Nutrición ──
   const saveMacros = async () => {
+    if (isReadOnly) return;
     setSaving(true);
     try {
       if (nutri) await dbPatch(`nutricion?id=eq.${nutri.id}`, { ...macros, updated_at:new Date().toISOString() });
-      else { const r = await dbPost("nutricion", { cliente_id:selected.id, ...macros }); setNutri(r[0]); }
+      else {
+        const r = await dbPost("nutricion", {
+          cliente_id: selected.id,
+          ciclo_id: cicloSel?.id || null,
+          ...macros
+        });
+        setNutri(r[0]);
+      }
       setMsg("✅ Macros guardados");
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
@@ -66,15 +134,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         await dbPost("comidas", { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 });
       }
       setShowDiaModal(false); setMsg("✅ Día guardado"); await loadData();
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
-  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"? Se borrarán todas sus comidas.`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
+  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
 
+  // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[] }); setShowRutinaModal(true); };
   const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e})) }); setShowRutinaModal(true); };
 
@@ -82,18 +151,30 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     try {
       let rid;
-      if (editRutina) { await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio }); rid=editRutina.id; await dbDel(`ejercicios?rutina_id=eq.${rid}`); }
-      else { const r = await dbPost("rutinas", { cliente_id:selected.id, nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio, orden:rutinas.length }); rid=r[0].id; }
+      if (editRutina) {
+        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio });
+        rid=editRutina.id; await dbDel(`ejercicios?rutina_id=eq.${rid}`);
+      } else {
+        const r = await dbPost("rutinas", {
+          cliente_id: selected.id,
+          ciclo_id: cicloSel?.id || null,
+          nombre: rutinaForm.nombre,
+          semanas: +rutinaForm.semanas,
+          fecha_inicio: rutinaForm.fecha_inicio,
+          orden: rutinas.length
+        });
+        rid=r[0].id;
+      }
       for (let i=0; i<rutinaForm.ejercicios.length; i++) {
         const e = rutinaForm.ejercicios[i];
         await dbPost("ejercicios", { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i });
       }
       setShowRutinaModal(false); setMsg("✅ Rutina guardada"); await loadData();
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
-  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"? Se borrarán todos los ejercicios de esta rutina.`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
+  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
   const addEj = (ej) => {
     if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
     setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
@@ -101,6 +182,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
 
+  const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) : "";
+
+  // ── Sin cliente seleccionado ──
   if (!selected) {
     const clientesFiltrados = clientes.filter(c =>
       c.nombre?.toLowerCase().includes(searchProg.toLowerCase()) ||
@@ -110,23 +194,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       <div style={{textAlign:"center",padding:60,color:C.muted}}>
         <div style={{fontSize:40,marginBottom:12}}>👆</div>
         <div style={{marginBottom:16}}>Selecciona un cliente para programar su plan</div>
-        <input
-          value={searchProg}
-          onChange={e=>setSearchProg(e.target.value)}
-          placeholder="🔍 Buscar cliente…"
-          style={{
-            background:"rgba(7,16,29,0.7)",
-            border:`1px solid rgba(46,92,184,0.20)`,
-            borderRadius:9, padding:"9px 16px",
-            color:"#e2eeff", fontSize:13,
-            fontFamily:"'Inter',sans-serif",
-            outline:"none", width:"100%", maxWidth:320,
-            marginBottom:16, display:"block", margin:"0 auto 16px"
-          }}
+        <input value={searchProg} onChange={e=>setSearchProg(e.target.value)} placeholder="🔍 Buscar cliente…"
+          style={{ background:"rgba(7,16,29,0.7)", border:`1px solid rgba(46,92,184,0.20)`, borderRadius:9, padding:"9px 16px", color:"#e2eeff", fontSize:13, fontFamily:"'Inter',sans-serif", outline:"none", width:"100%", maxWidth:320, marginBottom:16, display:"block", margin:"0 auto 16px" }}
         />
         <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center"}}>
           {clientesFiltrados.length === 0
-            ? <span style={{color:C.muted,fontSize:13}}>Sin resultados para "{searchProg}"</span>
+            ? <span style={{color:C.muted,fontSize:13}}>Sin resultados</span>
             : clientesFiltrados.map(c=><Btn key={c.id} small outline color={C.accentDark} onClick={()=>setSelected(c)}>{c.nombre}</Btn>)
           }
         </div>
@@ -136,73 +209,159 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+      {/* ── Cabecera cliente ── */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
         <div style={{background:C.accentDeep+"50",border:`1px solid color-mix(in srgb, ${C.accent} 25%, transparent)`,borderRadius:10,padding:"8px 16px"}}>
           <span style={{fontWeight:700,color:C.accent}}>{selected.nombre}</span>
           <span style={{fontSize:12,color:C.muted,marginLeft:8}}>{selected.email}</span>
         </div>
         <Btn small outline color={C.muted} onClick={()=>setSelected(null)}>Cambiar</Btn>
-        {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias,brand)}>📄 PDF Nutrición</Btn>}
+        {dias.length>0&&<Btn small outline color={C.accentDark} onClick={()=>generateNutriPDF(selected,nutri,dias,brand)}>📄 PDF</Btn>}
       </div>
+
+      {/* ── Selector de Ciclos ── */}
+      <div style={{marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <span style={{fontSize:13,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>📅 Ciclos / Períodos</span>
+          <Btn small grad onClick={()=>setShowNuevoCiclo(true)}>+ Nuevo Ciclo</Btn>
+        </div>
+
+        {ciclos.length === 0 ? (
+          <div style={{background:C.card,borderRadius:12,border:`1px solid ${C.border}`,padding:"20px",textAlign:"center",color:C.muted,fontSize:13}}>
+            Sin ciclos aún. Crea el primer ciclo para comenzar a registrar planes con historial.
+          </div>
+        ) : (
+          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+            {ciclos.map(c => (
+              <button key={c.id} onClick={()=>setCicloSel(c)}
+                style={{
+                  flexShrink:0, padding:"10px 18px", borderRadius:20,
+                  background: cicloSel?.id === c.id
+                    ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
+                    : (c.activo ? "rgba(46,92,184,0.12)" : "rgba(100,116,139,0.1)"),
+                  color: cicloSel?.id === c.id
+                    ? (c.activo ? "#000" : "#e2eeff")
+                    : (c.activo ? C.accent : C.muted),
+                  fontWeight: cicloSel?.id === c.id ? 700 : 500,
+                  fontSize:13, cursor:"pointer",
+                  border: cicloSel?.id === c.id
+                    ? `1px solid ${c.activo ? C.accent : "#64748b"}`
+                    : `1px solid ${c.activo ? "rgba(46,92,184,0.25)" : "rgba(100,116,139,0.2)"}`,
+                  transition:"all 0.2s", whiteSpace:"nowrap", fontFamily:"'Inter',sans-serif"
+                }}
+              >
+                {c.activo ? "🟢 " : "🗂️ "}{c.nombre}
+                {c.fecha_inicio && <span style={{fontSize:10,opacity:0.7,marginLeft:6}}>{fmtFecha(c.fecha_inicio)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Badge de modo lectura */}
+        {isReadOnly && (
+          <div style={{marginTop:10,padding:"8px 14px",background:"rgba(100,116,139,0.1)",borderRadius:10,border:"1px solid rgba(100,116,139,0.2)",fontSize:12,color:"#94a3b8",display:"flex",alignItems:"center",gap:8}}>
+            🔒 Estás viendo el historial de <strong style={{color:"#e2eeff"}}>{cicloSel.nombre}</strong>. Solo lectura — el ciclo activo es el verde.
+          </div>
+        )}
+      </div>
+
+      {/* ── Sub-tabs ── */}
       <div style={{display:"flex",gap:8,marginBottom:16}}>
         {[["nutri","🥗","Nutrición"],["deporte","🏋️","Rutinas"],["progreso","📊","Progreso"]].map(([k,ic,lb])=>(
-          <button key={k} onClick={()=>setSubtab(k)} style={{padding:"8px 20px",borderRadius:20,background:subtab===k?C.gradBtn:C.card,color:subtab===k?"#000":C.muted,fontWeight:subtab===k?700:400,fontSize:13,border:`1px solid ${subtab===k?C.accent:C.border}`,cursor:"pointer"}}>
+          <button key={k} onClick={()=>setSubtab(k)} style={{padding:"8px 20px",borderRadius:20,background:subtab===k?C.gradBtn:C.card,color:subtab===k?"#000":C.muted,fontWeight:subtab===k?700:400,fontSize:13,border:`1px solid ${subtab===k?C.accent:C.border}`,cursor:"pointer",fontFamily:"'Inter',sans-serif",transition:"all 0.2s"}}>
             {ic} {lb}
           </button>
         ))}
       </div>
 
-      {loading?<div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div>:<>
+      {loading ? <div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div> : <>
+
+        {/* ── NUTRICIÓN ── */}
         {subtab==="nutri"&&(
           <div>
-            <div style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:14}}>
+            {!cicloSel && (
+              <div style={{marginBottom:12,padding:"10px 14px",background:"rgba(245,158,11,0.08)",borderRadius:10,border:"1px solid rgba(245,158,11,0.2)",fontSize:12,color:"#fbbf24"}}>
+                ⚠️ Estás viendo planes sin ciclo asignado. Crea un ciclo para organizar el historial.
+              </div>
+            )}
+            <div style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:14,opacity:isReadOnly?0.75:1}}>
               <div style={{fontWeight:600,marginBottom:14,color:C.accent}}>Macros diarios</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 {[["calorias","🔥 Calorías (kcal)"],["proteina","🥩 Proteína (g)"],["carbohidratos","🍚 Carbohidratos (g)"],["grasas","🫒 Grasas (g)"]].map(([k,lb])=>(
-                  <Field key={k} label={lb}><input type="number" value={macros[k]} onChange={e=>setMacros(p=>({...p,[k]:e.target.value}))} placeholder="0"/></Field>
+                  <Field key={k} label={lb}><input type="number" value={macros[k]} onChange={e=>setMacros(p=>({...p,[k]:e.target.value}))} placeholder="0" disabled={isReadOnly}/></Field>
                 ))}
               </div>
-              <Btn small grad onClick={saveMacros} disabled={saving}>{saving?"Guardando…":"Guardar macros"}</Btn>
+              {!isReadOnly && <Btn small grad onClick={saveMacros} disabled={saving}>{saving?"Guardando…":"Guardar macros"}</Btn>}
             </div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <span style={{fontWeight:600}}>Días del plan <span style={{color:C.muted,fontWeight:400}}>({dias.length})</span></span>
-              <Btn small grad onClick={openNewDia}>+ Día</Btn>
+              {!isReadOnly && <Btn small grad onClick={openNewDia}>+ Día</Btn>}
             </div>
             {dias.map(d=>(
               <div key={d.id} style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div><span style={{fontWeight:600}}>{d.dia}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{d.comidas.length} comidas</span></div>
-                <div style={{display:"flex",gap:6}}>
-                  <Btn small outline color={C.accent} onClick={()=>openEditDia(d)}>Editar</Btn>
-                  <Btn small danger onClick={()=>deleteDia(d)}>Borrar</Btn>
-                </div>
+                {!isReadOnly && (
+                  <div style={{display:"flex",gap:6}}>
+                    <Btn small outline color={C.accent} onClick={()=>openEditDia(d)}>Editar</Btn>
+                    <Btn small danger onClick={()=>deleteDia(d)}>Borrar</Btn>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
+
+        {/* ── RUTINAS ── */}
         {subtab==="deporte"&&(
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <span style={{fontWeight:600}}>Rutinas <span style={{color:C.muted,fontWeight:400}}>({rutinas.length})</span></span>
-              <Btn small grad onClick={openNewRutina}>+ Rutina</Btn>
+              {!isReadOnly && <Btn small grad onClick={openNewRutina}>+ Rutina</Btn>}
             </div>
             {rutinas.map(r=>(
-              <div key={r.id} style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8}}>
+              <div key={r.id} style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,opacity:isReadOnly?0.75:1}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div><span style={{fontWeight:600}}>{r.nombre}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
-                  <div style={{display:"flex",gap:6}}>
-                    <Btn small outline color={C.accentDark} onClick={()=>openEditRutina(r)}>Editar</Btn>
-                    <Btn small danger onClick={()=>deleteRutina(r)}>Borrar</Btn>
-                  </div>
+                  {!isReadOnly && (
+                    <div style={{display:"flex",gap:6}}>
+                      <Btn small outline color={C.accentDark} onClick={()=>openEditRutina(r)}>Editar</Btn>
+                      <Btn small danger onClick={()=>deleteRutina(r)}>Borrar</Btn>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+            {rutinas.length===0 && !isReadOnly && (
+              <div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontSize:13}}>Sin rutinas en este ciclo. ¡Agrega la primera!</div>
+            )}
           </div>
         )}
+
         {subtab==="progreso"&&(
           <ProgresoCliente selected={selected} setMsg={setMsg}/>
         )}
       </>}
 
+      {/* ── Modal Nuevo Ciclo ── */}
+      {showNuevoCiclo&&(
+        <Modal title="📅 Nuevo Ciclo / Período" onClose={()=>setShowNuevoCiclo(false)}>
+          <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.6,background:`color-mix(in srgb,${C.accentDeep} 20%,transparent)`,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px"}}>
+            Al crear un nuevo ciclo, el ciclo activo actual se archivará automáticamente como historial. Podrás consultarlo en cualquier momento.
+          </div>
+          <Field label="Nombre del ciclo">
+            <input value={nuevoCicloNombre} onChange={e=>setNuevoCicloNombre(e.target.value)} placeholder='Ej. "Mayo - Definición", "Mes 1", "Etapa Volumen"'/>
+          </Field>
+          <Field label="Fecha de inicio">
+            <input type="date" value={nuevoCicloFecha} onChange={e=>setNuevoCicloFecha(e.target.value)}/>
+          </Field>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
+            <Btn outline color={C.muted} onClick={()=>setShowNuevoCiclo(false)}>Cancelar</Btn>
+            <Btn grad onClick={crearCiclo} disabled={savingCiclo}>{savingCiclo?"Creando…":"Crear Ciclo"}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal Nuevo/Editar Día ── */}
       {showDiaModal&&(
         <Modal title={editDia?`Editar: ${editDia.dia}`:"Nuevo día"} onClose={()=>setShowDiaModal(false)} wide>
           <Field label="Nombre del día"><input value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…"/></Field>
@@ -236,6 +395,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         </Modal>
       )}
 
+      {/* ── Modal Nueva/Editar Rutina ── */}
       {showRutinaModal&&(
         <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)} wide>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10}}>
