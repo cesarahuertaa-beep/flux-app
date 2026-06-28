@@ -159,11 +159,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     try {
       let diaId;
-      if (editDia) { await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); diaId=editDia.id; await dbDel(`comidas?dia_id=eq.${diaId}`); }
-      else { const r = await dbPost("nutricion_dias", { nutricion_id:nutri.id, dia:diaForm.dia, orden:diaForm.orden }); diaId=r[0].id; }
+      if (editDia) { 
+        await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); 
+        diaId = editDia.id; 
+        
+        const oldIds = editDia.comidas.map(c => c.id);
+        const newIds = diaForm.comidas.filter(c => c.id).map(c => c.id);
+        const toDelete = oldIds.filter(id => !newIds.includes(id));
+        if (toDelete.length > 0) {
+          await dbDel(`comidas?id=in.(${toDelete.join(",")})`);
+        }
+      }
+      else { 
+        const r = await dbPost("nutricion_dias", { nutricion_id:nutri.id, dia:diaForm.dia, orden:diaForm.orden }); 
+        diaId=r[0].id; 
+      }
+      
       for (let i=0; i<diaForm.comidas.length; i++) {
         const c = diaForm.comidas[i];
-        await dbPost("comidas", { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 });
+        const data = { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
+        delete data.id;
+        
+        if (c.id) {
+          await dbPatch(`comidas?id=eq.${c.id}`, data);
+        } else {
+          await dbPost("comidas", data);
+        }
       }
       setShowDiaModal(false); setMsg("✅ Día guardado"); await loadData();
     } catch(e) { setMsg("❌ " + e.message); }
@@ -185,7 +206,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       let rid;
       if (editRutina) {
         await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio });
-        rid=editRutina.id; await dbDel(`ejercicios?rutina_id=eq.${rid}`);
+        rid=editRutina.id; 
+        
+        const oldIds = editRutina.ejercicios.map(e => e.id);
+        const newIds = rutinaForm.ejercicios.filter(e => e.id).map(e => e.id);
+        const toDelete = oldIds.filter(id => !newIds.includes(id));
+        if (toDelete.length > 0) {
+          await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
+        }
       } else {
         const r = await dbPost("rutinas", {
           cliente_id: selected.id,
@@ -197,9 +225,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         rid=r[0].id;
       }
+      
       for (let i=0; i<rutinaForm.ejercicios.length; i++) {
         const e = rutinaForm.ejercicios[i];
-        await dbPost("ejercicios", { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i });
+        const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
+        
+        if (e.id) {
+          await dbPatch(`ejercicios?id=eq.${e.id}`, data);
+        } else {
+          await dbPost("ejercicios", data);
+        }
       }
       setShowRutinaModal(false); setMsg("✅ Rutina guardada"); await loadData();
     } catch(e) { setMsg("❌ " + e.message); }
