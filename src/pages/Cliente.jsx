@@ -228,7 +228,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                 {/* Selector de días */}
                 <div style={{
                   display:"flex", gap:8, marginBottom:20,
-                  overflowX:"auto", paddingBottom:4
+                  flexWrap:"wrap"
                 }}>
                   {dias.map((d,i) => (
                     <button
@@ -236,7 +236,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                       onClick={()=>setDiaIdx(i)}
                       className="btn-hover"
                       style={{
-                        flexShrink:0, padding:"9px 20px",
+                        padding:"9px 20px",
                         borderRadius:20,
                         background: diaIdx===i ? C.gradBtn : C.card,
                         color: diaIdx===i ? "#000" : C.muted,
