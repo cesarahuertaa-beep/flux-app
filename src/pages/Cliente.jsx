@@ -357,10 +357,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                 </div>
               ) : <>
                 {/* Selector de rutinas */}
-                <div style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",paddingBottom:4}}>
+                <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
                   {rutinas.map((r,i)=>(
                     <button key={i} onClick={()=>setRutinaIdx(i)} className="btn-hover" style={{
-                      flexShrink:0, padding:"9px 20px", borderRadius:20,
+                      padding:"9px 20px", borderRadius:20,
                       background:rutinaIdx===i?C.gradBtn:C.card,
                       color:rutinaIdx===i?"#000":C.muted,
                       fontWeight:rutinaIdx===i?700:500, fontSize:13,
