@@ -435,17 +435,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                             background:`linear-gradient(135deg,${C.accentDeep},${C.faint})`,
                             color:C.text, padding:"10px 14px",
                             border:`1px solid ${C.border}`,
-                            minWidth:150, textAlign:"left",
+                            width:150, minWidth:150, maxWidth:150, textAlign:"left",
                             fontFamily:"'Inter',sans-serif", fontWeight:600,
-                            fontSize:11, textTransform:"uppercase", letterSpacing:"0.5px"
+                            fontSize:11, textTransform:"uppercase", letterSpacing:"0.5px",
+                            position:"sticky", left:0, zIndex:10,
+                            boxShadow:"inset -1px 0 0 rgba(255,255,255,0.1)"
                           }}>Ejercicio</th>
                           <th rowSpan={2} style={{
                             background:`linear-gradient(135deg,${C.accentDeep},${C.faint})`,
                             color:C.text, padding:"10px 10px",
                             border:`1px solid ${C.border}`,
-                            minWidth:52, textAlign:"center",
+                            width:52, minWidth:52, maxWidth:52, textAlign:"center",
                             fontWeight:600, fontSize:11,
-                            textTransform:"uppercase", letterSpacing:"0.5px"
+                            textTransform:"uppercase", letterSpacing:"0.5px",
+                            position:"sticky", left:150, zIndex:10,
+                            boxShadow:"inset -1px 0 0 rgba(255,255,255,0.1)"
                           }}>Serie</th>
                           {semanas.map((s,i)=>(
                             <th key={i} colSpan={2} style={{
@@ -485,7 +489,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                                       textAlign:"center",
                                       borderBottom:isLast?`2px solid ${C.accentDeep}`:`1px solid ${C.border}`,
                                       cursor:ej.gif_url?"pointer":"default",
-                                      transition:"background 0.2s"
+                                      transition:"background 0.2s",
+                                      position:"sticky", left:0, zIndex:5,
+                                      width:150, minWidth:150, maxWidth:150,
+                                      boxShadow:"inset -1px 0 0 rgba(255,255,255,0.05)"
                                     }}
                                     onMouseEnter={e=>{if(ej.gif_url)e.currentTarget.style.background=C.faint;}}
                                     onMouseLeave={e=>{e.currentTarget.style.background=rowBg;}}
@@ -509,10 +516,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                                   </td>
                                 )}
                                 <td style={{
-                                  padding:"7px 8px",border:`1px solid ${C.border}`,
+                                  background:rowBg, padding:"7px 8px", border:`1px solid ${C.border}`,
                                   textAlign:"center",color:C.accent,fontWeight:800,
                                   borderBottom:isLast?`2px solid ${C.accentDeep}`:`1px solid ${C.border}`,
-                                  fontFamily:"'Rajdhani',sans-serif", fontSize:14
+                                  fontFamily:"'Rajdhani',sans-serif", fontSize:14,
+                                  position:"sticky", left:150, zIndex:5,
+                                  width:52, minWidth:52, maxWidth:52,
+                                  boxShadow:"inset -1px 0 0 rgba(255,255,255,0.05)"
                                 }}>{si+1}</td>
                                 {semanas.map((_,wi)=>{
                                   const pKey=`${ej.id}__${wi}__${si}__peso`;
