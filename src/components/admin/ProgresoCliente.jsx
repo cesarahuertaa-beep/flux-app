@@ -204,7 +204,7 @@ export function ProgresoCliente({ selected, setMsg }) {
   if (loading) return <div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div>;
 
   return (
-    <div>
+    <div style={{paddingBottom: 100}}>
       {/* Sub-nav */}
       <div style={{display:"flex",gap:8,marginBottom:20}}>
         {[["evaluaciones","📊","Evaluaciones"],["rutinas","🏋️","Rutinas del cliente"]].map(([k,ic,lb])=>(

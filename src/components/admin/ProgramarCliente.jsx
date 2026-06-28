@@ -240,7 +240,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   }
 
   return (
-    <div>
+    <div style={{paddingBottom: 100}}>
       {/* ── Cabecera cliente ── */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
         <div style={{background:C.accentDeep+"50",border:`1px solid color-mix(in srgb, ${C.accent} 25%, transparent)`,borderRadius:10,padding:"8px 16px"}}>

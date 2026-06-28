@@ -159,7 +159,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         nombre={cliente.nombre}
       />
 
-      <div style={{padding:"24px 16px", maxWidth:860, margin:"0 auto"}}>
+      <div style={{padding:"24px 16px 100px 16px", maxWidth:860, margin:"0 auto"}}>
         {loading ? (
           <div style={{textAlign:"center",padding:"80px 0",color:C.muted}}>
             <div style={{
