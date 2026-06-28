@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { C, css } from "../styles/theme";
-import { FluxLogo, Field, OrbBackground } from "../components/ui";
+import { Field, OrbBackground } from "../components/ui";
 import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
 
 export default function Login({ onLogin }) {
@@ -14,8 +14,12 @@ export default function Login({ onLogin }) {
   const [loading, setLoading]     = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [focused, setFocused]     = useState(null);
+  const [showSplash, setShowSplash] = useState(true);
+  const [fadeSplash, setFadeSplash] = useState(false);
 
   useEffect(() => {
+    const timer1 = setTimeout(() => setFadeSplash(true), 2000);
+    const timer2 = setTimeout(() => setShowSplash(false), 2800);
     const hash = window.location.hash;
     if (hash.includes("access_token")) {
       const params = new URLSearchParams(hash.replace("#","?"));
@@ -26,6 +30,7 @@ export default function Login({ onLogin }) {
         window.history.replaceState(null,"",window.location.pathname);
       }
     }
+    return () => { clearTimeout(timer1); clearTimeout(timer2); };
   }, []);
 
   const submit = async () => {
@@ -101,12 +106,26 @@ export default function Login({ onLogin }) {
     <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
       <style>{css}</style>
 
+      {/* ── Splash Screen Overlay ── */}
+      {showSplash && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          background: "#000000",
+          zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: fadeSplash ? 0 : 1,
+          transition: "opacity 0.8s ease",
+          pointerEvents: fadeSplash ? "none" : "auto"
+        }}>
+          <img src="/logo.png" alt="Flux Splash" style={{ width: "320px", height: "auto" }} />
+        </div>
+      )}
+
       {/* ── Login Card ── */}
       <div className="animate-in" style={{ width:"100%",maxWidth:420,padding:"44px 40px 36px",background:"rgba(15,28,46,0.95)",borderRadius:24,border:"1px solid rgba(46,92,184,0.15)",position:"relative",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",boxShadow:"0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(46,92,184,0.08)",zIndex:1 }}>
 
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <FluxLogo size={38} animated large />
+        {/* Top Spacer */}
+        <div style={{ textAlign: "center", marginBottom: (mode === "reset" || mode === "set_password") ? 24 : 12 }}>
           {(mode === "reset" || mode === "set_password") && (
             <div style={{ marginTop: 12, fontSize: 13, color: "#64748b", letterSpacing: "0.3px" }}>
               {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
