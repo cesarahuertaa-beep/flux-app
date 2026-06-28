@@ -6,6 +6,17 @@ import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
 import InstallPrompt from "./components/InstallPrompt";
 
+// Helpers para persistir el tipo de sesión
+const saveSessionMeta = (role, clientId = null) => {
+  localStorage.setItem("flux_role", role);
+  if (clientId) localStorage.setItem("flux_client_id", clientId);
+  else localStorage.removeItem("flux_client_id");
+};
+const clearSessionMeta = () => {
+  localStorage.removeItem("flux_role");
+  localStorage.removeItem("flux_client_id");
+};
+
 export default function App() {
   const [session,    setSession]    = useState(null);
   const [atletaData, setAtletaData] = useState(null);
@@ -16,30 +27,38 @@ export default function App() {
     const restore = async () => {
       const token = restoreSession();
       const profileId = restoreProfileId();
-      if (token && profileId) {
+      const savedRole = localStorage.getItem("flux_role");
+      const savedClientId = localStorage.getItem("flux_client_id");
+
+      if (token && savedRole) {
         try {
-          const profiles = await dbGet(`profiles?id=eq.${profileId}`);
-          const role = profiles.length ? profiles[0].role : null;
-          if (role) {
-            // Verificar si la cuenta está activa
-            if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
-              setAuthToken(null); setProfileId(null);
-            } else if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
-              setSession({ role: role === "admin" ? "admin" : role, token, profileId });
+          if (savedRole === "client" && savedClientId) {
+            // Restaurar sesión de cliente directo desde la BD
+            const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
+            if (rows.length) {
+              setSession({ role: "client", data: rows[0], token });
             } else {
-              // Cliente
-              const email = profiles[0].email;
-              const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email)}&activo=eq.true`);
-              if (rows.length) {
-                setSession({ role: "client", data: rows[0], token });
-              } else {
-                setAuthToken(null); setProfileId(null);
-              }
+              setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
+          } else if (profileId) {
+            // Restaurar sesión de admin/nutriólogo/superadmin
+            const profiles = await dbGet(`profiles?id=eq.${profileId}`);
+            const role = profiles.length ? profiles[0].role : null;
+            if (role && (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo")) {
+              if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
+                setAuthToken(null); setProfileId(null); clearSessionMeta();
+              } else {
+                setSession({ role: role === "admin" ? "admin" : role, token, profileId });
+              }
+            } else {
+              setAuthToken(null); setProfileId(null); clearSessionMeta();
+            }
+          } else {
+            clearSessionMeta();
           }
         } catch {
-          // Token expirado u otro error — limpiar
-          setAuthToken(null); setProfileId(null);
+          // Token expirado u otro error — limpiar todo
+          setAuthToken(null); setProfileId(null); clearSessionMeta();
         }
       }
       setRestoring(false);
@@ -50,12 +69,17 @@ export default function App() {
     onSessionExpired(() => {
       setSession(null);
       setAtletaData(null);
+      clearSessionMeta();
     });
   }, []);
 
   const handleLogin = (s) => {
-    if (s.token) {
-      setAuthToken(s.token);
+    if (s.token) setAuthToken(s.token);
+    // Guardar meta de sesión para restauración futura
+    if (s.role === "client") {
+      saveSessionMeta("client", s.data?.id);
+    } else {
+      saveSessionMeta(s.role);
     }
     setSession(s);
   };
@@ -63,6 +87,7 @@ export default function App() {
   const handleLogout = () => {
     setAuthToken(null);
     setProfileId(null);
+    clearSessionMeta();
     setSession(null);
     setAtletaData(null);
   };
