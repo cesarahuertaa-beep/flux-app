@@ -9,38 +9,34 @@ import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
 
 const METRIC_GROUPS = [
   { label:"Básicas", icon:"⚖️", fields:[
-    { key:"peso",           label:"Peso (kg)",        type:"number", step:"0.1" },
-    { key:"estatura",       label:"Estatura (cm)",    type:"number" },
-    { key:"imc",            label:"IMC",              type:"number", step:"0.01", readOnly:true },
+    { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
+    { key:"estatura",  label:"Estatura (cm)", type:"number" },
+    { key:"imc",       label:"IMC",           type:"number", step:"0.01", readOnly:true },
   ]},
   { label:"Composición corporal", icon:"🔬", fields:[
-    { key:"grasa_pct",   label:"Grasa (%)",    type:"number", step:"0.1" },
-    { key:"musculo_pct", label:"Músculo (%)",  type:"number", step:"0.1" },
-    { key:"agua_pct",    label:"Agua (%)",     type:"number", step:"0.1" },
-    { key:"grasa_kg",    label:"Grasa (kg)",   type:"number", step:"0.1" },
-    { key:"musculo_kg",  label:"Músculo (kg)", type:"number", step:"0.1" },
+    { key:"grasa_pct",   label:"Grasa (%)",   type:"number", step:"0.1" },
+    { key:"musculo_pct", label:"Músculo (%)", type:"number", step:"0.1" },
   ]},
   { label:"Circunferencias (cm)", icon:"📏", fields:[
-    { key:"cintura", label:"Cintura", type:"number", step:"0.1" },
-    { key:"cadera",  label:"Cadera",  type:"number", step:"0.1" },
-    { key:"pecho",   label:"Pecho",   type:"number", step:"0.1" },
-    { key:"brazo",   label:"Brazo",   type:"number", step:"0.1" },
-    { key:"muslo",   label:"Muslo",   type:"number", step:"0.1" },
+    { key:"cintura", label:"Cintura",  type:"number", step:"0.1" },
+    { key:"cadera",  label:"Cadera",   type:"number", step:"0.1" },
+    { key:"icc",     label:"ICC",      type:"number", step:"0.001", readOnly:true },
+    { key:"pecho",   label:"Pecho",    type:"number", step:"0.1" },
+    { key:"brazo",   label:"Brazo",    type:"number", step:"0.1" },
+    { key:"muslo",   label:"Muslo",    type:"number", step:"0.1" },
   ]},
   { label:"Clínicos", icon:"🩺", fields:[
-    { key:"glucosa",          label:"Glucosa (mg/dL)",    type:"number" },
-    { key:"colesterol",       label:"Colesterol (mg/dL)", type:"number" },
-    { key:"presion_arterial", label:"Presión arterial",   type:"text", placeholder:"120/80" },
+    { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
+    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
   ]},
 ];
 
 const emptyForm = () => ({
-  fecha:new Date().toISOString().split("T")[0],
+  fecha: new Date().toISOString().split("T")[0],
   peso:"", estatura:"", imc:"",
-  grasa_pct:"", musculo_pct:"", agua_pct:"",
-  grasa_kg:"", musculo_kg:"",
-  cintura:"", cadera:"", pecho:"", brazo:"", muslo:"",
-  glucosa:"", colesterol:"", presion_arterial:"", notas:"",
+  grasa_pct:"", musculo_pct:"",
+  cintura:"", cadera:"", icc:"", pecho:"", brazo:"", muslo:"",
+  glucosa:"", presion_arterial:"", notas:"",
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
@@ -90,9 +86,15 @@ export function ProgresoCliente({ selected, setMsg }) {
   const updForm = (key, val) => {
     setForm(p => {
       const next = { ...p, [key]: val };
+      // Auto-calcular IMC
       if ((key==="peso" || key==="estatura") && next.peso && next.estatura) {
         const h = parseFloat(next.estatura) / 100;
         next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(2) : "";
+      }
+      // Auto-calcular ICC (cintura ÷ cadera)
+      if ((key==="cintura" || key==="cadera") && next.cintura && next.cadera) {
+        const icc = parseFloat(next.cintura) / parseFloat(next.cadera);
+        next.icc = icc > 0 ? icc.toFixed(2) : "";
       }
       return next;
     });
@@ -185,16 +187,18 @@ export function ProgresoCliente({ selected, setMsg }) {
 
 
   const DISPLAY_KEYS = [
-    { key:"peso",            label:"Peso",      unit:"kg",     icon:"⚖️" },
-    { key:"imc",             label:"IMC",       unit:"",       icon:"📐" },
-    { key:"grasa_pct",       label:"Grasa",     unit:"%",      icon:"🔴" },
-    { key:"musculo_pct",     label:"Músculo",   unit:"%",      icon:"💪" },
-    { key:"agua_pct",        label:"Agua",      unit:"%",      icon:"💧" },
-    { key:"cintura",         label:"Cintura",   unit:"cm",     icon:"📏" },
-    { key:"cadera",          label:"Cadera",    unit:"cm",     icon:"📏" },
-    { key:"glucosa",         label:"Glucosa",   unit:"mg/dL",  icon:"🩺" },
-    { key:"colesterol",      label:"Colesterol",unit:"mg/dL",  icon:"🩺" },
-    { key:"presion_arterial",label:"Presión",   unit:"",       icon:"❤️" },
+    { key:"peso",            label:"Peso",      unit:"kg",    icon:"⚖️" },
+    { key:"imc",             label:"IMC",        unit:"",      icon:"📐" },
+    { key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:"🔴" },
+    { key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:"💪" },
+    { key:"cintura",         label:"Cintura",    unit:"cm",    icon:"📏" },
+    { key:"cadera",          label:"Cadera",     unit:"cm",    icon:"📏" },
+    { key:"icc",             label:"ICC",         unit:"",      icon:"⚖️" },
+    { key:"pecho",           label:"Pecho",      unit:"cm",    icon:"📏" },
+    { key:"brazo",           label:"Brazo",      unit:"cm",    icon:"📏" },
+    { key:"muslo",           label:"Muslo",      unit:"cm",    icon:"📏" },
+    { key:"glucosa",         label:"Glucosa",    unit:"mg/dL", icon:"🩺" },
+    { key:"presion_arterial",label:"Presión",    unit:"",       icon:"❤️" },
   ];
 
   if (loading) return <div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div>;

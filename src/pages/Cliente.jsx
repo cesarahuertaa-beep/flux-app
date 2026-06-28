@@ -616,16 +616,18 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
                     const prev=metricas[idx+1];
                     const fmtD=d=>new Date(d+"T12:00:00").toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
                     const KEYS=[
-                      {key:"peso",            label:"Peso",       unit:"kg",    icon:"⚖️"},
-                      {key:"imc",             label:"IMC",        unit:"",      icon:"📐"},
-                      {key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:"🔴"},
-                      {key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:"💪"},
-                      {key:"agua_pct",        label:"Agua",       unit:"%",     icon:"💧"},
-                      {key:"cintura",         label:"Cintura",    unit:"cm",    icon:"📏"},
-                      {key:"cadera",          label:"Cadera",     unit:"cm",    icon:"📏"},
-                      {key:"glucosa",         label:"Glucosa",    unit:"mg/dL", icon:"🩺"},
-                      {key:"colesterol",      label:"Colesterol", unit:"mg/dL", icon:"🩺"},
-                      {key:"presion_arterial",label:"Presión",    unit:"",      icon:"❤️"},
+                      {key:"peso",            label:"Peso",    unit:"kg",    icon:"⚖️"},
+                      {key:"imc",             label:"IMC",     unit:"",      icon:"📐"},
+                      {key:"grasa_pct",       label:"Grasa",   unit:"%",     icon:"🔴"},
+                      {key:"musculo_pct",     label:"Músculo", unit:"%",     icon:"💪"},
+                      {key:"cintura",         label:"Cintura", unit:"cm",    icon:"📏"},
+                      {key:"cadera",          label:"Cadera",  unit:"cm",    icon:"📏"},
+                      {key:"icc",             label:"ICC",     unit:"",      icon:"⚖️"},
+                      {key:"pecho",           label:"Pecho",   unit:"cm",    icon:"📏"},
+                      {key:"brazo",           label:"Brazo",   unit:"cm",    icon:"📏"},
+                      {key:"muslo",           label:"Muslo",   unit:"cm",    icon:"📏"},
+                      {key:"glucosa",         label:"Glucosa", unit:"mg/dL", icon:"🩺"},
+                      {key:"presion_arterial",label:"Presión", unit:"",      icon:"❤️"},
                     ];
                     return (
                       <div key={m.id} className="animate-in" style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:12,animationDelay:`${idx*0.05}s`}}>
