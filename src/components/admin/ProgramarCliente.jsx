@@ -47,6 +47,83 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   const isReadOnly = cicloSel && !cicloSel.activo;
 
+  // ── Historial para Plantillas ──
+  const [historialRutinas, setHistorialRutinas] = useState([]);
+  const [historialDias, setHistorialDias] = useState([]);
+  
+  const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre || "Desconocido";
+
+  const loadHistorial = useCallback(async () => {
+    if (!clientes || clientes.length === 0) return;
+    try {
+      const ids = clientes.map(c => c.id).join(",");
+      const hr = await dbGet(`rutinas?cliente_id=in.(${ids})&order=created_at.desc&limit=50`);
+      setHistorialRutinas(hr);
+      
+      const hn = await dbGet(`nutricion?cliente_id=in.(${ids})`);
+      if (hn.length > 0) {
+        const nids = hn.map(n => n.id).join(",");
+        const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})&order=created_at.desc&limit=50`);
+        const hdMapped = hd.map(d => {
+          const nut = hn.find(n => n.id === d.nutricion_id);
+          return { ...d, cliente_id: nut?.cliente_id };
+        });
+        setHistorialDias(hdMapped);
+      }
+    } catch(e) { console.error("Error loading history", e); }
+  }, [clientes]);
+
+  useEffect(() => { loadHistorial(); }, [loadHistorial]);
+
+  const onSelectHistorialRutina = async (e) => {
+    const rid = e.target.value;
+    if (!rid) return;
+    e.target.value = ""; // reset select
+    const r = historialRutinas.find(x => String(x.id) === rid);
+    if (!r) return;
+    setLoading(true);
+    try {
+      const ejs = await dbGet(`ejercicios?rutina_id=eq.${rid}&order=orden.asc`);
+      setRutinaForm(p => ({
+        ...p,
+        nombre: r.nombre + " (Copia)",
+        semanas: r.semanas,
+        ejercicios: ejs.map(x => {
+           const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
+           delete copy.id;
+           delete copy.rutina_id;
+           return copy;
+        })
+      }));
+      setMsg("✅ Rutina cargada del historial");
+    } catch(err) { setMsg("❌ Error cargando rutina"); }
+    setLoading(false);
+  };
+
+  const onSelectHistorialDia = async (e) => {
+    const did = e.target.value;
+    if (!did) return;
+    e.target.value = ""; // reset select
+    const d = historialDias.find(x => String(x.id) === did);
+    if (!d) return;
+    setLoading(true);
+    try {
+      const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
+      setDiaForm(p => ({
+        ...p,
+        dia: d.dia + " (Copia)",
+        comidas: coms.map(x => {
+           const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
+           delete copy.id;
+           delete copy.dia_id;
+           return copy;
+        })
+      }));
+      setMsg("✅ Día cargado del historial");
+    } catch(err) { setMsg("❌ Error cargando día"); }
+    setLoading(false);
+  };
+
   // ── Cargar ciclos del cliente ──
   const loadCiclos = useCallback(async () => {
     if (!selected) return;
@@ -547,6 +624,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         <Modal title={editDia?`Editar: ${editDia.dia}`:"Nuevo día"} onClose={()=>setShowDiaModal(false)} wide>
           {!editDia && (
             <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
+              {historialDias.length > 0 && (
+                <div style={{marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{fontSize:12, fontWeight:600, color:C.muted, marginBottom:6}}>IMPORTAR DESDE HISTORIAL</div>
+                  <select onChange={onSelectHistorialDia} style={{width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:C.surface, color:C.text}}>
+                    <option value="">-- Seleccionar día preexistente --</option>
+                    {historialDias.map(hd => (
+                      <option key={hd.id} value={hd.id}>{hd.dia} (de {getClientName(hd.cliente_id)})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{display:"flex",gap:16,marginBottom:diaForm.crear_ciclo?12:0}}>
                 <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
                   <input type="radio" checked={!diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:false}))}/>
@@ -612,6 +700,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)} wide>
           {!editRutina && (
             <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
+              {historialRutinas.length > 0 && (
+                <div style={{marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{fontSize:12, fontWeight:600, color:C.muted, marginBottom:6}}>IMPORTAR DESDE HISTORIAL</div>
+                  <select onChange={onSelectHistorialRutina} style={{width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:C.surface, color:C.text}}>
+                    <option value="">-- Seleccionar rutina preexistente --</option>
+                    {historialRutinas.map(hr => (
+                      <option key={hr.id} value={hr.id}>{hr.nombre} (de {getClientName(hr.cliente_id)})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{display:"flex",gap:16,marginBottom:rutinaForm.crear_ciclo?12:0}}>
                 <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
                   <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:false}))}/>
