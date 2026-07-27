@@ -3,9 +3,23 @@ import { C, css } from "../styles/theme";
 import { Btn, Tag, Header, Sidebar, StatCard } from "../components/ui";
 import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
+import { enqueue } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { CitasCliente } from "../components/CitasCliente";
 import { parseFotos, getSemanasConFecha } from "../utils/helpers";
+
+/**
+ * Guarda en Supabase si hay internet, o encola en IndexedDB si no hay.
+ * El estado de React ya tiene los datos; esto solo persiste en el backend.
+ */
+const offlineAwareUpsert = async (records) => {
+  if (navigator.onLine) {
+    await dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo', records);
+  } else {
+    const items = Array.isArray(records) ? records : [records];
+    for (const item of items) await enqueue(item);
+  }
+};
 
 
 
@@ -68,13 +82,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
     if (!editCell) return;
     const [ejId,semana,serie,tipo] = editCell.split("__");
     const key=`${ejId}-${semana}-${serie}-${tipo}`;
-    const finalVal = editVal; // capture current state
+    const finalVal = editVal;
     
     setProgreso(p=>({...p,[key]:finalVal}));
     setEditCell(null); setEditVal("");
     
     try {
-      await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", { ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
+      await offlineAwareUpsert({ ejercicio_id:ejId, cliente_id:cliente.id, semana:+semana, serie:+serie, tipo, valor:finalVal, updated_at:new Date().toISOString() });
     } catch(e) {
       console.error("Error guardando celda:", e);
     }
@@ -106,8 +120,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         }
       });
       if (upserts.length > 0) {
-        // Batch: enviar todos los registros en una sola request
-        await dbUpsert("progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo", upserts);
+        await offlineAwareUpsert(upserts);
       }
       setMsg({ ok: true, text: "✅ Registros guardados correctamente" });
     } catch(e) {

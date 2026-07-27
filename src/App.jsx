@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
+import { dbUpsert } from "./lib/supabase";
+import { syncQueue } from "./lib/offlineQueue";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
@@ -71,6 +73,14 @@ export default function App() {
       setAtletaData(null);
       clearSessionMeta();
     });
+
+    // Sincronizar cola offline silenciosamente cuando vuelva la conexión
+    const handleOnline = () => syncQueue(dbUpsert);
+    window.addEventListener('online', handleOnline);
+    // También intentar al montar (por si había cola de una sesión anterior)
+    syncQueue(dbUpsert);
+
+    return () => window.removeEventListener('online', handleOnline);
   }, []);
 
   const handleLogin = (s) => {
