@@ -30,10 +30,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   // ── Ciclos ──
   const [ciclos, setCiclos] = useState([]);
   const [cicloSel, setCicloSel] = useState(null); // ciclo seleccionado para ver/editar
-  const [showNuevoCiclo, setShowNuevoCiclo] = useState(false);
-  const [nuevoCicloNombre, setNuevoCicloNombre] = useState("");
-  const [nuevoCicloFecha, setNuevoCicloFecha] = useState(new Date().toISOString().split("T")[0]);
-  const [savingCiclo, setSavingCiclo] = useState(false);
 
   // ── Datos del ciclo seleccionado ──
   const [nutri, setNutri] = useState(null);
@@ -90,30 +86,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
 
-  // ── Crear nuevo ciclo ──
-  const crearCiclo = async () => {
-    if (!nuevoCicloNombre.trim()) { setMsg("⚠️ Escribe un nombre para el ciclo"); return; }
-    setSavingCiclo(true);
-    try {
-      // Archivar ciclo activo anterior
-      if (ciclos.some(c => c.activo)) {
-        await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
-      }
-      // Crear nuevo ciclo activo
-      const nuevo = await dbPost("ciclos", {
-        cliente_id: selected.id,
-        nombre: nuevoCicloNombre.trim(),
-        fecha_inicio: nuevoCicloFecha,
-        activo: true
-      });
-      setMsg("✅ Ciclo creado: " + nuevoCicloNombre);
-      setShowNuevoCiclo(false);
-      setNuevoCicloNombre("");
-      await loadCiclos();
-      setCicloSel(nuevo[0]);
-    } catch(e) { setMsg("❌ " + e.message); }
-    setSavingCiclo(false);
-  };
+  // ── (Ciclos se crean ahora desde los modales de Día/Rutina) ──
 
   // ── Eliminar ciclo (solo si está vacío) ──
   const eliminarCiclo = async (ciclo, e) => {
@@ -166,13 +139,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
-  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) }); setShowDiaModal(true); };
+  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
+  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
 
   const saveDia = async () => {
-    if (!nutri) { setMsg("⚠️ Guarda los macros primero"); return; }
+    if (!nutri && !diaForm.crear_ciclo) { setMsg("⚠️ Guarda los macros primero"); return; }
     setSaving(true);
     try {
+      let currentNutri = nutri;
+      if (diaForm.crear_ciclo) {
+        if (!diaForm.ciclo_nombre.trim()) { setMsg("⚠️ Escribe el nombre del nuevo ciclo"); setSaving(false); return; }
+        if (ciclos.some(c => c.activo)) {
+          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+        }
+        const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: diaForm.ciclo_nombre.trim(), fecha_inicio: diaForm.ciclo_fecha, activo: true });
+        const activeCiclo = cRes[0];
+        await loadCiclos();
+        setCicloSel(activeCiclo);
+        
+        const nRes = await dbPost("nutricion", {
+          cliente_id: selected.id,
+          ciclo_id: activeCiclo.id,
+          ...macros
+        });
+        currentNutri = nRes[0];
+        setNutri(currentNutri);
+      }
+
       let diaId;
       if (editDia) { 
         await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); 
@@ -186,7 +179,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
       else { 
-        const r = await dbPost("nutricion_dias", { nutricion_id:nutri.id, dia:diaForm.dia, orden:diaForm.orden }); 
+        const r = await dbPost("nutricion_dias", { nutricion_id:currentNutri.id, dia:diaForm.dia, orden:diaForm.orden }); 
         diaId=r[0].id; 
       }
       
@@ -212,12 +205,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
 
   // ── Operaciones de Rutinas ──
-  const openNewRutina  = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[] }); setShowRutinaModal(true); };
-  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) }); setShowRutinaModal(true); };
+  const openNewRutina  = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowRutinaModal(true); };
+  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowRutinaModal(true); };
 
   const saveRutina = async () => {
     setSaving(true);
     try {
+      let activeCiclo = cicloSel;
+      if (rutinaForm.crear_ciclo) {
+        if (!rutinaForm.ciclo_nombre.trim()) { setMsg("⚠️ Escribe el nombre del nuevo ciclo"); setSaving(false); return; }
+        if (ciclos.some(c => c.activo)) {
+          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+        }
+        const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: rutinaForm.ciclo_nombre.trim(), fecha_inicio: rutinaForm.ciclo_fecha, activo: true });
+        activeCiclo = cRes[0];
+        await loadCiclos();
+        setCicloSel(activeCiclo);
+      }
+
       let rid;
       if (editRutina) {
         await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio });
@@ -232,7 +237,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       } else {
         const r = await dbPost("rutinas", {
           cliente_id: selected.id,
-          ciclo_id: cicloSel?.id || null,
+          ciclo_id: activeCiclo?.id || null,
           nombre: rutinaForm.nombre,
           semanas: +rutinaForm.semanas,
           fecha_inicio: rutinaForm.fecha_inicio,
@@ -370,7 +375,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       <div style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <span style={{fontSize:13,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>📅 Ciclos / Períodos</span>
-          <Btn small grad onClick={()=>setShowNuevoCiclo(true)}>+ Nuevo Ciclo</Btn>
         </div>
 
         {ciclos.length === 0 ? (
@@ -558,6 +562,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Modal Nuevo/Editar Día ── */}
       {showDiaModal&&(
         <Modal title={editDia?`Editar: ${editDia.dia}`:"Nuevo día"} onClose={()=>setShowDiaModal(false)} wide>
+          {!editDia && (
+            <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",gap:16,marginBottom:diaForm.crear_ciclo?12:0}}>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="radio" checked={!diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:false}))}/>
+                  Usar ciclo actual {cicloSel ? `(${cicloSel.nombre})` : ""}
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="radio" checked={diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:true}))}/>
+                  Crear nuevo ciclo
+                </label>
+              </div>
+              {diaForm.crear_ciclo && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <Field label="Nombre del ciclo"><input value={diaForm.ciclo_nombre} onChange={e=>setDiaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2"/></Field>
+                  <Field label="Fecha inicio del ciclo"><input type="date" value={diaForm.ciclo_fecha} onChange={e=>setDiaForm(p=>({...p,ciclo_fecha:e.target.value}))}/></Field>
+                </div>
+              )}
+            </div>
+          )}
           <Field label="Nombre del día"><input value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…"/></Field>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <span style={{fontWeight:600,fontSize:14}}>Comidas</span>
@@ -603,6 +627,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Modal Nueva/Editar Rutina ── */}
       {showRutinaModal&&(
         <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)} wide>
+          {!editRutina && (
+            <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",gap:16,marginBottom:rutinaForm.crear_ciclo?12:0}}>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:false}))}/>
+                  Usar ciclo actual {cicloSel ? `(${cicloSel.nombre})` : ""}
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="radio" checked={rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:true}))}/>
+                  Crear nuevo ciclo
+                </label>
+              </div>
+              {rutinaForm.crear_ciclo && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <Field label="Nombre del ciclo"><input value={rutinaForm.ciclo_nombre} onChange={e=>setRutinaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2"/></Field>
+                  <Field label="Fecha inicio del ciclo"><input type="date" value={rutinaForm.ciclo_fecha} onChange={e=>setRutinaForm(p=>({...p,ciclo_fecha:e.target.value}))}/></Field>
+                </div>
+              )}
+            </div>
+          )}
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10}}>
             <Field label="Nombre"><input value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1"/></Field>
             <Field label="Semanas"><input type="number" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))}/></Field>
