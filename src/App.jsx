@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, dbGet } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
@@ -87,6 +87,7 @@ export default function App() {
   const handleLogout = () => {
     setAuthToken(null);
     setProfileId(null);
+    saveRefreshToken(null);
     clearSessionMeta();
     setSession(null);
     setAtletaData(null);

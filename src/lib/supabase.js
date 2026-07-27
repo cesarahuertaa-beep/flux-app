@@ -4,12 +4,37 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // Token de autenticación — se activa al hacer login
 let _authToken = null;
 let _onSessionExpired = null; // callback para redirigir al login
+let _isRefreshing = false;
+let _refreshQueue = []; // promesas pendientes mientras se renueva el token
 
 export const setAuthToken = (t) => {
   _authToken = t;
-  // Persistir en localStorage para sobrevivir cierres de navegador
   if (t) localStorage.setItem("flux_token", t);
   else  localStorage.removeItem("flux_token");
+};
+
+/** Guardar refresh_token al hacer login */
+export const saveRefreshToken = (rt) => {
+  if (rt) localStorage.setItem("flux_refresh_token", rt);
+  else   localStorage.removeItem("flux_refresh_token");
+};
+
+/** Renovar el access_token silenciosamente usando el refresh_token */
+export const refreshSession = async () => {
+  const rt = localStorage.getItem("flux_refresh_token");
+  if (!rt) return false;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: rt }),
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    setAuthToken(d.access_token);
+    saveRefreshToken(d.refresh_token);
+    return true;
+  } catch { return false; }
 };
 
 export const getAuthToken = () => _authToken;
@@ -40,12 +65,26 @@ const q = async (path, opts={}) => {
     },
     ...restOpts
   });
-  // Interceptar sesión expirada
+  // Interceptar 401 — intentar renovar el token antes de cerrar sesión
   if (r.status === 401 && _authToken) {
-    setAuthToken(null);
-    setProfileId(null);
-    if (_onSessionExpired) _onSessionExpired();
-    throw new Error("Sesión expirada — inicia sesión de nuevo");
+    if (!_isRefreshing) {
+      _isRefreshing = true;
+      const ok = await refreshSession();
+      _isRefreshing = false;
+      _refreshQueue.forEach(resolve => resolve(ok));
+      _refreshQueue = [];
+      if (!ok) {
+        setAuthToken(null); setProfileId(null); saveRefreshToken(null);
+        if (_onSessionExpired) _onSessionExpired();
+        throw new Error("Sesión expirada — inicia sesión de nuevo");
+      }
+      // Reintentar la petición original con el token nuevo
+      return q(path, opts);
+    } else {
+      // Esperar a que termine el refresh en curso y reintentar
+      await new Promise(resolve => _refreshQueue.push(resolve));
+      return q(path, opts);
+    }
   }
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
   const t = await r.text(); return t ? JSON.parse(t) : [];
@@ -67,12 +106,16 @@ export const dbUpsert = async (p, b) => {
     },
     body: JSON.stringify(b)
   });
-  // Interceptar sesión expirada
+  // Interceptar 401 en upsert — renovar token silenciosamente
   if (r.status === 401 && _authToken) {
-    setAuthToken(null);
-    setProfileId(null);
-    if (_onSessionExpired) _onSessionExpired();
-    throw new Error("Sesión expirada — inicia sesión de nuevo");
+    const ok = await refreshSession();
+    if (!ok) {
+      setAuthToken(null); setProfileId(null); saveRefreshToken(null);
+      if (_onSessionExpired) _onSessionExpired();
+      throw new Error("Sesión expirada — inicia sesión de nuevo");
+    }
+    // Reintentar con token nuevo
+    return dbUpsert(p, b);
   }
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
   const t = await r.text(); return t ? JSON.parse(t) : [];
@@ -119,6 +162,8 @@ export const authSignIn = async (email, password) => {
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error_description || d.msg || "Error de autenticación");
+  // Guardar refresh_token para renovación automática de sesión
+  if (d.refresh_token) saveRefreshToken(d.refresh_token);
   return d;
 };
 
