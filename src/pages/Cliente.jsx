@@ -3,7 +3,7 @@ import { C, css } from "../styles/theme";
 import { Btn, Tag, Header, Sidebar, StatCard } from "../components/ui";
 import { generateNutriPDF, generateProgresoPDF } from "../utils/pdf";
 import { dbGet, dbUpsert } from "../lib/supabase";
-import { enqueue } from "../lib/offlineQueue";
+import { enqueue, getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { CitasCliente } from "../components/CitasCliente";
 import { parseFotos, getSemanasConFecha } from "../utils/helpers";
@@ -69,7 +69,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         const allIds = rsFull.flatMap(r=>r.ejercicios.map(e=>e.id));
         if (allIds.length) {
           const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
-          const pm={}; ps.forEach(p=>{pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`]=p.valor;}); setProgreso(pm);
+          const pm={};
+          ps.forEach(p=>{ pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`]=p.valor; });
+          // Fusionar registros pendientes en cola offline (sobrescriben Supabase)
+          // Esto evita perder datos al hacer pull-to-refresh sin internet
+          try {
+            const pending = await getAll();
+            pending
+              .filter(p => p.cliente_id === cliente.id)
+              .forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`]=p.valor; });
+          } catch { /* si IndexedDB falla, seguimos con los datos de Supabase */ }
+          setProgreso(pm);
         }
         const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`);
         setMetricas(ms);
