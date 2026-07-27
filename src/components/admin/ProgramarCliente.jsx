@@ -1,4 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableItem } from "../SortableItem";
 import { C } from "../../styles/theme";
 import { Btn, Modal, Field } from "../ui";
 import { EjercicioSelector } from "./EjercicioSelector";
@@ -151,8 +166,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", orden:dias.length, comidas:[{ hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
-  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c})) }); setShowDiaModal(true); };
+  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
+  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) }); setShowDiaModal(true); };
 
   const saveDia = async () => {
     if (!nutri) { setMsg("⚠️ Guarda los macros primero"); return; }
@@ -192,13 +207,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
-  const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
+  const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
 
   // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[] }); setShowRutinaModal(true); };
-  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e})) }); setShowRutinaModal(true); };
+  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) }); setShowRutinaModal(true); };
 
   const saveRutina = async () => {
     setSaving(true);
@@ -244,17 +259,75 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
   const addEj = (ej) => {
     if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
-    setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
+    setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { _dndId: Math.random().toString(36).slice(2,9), biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
   };
   const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
-  const moveEj = (i, dir) => {
-    setRutinaForm(p => {
-      if ((dir===-1 && i===0) || (dir===1 && i===p.ejercicios.length-1)) return p;
-      const es = [...p.ejercicios];
-      [es[i], es[i+dir]] = [es[i+dir], es[i]];
-      return { ...p, ejercicios:es };
-    });
+
+  // ── Handlers de Drag & Drop ──
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEndDias = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setDias((items) => {
+        const oldIndex = items.findIndex(d => String(d.id) === active.id);
+        const newIndex = items.findIndex(d => String(d.id) === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        // Patch in background
+        newItems.forEach((d, idx) => {
+          if (d.orden !== idx) {
+            dbPatch(`nutricion_dias?id=eq.${d.id}`, { orden: idx }).catch(e=>console.error(e));
+            d.orden = idx;
+          }
+        });
+        return newItems;
+      });
+    }
+  };
+
+  const handleDragEndComidas = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setDiaForm((p) => {
+        const oldIndex = p.comidas.findIndex(c => String(c._dndId) === active.id);
+        const newIndex = p.comidas.findIndex(c => String(c._dndId) === over.id);
+        return { ...p, comidas: arrayMove(p.comidas, oldIndex, newIndex) };
+      });
+    }
+  };
+
+  const handleDragEndRutinas = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setRutinas((items) => {
+        const oldIndex = items.findIndex(r => String(r.id) === active.id);
+        const newIndex = items.findIndex(r => String(r.id) === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        // Patch in background
+        newItems.forEach((r, idx) => {
+          if (r.orden !== idx) {
+            dbPatch(`rutinas?id=eq.${r.id}`, { orden: idx }).catch(e=>console.error(e));
+            r.orden = idx;
+          }
+        });
+        return newItems;
+      });
+    }
+  };
+
+  const handleDragEndEjercicios = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setRutinaForm((p) => {
+        const oldIndex = p.ejercicios.findIndex(e => String(e._dndId) === active.id);
+        const newIndex = p.ejercicios.findIndex(e => String(e._dndId) === over.id);
+        return { ...p, ejercicios: arrayMove(p.ejercicios, oldIndex, newIndex) };
+      });
+    }
   };
 
   const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) : "";
@@ -396,17 +469,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               <span style={{fontWeight:600}}>Días del plan <span style={{color:C.muted,fontWeight:400}}>({dias.length})</span></span>
               {!isReadOnly && <Btn small grad onClick={openNewDia}>+ Día</Btn>}
             </div>
-            {dias.map(d=>(
-              <div key={d.id} style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><span style={{fontWeight:600}}>{d.dia}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{d.comidas.length} comidas</span></div>
-                {!isReadOnly && (
-                  <div style={{display:"flex",gap:6}}>
-                    <Btn small outline color={C.accent} onClick={()=>openEditDia(d)}>Editar</Btn>
-                    <Btn small danger onClick={()=>deleteDia(d)}>Borrar</Btn>
-                  </div>
-                )}
-              </div>
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
+              <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
+                {dias.map(d=>(
+                  <SortableItem key={d.id} id={d.id}>
+                    {({ dragHandle, isDragging }) => (
+                      <div style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          {!isReadOnly && dragHandle}
+                          <div><span style={{fontWeight:600}}>{d.dia}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{d.comidas.length} comidas</span></div>
+                        </div>
+                        {!isReadOnly && (
+                          <div style={{display:"flex",gap:6}}>
+                            <Btn small outline color={C.accent} onClick={()=>openEditDia(d)}>Editar</Btn>
+                            <Btn small danger onClick={()=>deleteDia(d)}>Borrar</Btn>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </SortableItem>
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         )}
 
@@ -417,19 +501,30 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               <span style={{fontWeight:600}}>Rutinas <span style={{color:C.muted,fontWeight:400}}>({rutinas.length})</span></span>
               {!isReadOnly && <Btn small grad onClick={openNewRutina}>+ Rutina</Btn>}
             </div>
-            {rutinas.map(r=>(
-              <div key={r.id} style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,opacity:isReadOnly?0.75:1}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div><span style={{fontWeight:600}}>{r.nombre}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
-                  {!isReadOnly && (
-                    <div style={{display:"flex",gap:6}}>
-                      <Btn small outline color={C.accentDark} onClick={()=>openEditRutina(r)}>Editar</Btn>
-                      <Btn small danger onClick={()=>deleteRutina(r)}>Borrar</Btn>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
+              <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
+                {rutinas.map(r=>(
+                  <SortableItem key={r.id} id={r.id}>
+                    {({ dragHandle, isDragging }) => (
+                      <div style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,opacity:isReadOnly?0.75:1}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            {!isReadOnly && dragHandle}
+                            <div><span style={{fontWeight:600}}>{r.nombre}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
+                          </div>
+                          {!isReadOnly && (
+                            <div style={{display:"flex",gap:6}}>
+                              <Btn small outline color={C.accentDark} onClick={()=>openEditRutina(r)}>Editar</Btn>
+                              <Btn small danger onClick={()=>deleteRutina(r)}>Borrar</Btn>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </SortableItem>
+                ))}
+              </SortableContext>
+            </DndContext>
             {rutinas.length===0 && !isReadOnly && (
               <div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontSize:13}}>Sin rutinas en este ciclo. ¡Agrega la primera!</div>
             )}
@@ -468,25 +563,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <span style={{fontWeight:600,fontSize:14}}>Comidas</span>
             <Btn small outline color={C.accent} onClick={addComida}>+ Comida</Btn>
           </div>
-          {diaForm.comidas.map((c,i)=>(
-            <div key={i} style={{background:C.bg,borderRadius:10,border:`1px solid ${C.border}`,padding:12,marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                <span style={{fontSize:12,color:C.muted}}>Comida {i+1}</span>
-                <button onClick={()=>remComida(i)} style={{background:"none",color:"#f87171",fontSize:18,cursor:"pointer",border:"none"}}>×</button>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <Field label="Hora"><input value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am"/></Field>
-                <Field label="Nombre"><input value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno"/></Field>
-              </div>
-              <Field label="Opción 1"><textarea value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…"/></Field>
-              <Field label="Opción 2"><textarea value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…"/></Field>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
-                {[["calorias","Kcal"],["proteina","Prot g"],["carbohidratos","Carbs g"],["grasas","Grasas g"]].map(([f,lb])=>(
-                  <Field key={f} label={lb}><input type="number" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0"/></Field>
-                ))}
-              </div>
-            </div>
-          ))}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
+            <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
+              {diaForm.comidas.map((c,i)=>(
+                <SortableItem key={c._dndId} id={c._dndId}>
+                  {({ dragHandle, isDragging }) => (
+                    <div style={{background:C.bg,borderRadius:10,border:`1px solid ${C.border}`,padding:12,marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,alignItems:"center"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          {dragHandle}
+                          <span style={{fontSize:12,color:C.muted}}>Comida {i+1}</span>
+                        </div>
+                        <button onClick={()=>remComida(i)} style={{background:"none",color:"#f87171",fontSize:18,cursor:"pointer",border:"none"}}>×</button>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <Field label="Hora"><input value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am"/></Field>
+                        <Field label="Nombre"><input value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno"/></Field>
+                      </div>
+                      <Field label="Opción 1"><textarea value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…"/></Field>
+                      <Field label="Opción 2"><textarea value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…"/></Field>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
+                        {[["calorias","Kcal"],["proteina","Prot g"],["carbohidratos","Carbs g"],["grasas","Grasas g"]].map(([f,lb])=>(
+                          <Field key={f} label={lb}><input type="number" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0"/></Field>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </SortableItem>
+              ))}
+            </SortableContext>
+          </DndContext>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
             <Btn outline color={C.muted} onClick={()=>setShowDiaModal(false)}>Cancelar</Btn>
             <Btn grad onClick={saveDia} disabled={saving}>{saving?"Guardando…":"Guardar día"}</Btn>
@@ -511,21 +617,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:"center"}}>REPS</span>
                 <span/>
               </div>
-              {rutinaForm.ejercicios.map((e,i)=>(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:8,alignItems:"center"}}>
-                  <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                    <button onClick={()=>moveEj(i,-1)} disabled={i===0} style={{background:"transparent",border:"none",color:i===0?"transparent":C.accent,cursor:i===0?"default":"pointer",fontSize:14,padding:0,lineHeight:1}}>▲</button>
-                    <button onClick={()=>moveEj(i,1)} disabled={i===rutinaForm.ejercicios.length-1} style={{background:"transparent",border:"none",color:i===rutinaForm.ejercicios.length-1?"transparent":C.accent,cursor:i===rutinaForm.ejercicios.length-1?"default":"pointer",fontSize:14,padding:0,lineHeight:1}}>▼</button>
-                  </div>
-                  <div style={{width:36,height:36,borderRadius:6,overflow:"hidden",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {e.gif_url?<img src={e.gif_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:18}}>🏋️</span>}
-                  </div>
-                  <div style={{fontSize:13,fontWeight:500}}>{e.nombre}<br/><span style={{fontSize:10,color:C.muted}}>{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
-                  <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{textAlign:"center"}}/>
-                  <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{textAlign:"center"}}/>
-                  <button onClick={()=>remEj(i)} style={{background:"#ef444430",color:"#ef4444",borderRadius:6,padding:6,cursor:"pointer",fontSize:14,border:"none"}}>×</button>
-                </div>
-              ))}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
+                <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
+                  {rutinaForm.ejercicios.map((e,i)=>(
+                    <SortableItem key={e._dndId} id={e._dndId}>
+                      {({ dragHandle, isDragging }) => (
+                        <div style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:8,alignItems:"center",background:isDragging?C.card:"transparent",borderRadius:isDragging?8:0}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {dragHandle}
+                          </div>
+                          <div style={{width:36,height:36,borderRadius:6,overflow:"hidden",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {e.gif_url?<img src={e.gif_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:18}}>🏋️</span>}
+                          </div>
+                          <div style={{fontSize:13,fontWeight:500}}>{e.nombre}<br/><span style={{fontSize:10,color:C.muted}}>{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
+                          <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{textAlign:"center"}}/>
+                          <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{textAlign:"center"}}/>
+                          <button onClick={()=>remEj(i)} style={{background:"#ef444430",color:"#ef4444",borderRadius:6,padding:6,cursor:"pointer",fontSize:14,border:"none"}}>×</button>
+                        </div>
+                      )}
+                    </SortableItem>
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
           )}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:"auto",paddingTop:16}}>
