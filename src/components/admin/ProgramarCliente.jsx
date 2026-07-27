@@ -54,24 +54,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre || "Desconocido";
 
   const loadHistorial = useCallback(async () => {
-    if (!clientes || clientes.length === 0) return;
     try {
-      const ids = clientes.map(c => c.id).join(",");
-      const hr = await dbGet(`rutinas?cliente_id=in.(${ids})&order=created_at.desc&limit=50`);
+      const hr = await dbGet(`rutinas?order=created_at.desc&limit=50`);
       setHistorialRutinas(hr);
       
-      const hn = await dbGet(`nutricion?cliente_id=in.(${ids})`);
-      if (hn.length > 0) {
-        const nids = hn.map(n => n.id).join(",");
-        const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})&order=created_at.desc&limit=50`);
-        const hdMapped = hd.map(d => {
-          const nut = hn.find(n => n.id === d.nutricion_id);
-          return { ...d, cliente_id: nut?.cliente_id };
-        });
-        setHistorialDias(hdMapped);
-      }
+      const hd = await dbGet(`nutricion_dias?order=created_at.desc&limit=50`);
+      // Para obtener el cliente de un día, necesitamos su nutricion
+      const hn = await dbGet(`nutricion`); 
+      const hdMapped = hd.map(d => {
+        const nut = hn.find(n => n.id === d.nutricion_id);
+        return { ...d, cliente_id: nut?.cliente_id };
+      });
+      setHistorialDias(hdMapped);
     } catch(e) { console.error("Error loading history", e); }
-  }, [clientes]);
+  }, []);
 
   useEffect(() => { loadHistorial(); }, [loadHistorial]);
 
