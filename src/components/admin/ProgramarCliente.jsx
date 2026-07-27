@@ -540,24 +540,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
       </>}
 
-      {/* ── Modal Nuevo Ciclo ── */}
-      {showNuevoCiclo&&(
-        <Modal title="📅 Nuevo Ciclo / Período" onClose={()=>setShowNuevoCiclo(false)}>
-          <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.6,background:`color-mix(in srgb,${C.accentDeep} 20%,transparent)`,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px"}}>
-            Al crear un nuevo ciclo, el ciclo activo actual se archivará automáticamente como historial. Podrás consultarlo en cualquier momento.
-          </div>
-          <Field label="Nombre del ciclo">
-            <input value={nuevoCicloNombre} onChange={e=>setNuevoCicloNombre(e.target.value)} placeholder='Ej. "Mayo - Definición", "Mes 1", "Etapa Volumen"'/>
-          </Field>
-          <Field label="Fecha de inicio">
-            <input type="date" value={nuevoCicloFecha} onChange={e=>setNuevoCicloFecha(e.target.value)}/>
-          </Field>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
-            <Btn outline color={C.muted} onClick={()=>setShowNuevoCiclo(false)}>Cancelar</Btn>
-            <Btn grad onClick={crearCiclo} disabled={savingCiclo}>{savingCiclo?"Creando…":"Crear Ciclo"}</Btn>
-          </div>
-        </Modal>
-      )}
+
 
       {/* ── Modal Nuevo/Editar Día ── */}
       {showDiaModal&&(
