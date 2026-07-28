@@ -43,6 +43,13 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
 
+  // Si se limpia el cliente seleccionado en la pestaña de programar, regresar a la lista
+  useEffect(() => {
+    if (tab === "programar" && !selected) {
+      setTab("clientes");
+    }
+  }, [tab, selected]);
+
   // Cargar mapa id→nombre de nutriólogos (solo superadmin)
   useEffect(() => {
     if (!isSuperadmin) return;
@@ -133,7 +140,6 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
     : [
         ["clientes","👥","Clientes"],
         ["biblioteca","📚","Biblioteca"],
-        ["programar","📋","Programar"],
         ["agenda","📅","Agenda"],
         ["equipo","🗂️","Mi Equipo"],
         ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
