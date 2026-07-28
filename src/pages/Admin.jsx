@@ -169,7 +169,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
               }}
               onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.20)";}}
               onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.10)";}}
-            >💪 Modo Atleta</button>
+            >Modo Atleta</button>
           )
         }
       />
@@ -240,7 +240,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
                   <input
                     value={searchClientes}
                     onChange={e=>setSearchClientes(e.target.value)}
-                    placeholder="🔍 Buscar cliente…"
+                    placeholder="Buscar cliente…"
                     style={{
                       background:"rgba(7,16,29,0.7)",
                       border:"1px solid rgba(46,92,184,0.18)",

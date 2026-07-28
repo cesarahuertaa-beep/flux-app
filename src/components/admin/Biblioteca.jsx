@@ -76,7 +76,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         </div>
         {isSuperadmin && (
           <Btn grad onClick={openNew} style={{ padding:"10px 20px" }}>
-            + Nuevo ejercicio
+            Nuevo ejercicio
           </Btn>
         )}
       </div>
@@ -92,7 +92,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         <input
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
-          placeholder="🔍 Buscar ejercicio…"
+          placeholder="Buscar ejercicio…"
           style={{
             flex:1, minWidth:160, maxWidth:220,
             background:"rgba(3,5,10,0.7)",

@@ -137,17 +137,17 @@ export function AgendaAdmin({ setMsg, profileId }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 24, color: C.text, letterSpacing: "0.5px" }}>
-            📅 Agenda
+            Agenda
           </h2>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
             {pendientesCount > 0
-              ? <span style={{ color: "#fbbf24", fontWeight: 700 }}>⚡ {pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
+              ? <span style={{ color: "#fbbf24", fontWeight: 700 }}>{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
               : "Todo al día"}
           </div>
         </div>
         {/* Sub-tabs */}
         <div style={{ display: "flex", gap: 6 }}>
-          {[["citas", "📋 Citas"], ["horarios", "🕐 Horarios"]].map(([k, lb]) => (
+          {[["citas", "Citas"], ["horarios", "Horarios"]].map(([k, lb]) => (
             <button key={k} onClick={() => setSubTab(k)} style={{
               padding: "7px 16px", borderRadius: 9, fontSize: 12, fontWeight: 700,
               fontFamily: "'Inter',sans-serif", cursor: "pointer", transition: "all 0.2s",
@@ -187,7 +187,6 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
           {citasFiltradas.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-              <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>📅</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>Sin citas {filtro !== "todos" ? `en estado "${filtro}"` : ""}</div>
             </div>
           ) : (
@@ -267,15 +266,14 @@ export function AgendaAdmin({ setMsg, profileId }) {
             <div style={{ fontSize: 13, color: C.muted }}>
               Define los días y horas en que los clientes pueden solicitar una cita.
             </div>
-            <Btn small grad onClick={() => setShowHorario(true)}>+ Agregar horario</Btn>
+            <Btn small grad onClick={() => setShowHorario(true)}>Agregar horario</Btn>
           </div>
 
           {disponibilidad.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-              <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>🕐</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.muted, marginBottom: 8 }}>Sin horarios configurados</div>
               <div style={{ fontSize: 13, marginBottom: 20 }}>Agrega tu disponibilidad para que los clientes puedan solicitar citas</div>
-              <Btn small grad onClick={() => setShowHorario(true)}>+ Agregar primer horario</Btn>
+              <Btn small grad onClick={() => setShowHorario(true)}>Agregar primer horario</Btn>
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
@@ -304,7 +302,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
       {/* Modal Rechazar */}
       {modalRechazo && (
-        <Modal title="❌ Rechazar cita" onClose={() => setModalRechazo(null)}>
+        <Modal title="Rechazar cita" onClose={() => setModalRechazo(null)}>
           <div style={{ fontSize: 14, color: C.muted, marginBottom: 16, lineHeight: 1.6 }}>
             Rechazando la cita de <strong style={{ color: C.text }}>{clienteNombre(modalRechazo.cliente_id)}</strong> el{" "}
             <strong style={{ color: C.text }}>{fmtFechaHora(modalRechazo.fecha_hora)}</strong>.
@@ -330,7 +328,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
       {/* Modal Agregar Horario */}
       {showHorario && (
-        <Modal title="🕐 Agregar horario de disponibilidad" onClose={() => setShowHorario(false)}>
+        <Modal title="Agregar horario de disponibilidad" onClose={() => setShowHorario(false)}>
           <Field label="Día de la semana">
             <select value={horarioForm.dia_semana} onChange={e => setHorarioForm(p => ({ ...p, dia_semana: +e.target.value }))}>
               {DIAS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}

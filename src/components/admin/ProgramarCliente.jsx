@@ -433,7 +433,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Selector de Ciclos ── */}
       <div style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <span style={{fontSize:13,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>📅 Ciclos / Períodos</span>
+          <span style={{fontSize:13,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Ciclos / Períodos</span>
         </div>
 
         {ciclos.length === 0 ? (
@@ -462,7 +462,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     transition:"all 0.2s", whiteSpace:"nowrap", fontFamily:"'Inter',sans-serif"
                   }}
                 >
-                  {c.activo ? "🟢 " : "🗂️ "}{c.nombre}
+                  {c.nombre}
                   {c.fecha_inicio && <span style={{fontSize:10,opacity:0.7,marginLeft:6}}>{fmtFecha(c.fecha_inicio)}</span>}
                 </button>
                 {/* Botón de borrar — solo visible al seleccionar ese ciclo */}
@@ -522,7 +522,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <div style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:14,opacity:isReadOnly?0.75:1}}>
               <div style={{fontWeight:600,marginBottom:14,color:C.accent}}>Macros diarios</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                {[["calorias","🔥 Calorías (kcal)"],["proteina","🥩 Proteína (g)"],["carbohidratos","🍚 Carbohidratos (g)"],["grasas","🫒 Grasas (g)"]].map(([k,lb])=>(
+                {[["calorias","Calorías (kcal)"],["proteina","Proteína (g)"],["carbohidratos","Carbohidratos (g)"],["grasas","Grasas (g)"]].map(([k,lb])=>(
                   <Field key={k} label={lb}><input type="number" value={macros[k]} onChange={e=>setMacros(p=>({...p,[k]:e.target.value}))} placeholder="0" disabled={isReadOnly}/></Field>
                 ))}
               </div>
