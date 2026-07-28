@@ -75,6 +75,12 @@ input:focus, select:focus, textarea:focus {
     0 0 24px rgba(46,92,184,0.10),
     inset 0 1px 0 rgba(46,92,184,0.06);
 }
+input[type="radio"], input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--brand-accent, #2e5cb8);
+}
 input::placeholder { color: ${C.muted}; }
 select option { background: ${C.card}; }
 textarea { resize: vertical; min-height: 80px; }
