@@ -617,14 +617,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   </select>
                 </div>
               )}
-              <div style={{display:"flex",gap:16,marginBottom:diaForm.crear_ciclo?12:0}}>
-                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
-                  <input type="radio" checked={!diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:false}))}/>
-                  Usar ciclo actual {cicloSel ? `(${cicloSel.nombre})` : ""}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:diaForm.crear_ciclo?12:0}}>
+                <label style={{
+                  display:"flex",alignItems:"center",gap:10,fontSize:13,cursor:"pointer",
+                  background: !diaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
+                  border: `1px solid ${!diaForm.crear_ciclo ? C.accent : C.border}`,
+                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
+                }}>
+                  <input type="radio" checked={!diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:false}))} style={{accentColor: C.accent}}/>
+                  <div style={{lineHeight:1.3}}>
+                    <div>Usar ciclo actual</div>
+                    <div style={{opacity:0.6,fontSize:11,marginTop:2}}>{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
+                  </div>
                 </label>
-                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
-                  <input type="radio" checked={diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:true}))}/>
-                  Crear nuevo ciclo
+                
+                <label style={{
+                  display:"flex",alignItems:"center",gap:10,fontSize:13,cursor:"pointer",
+                  background: diaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
+                  border: `1px solid ${diaForm.crear_ciclo ? C.accent : C.border}`,
+                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
+                }}>
+                  <input type="radio" checked={diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:true}))} style={{accentColor: C.accent}}/>
+                  <div style={{lineHeight:1.3}}>
+                    <div>Crear nuevo</div>
+                    <div style={{opacity:0.6,fontSize:11,marginTop:2}}>Ciclo / Período</div>
+                  </div>
                 </label>
               </div>
               {diaForm.crear_ciclo && (
@@ -693,14 +710,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   </select>
                 </div>
               )}
-              <div style={{display:"flex",gap:16,marginBottom:rutinaForm.crear_ciclo?12:0}}>
-                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
-                  <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:false}))}/>
-                  Usar ciclo actual {cicloSel ? `(${cicloSel.nombre})` : ""}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:rutinaForm.crear_ciclo?12:0}}>
+                <label style={{
+                  display:"flex",alignItems:"center",gap:10,fontSize:13,cursor:"pointer",
+                  background: !rutinaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
+                  border: `1px solid ${!rutinaForm.crear_ciclo ? C.accent : C.border}`,
+                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
+                }}>
+                  <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:false}))} style={{accentColor: C.accent}}/>
+                  <div style={{lineHeight:1.3}}>
+                    <div>Usar ciclo actual</div>
+                    <div style={{opacity:0.6,fontSize:11,marginTop:2}}>{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
+                  </div>
                 </label>
-                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
-                  <input type="radio" checked={rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:true}))}/>
-                  Crear nuevo ciclo
+                
+                <label style={{
+                  display:"flex",alignItems:"center",gap:10,fontSize:13,cursor:"pointer",
+                  background: rutinaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
+                  border: `1px solid ${rutinaForm.crear_ciclo ? C.accent : C.border}`,
+                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
+                }}>
+                  <input type="radio" checked={rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:true}))} style={{accentColor: C.accent}}/>
+                  <div style={{lineHeight:1.3}}>
+                    <div>Crear nuevo</div>
+                    <div style={{opacity:0.6,fontSize:11,marginTop:2}}>Ciclo / Período</div>
+                  </div>
                 </label>
               </div>
               {rutinaForm.crear_ciclo && (
