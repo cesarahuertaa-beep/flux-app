@@ -46,6 +46,8 @@ const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { y
 export function ProgresoCliente({ selected, setMsg }) {
   const [metricas,     setMetricas]     = useState([]);
   const [rutinas,      setRutinas]      = useState([]);
+  const [ciclos,       setCiclos]       = useState([]);
+  const [cicloSel,     setCicloSel]     = useState(null); // ciclo activo por defecto
   const [progreso,     setProgreso]     = useState({});
   const [loading,      setLoading]      = useState(false);
   const [saving,       setSaving]       = useState(false);
@@ -65,7 +67,16 @@ export function ProgresoCliente({ selected, setMsg }) {
     try {
       const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`);
       setMetricas(ms);
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&order=orden.asc`);
+
+      // Load cycles and select the active one by default
+      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=fecha_inicio.desc`);
+      setCiclos(cs);
+      const activeCiclo = cs.find(c => c.activo) || cs[0] || null;
+      setCicloSel(prev => prev ?? activeCiclo); // Only set on first load
+
+      // Load routines of the active cycle only
+      const cicloFiltro = activeCiclo ? `ciclo_id=eq.${activeCiclo.id}` : `ciclo_id=is.null`;
+      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&order=orden.asc`);
       const rsFull = await Promise.all(rs.map(async r => ({
         ...r, ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`)
       })));
@@ -76,12 +87,38 @@ export function ProgresoCliente({ selected, setMsg }) {
         const pm = {};
         ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
         setProgreso(pm);
+      } else {
+        setProgreso({});
       }
     } catch(e) { setMsg("❌ " + e.message); }
     setLoading(false);
   }, [selected]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load routines for any selected cycle (used when the user clicks a cycle pill)
+  const loadRutinas = useCallback(async (ciclo) => {
+    if (!selected || !ciclo) return;
+    setLoading(true);
+    try {
+      const filtro = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
+      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${filtro}&order=orden.asc`);
+      const rsFull = await Promise.all(rs.map(async r => ({
+        ...r, ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`)
+      })));
+      setRutinas(rsFull);
+      const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
+      if (allIds.length) {
+        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})`);
+        const pm = {};
+        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
+        setProgreso(pm);
+      } else {
+        setProgreso({});
+      }
+    } catch(e) { setMsg("❌ " + e.message); }
+    setLoading(false);
+  }, [selected]);
 
   const updForm = (key, val) => {
     setForm(p => {
@@ -295,6 +332,26 @@ export function ProgresoCliente({ selected, setMsg }) {
       {/* ── RUTINAS DEL CLIENTE ── */}
       {sub==="rutinas"&&(
         <div>
+          {/* Cycle selector */}
+          {ciclos.length > 0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:8}}>Ciclo</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {ciclos.map(c => (
+                  <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} style={{
+                    padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
+                    transition:"all 0.2s",border:"1px solid",
+                    background: cicloSel?.id===c.id ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)") : "transparent",
+                    color: cicloSel?.id===c.id ? (c.activo ? "#000" : C.text) : C.muted,
+                    borderColor: cicloSel?.id===c.id ? (c.activo ? C.accent : "#64748b") : C.border,
+                  }}>
+                    {c.nombre}
+                    {c.activo && <span style={{marginLeft:5,display:"inline-block",width:6,height:6,borderRadius:"50%",background:"#4ade80",verticalAlign:"middle"}}/>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {rutinas.length===0?(
             <div style={{textAlign:"center",padding:"60px 0",color:C.muted}}>
               <div style={{fontSize:48,marginBottom:12}}>🏋️</div>
