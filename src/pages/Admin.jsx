@@ -7,6 +7,7 @@ import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
+import { TimerWidget } from "../components/TimerWidget";
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
   const [tab, setTab]                       = useState("inicio");
@@ -438,6 +439,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
           </div>
         </Modal>
       )}
+      <TimerWidget />
     </div>
   );
 }
