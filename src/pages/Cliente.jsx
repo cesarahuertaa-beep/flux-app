@@ -7,6 +7,7 @@ import { enqueue, getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { CitasCliente } from "../components/CitasCliente";
 import { parseFotos, getSemanasConFecha } from "../utils/helpers";
+import { TimerWidget } from "../components/TimerWidget";
 
 /**
  * Guarda en Supabase si hay internet, o encola en IndexedDB si no hay.
@@ -827,6 +828,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         </div>
       ) : null}
 
+      <TimerWidget />
     </div>
   );
 }
