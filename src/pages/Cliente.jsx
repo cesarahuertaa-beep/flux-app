@@ -828,7 +828,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode=false, onB
         </div>
       ) : null}
 
-      <TimerWidget />
+      {tab === "deporte" && <TimerWidget />}
     </div>
   );
 }
