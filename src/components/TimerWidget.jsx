@@ -43,7 +43,12 @@ const playBeep = () => {
 function DrumCol({ label, value, max, onChange }) {
   const prev = (value - 1 + max) % max;
   const next = (value + 1) % max;
+  
   const startY = useRef(null);
+  const startVal = useRef(null);
+  
+  const [editing, setEditing] = useState(false);
+  const [tempVal, setTempVal] = useState("");
 
   const handleWheel = (e) => {
     e.preventDefault();
@@ -51,12 +56,38 @@ function DrumCol({ label, value, max, onChange }) {
     else onChange((value - 1 + max) % max);
   };
 
-  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
-  const handleTouchEnd = (e) => {
-    if (startY.current === null) return;
-    const dy = startY.current - e.changedTouches[0].clientY;
-    if (Math.abs(dy) > 12) { dy > 0 ? onChange((value + 1) % max) : onChange((value - 1 + max) % max); }
+  const handleTouchStart = (e) => { 
+    startY.current = e.touches[0].clientY; 
+    startVal.current = value;
+  };
+  
+  const handleTouchMove = (e) => {
+    if (startY.current === null || startVal.current === null) return;
+    const dy = startY.current - e.touches[0].clientY;
+    // 25px per tick for fluid scroll
+    const ticks = Math.floor(dy / 25);
+    let newVal = (startVal.current + ticks) % max;
+    if (newVal < 0) newVal = (newVal + max) % max;
+    if (newVal !== value) onChange(newVal);
+  };
+
+  const handleTouchEnd = () => {
     startY.current = null;
+    startVal.current = null;
+  };
+
+  const handleBlur = () => {
+    setEditing(false);
+    const parsed = parseInt(tempVal, 10);
+    if (!isNaN(parsed)) {
+      let v = parsed % max;
+      if (v < 0) v = (v + max) % max;
+      onChange(v);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleBlur();
   };
 
   const accent = "var(--brand-accent, #2e5cb8)";
@@ -81,6 +112,7 @@ function DrumCol({ label, value, max, onChange }) {
         ref={colRef}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "ns-resize", userSelect: "none", touchAction: "none" }}
       >
@@ -91,12 +123,33 @@ function DrumCol({ label, value, max, onChange }) {
         >{pad(prev)}</div>
 
         {/* Current — highlighted */}
-        <div style={{
-          fontSize: 42, fontWeight: 800, color: "#fff",
-          fontFamily: "'Rajdhani',monospace", lineHeight: 1,
-          textShadow: `0 0 18px ${accent}88`,
-          transition: "all 0.15s",
-        }}>{pad(value)}</div>
+        {editing ? (
+          <input
+            autoFocus
+            type="number"
+            value={tempVal}
+            onChange={(e) => setTempVal(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: 50, fontSize: 36, fontWeight: 800, textAlign: "center",
+              background: "transparent", border: "none", color: "#fff",
+              fontFamily: "'Rajdhani',monospace", outline: "none",
+              borderBottom: `2px solid ${accent}`, padding: 0, margin: "3px 0",
+              appearance: "textfield"
+            }}
+          />
+        ) : (
+          <div 
+            onClick={() => { setEditing(true); setTempVal(String(value)); }}
+            style={{
+              fontSize: 42, fontWeight: 800, color: "#fff",
+              fontFamily: "'Rajdhani',monospace", lineHeight: 1,
+              textShadow: `0 0 18px ${accent}88`,
+              transition: "all 0.15s", cursor: "text"
+            }}
+          >{pad(value)}</div>
+        )}
 
         {/* Next — tap to go forward */}
         <div
