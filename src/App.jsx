@@ -7,6 +7,13 @@ import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
 import InstallPrompt from "./components/InstallPrompt";
+import { useRegisterSW } from "virtual:pwa-register/react";
+
+// Auto-reload when a new SW version is waiting
+function usePWAAutoUpdate() {
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+  useEffect(() => { if (needRefresh) updateServiceWorker(true); }, [needRefresh]);
+}
 
 // Helpers para persistir el tipo de sesión
 const saveSessionMeta = (role, clientId = null) => {
@@ -20,6 +27,7 @@ const clearSessionMeta = () => {
 };
 
 export default function App() {
+  usePWAAutoUpdate();
   const [session,    setSession]    = useState(null);
   const [atletaData, setAtletaData] = useState(null);
   const [restoring,  setRestoring]  = useState(true);
