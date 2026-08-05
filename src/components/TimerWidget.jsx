@@ -61,16 +61,28 @@ function DrumCol({ label, value, max, onChange }) {
 
   const accent = "var(--brand-accent, #2e5cb8)";
 
+  const colRef = useRef(null);
+
+  // Prevent page scroll when touching the drum column
+  useEffect(() => {
+    const el = colRef.current;
+    if (!el) return;
+    const stop = (e) => e.preventDefault();
+    el.addEventListener("touchmove", stop, { passive: false });
+    return () => el.removeEventListener("touchmove", stop);
+  }, []);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
       <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6 }}>
         {label}
       </div>
       <div
+        ref={colRef}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "ns-resize", userSelect: "none" }}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "ns-resize", userSelect: "none", touchAction: "none" }}
       >
         {/* Prev — tap to go back */}
         <div
@@ -254,10 +266,10 @@ export function TimerWidget() {
             )}
           </div>
 
-          {/* ── Drum Picker (SET mode) ── */}
-          {mode === "set" && (
+          {/* ── Drum Picker (SET mode, hidden when adding pill) ── */}
+          {mode === "set" && !addingPill && (
             <div style={{ position: "relative", marginBottom: 16 }}>
-              {/* Highlight band behind center */}
+              {/* Highlight band behind center row */}
               <div style={{
                 position: "absolute", left: 0, right: 0,
                 top: "50%", transform: "translateY(-50%)",
@@ -266,15 +278,6 @@ export function TimerWidget() {
                 border: `1px solid ${accent}22`,
                 pointerEvents: "none",
               }}/>
-              {/* Separator dots */}
-              <div style={{
-                position: "absolute", left: "50%", top: "50%",
-                transform: "translate(-50%,-50%)",
-                display: "flex", flexDirection: "column", gap: 6, pointerEvents: "none", zIndex: 2,
-              }}>
-                <span style={{ fontSize: 28, fontWeight: 900, color: `${accent}88`, lineHeight: 0.6, fontFamily: "'Rajdhani',monospace" }}>:</span>
-                <span style={{ fontSize: 28, fontWeight: 900, color: `${accent}88`, lineHeight: 0.6, fontFamily: "'Rajdhani',monospace" }}>:</span>
-              </div>
               <div style={{ display: "flex", gap: 0, padding: "8px 0", position: "relative", zIndex: 1 }}>
                 <DrumCol label="Horas"    value={hours} max={24} onChange={setHours}/>
                 <DrumCol label="Minutos"  value={mins}  max={60} onChange={setMins}/>
