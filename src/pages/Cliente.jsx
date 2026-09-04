@@ -7,7 +7,7 @@ import { CitasCliente } from "../components/CitasCliente";
 import Nutrition from "../components/cliente/Nutrition";
 import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
-import { BarChart2, UtensilsCrossed, Dumbbell, CalendarDays, Camera } from "lucide-react";
+import { BarChart2, UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin, Search } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -96,7 +96,12 @@ export default function ClienteView({ session, onLogout }) {
     }
   };
 
-  const SIDEBAR_ITEMS = [
+  const isLibre = !cliente.nutriologo_id;
+  const SIDEBAR_ITEMS = isLibre ? [
+    { id: "inicio", label: "Inicio", icon: <BarChart2 size={18} strokeWidth={1.5} /> },
+    { id: "tienda", label: "Tienda Oficial", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+    { id: "directorio", label: "Especialistas", icon: <MapPin size={18} strokeWidth={1.5} /> },
+  ] : [
     { id: "inicio",   label: "Inicio",          icon: <BarChart2 size={18} strokeWidth={1.5} /> },
     { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
@@ -126,24 +131,58 @@ export default function ClienteView({ session, onLogout }) {
       ) : (
         <>
           {tab === "inicio" && (
-            <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
-              <img src={brand?.logo_url || "/logo.png"} alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
-              <h2 className="text-2xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Hola, {cliente.nombre.split(" ")[0]}
-              </h2>
-              <p className="text-sm text-[#6B7A8D]">Selecciona una opción en el menú para comenzar.</p>
+            <div className="flex flex-col items-center justify-center h-full text-center p-6">
+              {isLibre ? (
+                <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-[#E2E8F0] max-w-2xl w-full">
+                  <div className="w-16 h-16 bg-blue-50 text-[var(--brand-primary)] rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <MapPin size={32} />
+                  </div>
+                  <h2 className="text-3xl font-extrabold text-[#0B1929] mb-4 font-['Space_Grotesk',sans-serif]">
+                    ¡Bienvenido a Flux, {cliente.nombre.split(" ")[0]}!
+                  </h2>
+                  <p className="text-[#6B7A8D] mb-8 text-lg">
+                    Aún no tienes un plan clínico asignado. Explora nuestra tienda o lleva tus resultados al siguiente nivel contratando a un especialista.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onClick={() => setTab("directorio")} className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-8 py-3.5 rounded-2xl text-[15px] font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
+                      <Search size={18} /> Ver Directorio Médico
+                    </button>
+                    <button onClick={() => setTab("tienda")} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-8 py-3.5 rounded-2xl text-[15px] font-bold transition-all flex items-center justify-center gap-2">
+                      <ShoppingBag size={18} /> Ir a la Tienda
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="opacity-60">
+                  <img src={brand?.logo_url || "/logo.png"} alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
+                  <h2 className="text-2xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    Hola, {cliente.nombre.split(" ")[0]}
+                  </h2>
+                  <p className="text-sm text-[#6B7A8D]">Selecciona una opción en el menú para comenzar.</p>
+                </div>
+              )}
             </div>
           )}
 
-          {tab === "nutricion" && (
-            <Nutrition 
-              dias={dias} 
-              cliente={cliente}
-              nutri={nutri}
-            />
+          {tab === "tienda" && (
+            <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
+              <ShoppingBag size={48} className="mb-4 opacity-50" />
+              <p>Módulo de E-Commerce en construcción...</p>
+            </div>
           )}
 
-          {tab === "deporte" && (
+          {tab === "directorio" && (
+            <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
+              <MapPin size={48} className="mb-4 opacity-50" />
+              <p>Módulo de Directorio Médico en construcción...</p>
+            </div>
+          )}
+
+          {tab === "nutricion" && !isLibre && (
+            <Nutrition dias={dias} cliente={cliente} nutri={nutri} />
+          )}
+
+          {tab === "deporte" && !isLibre && (
             <Training 
               rutinas={rutinas} 
               progreso={progreso}
@@ -155,11 +194,11 @@ export default function ClienteView({ session, onLogout }) {
             />
           )}
 
-          {tab === "progreso" && (
+          {tab === "progreso" && !isLibre && (
             <Progreso cliente={cliente} />
           )}
 
-          {tab === "citas" && (
+          {tab === "citas" && !isLibre && (
             <CitasCliente cliente={cliente} />
           )}
         </>

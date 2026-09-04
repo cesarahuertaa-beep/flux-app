@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
 import { dbUpsert } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
@@ -67,7 +69,7 @@ export default function App() {
             clearSessionMeta();
           }
         } catch {
-          // Token expirado u otro error — limpiar todo
+          // Token expirado u otro error -> limpiar todo
           setAuthToken(null); setProfileId(null); clearSessionMeta();
         }
       }
@@ -85,7 +87,6 @@ export default function App() {
     // Sincronizar cola offline silenciosamente cuando vuelva la conexión
     const handleOnline = () => syncQueue(dbUpsert);
     window.addEventListener('online', handleOnline);
-    // También intentar al montar (por si había cola de una sesión anterior)
     syncQueue(dbUpsert);
 
     return () => window.removeEventListener('online', handleOnline);
@@ -114,16 +115,7 @@ export default function App() {
   const handleModoAtleta  = (clienteRecord) => setAtletaData(clienteRecord);
   const handleBackToAdmin = () => setAtletaData(null);
 
-  const renderView = () => {
-    if (restoring) {
-      return (
-        <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
-          <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
-        </div>
-      );
-    }
-    if (!session) return <Login onLogin={handleLogin}/>;
-    // Modo Atleta: nutriólogo temporalmente en vista de cliente
+  const MainApp = () => {
     if (atletaData) return (
       <ClienteView
         session={{ role:"client", data:atletaData, token:session.token }}
@@ -139,7 +131,34 @@ export default function App() {
 
   return (
     <BrandProvider session={session}>
-      {renderView()}
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing session={session} />} />
+          <Route path="/login" element={
+            restoring ? (
+              <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
+              </div>
+            ) : session ? (
+              <Navigate to="/app" replace />
+            ) : (
+              <Login onLogin={handleLogin} />
+            )
+          } />
+          <Route path="/app/*" element={
+            restoring ? (
+              <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
+              </div>
+            ) : !session ? (
+              <Navigate to="/login" replace />
+            ) : (
+              <MainApp />
+            )
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
       <InstallPrompt />
     </BrandProvider>
   );

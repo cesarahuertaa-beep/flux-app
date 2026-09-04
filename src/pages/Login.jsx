@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Mail, Lock, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
+import { Mail, Lock, ArrowRight, CheckCircle, AlertCircle, User } from "lucide-react";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost } from "../lib/supabase";
 
 export default function Login({ onLogin }) {
   const [mode, setMode]           = useState("login");
+  const [nombre, setNombre]       = useState("");
   const [email, setEmail]         = useState("");
   const [pass, setPass]           = useState("");
   const [newPass, setNewPass]     = useState("");
@@ -70,6 +71,37 @@ export default function Login({ onLogin }) {
     } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
+  const signUpSubmit = async () => {
+    if (!nombre.trim() || !email.trim() || !pass) {
+      setErr("Por favor llena todos los campos");
+      return;
+    }
+    if (pass.length < 6) {
+      setErr("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setLoading(true); setErr(""); setInfo("");
+    try {
+      const data = await authSignUp(email.trim(), pass, nombre);
+      if (!data.user) {
+        throw new Error("No se pudo crear el usuario en Auth.");
+      }
+      
+      await dbPost("clientes", { 
+        nombre: nombre.trim(), 
+        email: email.trim(), 
+        auth_id: data.user.id, 
+        activo: true, 
+        nutriologo_id: null 
+      });
+
+      await submit();
+    } catch(e) {
+      setErr(e.message);
+      setLoading(false);
+    }
+  };
+
   const sendReset = async () => {
     if (!email) { setErr("Escribe tu email"); return; }
     setLoading(true); setErr("");
@@ -105,11 +137,27 @@ export default function Login({ onLogin }) {
       {/* ── Login Card ── */}
       <div className="animate-in w-full max-w-[420px] px-10 pt-11 pb-9 bg-white rounded-3xl border border-[#E2E8F0] shadow-2xl relative z-10 mx-4">
         
-        {/* Top Spacer */}
-        <div className={`text-center ${mode === "reset" || mode === "set_password" ? 'mb-6' : 'mb-3'}`}>
+        {/* Top Spacer / Toggle */}
+        <div className={`text-center ${mode === "reset" || mode === "set_password" ? 'mb-6' : 'mb-5'}`}>
           {(mode === "reset" || mode === "set_password") && (
             <div className="mt-3 text-[13px] text-[#6B7A8D] tracking-wide">
               {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
+            </div>
+          )}
+          {(mode === "login" || mode === "signup") && (
+            <div className="flex bg-[#F0F4FA] rounded-full p-1 mx-auto w-fit mt-2">
+              <button
+                onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
+                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode === "login" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+              >
+                Iniciar Sesión
+              </button>
+              <button
+                onClick={() => { setMode("signup"); setErr(""); setInfo(""); }}
+                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode === "signup" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+              >
+                Crear Cuenta
+              </button>
             </div>
           )}
         </div>
@@ -175,6 +223,62 @@ export default function Login({ onLogin }) {
               ¿Olvidaste tu contraseña?
             </button>
           </div>
+        </>}
+
+        {/* ── SIGNUP FORM ── */}
+        {mode === "signup" && <>
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nombre Completo</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <User size={18} />
+              </div>
+              <input
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && signUpSubmit()}
+                placeholder="Tu nombre"
+                type="text"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
+          </div>
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Email</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Mail size={18} />
+              </div>
+              <input
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && signUpSubmit()}
+                placeholder="tu@email.com"
+                type="email"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
+          </div>
+          <div className="mb-6">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Contraseña</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Lock size={18} />
+              </div>
+              <input
+                type="password"
+                value={pass}
+                onChange={e => setPass(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && signUpSubmit()}
+                placeholder="••••••••"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+            {loading ? "CREANDO…" : <>CREAR CUENTA <ArrowRight size={16} /></>}
+          </button>
         </>}
 
         {/* ── RESET FORM ── */}

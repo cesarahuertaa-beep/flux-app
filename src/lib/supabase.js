@@ -167,6 +167,21 @@ export const authSignIn = async (email, password) => {
   return d;
 };
 
+export const authSignUp = async (email, password, nombre) => {
+  const r = await fetch(`${SUPA_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, data: { nombre } })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.msg || d.error_description || "Error registrando cuenta");
+  
+  if (d.session) {
+    if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
+  }
+  return d;
+};
+
 // Invitar usuario — extraData: { role, nombre, nombre_marca, color_primario }
 export const authInvite = async (email, extraData={}) => {
   const r = await fetch(`${SUPA_URL}/functions/v1/invite-user`, {
