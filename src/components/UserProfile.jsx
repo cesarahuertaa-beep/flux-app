@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { dbUpsert } from "../lib/supabase";
-import { User, Mail, Save, AlertCircle, CheckCircle2 } from "lucide-react";
+import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut } from "lucide-react";
 
-export default function UserProfile({ session }) {
+export default function UserProfile({ session, onLogout }) {
   const user = session?.data || session; // Cliente o Admin
   
   const [nombre, setNombre] = useState(user?.nombre || "");
@@ -129,6 +129,15 @@ export default function UserProfile({ session }) {
           >
             {loading ? "Guardando..." : <><Save size={18} /> Guardar Cambios</>}
           </button>
+
+          {onLogout && (
+            <button 
+              onClick={onLogout}
+              className="w-full mt-2 py-3.5 rounded-xl font-bold text-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2 transition-all border border-red-100"
+            >
+              <LogOut size={18} /> Cerrar Sesión
+            </button>
+          )}
         </div>
 
       </div>

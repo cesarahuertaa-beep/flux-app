@@ -9,6 +9,7 @@ import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
+import UserProfile from "../components/UserProfile";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 

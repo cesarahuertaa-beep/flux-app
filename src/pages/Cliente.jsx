@@ -204,7 +204,7 @@ export default function ClienteView({ session, onLogout }) {
           )}
 
           {tab === "perfil" && (
-            <UserProfile session={session} />
+            <UserProfile session={session} onLogout={onLogout} />
           )}
         </>
       )}

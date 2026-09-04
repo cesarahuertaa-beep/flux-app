@@ -100,18 +100,8 @@ export function AppLayout({ children, nav, active, setActive, session, onLogout 
           })}
         </nav>
 
-        {/* Footer: cerrar sesión + colapsar */}
+        {/* Footer: colapsar */}
         <div className={`px-2 pb-5 pt-3 border-t border-[#E2E5EA] flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-red-500 hover:bg-red-50 transition-all text-xs font-medium w-full"
-            style={{ justifyContent: collapsed ? "center" : "flex-start" }}
-            title={collapsed ? "Cerrar Sesión" : undefined}
-          >
-            <span className="flex-shrink-0"><LogOut size={16} strokeWidth={1.5} /></span>
-            {!collapsed && <span>Cerrar Sesión</span>}
-          </button>
-
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#6B7A8D] hover:bg-white hover:text-[var(--brand-primary)] transition-all text-xs font-medium border border-transparent hover:border-[#E2E5EA] w-full mt-1"
@@ -185,16 +175,6 @@ export function AppLayout({ children, nav, active, setActive, session, onLogout 
             </React.Fragment>
           );
         })}
-
-        {/* Botón de cerrar sesión en la bottom bar (ícono pequeño al final) */}
-        <button
-          onClick={onLogout}
-          className="flex flex-col items-center justify-center gap-0.5 py-2.5 px-3 text-red-400"
-        >
-          <span className="block h-0.5 w-5 rounded-full mb-1 bg-transparent" />
-          <span className="text-base leading-none mb-0.5"><LogOut size={18} strokeWidth={1.5} /></span>
-          <span className="text-[10px] font-medium leading-none mt-0.5">Salir</span>
-        </button>
       </nav>
 
     </div>
