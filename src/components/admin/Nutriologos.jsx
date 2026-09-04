@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field, Tag } from "../ui";
 import { getNutriologos, updateProfile, authInvite, storageUpload } from "../../lib/supabase";
+import { Image, CheckCircle2, XCircle, AlertCircle, Search, User, MessageCircle, Pencil, X, Plus, Mail } from "lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -11,34 +10,79 @@ const uploadLogo = async (file) => {
   return await storageUpload("logos", fname, file);
 };
 
+const Btn = ({ children, onClick, disabled, small, outline, grad, className = "" }) => {
+  let baseClass = "inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ";
+  if (small) baseClass += "px-3 py-1.5 text-xs ";
+  else baseClass += "px-4 py-2 text-sm ";
+  
+  if (grad) baseClass += "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500 ";
+  else if (outline) baseClass += "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200 ";
+  else baseClass += "bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500 ";
+  
+  // Custom color overrides
+  if (outline && className.includes("text-red-500")) {
+    baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50", "text-red-600 hover:bg-red-50 border-red-200");
+  }
+  
+  return (
+    <button onClick={onClick} disabled={disabled} className={baseClass + className}>
+      {children}
+    </button>
+  );
+};
+
+const Modal = ({ title, onClose, children }) => (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">{title}</h3>
+        <button onClick={onClose} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+const Field = ({ label, hint, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-medium text-slate-700">{label}</label>
+    {children}
+    {hint && <span className="text-xs text-slate-500">{hint}</span>}
+  </div>
+);
+
+const InputClass = "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors";
+
 const LogoPicker = ({ value, onChange, uploading }) => {
   const ref = useRef();
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:4 }}>
+    <div className="flex items-center gap-4 mt-1">
       {/* Preview */}
       <div
         onClick={() => ref.current?.click()}
-        style={{
-          width:64, height:64, borderRadius:12, border:`2px dashed ${value ? "rgba(56,189,248,0.4)" : "rgba(56,189,248,0.2)"}`,
-          background:"rgba(10,20,40,0.6)", display:"flex", alignItems:"center", justifyContent:"center",
-          cursor:"pointer", overflow:"hidden", flexShrink:0, transition:"border-color 0.2s"
-        }}
+        className={`w-16 h-16 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer shrink-0 overflow-hidden transition-colors ${value ? 'border-blue-400 bg-slate-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300'}`}
         title="Haz clic para seleccionar imagen"
       >
         {value
-          ? <img src={value} alt="logo" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>
-          : <span style={{ fontSize:24, opacity:0.4 }}>🖼️</span>
+          ? <img src={value} alt="logo" className="w-full h-full object-contain" />
+          : <Image className="w-6 h-6 text-slate-300" />
         }
       </div>
       <div>
-        <input ref={ref} type="file" accept="image/*" style={{ display:"none" }} onChange={onChange}/>
-        <Btn small outline color={C.accent} onClick={() => ref.current?.click()} disabled={uploading}>
+        <input ref={ref} type="file" accept="image/*" className="hidden" onChange={onChange}/>
+        <Btn small outline onClick={() => ref.current?.click()} disabled={uploading}>
           {uploading ? "Subiendo…" : value ? "Cambiar logo" : "Subir logo"}
         </Btn>
         {value && (
-          <div style={{ fontSize:11, color:C.muted, marginTop:5 }}>Logo cargado ✓</div>
+          <div className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
+            <CheckCircle2 size={12} /> Logo cargado
+          </div>
         )}
-        <div style={{ fontSize:11, color:C.dim, marginTop:value ? 2 : 5 }}>PNG, JPG o SVG recomendado</div>
+        <div className="text-[11px] text-slate-400 mt-1">PNG, JPG o SVG recomendado</div>
       </div>
     </div>
   );
@@ -71,13 +115,13 @@ export function Nutriologos({ setMsg }) {
     try {
       const url = await uploadLogo(file);
       setter(p => ({ ...p, logo_url: url }));
-      setMsg("✅ Logo cargado");
-    } catch(err) { setMsg("❌ " + err.message); }
+      setMsg(<span className="flex items-center gap-2"><CheckCircle2 size={16}/> Logo cargado</span>);
+    } catch(err) { setMsg(<span className="flex items-center gap-2"><XCircle size={16}/> {err.message}</span>); }
     setUploadingLogo(false);
   };
 
   const invite = async () => {
-    if (!form.email || !form.nombre) { setMsg("⚠️ Nombre y email son obligatorios"); return; }
+    if (!form.email || !form.nombre) { setMsg(<span className="flex items-center gap-2"><AlertCircle size={16}/> Nombre y email son obligatorios</span>); return; }
     setSaving(true);
     try {
       await authInvite(form.email, {
@@ -88,11 +132,11 @@ export function Nutriologos({ setMsg }) {
         color_primario: form.color_primario,
         logo_url: form.logo_url || ""
       });
-      setMsg("✅ Invitación enviada — el nutriólogo recibirá un email para crear su contraseña");
+      setMsg(<span className="flex items-center gap-2"><CheckCircle2 size={16}/> Invitación enviada — el nutriólogo recibirá un email para crear su contraseña</span>);
       setShowInvite(false);
       setForm({ nombre:"", email:"", telefono:"", nombre_marca:"", color_primario:"#56CCF2", logo_url:"" });
       setTimeout(load, 2000);
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<span className="flex items-center gap-2"><XCircle size={16}/> {e.message}</span>); }
     setSaving(false);
   };
 
@@ -100,10 +144,10 @@ export function Nutriologos({ setMsg }) {
     setSaving(true);
     try {
       await updateProfile(showEdit.id, editForm);
-      setMsg("✅ Perfil actualizado");
+      setMsg(<span className="flex items-center gap-2"><CheckCircle2 size={16}/> Perfil actualizado</span>);
       setShowEdit(null);
       await load();
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<span className="flex items-center gap-2"><XCircle size={16}/> {e.message}</span>); }
     setSaving(false);
   };
 
@@ -111,38 +155,36 @@ export function Nutriologos({ setMsg }) {
     try {
       const newState = n.activo === false ? true : false;
       await updateProfile(n.id, { activo: newState });
-      setMsg(`✅ Nutriólogo ${newState ? "activado" : "suspendido"}`);
+      setMsg(<span className="flex items-center gap-2"><CheckCircle2 size={16}/> Nutriólogo {newState ? "activado" : "suspendido"}</span>);
       await load();
-    } catch(e) { setMsg("❌ Error: " + e.message); }
+    } catch(e) { setMsg(<span className="flex items-center gap-2"><XCircle size={16}/> Error: {e.message}</span>); }
   };
 
   return (
-    <div className="animate-in">
+    <div className="animate-in fade-in duration-300">
       {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontFamily:"'Rajdhani',sans-serif", fontWeight:700, fontSize:24, color:C.text, letterSpacing:"0.5px" }}>
+          <h2 className="font-sans font-bold text-2xl text-slate-800 tracking-wide">
             Nutriólogos
           </h2>
-          <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>
+          <div className="text-sm text-slate-500 mt-1">
             {nutriologos.length} registrado{nutriologos.length !== 1 ? "s" : ""}
           </div>
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          <input
-            value={searchNutris}
-            onChange={e=>setSearchNutris(e.target.value)}
-            placeholder="🔍 Buscar nutriólogo…"
-            style={{
-              background:"rgba(7,16,29,0.7)",
-              border:`1px solid ${C.border}`,
-              borderRadius:9, padding:"8px 14px",
-              color:C.text, fontSize:13,
-              fontFamily:"'Inter',sans-serif",
-              outline:"none", width:200
-            }}
-          />
-          <Btn grad onClick={() => setShowInvite(true)}>+ Invitar nutriólogo</Btn>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={searchNutris}
+              onChange={e=>setSearchNutris(e.target.value)}
+              placeholder="Buscar nutriólogo…"
+              className="bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors w-52"
+            />
+          </div>
+          <Btn grad onClick={() => setShowInvite(true)}>
+            <Plus size={16} className="mr-1.5" /> Invitar nutriólogo
+          </Btn>
         </div>
       </div>
 
@@ -154,98 +196,81 @@ export function Nutriologos({ setMsg }) {
         );
 
         if (loading) return (
-          <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
-            <div style={{ width:36, height:36, borderRadius:"50%", border:`3px solid ${C.border}`, borderTopColor:C.accent, animation:"rotateSlow 0.8s linear infinite", margin:"0 auto 14px" }}/>
+          <div className="text-center py-16 text-slate-500">
+            <div className="w-9 h-9 rounded-full border-4 border-slate-200 border-t-blue-500 animate-spin mx-auto mb-4"/>
             Cargando…
           </div>
         );
 
         if (nutriologos.length === 0) return (
-          <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>🧑‍⚕️</div>
-            <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Sin nutriólogos aún</div>
-            <div style={{ fontSize:13 }}>Invita al primer nutriólogo para comenzar</div>
+          <div className="text-center py-20 text-slate-500">
+            <User size={48} className="mx-auto mb-4 text-slate-300" />
+            <div className="text-base font-semibold mb-2 text-slate-700">Sin nutriólogos aún</div>
+            <div className="text-sm">Invita al primer nutriólogo para comenzar</div>
           </div>
         );
 
         if (filteredNutriologos.length === 0 && searchNutris) return (
-          <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
-            <div style={{ fontSize:40, marginBottom:12, opacity:0.3 }}>🔍</div>
-            <div style={{ fontSize:15, fontWeight:600, color:C.muted }}>Sin resultados para "{searchNutris}"</div>
+          <div className="text-center py-16 text-slate-500">
+            <Search size={40} className="mx-auto mb-3 text-slate-300 opacity-50" />
+            <div className="text-sm font-semibold">Sin resultados para "{searchNutris}"</div>
           </div>
         );
 
         return (
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          <div className="flex flex-col gap-3">
             {filteredNutriologos.map((n, i) => (
-              <div key={n.id} className="card-hover animate-in" style={{
-              animationDelay:`${i*0.04}s`,
-              background:`linear-gradient(135deg, ${C.card}, ${C.surfaceAlt})`,
-              borderRadius:14, border:`1px solid ${C.border}`,
-              padding:"16px 20px", display:"flex",
-              alignItems:"center", justifyContent:"space-between",
-              flexWrap:"wrap", gap:12, position:"relative", overflow:"hidden"
-            }}>
+              <div key={n.id} className="relative overflow-hidden bg-white hover:bg-slate-50 transition-colors rounded-xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${i*0.04}s`, animationFillMode: 'both' }}>
               {/* Barra de color de marca */}
-              <div style={{
-                position:"absolute", left:0, top:0, bottom:0, width:4,
-                background: n.color_primario || C.gradBtn,
-                borderRadius:"4px 0 0 4px"
-              }}/>
-              <div style={{ paddingLeft:12, display:"flex", alignItems:"center", gap:14 }}>
+              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ background: n.color_primario || '#3b82f6' }}/>
+              
+              <div className="pl-2 flex items-center gap-4">
                 {/* Logo thumbnail */}
-                <div style={{
-                  width:44, height:44, borderRadius:10, overflow:"hidden",
-                  background:"rgba(10,20,40,0.7)", border:`1px solid ${C.border}`,
-                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0
-                }}>
+                <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
                   {n.logo_url
-                    ? <img src={n.logo_url} alt="logo" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>
-                    : <span style={{ fontSize:20, opacity:0.35 }}>🖼️</span>
+                    ? <img src={n.logo_url} alt="logo" className="w-full h-full object-contain" />
+                    : <Image size={20} className="text-slate-300" />
                   }
                 </div>
                 <div>
-                  <div style={{ fontWeight:700, fontSize:16, color:C.text, marginBottom:4 }}>
+                  <div className="font-semibold text-base text-slate-800 mb-1 flex items-center gap-2">
                     {n.nombre || "—"}
                     {n.nombre_marca && n.nombre_marca !== n.nombre && (
-                      <span style={{ marginLeft:10, fontSize:12, color:C.muted, fontWeight:400 }}>
+                      <span className="text-xs text-slate-500 font-normal">
                         {n.nombre_marca}
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize:12, color:C.muted }}>
-                    {n.email || "Sin email"}
+                  <div className="text-xs text-slate-500 flex items-center flex-wrap gap-x-3 gap-y-1">
+                    <span>{n.email || "Sin email"}</span>
                     {n.telefono && (
-                      <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{marginLeft:12, color:"#22c55e", textDecoration:"none", fontWeight:600, display:"inline-flex", alignItems:"center", gap:4}}>
-                        <span style={{fontSize:14}}>💬</span> WhatsApp
+                      <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 transition-colors">
+                        <MessageCircle size={14} /> WhatsApp
                       </a>
                     )}
                   </div>
-                  <div style={{ marginTop:6, display:"flex", gap:6, alignItems:"center" }}>
-                    <div style={{
-                      width:14, height:14, borderRadius:"50%",
-                      background: n.color_primario || C.accent,
-                      border:`2px solid ${C.border}`, flexShrink:0
-                    }}/>
-                    <span style={{ fontSize:11, color:C.muted }}>{n.color_primario || "#56CCF2"}</span>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded-full border border-slate-200 shrink-0" style={{ background: n.color_primario || '#3b82f6' }}/>
+                    <span className="text-[11px] text-slate-500">{n.color_primario || "#56CCF2"}</span>
                   </div>
                 </div>
               </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                <Tag color={n.activo !== false ? C.accent : "#f87171"} size="md">
-                  {n.activo !== false ? "● Activo" : "○ Suspendido"}
-                </Tag>
-                <Btn small outline color={C.accentMid} onClick={() => {
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${n.activo !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${n.activo !== false ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                  {n.activo !== false ? "Activo" : "Suspendido"}
+                </span>
+                <Btn small outline onClick={() => {
                   setShowEdit(n);
                   setEditForm({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
                 }}>
                   Editar marca
                 </Btn>
-                <Btn small outline color={n.activo !== false ? "#ef4444" : C.accent} onClick={() => toggleActivo(n)}>
+                <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivo(n)}>
                   {n.activo !== false ? "Suspender" : "Activar"}
                 </Btn>
-                </div>
               </div>
+            </div>
             ))}
           </div>
         );
@@ -253,18 +278,18 @@ export function Nutriologos({ setMsg }) {
 
       {/* Modal Invitar */}
       {showInvite && (
-        <Modal title="🧑‍⚕️ Invitar nutriólogo" onClose={() => setShowInvite(false)}>
+        <Modal title={<><User size={20} className="text-blue-500"/> Invitar nutriólogo</>} onClose={() => setShowInvite(false)}>
           <Field label="Nombre completo">
-            <input value={form.nombre} onChange={e => setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Dra. Ana García"/>
+            <input className={InputClass} value={form.nombre} onChange={e => setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Dra. Ana García"/>
           </Field>
           <Field label="Email">
-            <input type="email" value={form.email} onChange={e => setForm(p=>({...p,email:e.target.value}))} placeholder="ana@email.com"/>
+            <input className={InputClass} type="email" value={form.email} onChange={e => setForm(p=>({...p,email:e.target.value}))} placeholder="ana@email.com"/>
           </Field>
           <Field label="Teléfono (WhatsApp)">
-            <input type="tel" value={form.telefono} onChange={e => setForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
+            <input className={InputClass} type="tel" value={form.telefono} onChange={e => setForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
           </Field>
           <Field label="Nombre de marca (opcional)">
-            <input value={form.nombre_marca} onChange={e => setForm(p=>({...p,nombre_marca:e.target.value}))} placeholder="Ej. NutriMax Pro"/>
+            <input className={InputClass} value={form.nombre_marca} onChange={e => setForm(p=>({...p,nombre_marca:e.target.value}))} placeholder="Ej. NutriMax Pro"/>
           </Field>
           <Field label="Logo de marca (opcional)" hint="Aparecerá en el panel del nutriólogo y en el panel de sus clientes">
             <LogoPicker
@@ -274,25 +299,27 @@ export function Nutriologos({ setMsg }) {
             />
           </Field>
           <Field label="Color principal de su marca">
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:4 }}>
+            <div className="flex gap-2 flex-wrap mt-1">
               {COLORS.map(col => (
-                <div key={col} onClick={() => setForm(p=>({...p,color_primario:col}))} style={{
-                  width:28, height:28, borderRadius:"50%", background:col, cursor:"pointer",
-                  border: form.color_primario===col ? `3px solid white` : `2px solid transparent`,
-                  boxShadow: form.color_primario===col ? `0 0 8px ${col}` : "none",
-                  transition:"all 0.15s"
+                <div key={col} onClick={() => setForm(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{
+                  background:col,
+                  border: form.color_primario===col ? `2px solid white` : `2px solid transparent`,
+                  boxShadow: form.color_primario===col ? `0 0 0 2px ${col}` : "none",
                 }}/>
               ))}
-              <input type="color" value={form.color_primario} onChange={e => setForm(p=>({...p,color_primario:e.target.value}))}
-                style={{ width:28, height:28, border:"none", borderRadius:"50%", cursor:"pointer", padding:0, background:"transparent" }}
-                title="Color personalizado"/>
+              <div className="relative w-7 h-7 rounded-full overflow-hidden border border-slate-200">
+                <input type="color" value={form.color_primario} onChange={e => setForm(p=>({...p,color_primario:e.target.value}))}
+                  className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer"
+                  title="Color personalizado"/>
+              </div>
             </div>
           </Field>
-          <div style={{ background:`color-mix(in srgb, ${C.accentDeep} 19%, transparent)`, border:`1px solid color-mix(in srgb, ${C.accent} 15%, transparent)`, borderRadius:10, padding:"11px 14px", fontSize:12, color:C.muted, marginBottom:20, lineHeight:1.6 }}>
-            📧 El nutriólogo recibirá un email para crear su contraseña. Su panel ya estará configurado con su branding.
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 mb-5 leading-relaxed flex items-start gap-2">
+            <Mail size={16} className="text-blue-500 shrink-0 mt-0.5" />
+            <span>El nutriólogo recibirá un email para crear su contraseña. Su panel ya estará configurado con su branding.</span>
           </div>
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => setShowInvite(false)}>Cancelar</Btn>
+          <div className="flex gap-2.5 justify-end mt-2">
+            <Btn outline onClick={() => setShowInvite(false)}>Cancelar</Btn>
             <Btn grad onClick={invite} disabled={saving || uploadingLogo}>{saving ? "Enviando…" : "Invitar"}</Btn>
           </div>
         </Modal>
@@ -300,15 +327,15 @@ export function Nutriologos({ setMsg }) {
 
       {/* Modal editar branding */}
       {showEdit && (
-        <Modal title={`✏️ Editar — ${showEdit.nombre || "Nutriólogo"}`} onClose={() => setShowEdit(null)}>
+        <Modal title={<><Pencil size={20} className="text-blue-500"/> Editar — {showEdit.nombre || "Nutriólogo"}</>} onClose={() => setShowEdit(null)}>
           <Field label="Nombre completo">
-            <input value={editForm.nombre} onChange={e => setEditForm(p=>({...p,nombre:e.target.value}))}/>
+            <input className={InputClass} value={editForm.nombre} onChange={e => setEditForm(p=>({...p,nombre:e.target.value}))}/>
           </Field>
           <Field label="Teléfono (WhatsApp)">
-            <input type="tel" value={editForm.telefono} onChange={e => setEditForm(p=>({...p,telefono:e.target.value}))}/>
+            <input className={InputClass} type="tel" value={editForm.telefono} onChange={e => setEditForm(p=>({...p,telefono:e.target.value}))}/>
           </Field>
           <Field label="Nombre de marca">
-            <input value={editForm.nombre_marca} onChange={e => setEditForm(p=>({...p,nombre_marca:e.target.value}))}/>
+            <input className={InputClass} value={editForm.nombre_marca} onChange={e => setEditForm(p=>({...p,nombre_marca:e.target.value}))}/>
           </Field>
           <Field label="Logo de marca" hint="Aparecerá en el panel del nutriólogo y en el panel de sus clientes">
             <LogoPicker
@@ -318,21 +345,22 @@ export function Nutriologos({ setMsg }) {
             />
           </Field>
           <Field label="Color de marca">
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:4 }}>
+            <div className="flex gap-2 flex-wrap mt-1">
               {COLORS.map(col => (
-                <div key={col} onClick={() => setEditForm(p=>({...p,color_primario:col}))} style={{
-                  width:28, height:28, borderRadius:"50%", background:col, cursor:"pointer",
-                  border: editForm.color_primario===col ? `3px solid white` : `2px solid transparent`,
-                  boxShadow: editForm.color_primario===col ? `0 0 8px ${col}` : "none",
-                  transition:"all 0.15s"
+                <div key={col} onClick={() => setEditForm(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{
+                  background:col,
+                  border: editForm.color_primario===col ? `2px solid white` : `2px solid transparent`,
+                  boxShadow: editForm.color_primario===col ? `0 0 0 2px ${col}` : "none",
                 }}/>
               ))}
-              <input type="color" value={editForm.color_primario} onChange={e => setEditForm(p=>({...p,color_primario:e.target.value}))}
-                style={{ width:28, height:28, border:"none", borderRadius:"50%", cursor:"pointer", padding:0, background:"transparent" }}/>
+              <div className="relative w-7 h-7 rounded-full overflow-hidden border border-slate-200">
+                <input type="color" value={editForm.color_primario} onChange={e => setEditForm(p=>({...p,color_primario:e.target.value}))}
+                  className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer"/>
+              </div>
             </div>
           </Field>
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => setShowEdit(null)}>Cancelar</Btn>
+          <div className="flex gap-2.5 justify-end mt-2">
+            <Btn outline onClick={() => setShowEdit(null)}>Cancelar</Btn>
             <Btn grad onClick={saveEdit} disabled={saving || uploadingLogo}>{saving ? "Guardando…" : "Guardar cambios"}</Btn>
           </div>
         </Modal>

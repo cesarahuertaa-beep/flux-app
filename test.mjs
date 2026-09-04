@@ -1,0 +1,1 @@
+﻿import { createClient } from " @supabase/supabase-js\; import dotenv from \dotenv\; dotenv.config(); const s = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY); s.from(\nutricion_dias\).select(\*\).limit(3).then(r => console.log(r.data));

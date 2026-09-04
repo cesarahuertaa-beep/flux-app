@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { C, GRUPOS, TIPOS } from "../../styles/theme";
-import { Btn, Modal, Field, Tag } from "../ui";
+import { GRUPOS, TIPOS } from "../../styles/theme";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
+import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X } from "lucide-react";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
@@ -21,8 +21,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       const fname = `${Date.now()}.${ext}`;
       const url = await storageUpload("ejercicios", fname, file);
       setForm(p => ({ ...p, gif_url: url }));
-      setMsg("✅ Archivo subido");
-    } catch(e) { setMsg("❌ "+e.message); }
+      setMsg(<div className='flex gap-2 items-center'><CheckCircle2 className='w-4 h-4 text-green-500'/> Archivo subido</div>);
+    } catch(e) { setMsg('❌ ' + e.message); }
     setUploading(false);
   };
 
@@ -30,20 +30,20 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, tipo_movimiento:e.tipo_movimiento, gif_url:e.gif_url||"" }); setShowModal(true); };
 
   const save = async () => {
-    if (!form.nombre) { setMsg("⚠️ Escribe el nombre"); return; }
+    if (!form.nombre) { setMsg(<div className='flex gap-2 items-center'><AlertCircle className='w-4 h-4 text-yellow-500'/> Escribe el nombre</div>); return; }
     setSaving(true);
     try {
       if (editEj) await dbPatch(`biblioteca_ejercicios?id=eq.${editEj.id}`, form);
       else        await dbPost("biblioteca_ejercicios", form);
-      setShowModal(false); setMsg("✅ Ejercicio guardado"); onUpdate();
-    } catch(e) { setMsg("❌ "+e.message); }
+      setShowModal(false); setMsg(<div className='flex gap-2 items-center'><CheckCircle2 className='w-4 h-4 text-green-500'/> Ejercicio guardado</div>); onUpdate();
+    } catch(e) { setMsg('❌ ' + e.message); }
     setSaving(false);
   };
 
   const deleteEj = async (e) => {
     if (!confirm(`¿Eliminar "${e.nombre}"? Esta acción no se puede deshacer.`)) return;
     await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
-    setMsg("🗑️ Ejercicio eliminado"); onUpdate();
+    setMsg(<div className='flex gap-2 items-center'><Trash2 className='w-4 h-4 text-red-500'/> Ejercicio eliminado</div>); onUpdate();
   };
 
   const filtrados = biblioteca.filter(e => {
@@ -63,56 +63,37 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   return (
     <div>
       {/* ── Header row ── */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24, flexWrap:"wrap", gap:12 }}>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <div>
-          <h2 style={{
-            fontFamily:"'Space Grotesk',sans-serif",
-            fontWeight:700, fontSize:24, color:"#e2eeff",
-            letterSpacing:"0.3px", marginBottom:4
-          }}>Biblioteca de Ejercicios</h2>
-          <p style={{ fontSize:13, color:"#64748b" }}>
+          <h2 className="font-bold text-2xl text-[#0B1929] tracking-wide mb-1 font-['Space_Grotesk',sans-serif]">
+            Biblioteca de Ejercicios
+          </h2>
+          <p className="text-[13px] text-[#6B7A8D]">
             {biblioteca.length} ejercicio{biblioteca.length !== 1 ? "s" : ""} en la colección global
           </p>
         </div>
         {isSuperadmin && (
-          <Btn grad onClick={openNew} style={{ padding:"10px 20px" }}>
-            Nuevo ejercicio
-          </Btn>
+          <button onClick={openNew} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-colors">
+            <Plus size={18} /> Nuevo ejercicio
+          </button>
         )}
       </div>
 
       {/* ── Filters ── */}
-      <div style={{
-        display:"flex", gap:10, marginBottom:20, flexWrap:"wrap",
-        padding:"14px 16px",
-        background:"rgba(7,13,24,0.6)",
-        borderRadius:14, border:"1px solid rgba(56,189,248,0.07)",
-        backdropFilter:"blur(12px)"
-      }}>
-        <input
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-          placeholder="Buscar ejercicio…"
-          style={{
-            flex:1, minWidth:160, maxWidth:220,
-            background:"rgba(3,5,10,0.7)",
-            color:"#e2eeff",
-            border:"1px solid rgba(56,189,248,0.1)",
-            borderRadius:10, padding:"8px 14px",
-            fontSize:13, outline:"none",
-            fontFamily:"'Inter',sans-serif"
-          }}
-        />
+      <div className="flex gap-2.5 mb-5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+        <div className="relative flex-1 min-w-[160px] max-w-[220px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar ejercicio…"
+            className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif]"
+          />
+        </div>
         <select
           value={filtroGrupo}
           onChange={e => setFiltroGrupo(e.target.value)}
-          style={{
-            background:"rgba(3,5,10,0.7)", color:"#e2eeff",
-            border:"1px solid rgba(56,189,248,0.1)",
-            borderRadius:10, padding:"8px 14px",
-            fontSize:13, outline:"none",
-            fontFamily:"'Inter',sans-serif", minWidth:130
-          }}
+          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif] min-w-[130px]"
         >
           <option>Todos</option>
           {GRUPOS.map(g => <option key={g}>{g}</option>)}
@@ -120,13 +101,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         <select
           value={filtroTipo}
           onChange={e => setFiltroTipo(e.target.value)}
-          style={{
-            background:"rgba(3,5,10,0.7)", color:"#e2eeff",
-            border:"1px solid rgba(56,189,248,0.1)",
-            borderRadius:10, padding:"8px 14px",
-            fontSize:13, outline:"none",
-            fontFamily:"'Inter',sans-serif", minWidth:140
-          }}
+          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif] min-w-[140px]"
         >
           <option>Todos</option>
           {TIPOS.map(t => <option key={t}>{t}</option>)}
@@ -134,118 +109,84 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         {(filtroGrupo !== "Todos" || filtroTipo !== "Todos" || busqueda) && (
           <button
             onClick={() => { setBusqueda(""); setFiltroGrupo("Todos"); setFiltroTipo("Todos"); }}
-            style={{
-              background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.2)",
-              borderRadius:10, padding:"8px 14px",
-              color:"#f87171", fontSize:12, cursor:"pointer",
-              fontFamily:"'Inter',sans-serif", fontWeight:600
-            }}
-          >✕ Limpiar</button>
+            className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
+          >
+            <X size={14} /> Limpiar
+          </button>
         )}
       </div>
 
       {/* ── Grid ── */}
       {filtrados.length === 0 ? (
-        <div style={{
-          textAlign:"center", padding:"80px 0", color:"#475569",
-          background:"rgba(7,13,24,0.4)", borderRadius:16,
-          border:"1px solid rgba(56,189,248,0.05)"
-        }}>
-          <div style={{ fontSize:48, marginBottom:16, opacity:0.4 }}>🏋️</div>
-          <div style={{ fontSize:16, fontWeight:600, marginBottom:6, color:"#64748b" }}>
+        <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+          <Dumbbell size={48} className="mx-auto mb-4 opacity-20" />
+          <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
             {biblioteca.length === 0 ? "La biblioteca está vacía" : "No hay ejercicios que coincidan"}
           </div>
-          <div style={{ fontSize:13, color:"#475569" }}>
+          <div className="text-[13px] text-[#6B7A8D]">
             {biblioteca.length === 0 && isSuperadmin ? "Agrega el primer ejercicio con el botón de arriba" : "Intenta con otros filtros"}
           </div>
         </div>
       ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:14 }}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px]">
           {filtrados.map((e, i) => {
             const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
             return (
               <div
                 key={e.id}
-                className="ex-card animate-in"
-                style={{
-                  background:"linear-gradient(160deg, rgba(10,20,40,0.85), rgba(7,13,24,0.95))",
-                  borderRadius:16,
-                  border:`1px solid rgba(56,189,248,0.08)`,
-                  overflow:"hidden",
-                  position:"relative",
-                  backdropFilter:"blur(12px)",
-                  boxShadow:"0 4px 24px rgba(0,0,0,0.3)",
-                  animationDelay:`${i * 0.04}s`
-                }}
+                className="group animate-in bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md"
+                style={{ animationDelay:`${i * 0.04}s` }}
               >
                 {/* Top color accent */}
                 <div style={{
                   position:"absolute", top:0, left:0, right:0, height:2,
-                  background:`linear-gradient(90deg, transparent, ${accentColor}80, transparent)`
+                  background:`linear-gradient(90deg, transparent, ${accentColor}, transparent)`
                 }}/>
 
                 {/* Image area */}
                 <div
                   onClick={() => e.gif_url && setPreview(e)}
-                  style={{
-                    height:130,
-                    background:`linear-gradient(135deg, rgba(3,5,10,0.9), rgba(7,13,24,0.8))`,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    cursor: e.gif_url ? "pointer" : "default",
-                    overflow:"hidden", position:"relative"
-                  }}
+                  className={`h-[130px] bg-gray-50 flex items-center justify-center relative overflow-hidden ${e.gif_url ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                   {e.gif_url ? (
                     <>
                       <img
                         src={e.gif_url} alt={e.nombre}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", transition:"transform 0.4s ease" }}
-                        onMouseEnter={ev => ev.currentTarget.style.transform = "scale(1.05)"}
-                        onMouseLeave={ev => ev.currentTarget.style.transform = "scale(1)"}
+                        className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
                       />
                       {/* Play overlay */}
-                      <div
-                        className="ex-img-overlay"
-                        style={{
-                          position:"absolute", inset:0,
-                          background:"rgba(3,5,10,0.4)",
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          opacity:0, transition:"opacity 0.3s ease"
-                        }}
-                      >
-                        <div style={{
-                          width:40, height:40, borderRadius:"50%",
-                          background:"rgba(56,189,248,0.9)",
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          fontSize:16, color:"#030a14",
-                          boxShadow:"0 0 20px rgba(56,189,248,0.5)"
-                        }}>▶</div>
+                      <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0B1929] shadow-lg">
+                          <Play size={20} className="ml-1" />
+                        </div>
                       </div>
                     </>
                   ) : (
-                    <span style={{ fontSize:40, opacity:0.2 }}>🏋️</span>
+                    <Dumbbell size={40} className="text-gray-300" />
                   )}
                 </div>
 
                 {/* Content */}
-                <div style={{ padding:"12px 14px 14px" }}>
-                  <div style={{
-                    fontWeight:600, fontSize:13, color:"#e2eeff",
-                    marginBottom:8, lineHeight:1.4,
-                    fontFamily:"'Inter',sans-serif"
-                  }}>{e.nombre}</div>
-                  <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom: isSuperadmin ? 10 : 0 }}>
-                    <Tag color={accentColor}>{e.grupo_muscular}</Tag>
-                    <Tag color="#818cf8">{e.tipo_movimiento}</Tag>
+                <div className="p-3">
+                  <div className="font-semibold text-[13px] text-[#0B1929] mb-2 leading-snug font-['Inter',sans-serif]">
+                    {e.nombre}
+                  </div>
+                  <div className="flex gap-1 flex-wrap mb-2.5">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ backgroundColor:`${accentColor}20`, color:accentColor }}>
+                      {e.grupo_muscular}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-600">
+                      {e.tipo_movimiento}
+                    </span>
                   </div>
                   {isSuperadmin && (
-                    <div style={{ display:"flex", gap:6, marginTop:2 }}>
-                      <Btn small outline color="rgba(56,189,248,0.7)" onClick={() => openEdit(e)} style={{ flex:1 }}>
-                        Editar
-                      </Btn>
-                      <Btn small danger onClick={() => deleteEj(e)} style={{ flex:1 }}>
-                        Borrar
-                      </Btn>
+                    <div className="flex gap-1.5 mt-1">
+                      <button onClick={() => openEdit(e)} className="flex-1 flex justify-center items-center gap-1 border border-blue-200 text-blue-600 hover:bg-blue-50 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
+                        <Edit2 size={12} /> Editar
+                      </button>
+                      <button onClick={() => deleteEj(e)} className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
+                        <Trash2 size={12} /> Borrar
+                      </button>
                     </div>
                   )}
                 </div>
@@ -257,112 +198,114 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
       {/* ── Add/Edit Modal ── */}
       {showModal && (
-        <Modal title={editEj ? "✏️ Editar ejercicio" : "➕ Nuevo ejercicio"} onClose={() => setShowModal(false)}>
-          <Field label="Nombre del ejercicio">
-            <input value={form.nombre} onChange={e => setForm(p => ({...p,nombre:e.target.value}))} placeholder="Ej. Press de banca inclinado"/>
-          </Field>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-            <Field label="Grupo muscular">
-              <select value={form.grupo_muscular} onChange={e => setForm(p => ({...p,grupo_muscular:e.target.value}))}>
-                {GRUPOS.map(g => <option key={g}>{g}</option>)}
-              </select>
-            </Field>
-            <Field label="Tipo de movimiento">
-              <select value={form.tipo_movimiento} onChange={e => setForm(p => ({...p,tipo_movimiento:e.target.value}))}>
-                {TIPOS.map(t => <option key={t}>{t}</option>)}
-              </select>
-            </Field>
-          </div>
-          <Field label="GIF / Video del ejercicio">
-            <div style={{
-              border:"1px dashed rgba(56,189,248,0.2)", borderRadius:12,
-              padding:20, textAlign:"center",
-              background:"rgba(7,13,24,0.6)"
-            }}>
-              {form.gif_url ? (
-                <div>
-                  <img src={form.gif_url} alt="preview" style={{ maxHeight:140, borderRadius:10, marginBottom:10 }}/>
-                  <div><Btn small outline color="rgba(56,189,248,0.5)" onClick={() => setForm(p => ({...p,gif_url:""}))}>Cambiar</Btn></div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize:36, marginBottom:8, opacity:0.4 }}>🎬</div>
-                  <div style={{ fontSize:13, color:"#64748b", marginBottom:12 }}>Sube un GIF o video MP4</div>
-                  <input
-                    id="gif-upload" type="file"
-                    accept="image/gif,video/mp4,image/png,image/jpg,image/jpeg"
-                    style={{ display:"none" }}
-                    onChange={e => e.target.files[0] && uploadGif(e.target.files[0])}
-                  />
-                  <label
-                    htmlFor="gif-upload"
-                    style={{
-                      display:"inline-block", padding:"8px 18px",
-                      background:"linear-gradient(135deg, #38bdf8, #0ea5e9)",
-                      borderRadius:10, fontWeight:700, fontSize:12,
-                      color:"#030a14", cursor:"pointer",
-                      boxShadow:"0 4px 16px rgba(56,189,248,0.3)"
-                    }}
-                  >
-                    {uploading ? "Subiendo…" : "Seleccionar archivo"}
-                  </label>
-                </div>
-              )}
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+              <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
+                {editEj ? <><Edit2 size={20} className="text-blue-600"/> Editar ejercicio</> : <><Plus size={20} className="text-blue-600"/> Nuevo ejercicio</>}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
             </div>
-          </Field>
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:4 }}>
-            <Btn outline color="rgba(100,116,139,0.7)" onClick={() => setShowModal(false)}>Cancelar</Btn>
-            <Btn grad onClick={save} disabled={saving || uploading}>
-              {saving ? "Guardando…" : "Guardar ejercicio"}
-            </Btn>
+            
+            <div className="p-5 overflow-y-auto flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Nombre del ejercicio</label>
+                <input value={form.nombre} onChange={e => setForm(p => ({...p,nombre:e.target.value}))} placeholder="Ej. Press de banca inclinado" className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"/>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Grupo muscular</label>
+                  <select value={form.grupo_muscular} onChange={e => setForm(p => ({...p,grupo_muscular:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                    {GRUPOS.map(g => <option key={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Tipo de movimiento</label>
+                  <select value={form.tipo_movimiento} onChange={e => setForm(p => ({...p,tipo_movimiento:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                    {TIPOS.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">GIF / Video del ejercicio</label>
+                <div className="border border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50">
+                  {form.gif_url ? (
+                    <div>
+                      <img src={form.gif_url} alt="preview" className="max-h-[140px] rounded-lg mx-auto mb-3 shadow-sm"/>
+                      <div>
+                        <button onClick={() => setForm(p => ({...p,gif_url:""}))} className="text-sm px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 bg-white rounded-lg font-semibold transition-colors">
+                          Cambiar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Video size={36} className="mx-auto mb-2 text-gray-300" />
+                      <div className="text-[13px] text-[#6B7A8D] mb-3">Sube un GIF o video MP4</div>
+                      <input
+                        id="gif-upload" type="file"
+                        accept="image/gif,video/mp4,image/png,image/jpg,image/jpeg"
+                        className="hidden"
+                        onChange={e => e.target.files[0] && uploadGif(e.target.files[0])}
+                      />
+                      <label
+                        htmlFor="gif-upload"
+                        className="inline-block px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg font-semibold text-[12px] cursor-pointer transition-colors shadow-sm"
+                      >
+                        {uploading ? "Subiendo..." : "Seleccionar archivo"}
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[#6B7A8D] rounded-xl font-semibold text-sm transition-colors">
+                Cancelar
+              </button>
+              <button onClick={save} disabled={saving || uploading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving ? "Guardando..." : "Guardar ejercicio"}
+              </button>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* ── Preview Modal ── */}
       {preview && (
         <div
           onClick={() => setPreview(null)}
-          style={{
-            position:"fixed", inset:0,
-            background:"rgba(3,5,10,0.92)",
-            backdropFilter:"blur(20px)",
-            zIndex:200, display:"flex",
-            alignItems:"center", justifyContent:"center",
-            padding:20
-          }}
+          className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[200] flex items-center justify-center p-5"
         >
           <div
-            className="animate-in-scale"
-            style={{
-              background:"linear-gradient(145deg, rgba(10,20,40,0.95), rgba(7,13,24,0.98))",
-              borderRadius:20, padding:24,
-              maxWidth:440, width:"100%",
-              textAlign:"center",
-              border:"1px solid rgba(56,189,248,0.12)",
-              boxShadow:"0 32px 100px rgba(0,0,0,0.7), 0 0 80px rgba(8,47,73,0.4)"
-            }}
+            className="animate-in bg-white rounded-2xl p-6 max-w-[440px] w-full text-center border border-[#E2E8F0] shadow-2xl relative"
             onClick={e => e.stopPropagation()}
           >
+            <button onClick={() => setPreview(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
             <img
               src={preview.gif_url} alt={preview.nombre}
-              style={{ width:"100%", borderRadius:14, marginBottom:16, boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}
+              className="w-full rounded-xl mb-4 shadow-sm"
             />
-            <div style={{ fontWeight:700, fontSize:18, color:"#e2eeff", marginBottom:8, fontFamily:"'Space Grotesk',sans-serif" }}>
+            <div className="font-bold text-[18px] text-[#0B1929] mb-2 font-['Space_Grotesk',sans-serif]">
               {preview.nombre}
             </div>
-            <div style={{ display:"flex", gap:6, justifyContent:"center", marginBottom:16 }}>
-              <Tag color={groupColors[preview.grupo_muscular] || "#38bdf8"}>{preview.grupo_muscular}</Tag>
-              <Tag color="#818cf8">{preview.tipo_movimiento}</Tag>
+            <div className="flex gap-1.5 justify-center mb-4">
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor:`${groupColors[preview.grupo_muscular] || "#38bdf8"}20`, color: groupColors[preview.grupo_muscular] || "#38bdf8" }}>
+                {preview.grupo_muscular}
+              </span>
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-600">
+                {preview.tipo_movimiento}
+              </span>
             </div>
             <button
               onClick={() => setPreview(null)}
-              style={{
-                background:"rgba(56,189,248,0.1)", border:"1px solid rgba(56,189,248,0.2)",
-                borderRadius:10, padding:"8px 20px", color:"#38bdf8",
-                fontSize:13, cursor:"pointer", fontFamily:"'Inter',sans-serif", fontWeight:600
-              }}
-            >Cerrar</button>
+              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-[13px] font-semibold font-['Inter',sans-serif] transition-colors border border-gray-200"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

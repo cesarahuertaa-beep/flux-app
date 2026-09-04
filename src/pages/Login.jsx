@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { C, css } from "../styles/theme";
-import { Field, OrbBackground } from "../components/ui";
+import { Mail, Lock, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet } from "../lib/supabase";
 
 export default function Login({ onLogin }) {
@@ -13,7 +12,6 @@ export default function Login({ onLogin }) {
   const [info, setInfo]           = useState("");
   const [loading, setLoading]     = useState(false);
   const [accessToken, setAccessToken] = useState("");
-  const [focused, setFocused]     = useState(null);
   const [showSplash, setShowSplash] = useState(true);
   const [fadeSplash, setFadeSplash] = useState(false);
 
@@ -26,7 +24,10 @@ export default function Login({ onLogin }) {
       const token = params.get("access_token");
       const type  = params.get("type");
       if (token && (type==="invite"||type==="recovery"||type==="signup")) {
-        setAccessToken(token); setMode("set_password");
+        setTimeout(() => {
+          setAccessToken(token); 
+          setMode("set_password");
+        }, 0);
         window.history.replaceState(null,"",window.location.pathname);
       }
     }
@@ -74,7 +75,7 @@ export default function Login({ onLogin }) {
     setLoading(true); setErr("");
     try {
       await authResetPassword(email.trim());
-      setInfo("✅ Revisa tu email para restablecer tu contraseña.");
+      setInfo("Revisa tu email para restablecer tu contraseña.");
       setMode("login");
     } catch(e) { setErr(e.message); }
     setLoading(false);
@@ -86,48 +87,28 @@ export default function Login({ onLogin }) {
     setLoading(true); setErr("");
     try {
       await authUpdatePassword(accessToken, newPass);
-      setInfo("✅ Contraseña establecida. Ya puedes entrar.");
+      setInfo("Contraseña establecida. Ya puedes entrar.");
       setMode("login");
     } catch(e) { setErr(e.message); }
     setLoading(false);
   };
 
-  const inputStyle = (field) => ({
-    background: focused === field ? "rgba(15,28,46,0.95)" : "rgba(7,16,29,0.85)",
-    color: C.text,
-    border: `1px solid ${focused === field ? "rgba(46,92,184,0.55)" : "rgba(46,92,184,0.14)"}`,
-    borderRadius: 12, padding: "13px 16px", fontSize: 14,
-    width: "100%", outline: "none", fontFamily: "'Inter',sans-serif",
-    transition: "all 0.25s ease",
-    boxShadow: focused === field ? "0 0 0 3px rgba(46,92,184,0.14)" : "none",
-  });
-
   return (
-    <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
-      <style>{css}</style>
-
+    <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center relative overflow-hidden font-['Inter',sans-serif]">
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          background: "#000000",
-          zIndex: 50,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          opacity: fadeSplash ? 0 : 1,
-          transition: "opacity 0.8s ease",
-          pointerEvents: fadeSplash ? "none" : "auto"
-        }}>
-          <img src="/logo.png" alt="Flux Splash" style={{ width: "320px", height: "auto" }} />
+        <div className={`absolute inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[800ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <img src="/logo.png" alt="Flux Splash" className="w-[320px] h-auto" />
         </div>
       )}
 
       {/* ── Login Card ── */}
-      <div className="animate-in" style={{ width:"100%",maxWidth:420,padding:"44px 40px 36px",background:"rgba(15,28,46,0.95)",borderRadius:24,border:"1px solid rgba(46,92,184,0.15)",position:"relative",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",boxShadow:"0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(46,92,184,0.08)",zIndex:1 }}>
-
+      <div className="animate-in w-full max-w-[420px] px-10 pt-11 pb-9 bg-white rounded-3xl border border-[#E2E8F0] shadow-2xl relative z-10 mx-4">
+        
         {/* Top Spacer */}
-        <div style={{ textAlign: "center", marginBottom: (mode === "reset" || mode === "set_password") ? 24 : 12 }}>
+        <div className={`text-center ${mode === "reset" || mode === "set_password" ? 'mb-6' : 'mb-3'}`}>
           {(mode === "reset" || mode === "set_password") && (
-            <div style={{ marginTop: 12, fontSize: 13, color: "#64748b", letterSpacing: "0.3px" }}>
+            <div className="mt-3 text-[13px] text-[#6B7A8D] tracking-wide">
               {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
             </div>
           )}
@@ -135,93 +116,87 @@ export default function Login({ onLogin }) {
 
         {/* Messages */}
         {info && (
-          <div style={{
-            background: "rgba(8,47,73,0.5)",
-            border: "1px solid rgba(56,189,248,0.2)",
-            borderRadius: 12, padding: "12px 16px",
-            fontSize: 13, color: "#38bdf8",
-            marginBottom: 18, lineHeight: 1.6,
-            backdropFilter: "blur(8px)"
-          }}>{info}</div>
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] text-green-700 mb-5 leading-relaxed flex items-center gap-2">
+            <CheckCircle size={16} className="text-green-600 shrink-0" />
+            <span>{info}</span>
+          </div>
         )}
         {err && (
-          <div style={{
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.25)",
-            borderRadius: 12, padding: "12px 16px",
-            fontSize: 13, color: "#f87171",
-            marginBottom: 18, textAlign: "center",
-            lineHeight: 1.6
-          }}>{err}</div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-600 mb-5 leading-relaxed text-center flex items-center gap-2 justify-center">
+            <AlertCircle size={16} className="text-red-500 shrink-0" />
+            <span>{err}</span>
+          </div>
         )}
 
         {/* ── LOGIN FORM ── */}
         {mode === "login" && <>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Email</div>
-            <input
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && submit()}
-              onFocus={() => setFocused("email")}
-              onBlur={() => setFocused(null)}
-              placeholder="tu@email.com"
-              type="email"
-              style={inputStyle("email")}
-            />
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Email</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Mail size={18} />
+              </div>
+              <input
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+                placeholder="tu@email.com"
+                type="email"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
           </div>
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Contraseña</div>
-            <input
-              type="password"
-              value={pass}
-              onChange={e => setPass(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && submit()}
-              onFocus={() => setFocused("pass")}
-              onBlur={() => setFocused(null)}
-              placeholder="••••••••"
-              style={inputStyle("pass")}
-            />
+          <div className="mb-6">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Contraseña</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Lock size={18} />
+              </div>
+              <input
+                type="password"
+                value={pass}
+                onChange={e => setPass(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+                placeholder="••••••••"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
           </div>
 
-          <button onClick={submit} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:loading?"rgba(15,28,46,0.7)":"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:loading?"#6e87a2":"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:16,letterSpacing:"1.5px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none",transition:"all 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-            {loading ? "Verificando…" : "ENTRAR"}
+          <button onClick={submit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+            {loading ? "VERIFICANDO…" : <>ENTRAR <ArrowRight size={16} /></>}
           </button>
 
-          <div style={{ textAlign: "center" }}>
+          <div className="text-center">
             <button
               onClick={() => { setMode("reset"); setErr(""); }}
-              style={{
-                background: "none", border: "none",
-                color: "#475569", fontSize: 12,
-                cursor: "pointer", fontFamily: "'Inter', sans-serif",
-                transition: "color 0.2s",
-                textDecoration: "none",
-                letterSpacing: "0.2px"
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = "var(--brand-accent,#2e5cb8)"}
-              onMouseLeave={e => e.currentTarget.style.color = "#475569"}
-            >¿Olvidaste tu contraseña?</button>
+              className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8] tracking-wide"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </div>
         </>}
 
         {/* ── RESET FORM ── */}
         {mode === "reset" && <>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Tu email</div>
-            <input
-              value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com" type="email"
-              onFocus={() => setFocused("resetEmail")}
-              onBlur={() => setFocused(null)}
-              style={inputStyle("resetEmail")}
-            />
+          <div className="mb-5">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Tu email</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Mail size={18} />
+              </div>
+              <input
+                value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="tu@email.com" type="email"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+              />
+            </div>
           </div>
-          <button onClick={sendReset} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",marginBottom:14,letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
-            {loading ? "Enviando…" : "Enviar instrucciones"}
+          <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+            {loading ? "ENVIANDO…" : "ENVIAR INSTRUCCIONES"}
           </button>
-          <div style={{ textAlign: "center" }}>
-            <button onClick={() => { setMode("login"); setErr(""); }} style={{ background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer",fontFamily:"'Inter',sans-serif" }} onMouseEnter={e=>e.currentTarget.style.color="var(--brand-accent,#2e5cb8)"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>
+          <div className="text-center">
+            <button onClick={() => { setMode("login"); setErr(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
               Volver al login
             </button>
           </div>
@@ -229,26 +204,33 @@ export default function Login({ onLogin }) {
 
         {/* ── SET PASSWORD FORM ── */}
         {mode === "set_password" && <>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Nueva contraseña</div>
-            <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" onFocus={() => setFocused("np")} onBlur={() => setFocused(null)} style={inputStyle("np")} />
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nueva contraseña</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Lock size={18} />
+              </div>
+              <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
+            </div>
           </div>
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>Confirmar contraseña</div>
-            <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" onFocus={() => setFocused("cp")} onBlur={() => setFocused(null)} style={inputStyle("cp")} />
+          <div className="mb-6">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Confirmar contraseña</div>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Lock size={18} />
+              </div>
+              <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
+            </div>
           </div>
-          <button onClick={setPassword} disabled={loading} className="btn-hover" style={{ width:"100%",padding:"14px",background:"linear-gradient(135deg,#2e5cb8,#3d6fd0)",border:"none",borderRadius:12,fontWeight:800,fontSize:14,color:"#fff",cursor:loading?"not-allowed":"pointer",letterSpacing:"1px",fontFamily:"'Space Grotesk',sans-serif",boxShadow:"none" }}>
-            {loading ? "Guardando…" : "Establecer contraseña"}
+          <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+            {loading ? "GUARDANDO…" : "ESTABLECER CONTRASEÑA"}
           </button>
         </>}
 
         {/* Footer */}
-        <div style={{
-          marginTop: 28, textAlign: "center",
-          fontSize: 10, color: "#1e293b",
-          letterSpacing: "2px", textTransform: "uppercase",
-          fontFamily: "'Space Grotesk', sans-serif"
-        }}>KEEP GOING 💪</div>
+        <div className="mt-7 text-center text-[10px] text-[#6B7A8D] tracking-[2px] uppercase font-['Space_Grotesk',sans-serif]">
+          KEEP GOING 💪
+        </div>
       </div>
     </div>
   );

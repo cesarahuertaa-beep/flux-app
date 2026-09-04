@@ -117,13 +117,8 @@ export default function App() {
   const renderView = () => {
     if (restoring) {
       return (
-        <div style={{ minHeight:"100vh", background:"#04080f", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div style={{
-            width:44, height:44, borderRadius:"50%",
-            border:"3px solid rgba(46,92,184,0.15)",
-            borderTopColor:"#2e5cb8",
-            animation:"rotateSlow 0.8s linear infinite"
-          }}/>
+        <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
+          <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
         </div>
       );
     }

@@ -5,7 +5,12 @@ const BrandContext = createContext(null);
 
 export const useBrand = () => useContext(BrandContext);
 
-const FLUX_DEFAULT = { nombre_marca: "FLUX", color_primario: "#2e5cb8", logo_url: "/logo.png" };
+// Default FLUX brand - used for superadmin or unauthenticated state
+const FLUX_DEFAULT = { 
+  nombre_marca: "FLUX", 
+  color_primario: "#1A6FD4", 
+  logo_url: "/logo.png" 
+};
 
 export function BrandProvider({ children, session }) {
   const [brand, setBrand] = useState(FLUX_DEFAULT);
@@ -35,7 +40,7 @@ export function BrandProvider({ children, session }) {
             const p = res[0];
             setBrand({
               nombre_marca: p.nombre_marca || "FLUX",
-              color_primario: p.color_primario || "#56CCF2",
+              color_primario: p.color_primario || "#1A6FD4",
               logo_url: p.logo_url || "/logo.png"
             });
           }
@@ -48,12 +53,14 @@ export function BrandProvider({ children, session }) {
     fetchBrand();
   }, [session]);
 
-  // Generamos tonos más oscuros usando color-mix nativo de CSS para inyectarlos en el :root
+  // Generamos variables CSS dinámicas basadas en el color primario de la marca.
+  // Usamos color-mix para generar fondos ligeros y tonos oscuros (Figma style).
   const cssVars = {
-    "--brand-accent": brand.color_primario,
-    "--brand-accent-mid": `color-mix(in srgb, ${brand.color_primario} 80%, black)`,
-    "--brand-accent-dark": `color-mix(in srgb, ${brand.color_primario} 50%, black)`,
-    "--brand-accent-deep": `color-mix(in srgb, ${brand.color_primario} 30%, black)`
+    "--brand-primary": brand.color_primario,
+    // Fondo claro con 10% de opacidad para componentes seleccionados (ej: sidebar activo)
+    "--brand-secondary": `color-mix(in srgb, ${brand.color_primario} 10%, white)`,
+    "--brand-primary-hover": `color-mix(in srgb, ${brand.color_primario} 85%, black)`,
+    "--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
   };
 
   return (

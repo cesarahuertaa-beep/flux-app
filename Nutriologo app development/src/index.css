@@ -6,18 +6,23 @@ html, body, #root {
 }
 
 :root {
-  /* Neutral colors from Figma */
   --background: #F7F9FC;
   --foreground: #0B1929;
   --card: #FFFFFF;
   --card-foreground: #0B1929;
+  --primary: #1A6FD4;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E8F1FB;
+  --secondary-foreground: #1A6FD4;
   --muted: #F0F4FA;
   --muted-foreground: #6B7A8D;
+  --accent: #38BDF8;
+  --accent-foreground: #0B1929;
   --border: #E2E8F0;
-  
-  /* These will be overridden dynamically by BrandContext.jsx */
-  --brand-primary: #1A6FD4;
-  --brand-secondary: #E8F1FB;
+  --ring: #1A6FD4;
+  --radius: 10px;
+  --sidebar: #0B1929;
+  --sidebar-foreground: #FFFFFF;
 }
 
 * {
@@ -40,21 +45,20 @@ h1, h2, h3, h4, h5, h6 {
 
 .scroll-hide::-webkit-scrollbar { display: none; }
 
-/* Desactivar pull-to-refresh en móvil — comportamiento de app nativa */
-html, body {
-  overscroll-behavior-y: none;
-  background-color: var(--background);
-  /* Evita el bounce de Safari en iOS */
-  -webkit-overflow-scrolling: touch;
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
 }
+.pulse-ring { animation: pulse-ring 2s ease-out infinite; }
 
-/* Spinner de carga */
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
+.count-up { animation: count-up 0.4s ease-out; }
 
-/* Asegurar que el fondo de toda la app sea blanco en mobile */
-#root {
-  min-height: 100dvh;
-  background: #F7F9FC;
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
+.slide-in { animation: slide-in 0.3s ease-out; }

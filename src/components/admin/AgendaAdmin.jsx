@@ -1,7 +1,72 @@
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field, Tag } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../../lib/supabase";
+import {
+  Clock,
+  Clock3,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  Ban,
+  ClipboardList,
+  Monitor,
+  Building,
+  MessageCircle,
+  Plus
+} from "lucide-react";
+
+// ── UI Components (Tailwind Light Theme) ──────────────────────────────────────
+const Tag = ({ children, className = "" }) => (
+  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border ${className}`}>
+    {children}
+  </span>
+);
+
+const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad }) => {
+  let base = "inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+  let size = small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  
+  let variant = "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"; // default
+  if (outline) {
+    if (color === "#ef4444" || danger) {
+      variant = "border border-red-200 text-red-600 hover:bg-red-50 bg-white";
+    } else {
+      variant = "border border-slate-200 text-slate-600 hover:bg-slate-50 bg-white";
+    }
+  } else if (danger) {
+    variant = "bg-red-600 text-white hover:bg-red-700 shadow-sm";
+  } else if (grad) {
+    variant = "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-sm";
+  }
+
+  return (
+    <button className={`${base} ${size} ${variant}`} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+};
+
+const Modal = ({ title, onClose, children }) => (
+  <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
+      <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+        <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
+        <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+          <XCircle className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="p-6 flex flex-col gap-4">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+const Field = ({ label, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-semibold text-[#0B1929]">{label}</label>
+    {children}
+  </div>
+);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -15,10 +80,10 @@ const fmtFechaHora = (iso) => {
 };
 
 const ESTADO_COLOR = {
-  pendiente:  { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.35)",  text: "#fbbf24", label: "⏳ Pendiente" },
-  confirmada: { bg: "rgba(34,197,94,0.10)",   border: "rgba(34,197,94,0.30)",   text: "#22c55e", label: "✅ Confirmada" },
-  rechazada:  { bg: "rgba(239,68,68,0.10)",   border: "rgba(239,68,68,0.30)",   text: "#f87171", label: "❌ Rechazada" },
-  cancelada:  { bg: "rgba(100,116,139,0.10)", border: "rgba(100,116,139,0.30)", text: "#94a3b8", label: "🚫 Cancelada" },
+  pendiente:  { bg: "bg-yellow-50",  border: "border-yellow-200",  text: "text-yellow-700", bar: "bg-yellow-400", label: "Pendiente", Icon: Clock },
+  confirmada: { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700", bar: "bg-green-400", label: "Confirmada", Icon: CheckCircle2 },
+  rechazada:  { bg: "bg-red-50",     border: "border-red-200",     text: "text-red-700", bar: "bg-red-400", label: "Rechazada", Icon: XCircle },
+  cancelada:  { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700", bar: "bg-slate-400", label: "Cancelada", Icon: Ban },
 };
 
 // ── Componente principal ─────────────────────────────────────────────────────
@@ -28,7 +93,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [clientes, setClientes]             = useState([]);
   const [loading, setLoading]               = useState(true);
   const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
-  const [filtro, setFiltro]                 = useState("pendiente"); // "todos" | "pendiente" | "confirmada"
+  const [filtro, setFiltro]                 = useState("pendiente"); // "todos" | "pendiente" | "confirmada" | "rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
@@ -74,21 +139,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setSaving(true);
     try {
       await dbPatch(`citas?id=eq.${cita.id}`, { estado: "confirmada" });
-      setMsg("✅ Cita confirmada");
+      setMsg("Cita confirmada");
       loadCitas();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg(e.message); }
     setSaving(false);
   };
 
   const rechazar = async () => {
-    if (!motivoRechazo.trim()) { setMsg("⚠️ Escribe el motivo del rechazo"); return; }
+    if (!motivoRechazo.trim()) { setMsg("Escribe el motivo del rechazo"); return; }
     setSaving(true);
     try {
       await dbPatch(`citas?id=eq.${modalRechazo.id}`, { estado: "rechazada", motivo_rechazo: motivoRechazo });
-      setMsg("🔴 Cita rechazada");
+      setMsg("Cita rechazada");
       setModalRechazo(null); setMotivoRechazo("");
       loadCitas();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg(e.message); }
     setSaving(false);
   };
 
@@ -96,28 +161,28 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setSaving(true);
     try {
       await dbPatch(`citas?id=eq.${cita.id}`, { estado: "cancelada" });
-      setMsg("🚫 Cita cancelada");
+      setMsg("Cita cancelada");
       loadCitas();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg(e.message); }
     setSaving(false);
   };
 
   const agregarHorario = async () => {
     try {
       await dbPost("disponibilidad", { ...horarioForm, nutriologo_id: myId });
-      setMsg("✅ Horario guardado");
+      setMsg("Horario guardado");
       setShowHorario(false);
       loadDisponibilidad();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg(e.message); }
   };
 
   const eliminarHorario = async (id) => {
     if (!confirm("¿Eliminar este horario de disponibilidad?")) return;
     try {
       await dbDel(`disponibilidad?id=eq.${id}`);
-      setMsg("🗑️ Horario eliminado");
+      setMsg("Horario eliminado");
       loadDisponibilidad();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg(e.message); }
   };
 
   // ── Helpers de render ──
@@ -132,124 +197,128 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   // ── Render ──
   return (
-    <div className="animate-in">
+    <div className="animate-in w-full">
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 24, color: C.text, letterSpacing: "0.5px" }}>
+          <h2 className="font-bold text-2xl text-[#0B1929] tracking-tight">
             Agenda
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+          <div className="text-sm text-[#6B7A8D] mt-1">
             {pendientesCount > 0
-              ? <span style={{ color: "#fbbf24", fontWeight: 700 }}>{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
+              ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
               : "Todo al día"}
           </div>
         </div>
         {/* Sub-tabs */}
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
           {[["citas", "Citas"], ["horarios", "Horarios"]].map(([k, lb]) => (
-            <button key={k} onClick={() => setSubTab(k)} style={{
-              padding: "7px 16px", borderRadius: 9, fontSize: 12, fontWeight: 700,
-              fontFamily: "'Inter',sans-serif", cursor: "pointer", transition: "all 0.2s",
-              background: subTab === k ? "rgba(46,92,184,0.25)" : "rgba(46,92,184,0.07)",
-              border: `1px solid ${subTab === k ? "rgba(46,92,184,0.5)" : "rgba(46,92,184,0.15)"}`,
-              color: subTab === k ? C.accent : C.muted
-            }}>{lb}</button>
+            <button key={k} onClick={() => setSubTab(k)} className={`
+              px-4 py-1.5 rounded-lg text-sm font-semibold transition-all
+              ${subTab === k ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
+            `}>
+              {lb}
+            </button>
           ))}
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.border}`, borderTopColor: C.accent, animation: "rotateSlow 0.8s linear infinite", margin: "0 auto 14px" }} />
+        <div className="text-center py-16 text-[#6B7A8D]">
+          <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-blue-600 animate-spin mx-auto mb-4" />
           Cargando agenda…
         </div>
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
           {/* Filtros */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-            {[["pendiente", "⏳ Pendientes"], ["confirmada", "✅ Confirmadas"], ["rechazada", "❌ Rechazadas"], ["todos", "📋 Todas"]].map(([k, lb]) => (
-              <button key={k} onClick={() => setFiltro(k)} style={{
-                padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                fontFamily: "'Inter',sans-serif", cursor: "pointer", transition: "all 0.2s",
-                background: filtro === k ? "rgba(46,92,184,0.25)" : "rgba(46,92,184,0.06)",
-                border: `1px solid ${filtro === k ? "rgba(46,92,184,0.45)" : "rgba(46,92,184,0.12)"}`,
-                color: filtro === k ? C.accent : C.muted
-              }}>
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[
+              ["pendiente", "Pendientes", Clock], 
+              ["confirmada", "Confirmadas", CheckCircle2], 
+              ["rechazada", "Rechazadas", XCircle], 
+              ["todos", "Todas", ClipboardList]
+            ].map(([k, lb, Icon]) => (
+              <button key={k} onClick={() => setFiltro(k)} className={`
+                inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border
+                ${filtro === k ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-[#6B7A8D] hover:bg-slate-50"}
+              `}>
+                <Icon className="w-4 h-4" />
                 {lb}
                 {k === "pendiente" && pendientesCount > 0 && (
-                  <span style={{ marginLeft: 6, background: "#fbbf24", color: "#000", borderRadius: "50%", padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{pendientesCount}</span>
+                  <span className="ml-1 bg-yellow-400 text-yellow-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
+                    {pendientesCount}
+                  </span>
                 )}
               </button>
             ))}
           </div>
 
           {citasFiltradas.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>Sin citas {filtro !== "todos" ? `en estado "${filtro}"` : ""}</div>
+            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="text-[15px] font-semibold text-[#6B7A8D]">Sin citas {filtro !== "todos" ? `en estado "${filtro}"` : ""}</div>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="flex flex-col gap-3">
               {citasFiltradas.map((cita, i) => {
                 const estado = ESTADO_COLOR[cita.estado] || ESTADO_COLOR.cancelada;
+                const StateIcon = estado.Icon;
                 const tel = clienteTelefono(cita.cliente_id);
                 return (
-                  <div key={cita.id} className="card-hover animate-in" style={{
-                    animationDelay: `${i * 0.04}s`,
-                    background: "linear-gradient(145deg, rgba(10,20,40,0.85), rgba(7,13,24,0.95))",
-                    borderRadius: 16, border: "1px solid rgba(46,92,184,0.1)",
-                    padding: "16px 20px", position: "relative", overflow: "hidden",
-                    backdropFilter: "blur(12px)"
-                  }}>
+                  <div key={cita.id} className="animate-in bg-white rounded-xl border border-[#E2E8F0] p-4 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
                     {/* Barra lateral estado */}
-                    <div style={{
-                      position: "absolute", left: 0, top: 0, bottom: 0, width: 4,
-                      background: estado.text, borderRadius: "4px 0 0 4px",
-                      boxShadow: `0 0 12px ${estado.text}55`
-                    }} />
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${estado.bar}`} />
 
-                    <div style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div className="pl-3 flex justify-between items-start flex-wrap gap-4">
                       {/* Info izquierda */}
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 4, fontFamily: "'Space Grotesk',sans-serif" }}>
+                        <div className="font-bold text-[15px] text-[#0B1929] mb-1">
                           {clienteNombre(cita.cliente_id)}
                         </div>
-                        <div style={{ fontSize: 13, color: C.muted, marginBottom: 6 }}>
-                          🕐 {fmtFechaHora(cita.fecha_hora)}
+                        <div className="text-sm text-[#6B7A8D] mb-2 flex items-center gap-1.5">
+                          <Clock3 className="w-4 h-4" /> {fmtFechaHora(cita.fecha_hora)}
                         </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                          <Tag size="sm" color={estado.text}>{estado.label}</Tag>
-                          <Tag size="sm" color={C.accentMid}>
-                            {cita.modalidad === "virtual" ? "💻 Virtual" : "🏢 Presencial"}
+                        <div className="flex gap-2 flex-wrap items-center">
+                          <Tag className={`${estado.bg} ${estado.border} ${estado.text}`}>
+                            <StateIcon className="w-3.5 h-3.5" />
+                            {estado.label}
+                          </Tag>
+                          <Tag className="bg-slate-100 border-slate-200 text-slate-700">
+                            {cita.modalidad === "virtual" ? <><Monitor className="w-3.5 h-3.5" /> Virtual</> : <><Building className="w-3.5 h-3.5" /> Presencial</>}
                           </Tag>
                           {tel && (
                             <a
                               href={`https://wa.me/${tel.replace(/\D/g, "")}?text=Hola+${clienteNombre(cita.cliente_id)}%2C+sobre+tu+cita+el+${encodeURIComponent(fmtFechaHora(cita.fecha_hora))}`}
                               target="_blank" rel="noreferrer"
-                              style={{ color: "#22c55e", fontSize: 12, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+                              className="text-green-600 text-xs font-bold no-underline inline-flex items-center gap-1 hover:text-green-700 transition-colors bg-green-50 px-2 py-1 rounded-md border border-green-200"
                             >
-                              💬 WhatsApp
+                              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                             </a>
                           )}
                         </div>
                         {cita.motivo_rechazo && (
-                          <div style={{ marginTop: 8, fontSize: 12, color: "#f87171", background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "6px 10px", border: "1px solid rgba(239,68,68,0.15)" }}>
+                          <div className="mt-3 text-xs text-red-700 bg-red-50 rounded-lg p-2.5 border border-red-100 font-medium">
                             Motivo: {cita.motivo_rechazo}
                           </div>
                         )}
                       </div>
 
                       {/* Acciones derecha */}
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div className="flex gap-2 flex-wrap">
                         {cita.estado === "pendiente" && (
                           <>
-                            <Btn small grad onClick={() => confirmar(cita)} disabled={saving}>✅ Confirmar</Btn>
-                            <Btn small outline color="#ef4444" onClick={() => { setModalRechazo(cita); setMotivoRechazo(""); }}>❌ Rechazar</Btn>
+                            <Btn small grad onClick={() => confirmar(cita)} disabled={saving}>
+                              <CheckCircle2 className="w-4 h-4" /> Confirmar
+                            </Btn>
+                            <Btn small outline danger onClick={() => { setModalRechazo(cita); setMotivoRechazo(""); }}>
+                              <XCircle className="w-4 h-4" /> Rechazar
+                            </Btn>
                           </>
                         )}
                         {cita.estado === "confirmada" && (
-                          <Btn small outline color="#ef4444" onClick={() => cancelar(cita)} disabled={saving}>🚫 Cancelar</Btn>
+                          <Btn small outline danger onClick={() => cancelar(cita)} disabled={saving}>
+                            <Ban className="w-4 h-4" /> Cancelar
+                          </Btn>
                         )}
                       </div>
                     </div>
@@ -262,37 +331,38 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : (
         // ── Vista de Horarios ───────────────────────────────────────────────
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: C.muted }}>
+          <div className="flex flex-wrap justify-between items-center mb-5 gap-3">
+            <div className="text-sm text-[#6B7A8D]">
               Define los días y horas en que los clientes pueden solicitar una cita.
             </div>
-            <Btn small grad onClick={() => setShowHorario(true)}>Agregar horario</Btn>
+            <Btn small grad onClick={() => setShowHorario(true)}>
+              <Plus className="w-4 h-4" /> Agregar horario
+            </Btn>
           </div>
 
           {disponibilidad.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.muted, marginBottom: 8 }}>Sin horarios configurados</div>
-              <div style={{ fontSize: 13, marginBottom: 20 }}>Agrega tu disponibilidad para que los clientes puedan solicitar citas</div>
-              <Btn small grad onClick={() => setShowHorario(true)}>Agregar primer horario</Btn>
+            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="text-[15px] font-semibold text-[#0B1929] mb-2">Sin horarios configurados</div>
+              <div className="text-sm text-[#6B7A8D] mb-5">Agrega tu disponibilidad para que los clientes puedan solicitar citas</div>
+              <Btn small grad onClick={() => setShowHorario(true)}>
+                <Plus className="w-4 h-4" /> Agregar primer horario
+              </Btn>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {disponibilidad.map(h => (
-                <div key={h.id} style={{
-                  background: "linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
-                  borderRadius: 14, border: "1px solid rgba(46,92,184,0.12)",
-                  padding: "14px 18px", display: "flex", alignItems: "center",
-                  justifyContent: "space-between", gap: 10
-                }}>
+                <div key={h.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow">
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>
+                    <div className="font-bold text-sm text-[#0B1929] mb-1">
                       {DIAS_FULL[h.dia_semana]}
                     </div>
-                    <div style={{ fontSize: 13, color: C.muted }}>
-                      🕐 {h.hora_inicio?.slice(0, 5)} – {h.hora_fin?.slice(0, 5)}
+                    <div className="text-sm text-[#6B7A8D] flex items-center gap-1.5">
+                      <Clock3 className="w-4 h-4" /> {h.hora_inicio?.slice(0, 5)} – {h.hora_fin?.slice(0, 5)}
                     </div>
                   </div>
-                  <Btn small outline color="#ef4444" onClick={() => eliminarHorario(h.id)}>🗑️</Btn>
+                  <Btn small outline danger onClick={() => eliminarHorario(h.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Btn>
                 </div>
               ))}
             </div>
@@ -303,22 +373,22 @@ export function AgendaAdmin({ setMsg, profileId }) {
       {/* Modal Rechazar */}
       {modalRechazo && (
         <Modal title="Rechazar cita" onClose={() => setModalRechazo(null)}>
-          <div style={{ fontSize: 14, color: C.muted, marginBottom: 16, lineHeight: 1.6 }}>
-            Rechazando la cita de <strong style={{ color: C.text }}>{clienteNombre(modalRechazo.cliente_id)}</strong> el{" "}
-            <strong style={{ color: C.text }}>{fmtFechaHora(modalRechazo.fecha_hora)}</strong>.
+          <div className="text-sm text-[#6B7A8D] leading-relaxed">
+            Rechazando la cita de <strong className="text-[#0B1929]">{clienteNombre(modalRechazo.cliente_id)}</strong> el{" "}
+            <strong className="text-[#0B1929]">{fmtFechaHora(modalRechazo.fecha_hora)}</strong>.
             <br/>El cliente verá el motivo en su aplicación.
           </div>
           <Field label="Motivo del rechazo">
             <textarea
+              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-y"
               value={motivoRechazo}
               onChange={e => setMotivoRechazo(e.target.value)}
-              placeholder="Ej. El horario ya fue ocupado por otro paciente. Te invitamos a seleccionar una nueva fecha."
+              placeholder="Ej. El horario ya fue ocupado..."
               rows={4}
-              style={{ resize: "vertical", fontFamily: "'Inter',sans-serif", fontSize: 13 }}
             />
           </Field>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => setModalRechazo(null)}>Cancelar</Btn>
+          <div className="flex gap-2 justify-end mt-2">
+            <Btn outline onClick={() => setModalRechazo(null)}>Cancelar</Btn>
             <Btn danger onClick={rechazar} disabled={saving || !motivoRechazo.trim()}>
               {saving ? "Rechazando…" : "Confirmar rechazo"}
             </Btn>
@@ -328,26 +398,38 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
       {/* Modal Agregar Horario */}
       {showHorario && (
-        <Modal title="Agregar horario de disponibilidad" onClose={() => setShowHorario(false)}>
+        <Modal title="Agregar disponibilidad" onClose={() => setShowHorario(false)}>
           <Field label="Día de la semana">
-            <select value={horarioForm.dia_semana} onChange={e => setHorarioForm(p => ({ ...p, dia_semana: +e.target.value }))}>
+            <select 
+              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              value={horarioForm.dia_semana} 
+              onChange={e => setHorarioForm(p => ({ ...p, dia_semana: +e.target.value }))}
+            >
               {DIAS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
             </select>
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3 mt-1">
             <Field label="Hora inicio">
-              <select value={horarioForm.hora_inicio} onChange={e => setHorarioForm(p => ({ ...p, hora_inicio: e.target.value }))}>
+              <select 
+                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={horarioForm.hora_inicio} 
+                onChange={e => setHorarioForm(p => ({ ...p, hora_inicio: e.target.value }))}
+              >
                 {HORAS.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
             </Field>
             <Field label="Hora fin">
-              <select value={horarioForm.hora_fin} onChange={e => setHorarioForm(p => ({ ...p, hora_fin: e.target.value }))}>
+              <select 
+                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={horarioForm.hora_fin} 
+                onChange={e => setHorarioForm(p => ({ ...p, hora_fin: e.target.value }))}
+              >
                 {HORAS.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
             </Field>
           </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => setShowHorario(false)}>Cancelar</Btn>
+          <div className="flex gap-2 justify-end mt-3">
+            <Btn outline onClick={() => setShowHorario(false)}>Cancelar</Btn>
             <Btn grad onClick={agregarHorario}>Guardar horario</Btn>
           </div>
         </Modal>

@@ -1,0 +1,10 @@
+{
+  "description": "Centralized platform for nutritionists to assign diets, training plans, track progress, manage appointments, and analyze patient health data visually.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

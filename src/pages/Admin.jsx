@@ -1,17 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
-import { C, css } from "../styles/theme";
-import { Btn, Modal, Field, Tag, Header, Sidebar, OrbBackground } from "../components/ui";
+import { 
+  Users, Folder, CalendarDays, UsersRound, Building2, 
+  Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X 
+} from "lucide-react";
+import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
-import { TimerWidget } from "../components/TimerWidget";
+import { useBrand } from "../components/BrandContext";
+
+// Contenedor temporal para los sub-componentes oscuros (legacy)
+// Ocupa al menos el 100% de la altura para que no se corte el fondo
+const SubComponentWrapper = ({ children, title }) => (
+  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] overflow-hidden">
+    {title && (
+      <div className="px-4 md:px-8 py-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between shadow-sm z-10 shrink-0">
+        <h1 className="text-lg font-bold tracking-tight text-[#0B1929]">{title}</h1>
+      </div>
+    )}
+    <div className="flex-1 w-full relative p-4 md:p-8 overflow-y-auto">
+      {children}
+    </div>
+  </div>
+);
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
-  const [tab, setTab]                       = useState("inicio");
-  const [menuOpen, setMenuOpen]             = useState(false);
+  const brand = useBrand();
+  const [tab, setTab]                       = useState("clientes");
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -25,7 +43,6 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
   const [nutriologoMap, setNutrioMap]       = useState({});
   const [searchClientes, setSearchClientes] = useState("");
 
-  // Filtro por nutriologo_id — superadmin ve todo, nutriólogo ve los suyos
   const myId = profileId || getProfileId();
   const clientesFilter = isSuperadmin
     ? "clientes?order=created_at.asc"
@@ -44,14 +61,12 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
 
-  // Si se limpia el cliente seleccionado en la pestaña de programar, regresar a la lista
   useEffect(() => {
     if (tab === "programar" && !selected) {
       setTab("clientes");
     }
   }, [tab, selected]);
 
-  // Cargar mapa id→nombre de nutriólogos (solo superadmin)
   useEffect(() => {
     if (!isSuperadmin) return;
     dbGet("profiles?role=eq.nutriologo&select=id,nombre").then(rows => {
@@ -62,7 +77,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
   }, [isSuperadmin]);
 
   const createClient = async () => {
-    if (!newClient.email||!newClient.nombre) { setMsg("⚠️ Nombre y email son obligatorios"); return; }
+    if (!newClient.email||!newClient.nombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
       const authUser = await authInvite(newClient.email, { role: "cliente", nombre: newClient.nombre });
@@ -73,10 +88,10 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         telefono: newClient.telefono,
         auth_id: authUser.id,
         activo: true,
-        nutriologo_id: myId   // ← asignar al nutriólogo que lo crea
+        nutriologo_id: myId
       });
       setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
-      await loadClientes(); setMsg("✅ Cliente creado — se le envió email de invitación");
+      await loadClientes(); setMsg("✅ Cliente creado - se le envió email de invitación");
     } catch(e) { setMsg("❌ "+e.message); }
     setSaving(false);
   };
@@ -102,18 +117,15 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   const activarModoAtleta = async () => {
     try {
-      // 1. Obtener email y nombre propio del nutriólogo
       const profiles = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`);
       if (!profiles.length) { setMsg("❌ No se encontró tu perfil"); return; }
       const { nombre, email } = profiles[0];
 
-      // 2. Buscar registro de atleta propio ya creado
       const existing = await dbGet(`clientes?nutriologo_id=eq.${myId}&email=ilike.${encodeURIComponent(email)}&limit=1`);
       let clienteRecord;
       if (existing.length) {
         clienteRecord = existing[0];
       } else {
-        // 3. Crear registro de cliente-atleta (sin invitación por email)
         const created = await dbPost("clientes", {
           nombre, email,
           objetivo: "Mi entrenamiento personal",
@@ -132,316 +144,271 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-  // Tabs: administrativo solo ve clientes y agenda; nutriólogo ve todo
-  const tabs = role === "administrativo"
+  const SIDEBAR_ITEMS = role === "administrativo"
     ? [
-        ["clientes","👥","Clientes"],
-        ["agenda","📅","Agenda"]
+        { id: "clientes", label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
       ]
     : [
-        ["clientes","👥","Clientes"],
-        ["biblioteca","📚","Biblioteca"],
-        ["agenda","📅","Agenda"],
-        ["equipo","🗂️","Mi Equipo"],
-        ...(isSuperadmin ? [["nutriologos","🌐","Nutriólogos"]] : [])
+        { id: "clientes",   label: "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
+        { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+        { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
+        ...(isSuperadmin ? [{ id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> }] : [])
       ];
 
   return (
-    <div style={{ minHeight:"100vh", background:"#03050a", position:"relative" }}>
-      <style>{css}</style>
-      <OrbBackground/>
-
-      <Header
-        role={isSuperadmin ? "superadmin" : "admin"}
-        onLogout={onLogout}
-        onMenuClick={() => setMenuOpen(true)}
-        extra={
-          !isSuperadmin && (
-            <button
-              onClick={activarModoAtleta}
-              style={{
-                padding:"7px 14px", borderRadius:9,
-                background:"rgba(46,92,184,0.10)",
-                border:"1px solid rgba(46,92,184,0.25)",
-                color:"var(--brand-accent,#2e5cb8)",
-                fontSize:13, fontWeight:700,
-                cursor:"pointer", fontFamily:"'Inter',sans-serif",
-                transition:"all 0.2s", whiteSpace:"nowrap"
-              }}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(46,92,184,0.20)";}}
-              onMouseLeave={e=>{e.currentTarget.style.background="rgba(46,92,184,0.10)";}}
-            >Modo Atleta</button>
-          )
-        }
-      />
-
-      <Sidebar 
-        isOpen={menuOpen} 
-        onClose={() => setMenuOpen(false)} 
-        tabs={tabs} 
-        active={tab} 
-        onChange={setTab}
-        onLogout={onLogout}
-        role={isSuperadmin ? "superadmin" : "admin"}
-      />
-
-      <div style={{ padding:"28px 24px", maxWidth:980, margin:"0 auto", position:"relative", zIndex:1 }}>
-
-        {/* Toast de mensajes */}
-        {msg && (
-          <div
-            className="animate-in"
-            onClick={()=>setMsg("")}
-            style={{
-              background: msg.startsWith("❌") ? "#ef444420" : `color-mix(in srgb, ${C.accentDeep} 38%, transparent)`,
-              border:`1px solid ${msg.startsWith("❌") ? "#ef444440" : C.accent+"40"}`,
-              borderRadius:12, padding:"12px 18px",
-              fontSize:13, marginBottom:20,
-              cursor:"pointer", color: msg.startsWith("❌") ? "#f87171" : C.accent,
-              display:"flex", alignItems:"center", justifyContent:"space-between",
-              backdropFilter:"blur(4px)"
-            }}
-          >
-            <span>{msg}</span>
-            <span style={{opacity:0.5,fontSize:16}}>×</span>
+    <AppLayout
+      nav={SIDEBAR_ITEMS}
+      active={tab}
+      setActive={setTab}
+      brand={brand}
+      onLogout={onLogout}
+    >
+      {/* Toast Notification (z-[110] para que siempre esté arriba) */}
+      {msg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-top-4">
+          <div className="bg-white px-4 py-3 rounded-xl shadow-lg border border-[#E2E8F0] flex items-center gap-3">
+            <span className="text-sm font-medium text-[#0B1929]">{msg}</span>
+            <button onClick={() => setMsg("")} className="text-[#6B7A8D] hover:text-[#0B1929]">
+              <X size={16} />
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── PANTALLA INICIO EN BLANCO ── */}
-        {tab === "inicio" && (
-          <div className="animate-in" style={{
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            paddingTop: "15vh", textAlign: "center", opacity: 0.6
-          }}>
-            <img src="/logo.png" alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: C.text, marginBottom: 8 }}>Bienvenido al Panel</h2>
-            <p style={{ color: C.muted, fontSize: 14 }}>Abre el menú superior izquierdo para comenzar.</p>
-          </div>
-        )}
-
-        {/* ── TAB CLIENTES ── */}
-        {tab==="clientes" && (
-          <div className="animate-in">
-              <div style={{
-                display:"flex", justifyContent:"space-between",
-                alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:12
-              }}>
-                <div>
-                  <h2 style={{
-                    fontFamily:"'Space Grotesk',sans-serif",
-                    fontWeight:700, fontSize:24,
-                    color:"#e2eeff", letterSpacing:"0.3px", marginBottom:4
-                  }}>Clientes</h2>
-                  <div style={{fontSize:13,color:"#64748b"}}>
-                    {filteredClientes.filter(c=>c.activo).length} activos· {filteredClientes.filter(c=>!c.activo).length} inactivos
-                    {searchClientes && <span style={{color:"var(--brand-accent,#2e5cb8)",marginLeft:6}}>({filteredClientes.length} de {clientes.length})</span>}
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                  <input
-                    value={searchClientes}
-                    onChange={e=>setSearchClientes(e.target.value)}
-                    placeholder="Buscar cliente…"
-                    style={{
-                      background:"rgba(7,16,29,0.7)",
-                      border:"1px solid rgba(46,92,184,0.18)",
-                      borderRadius:9, padding:"8px 14px",
-                      color:"#e2eeff", fontSize:13,
-                      fontFamily:"'Inter',sans-serif",
-                      outline:"none", width:200
-                    }}
-                  />
-                  <Btn grad onClick={()=>setShowNewClient(true)}>+ Nuevo cliente</Btn>
-                </div>
+      {tab === "clientes" && (
+        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+          {/* Header */}
+          <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4">
+            {/* Cabecera superior: Título y Modo Atleta */}
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+                  Panel de Administración
+                </p>
+                <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+                  Pacientes
+                </h1>
+                <p className="text-sm text-[#6B7A8D] mt-1">
+                  {activeCount} pacientes activos de {clientes.length} totales
+                </p>
               </div>
+              
+              {!isSuperadmin && (
+                <button
+                  onClick={activarModoAtleta}
+                  className="flex items-center gap-1.5 px-3 py-2 md:px-4 md:py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs md:text-sm font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
+                >
+                  <Activity size={16} />
+                  <span className="hidden sm:inline">Modo Atleta</span>
+                  <span className="sm:hidden">Atleta</span>
+                </button>
+              )}
+            </div>
+            
+            {/* Controles de búsqueda y acción */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+              <div className="relative flex-1 w-full">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o email..."
+                  value={searchClientes}
+                  onChange={(e) => setSearchClientes(e.target.value)}
+                  className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
+                />
+              </div>
+              <button
+                onClick={() => setShowNewClient(true)}
+                className="flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity w-full sm:w-auto"
+              >
+                <Plus size={18} />
+                <span>Nuevo Paciente</span>
+              </button>
+            </div>
+          </div>
 
+          {/* Lista de Clientes */}
+          <div className="flex-1 p-6 md:p-8">
             {loading ? (
-              <div style={{ textAlign:"center", padding:"80px 0", color:"#64748b", fontSize:14 }}>
-                <div style={{
-                  width:44, height:44, borderRadius:"50%",
-                  border:"2px solid rgba(56,189,248,0.1)",
-                  borderTopColor:"#38bdf8",
-                  animation:"rotateSlow 0.8s linear infinite",
-                  margin:"0 auto 16px",
-                  boxShadow:"0 0 20px rgba(56,189,248,0.2)"
-                }}/>
-                Cargando clientes…
-              </div>
+              <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando pacientes...</div>
             ) : filteredClientes.length === 0 ? (
-              <div style={{
-                textAlign:"center", padding:"60px 0", color:"#475569",
-                background:"rgba(7,13,24,0.4)", borderRadius:16,
-                border:"1px solid rgba(56,189,248,0.05)"
-              }}>
-                <div style={{fontSize:40,marginBottom:12,opacity:0.3}}>🔍</div>
-                <div style={{fontSize:15,fontWeight:600,color:"#64748b"}}>Sin resultados para "{searchClientes}"</div>
+              <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
+                <div className="w-16 h-16 bg-[#E2E8F0] rounded-full flex items-center justify-center mb-4">
+                  <Users size={32} className="text-[#6B7A8D]" />
+                </div>
+                <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+                  No se encontraron pacientes
+                </h2>
+                <p className="text-sm text-[#6B7A8D]">Agrega un nuevo paciente para comenzar.</p>
               </div>
             ) : (
-              <div style={{display:"flex", flexDirection:"column", gap:10}}>
-                {filteredClientes.map((c, i) => (
-                  <div
-                    key={c.id}
-                    className="card-hover animate-in"
-                    style={{
-                      background:"linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
-                      borderRadius:16,
-                      border:"1px solid rgba(56,189,248,0.07)",
-                      padding:"16px 20px",
-                      display:"flex", alignItems:"center",
-                      justifyContent:"space-between",
-                      flexWrap:"wrap", gap:12,
-                      animationDelay:`${i*0.05}s`,
-                      position:"relative", overflow:"hidden",
-                      backdropFilter:"blur(12px)"
-                    }}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredClientes.map((c) => (
+                  <div 
+                    key={c.id} 
+                    className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden flex flex-col hover:border-[var(--brand-primary)] transition-colors shadow-sm"
                   >
-                    {/* Left accent bar */}
-                    <div style={{
-                      position:"absolute", left:0, top:"15%", bottom:"15%",
-                      width:3, borderRadius:"0 3px 3px 0",
-                      background: c.activo
-                        ? "linear-gradient(180deg, #38bdf8, #818cf8)"
-                        : "rgba(239,68,68,0.6)",
-                      boxShadow: c.activo ? "0 0 12px rgba(56,189,248,0.4)" : "0 0 8px rgba(239,68,68,0.3)"
-                    }}/>
-                    <div style={{paddingLeft:12}}>
-                      <div style={{ fontWeight:700, fontSize:15, color:"#e2eeff", marginBottom:3, fontFamily:"'Space Grotesk',sans-serif" }}>
-                        {c.nombre}
-                        <span style={{fontSize:12, color:"#475569", fontWeight:400, fontFamily:"'Inter',sans-serif", marginLeft:8}}>{c.email}</span>
-                      </div>
-                      <div style={{fontSize:12, color:"#64748b"}}>
-                        {c.objetivo||"Sin objetivo definido"}
+                    <div className="p-5 flex-1 relative">
+                      <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
+                      
+                      <div className="pl-2">
+                        <div className="flex items-start justify-between mb-1">
+                          <h3 className="font-bold text-[#0B1929] text-lg leading-tight truncate pr-2">
+                            {c.nombre}
+                          </h3>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                            c.activo 
+                              ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
+                              : 'bg-red-50 text-red-500'
+                          }`}>
+                            {c.activo ? "Activo" : "Inactivo"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
+                        
+                        <div className="text-sm text-[#4A5568] mb-4 line-clamp-2 min-h-[40px]">
+                          {c.objetivo || "Sin objetivo definido"}
+                        </div>
+
                         {c.telefono && (
-                          <a href={`https://wa.me/${c.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{marginLeft:12, color:"#22c55e", textDecoration:"none", fontWeight:600, display:"inline-flex", alignItems:"center", gap:4}}>
-                            <span style={{fontSize:14}}>💬</span> WhatsApp
+                          <a 
+                            href={`https://wa.me/${c.telefono.replace(/\D/g,'')}`} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            onClick={e => e.stopPropagation()} 
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-600 hover:text-green-700 bg-green-50 px-2.5 py-1 rounded-lg transition-colors"
+                          >
+                            <MessageCircle size={14} /> WhatsApp
                           </a>
                         )}
+
+                        {isSuperadmin && c.nutriologo_id && (
+                          <div className="text-[10px] text-[#6B7A8D] mt-3 font-medium flex items-center gap-1">
+                            <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
+                          </div>
+                        )}
                       </div>
-                      {isSuperadmin && c.nutriologo_id && (
-                        <div style={{fontSize:11, color:"#818cf8", marginTop:3, fontWeight:500}}>
-                          👤 {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
-                        </div>
-                      )}
                     </div>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{
-                        fontSize:11, fontWeight:700, letterSpacing:"0.5px",
-                        padding:"4px 12px", borderRadius:20,
-                        background: c.activo ? "rgba(56,189,248,0.12)" : "rgba(239,68,68,0.12)",
-                        border: `1px solid ${c.activo ? "rgba(56,189,248,0.25)" : "rgba(239,68,68,0.25)"}`,
-                        color: c.activo ? "#38bdf8" : "#f87171",
-                        fontFamily:"'Inter',sans-serif"
-                      }}>{c.activo ? "● Activo" : "○ Inactivo"}</span>
+                    
+                    <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-3 flex items-center gap-2">
                       {role !== "administrativo" && (
-                        <Btn small outline color="rgba(129,140,248,0.8)" onClick={()=>{setSelected(c);setTab("programar");}}>
+                        <button 
+                          onClick={() => { setSelected(c); setTab("programar"); }}
+                          className="flex-1 bg-white border border-[#E2E8F0] text-[var(--brand-primary)] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[var(--brand-primary)] hover:text-white transition-colors"
+                        >
                           Programar
-                        </Btn>
+                        </button>
                       )}
-                      <Btn small outline color={C.muted} onClick={()=>{
-                        setEditClient(c);
-                        setEditClientForm({ nombre:c.nombre||"", telefono:c.telefono||"", objetivo:c.objetivo||"" });
-                      }}>
-                        ✏️ Editar
-                      </Btn>
-                      <Btn small outline color={c.activo ? "rgba(239,68,68,0.8)" : "rgba(56,189,248,0.8)"} onClick={()=>toggleActivo(c)}>
-                        {c.activo ? "Desactivar" : "Activar"}
-                      </Btn>
+                      <button 
+                        onClick={() => {
+                          setEditClient(c);
+                          setEditClientForm({ nombre:c.nombre||"", telefono:c.telefono||"", objetivo:c.objetivo||"" });
+                        }}
+                        className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-1.5 rounded-lg hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => toggleActivo(c)}
+                        className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-1.5 rounded-lg transition-colors ${
+                          c.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'
+                        }`}
+                        title={c.activo ? "Desactivar" : "Activar"}
+                      >
+                        {c.activo ? <X size={16} /> : <AlertCircle size={16} />}
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {tab==="biblioteca" && (
-          <div className="animate-in">
-            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin}/>
-          </div>
-        )}
-        {tab==="programar" && (
-          <div className="animate-in">
-            <ProgramarCliente
-              clientes={clientes}
-              selected={selected}
-              setSelected={setSelected}
-              setMsg={setMsg}
-              biblioteca={biblioteca}
-            />
-          </div>
-        )}
-        {tab==="nutriologos" && isSuperadmin && (
-          <div className="animate-in">
-            <Nutriologos setMsg={setMsg}/>
-          </div>
-        )}
-        {tab==="equipo" && role !== "administrativo" && (
-          <div className="animate-in">
-            <GestionEquipo setMsg={setMsg} profileId={myId}/>
-          </div>
-        )}
-        {tab==="agenda" && (
-          <div className="animate-in">
-            <AgendaAdmin setMsg={setMsg} profileId={myId}/>
-          </div>
-        )}
-      </div>
+      {/* Legacy Dark Mode Sub-Components */}
+      {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
+      {tab === "programar" && <SubComponentWrapper title="Asignador de Dietas y Rutinas"><ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} /></SubComponentWrapper>}
+      {tab === "nutriologos" && isSuperadmin && <SubComponentWrapper><Nutriologos setMsg={setMsg}/></SubComponentWrapper>}
+      {tab === "equipo" && role !== "administrativo" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
+      {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
 
-      {/* Modal nuevo cliente */}
+      {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
       {showNewClient && (
-        <Modal title="➕ Nuevo cliente" onClose={()=>setShowNewClient(false)}>
-          <Field label="Nombre completo">
-            <input value={newClient.nombre} onChange={e=>setNewClient(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Ana García"/>
-          </Field>
-          <Field label="Email">
-            <input type="email" value={newClient.email} onChange={e=>setNewClient(p=>({...p,email:e.target.value}))} placeholder="ana@email.com"/>
-          </Field>
-          <Field label="Teléfono (WhatsApp)">
-            <input type="tel" value={newClient.telefono} onChange={e=>setNewClient(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
-          </Field>
-          <Field label="Objetivo">
-            <input value={newClient.objetivo} onChange={e=>setNewClient(p=>({...p,objetivo:e.target.value}))} placeholder="Pérdida de peso, ganancia muscular…"/>
-          </Field>
-          <div style={{
-            background:`color-mix(in srgb, ${C.accentDeep} 19%, transparent)`,
-            border:`1px solid color-mix(in srgb, ${C.accent} 15%, transparent)`,
-            borderRadius:10, padding:"11px 14px",
-            fontSize:12, color:C.muted, marginBottom:20, lineHeight:1.6
-          }}>
-            📧 El cliente recibirá un email de invitación para crear su contraseña.
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#0B1929]">Nuevo Paciente</h2>
+              <button onClick={() => setShowNewClient(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre completo</label>
+                <input value={newClient.nombre} onChange={e=>setNewClient(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Ana García" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Email</label>
+                <input type="email" value={newClient.email} onChange={e=>setNewClient(p=>({...p,email:e.target.value}))} placeholder="ana@email.com" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Teléfono (WhatsApp)</label>
+                <input type="tel" value={newClient.telefono} onChange={e=>setNewClient(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Objetivo</label>
+                <input value={newClient.objetivo} onChange={e=>setNewClient(p=>({...p,objetivo:e.target.value}))} placeholder="Pérdida de peso, ganancia muscular..." className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 mt-2">
+                El paciente recibirá un email de invitación para crear su contraseña.
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3">
+              <button onClick={() => setShowNewClient(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
+              <button onClick={createClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
+                {saving ? "Enviando..." : "Crear y enviar invitación"}
+              </button>
+            </div>
           </div>
-          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-            <Btn outline color={C.muted} onClick={()=>setShowNewClient(false)}>Cancelar</Btn>
-            <Btn grad onClick={createClient} disabled={saving}>
-              {saving ? "Enviando invitación…" : "Crear y enviar invitación"}
-            </Btn>
-          </div>
-        </Modal>
+        </div>
       )}
 
-      {/* Modal editar cliente */}
       {editClient && (
-        <Modal title={`✏️ Editar cliente — ${editClient.email}`} onClose={()=>setEditClient(null)}>
-          <Field label="Nombre completo">
-            <input value={editClientForm.nombre} onChange={e=>setEditClientForm(p=>({...p,nombre:e.target.value}))} />
-          </Field>
-          <Field label="Teléfono (WhatsApp)">
-            <input type="tel" value={editClientForm.telefono} onChange={e=>setEditClientForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678"/>
-          </Field>
-          <Field label="Objetivo">
-            <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} />
-          </Field>
-          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:10}}>
-            <Btn outline color={C.muted} onClick={()=>setEditClient(null)}>Cancelar</Btn>
-            <Btn grad onClick={saveEditClient} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar cambios"}
-            </Btn>
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#0B1929]">Editar Paciente</h2>
+              <button onClick={() => setEditClient(null)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre completo</label>
+                <input value={editClientForm.nombre} onChange={e=>setEditClientForm(p=>({...p,nombre:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Teléfono (WhatsApp)</label>
+                <input type="tel" value={editClientForm.telefono} onChange={e=>setEditClientForm(p=>({...p,telefono:e.target.value}))} placeholder="Ej. +525512345678" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Objetivo</label>
+                <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3">
+              <button onClick={() => setEditClient(null)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
+              <button onClick={saveEditClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
-      <TimerWidget />
-    </div>
+    </AppLayout>
   );
 }
-
-

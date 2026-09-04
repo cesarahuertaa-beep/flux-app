@@ -1,46 +1,18 @@
-/**
- * SortableItem.jsx
- * Componente reutilizable de drag-and-drop para @dnd-kit.
- * Envuelve cualquier fila/card con el ícono de 6 puntos como asa de movimiento.
- * Compatible con mouse y touch (móvil).
- */
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
-/** Ícono de 6 puntos — asa visual de arrastre */
 export const DragHandle = ({ listeners, attributes }) => (
   <span
     {...listeners}
     {...attributes}
     title="Arrastra para reordenar"
-    style={{
-      cursor: "grab",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "4px 6px",
-      borderRadius: 6,
-      color: "rgba(100,116,139,0.6)",
-      fontSize: 16,
-      lineHeight: 1,
-      flexShrink: 0,
-      transition: "color 0.15s",
-      touchAction: "none",
-      userSelect: "none",
-      WebkitUserSelect: "none",
-    }}
-    onMouseEnter={e => (e.currentTarget.style.color = "var(--brand-accent,#2e5cb8)")}
-    onMouseLeave={e => (e.currentTarget.style.color = "rgba(100,116,139,0.6)")}
+    className="cursor-grab flex items-center justify-center p-1.5 rounded-md text-[#9BA5B0] hover:text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shrink-0 touch-none select-none"
   >
-    ⠿
+    <GripVertical size={18} strokeWidth={1.5} />
   </span>
 );
 
-/**
- * SortableItem — envuelve un ítem con lógica de sorting.
- * @param {string|number} id  — id único del ítem
- * @param {function} children — render function: ({ dragHandle, isDragging }) => JSX
- */
 export const SortableItem = ({ id, children }) => {
   const {
     attributes,
@@ -55,17 +27,18 @@ export const SortableItem = ({ id, children }) => {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : "auto",
-    opacity: isDragging ? 0.85 : 1,
-    boxShadow: isDragging
-      ? "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(46,92,184,0.3)"
-      : "none",
+    opacity: isDragging ? 0.9 : 1,
     position: "relative",
   };
 
   const dragHandle = <DragHandle listeners={listeners} attributes={attributes} />;
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={isDragging ? "shadow-2xl ring-2 ring-[var(--brand-primary)] ring-opacity-50 rounded-xl" : ""}
+    >
       {children({ dragHandle, isDragging })}
     </div>
   );

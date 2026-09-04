@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>FLUX Promo Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Inter',system-ui,sans-serif;overflow:hidden}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700;800&family=Rajdhani:wght@700&display=swap');
+
+/* Phone */
+.phone{width:320px;height:640px;background:#0a0f1a;border-radius:40px;border:2px solid #1e3a5f;box-shadow:0 0 60px rgba(34,211,238,0.15),0 40px 120px rgba(0,0,0,0.8);position:relative;overflow:hidden}
+.phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:28px;background:#0a0f1a;border-radius:0 0 20px 20px;z-index:10}
+.screen{position:absolute;inset:0;padding-top:30px;opacity:0}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(4,8,15,0.9);border-bottom:1px solid rgba(46,92,184,0.15)}
+.hdr-logo{display:flex;align-items:center;gap:6px}
+.hdr-logo-box{width:28px;height:28px;background:linear-gradient(135deg,#1a3a6e,#2e5cb8);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#22d3ee;font-family:'Space Grotesk',sans-serif}
+.hdr-name{text-align:center;line-height:1.2}
+.hdr-name b{font-size:10px;color:#e2e8f0;display:block}
+.hdr-name span{font-size:9px;color:#64748b}
+.hdr-btn{padding:5px 10px;border-radius:8px;background:rgba(46,92,184,0.1);border:1px solid rgba(46,92,184,0.2);color:#94a3b8;font-size:10px;cursor:pointer}
+
+/* Tabs */
+.tabs{display:flex;background:rgba(7,16,29,0.8);border-bottom:1px solid rgba(46,92,184,0.1);padding:0 4px}
+.tab{flex:1;padding:10px 4px 9px;font-size:10px;color:#64748b;text-align:center;position:relative;white-space:nowrap}
+.tab.active{color:#22d3ee;font-weight:700}
+.tab.active::after{content:'';position:absolute;bottom:0;left:10%;width:80%;height:2px;background:#22d3ee;border-radius:2px}
+
+/* Macro grid */
+.macros{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 10px 6px}
+.mac{background:rgba(15,28,46,0.95);border-radius:14px;border:1px solid rgba(46,92,184,0.12);padding:12px 8px;text-align:center}
+.mac-icon{font-size:18px;margin-bottom:4px}
+.mac-val{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;line-height:1}
+.mac-unit{font-size:8px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin:2px 0}
+.mac-label{font-size:9px;color:#94a3b8;font-weight:500}
+
+/* Day pill */
+.day-pill{margin:0 10px 8px;background:linear-gradient(135deg,#0891b2,#22d3ee);border-radius:20px;padding:8px 12px;font-size:9px;font-weight:700;color:#000;text-align:center}
+
+/* Meal card */
+.meal{margin:0 10px 6px;background:rgba(15,28,46,0.95);border-radius:12px;border:1px solid rgba(46,92,184,0.12);overflow:hidden}
+.meal-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid rgba(46,92,184,0.08);background:rgba(14,116,144,0.08)}
+.meal-time{font-size:9px;color:#64748b;background:rgba(30,58,95,0.5);padding:2px 7px;border-radius:10px;border:1px solid rgba(46,92,184,0.15)}
+.meal-name{font-size:11px;font-weight:700;color:#e2e8f0}
+.meal-kcal{font-size:11px;font-weight:800;color:#22d3ee;font-family:'Rajdhani',sans-serif}
+.meal-body{padding:7px 10px}
+.meal-opts{display:flex;gap:6px;margin-bottom:5px}
+.opt-active{padding:3px 10px;border-radius:10px;background:linear-gradient(135deg,#0891b2,#22d3ee);font-size:9px;font-weight:700;color:#000}
+.opt-ghost{padding:3px 10px;border-radius:10px;border:1px solid rgba(34,211,238,0.3);font-size:9px;color:#64748b}
+.meal-desc{font-size:9px;color:#94a3b8;line-height:1.4;margin-bottom:5px}
+.meal-macros{display:flex;gap:8px}
+.mm{font-size:9px;font-weight:700}
+
+/* Training */
+.day-pills{display:flex;gap:8px;padding:8px 10px}
+.dpill{padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer}
+.dpill.active{background:linear-gradient(135deg,#0891b2,#22d3ee);color:#000}
+.dpill.inactive{background:rgba(15,28,46,0.9);border:1px solid rgba(46,92,184,0.2);color:#64748b}
+.tip-card{margin:0 10px 8px;background:rgba(15,28,46,0.6);border:1px solid rgba(46,92,184,0.15);border-radius:10px;padding:8px 10px;font-size:9px;color:#64748b;line-height:1.5}
+.save-btn{margin:0 10px 8px;background:linear-gradient(135deg,#0891b2,#22d3ee);border-radius:10px;padding:9px;text-align:center;font-size:11px;font-weight:700;color:#000}
+.ex-table{margin:0 10px;background:rgba(10,18,35,0.9);border-radius:12px;overflow:hidden;border:1px solid rgba(46,92,184,0.15)}
+.ex-thead{display:grid;grid-template-columns:1fr 50px 50px 50px;padding:7px 10px;background:rgba(14,30,65,0.8);border-bottom:1px solid rgba(46,92,184,0.15)}
+.ex-thead span{font-size:8px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
+.ex-row{padding:8px 10px;border-bottom:1px solid rgba(46,92,184,0.07);display:grid;grid-template-columns:1fr 50px 50px 50px;align-items:center}
+.ex-info{display:flex;align-items:center;gap:6px}
+.ex-img{width:28px;height:28px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ex-name{font-size:9px;color:#e2e8f0;font-weight:600;line-height:1.3}
+.ex-reps{font-size:8px;color:#64748b}
+.ex-ver{font-size:8px;color:#22d3ee}
+.ex-num{font-size:11px;font-weight:700;color:#22d3ee;font-family:'Rajdhani',sans-serif;text-align:center}
+.ex-cell{font-size:10px;color:#22d3ee;text-align:center;font-family:'Rajdhani',sans-serif;font-weight:700}
+.ex-dash{font-size:10px;color:#1e3a5f;text-align:center}
+
+/* Modal */
+.modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.modal-card{background:rgba(15,28,46,0.98);border-radius:20px;border:1px solid rgba(46,92,184,0.2);padding:16px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+.modal-img{background:#fff;border-radius:12px;height:130px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:48px}
+.modal-title{font-size:14px;font-weight:700;color:#e2e8f0;text-align:center;margin-bottom:8px}
+.modal-tags{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+.modal-tag{padding:3px 10px;border-radius:10px;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);font-size:9px;color:#22d3ee}
+.modal-reps{font-size:11px;color:#64748b;text-align:center;margin-bottom:12px}
+.modal-reps b{color:#22d3ee}
+.modal-btn{background:linear-gradient(135deg,#0891b2,#22d3ee);border-radius:12px;padding:10px;text-align:center;font-size:12px;font-weight:700;color:#000}
+
+/* Overlay text */
+.overlay-text{position:fixed;bottom:80px;left:0;right:0;text-align:center;z-index:100;opacity:0;pointer-events:none}
+.ot-main{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:800;color:#fff;text-shadow:0 2px 20px rgba(0,0,0,0.8);line-height:1.2}
+.ot-sub{font-size:14px;color:#22d3ee;margin-top:6px;font-weight:500;letter-spacing:.5px}
+
+/* Intro */
+.intro-screen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
+.intro-logo{font-family:'Space Grotesk',sans-serif;font-size:80px;font-weight:800;color:#fff;letter-spacing:-4px;line-height:1}
+.intro-logo .x{color:#22d3ee;text-shadow:0 0 40px rgba(34,211,238,0.8);font-style:italic}
+.intro-tag{font-size:14px;color:#64748b;letter-spacing:4px;text-transform:uppercase;margin-top:8px}
+.glow-ring{width:200px;height:200px;border-radius:50%;border:1px solid rgba(34,211,238,0.2);position:absolute;animation:ring 3s ease-in-out infinite}
+.glow-ring:nth-child(2){width:280px;height:280px;animation-delay:.5s;border-color:rgba(34,211,238,0.1)}
+
+@keyframes ring{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.05);opacity:1}}
+
+/* Scroll wrapper */
+.scroll-wrap{overflow:hidden;height:100%}
+</style>
+</head>
+<body>
+
+<!-- Intro -->
+<div class="intro-screen" id="intro">
+  <div class="glow-ring"></div>
+  <div class="glow-ring"></div>
+  <div style="position:relative;text-align:center">
+    <div class="intro-logo">FLU<span class="x">X</span></div>
+    <div class="intro-tag">Fueling Your Performance</div>
+  </div>
+</div>
+
+<!-- Phone -->
+<div class="phone" id="phone" style="transform:perspective(800px) rotateY(20deg) rotateX(5deg) scale(0.7)">
+  <div class="phone-notch"></div>
+
+  <!-- SCREEN 1: Nutrición Macros -->
+  <div class="screen" id="s1">
+    <div class="hdr">
+      <div class="hdr-logo">
+        <div class="hdr-logo-box">F</div>
+        <span style="font-size:9px;color:#94a3b8">📄 PDF</span>
+      </div>
+      <div class="hdr-name"><b>Cesar Alberto Huerta</b><span>Mantenimiento</span></div>
+      <div class="hdr-btn">Salir</div>
+    </div>
+    <div class="tabs">
+      <div class="tab active">🥗 Nutrición</div>
+      <div class="tab">🏋️ Entrena</div>
+      <div class="tab">📊 Progreso</div>
+      <div class="tab">📅</div>
+    </div>
+    <div class="macros">
+      <div class="mac"><div class="mac-icon">🔥</div><div class="mac-val" style="color:#22d3ee">1855</div><div class="mac-unit">kcal</div><div class="mac-label">Calorías</div></div>
+      <div class="mac"><div class="mac-icon">🥩</div><div class="mac-val" style="color:#ef4444">169g</div><div class="mac-unit">gramos</div><div class="mac-label">Proteína</div></div>
+      <div class="mac"><div class="mac-icon">🍚</div><div class="mac-val" style="color:#818cf8">185g</div><div class="mac-unit">gramos</div><div class="mac-label">Carbos</div></div>
+      <div class="mac"><div class="mac-icon">🫒</div><div class="mac-val" style="color:#facc15">47g</div><div class="mac-unit">gramos</div><div class="mac-label">Grasas</div></div>
+    </div>
+    <div class="day-pill">Lunes, Martes, Miércoles, Viernes y Sábado</div>
+    <div class="meal">
+      <div class="meal-hdr"><span class="meal-time">8:00</span><span class="meal-name">Desayuno</span><span class="meal-kcal">220 kcal</span></div>
+      <div class="meal-body">
+        <div class="meal-opts"><span class="opt-active">Opción 1</span><span class="opt-ghost">Opción 2</span></div>
+        <div class="meal-desc">250 ml de claras de huevo y 1 manzana mediana</div>
+        <div class="meal-macros">
+          <span class="mm" style="color:#22d3ee">29g Prot</span>
+          <span class="mm" style="color:#818cf8">24g Carbs</span>
+          <span class="mm" style="color:#facc15">2g Grasas</span>
+        </div>
+      </div>
+    </div>
+    <div class="meal">
+      <div class="meal-hdr"><span class="meal-time">11:00</span><span class="meal-name">Colación 1</span><span class="meal-kcal">440 kcal</span></div>
+      <div class="meal-body">
+        <div class="meal-opts"><span class="opt-active">Opción 1</span><span class="opt-ghost">Opción 2</span></div>
+        <div class="meal-desc">160g de carne molida de res y 2 tortillas de maíz</div>
+        <div class="meal-macros">
+          <span class="mm" style="color:#22d3ee">36g Prot</span>
+          <span class="mm" style="color:#818cf8">36g Carbs</span>
+          <span class="mm" style="color:#facc15">18g Grasas</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Entrenamiento -->
+  <div class="screen" id="s2">
+    <div class="hdr">
+      <div class="hdr-logo"><div class="hdr-logo-box">F</div></div>
+      <div class="hdr-name"><b>Cesar Alberto Huerta</b><span>Mantenimiento</span></div>
+      <div class="hdr-btn">Salir</div>
+    </div>
+    <div class="tabs">
+      <div class="tab">🥗 Nutrición</div>
+      <div class="tab active">🏋️ Entrena</div>
+      <div class="tab">📊 Progreso</div>
+      <div class="tab">📅</div>
+    </div>
+    <div class="day-pills">
+      <div class="dpill active">lunes</div>
+      <div class="dpill inactive">martes</div>
+    </div>
+    <div class="save-btn">💾 Guardar registros</div>
+    <div class="ex-table">
+      <div class="ex-thead">
+        <span>EJERCICIO</span><span>SERIE</span><span>PESO</span><span>REPS</span>
+      </div>
+      <div class="ex-row">
+        <div class="ex-info">
+          <div class="ex-img">🦋</div>
+          <div><div class="ex-name">Butterfly chest</div><div class="ex-reps">10 reps</div><div class="ex-ver">▶ Ver</div></div>
+        </div>
+        <div class="ex-num">1</div><div class="ex-dash">—</div><div class="ex-dash">—</div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-info"><div style="width:28px"></div></div>
+        <div class="ex-num">2</div><div class="ex-dash">—</div><div class="ex-dash">—</div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-info">
+          <div class="ex-img">💪</div>
+          <div><div class="ex-name">Aducciones</div><div class="ex-reps">10 reps</div><div class="ex-ver">▶ Ver</div></div>
+        </div>
+        <div class="ex-num">1</div><div class="ex-cell">—</div><div class="ex-cell">10</div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-info"><div style="width:28px"></div></div>
+        <div class="ex-num">2</div><div class="ex-cell">8</div><div class="ex-cell">9</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: Modal ejercicio -->
+  <div class="screen" id="s3">
+    <div class="hdr">
+      <div class="hdr-logo"><div class="hdr-logo-box">F</div></div>
+      <div class="hdr-name"><b>Cesar Alberto Huerta</b><span>Mantenimiento</span></div>
+      <div class="hdr-btn">Salir</div>
+    </div>
+    <div class="tabs">
+      <div class="tab">🥗 Nutrición</div>
+      <div class="tab active">🏋️ Entrena</div>
+      <div class="tab">📊 Progreso</div>
+      <div class="tab">📅</div>
+    </div>
+    <div class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-img">🏋️</div>
+        <div class="modal-title">Butterfly chest</div>
+        <div class="modal-tags"><span class="modal-tag">Pecho</span><span class="modal-tag">Aislamiento</span></div>
+        <div class="modal-reps">Reps sugeridas: <b>10</b></div>
+        <div class="modal-btn">Cerrar</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Overlay text -->
+<div class="overlay-text" id="ot">
+  <div class="ot-main" id="ot-main"></div>
+  <div class="ot-sub" id="ot-sub"></div>
+</div>
+
+<script>
+const tl = gsap.timeline();
+
+// ── INTRO ──
+tl.to("#intro .intro-logo", {opacity:1, duration:0})
+  .from("#intro .intro-logo", {scale:0.5, opacity:0, duration:1.2, ease:"expo.out"})
+  .from("#intro .intro-tag",  {opacity:0, y:10, duration:0.8}, "-=0.4")
+  .to("#intro", {opacity:0, duration:0.8, delay:1.2, ease:"power2.in"})
+  .set("#intro", {display:"none"})
+
+// ── PHONE ENTERS ──
+  .to("#phone", {opacity:1, scale:1, rotateY:0, rotateX:0, duration:1.4, ease:"expo.out"})
+
+// ── SCREEN 1: Macros ──
+  .to("#s1", {opacity:1, duration:0.6, ease:"power2.out"})
+  .call(showText, ["Planes de Nutrición Personalizados", "Macros calculados para cada atleta"])
+  .to({}, {duration:2.5})
+  .call(hideText)
+  .to("#phone", {scale:1.5, y:-80, duration:1.2, ease:"power2.inOut"}, "-=0.5")
+  .to({}, {duration:1.5})
+
+// ── TRANSITION to SCREEN 2 ──
+  .to("#phone", {scale:1, y:0, duration:0.8, ease:"power2.inOut"})
+  .to("#s1", {opacity:0, x:-30, duration:0.4})
+  .to("#s2", {opacity:1, x:0, duration:0.5, ease:"power2.out"})
+  .call(showText, ["Rutinas Semana a Semana", "Tracking de peso y repeticiones"])
+  .to({}, {duration:2.5})
+  .call(hideText)
+  .to("#phone", {scale:1.4, y:-60, duration:1, ease:"power2.inOut"}, "-=0.5")
+  .to({}, {duration:1.5})
+
+// ── TRANSITION to SCREEN 3 ──
+  .to("#phone", {scale:1, y:0, duration:0.8, ease:"power2.inOut"})
+  .to("#s2", {opacity:0, x:-30, duration:0.4})
+  .to("#s3", {opacity:1, x:0, duration:0.5, ease:"power2.out"})
+  .call(showText, ["Biblioteca de Ejercicios", "Cada ejercicio con imagen y demostración"])
+  .to({}, {duration:2.5})
+  .call(hideText)
+
+// ── OUTRO ──
+  .to("#phone", {scale:0.9, opacity:0, duration:0.8, ease:"power2.in"}, "+=0.5")
+  .call(() => {
+    document.getElementById("ot-main").innerHTML = 'Tu marca. Tu app. 📱';
+    document.getElementById("ot-sub").innerText   = 'flux-sport.com';
+    gsap.to("#ot", {opacity:1, y:0, duration:0.8, ease:"expo.out"});
+  })
+  .from("#ot", {y:30, duration:0})
+  .to({}, {duration:3})
+  .to("#ot", {opacity:0, duration:0.6})
+  .call(() => tl.restart()); // Loop
+
+function showText(main, sub) {
+  document.getElementById("ot-main").innerText = main;
+  document.getElementById("ot-sub").innerText  = sub;
+  gsap.to("#ot", {opacity:1, y:0, duration:0.6, ease:"expo.out"});
+  gsap.from("#ot", {y:20, duration:0.01});
+}
+function hideText() {
+  gsap.to("#ot", {opacity:0, duration:0.4});
+}
+</script>
+</body>
+</html>

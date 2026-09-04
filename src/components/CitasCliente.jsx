@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../styles/theme";
-import { Btn, Modal, Field, Tag } from "./ui";
 import { dbGet, dbPost } from "../lib/supabase";
+import {
+  CalendarDays, Clock, Video, MapPin, Check, X,
+  AlertCircle, Plus, CheckCircle2, ChevronRight
+} from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -9,8 +11,9 @@ const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Vierne
 const fmtFechaHora = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
-    + " a las " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const dia = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  const hora = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return { dia, hora };
 };
 
 const fmtFechaCorta = (iso) => {
@@ -20,11 +23,11 @@ const fmtFechaCorta = (iso) => {
     + " • " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 };
 
-const ESTADO_COLOR = {
-  pendiente:  { text: "#fbbf24", label: "⏳ Pendiente de confirmación" },
-  confirmada: { text: "#22c55e", label: "✅ Confirmada" },
-  rechazada:  { text: "#f87171", label: "❌ Rechazada" },
-  cancelada:  { text: "#94a3b8", label: "🚫 Cancelada" },
+const ESTADOS = {
+  pendiente:  { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: <Clock size={14}/>, label: "Pendiente" },
+  confirmada: { text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: <Check size={14}/>, label: "Confirmada" },
+  rechazada:  { text: "text-red-600", bg: "bg-red-50", border: "border-red-200", icon: <X size={14}/>, label: "Rechazada" },
+  cancelada:  { text: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200", icon: <AlertCircle size={14}/>, label: "Cancelada" },
 };
 
 // ── Genera horarios disponibles dado un rango de disponibilidad y citas ya tomadas ──
@@ -56,17 +59,26 @@ const generarSlots = (disponibilidad, citasOcupadas, selectedDate) => {
 };
 
 // ── Componente ───────────────────────────────────────────────────────────────
-export function CitasCliente({ clienteId, nutriologoId }) {
-  const [citas, setCitas]               = useState([]);
+export function CitasCliente({ cliente }) {
+  // Manejo de props corregido
+  const clienteId = cliente?.id;
+  const nutriologoId = cliente?.nutriologo_id;
+
+  const [citas, setCitas] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [showModal, setShowModal]       = useState(false);
-  const [saving, setSaving]             = useState(false);
+  const [loading, setLoading] = useState(true);
+  
+  // Estados del Modal
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorReq, setErrorReq] = useState("");
+  const [exito, setExito] = useState(false);
+  
+  // Formulario
   const [selectedDate, setSelectedDate] = useState("");
-  const [slots, setSlots]               = useState([]);
+  const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [modalidad, setModalidad]       = useState("presencial");
-  const [exito, setExito]               = useState(false);
+  const [modalidad, setModalidad] = useState("presencial");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -77,7 +89,9 @@ export function CitasCliente({ clienteId, nutriologoId }) {
       ]);
       setCitas(c);
       setDisponibilidad(d);
-    } catch { }
+    } catch (e) {
+      console.error("Error al cargar citas", e);
+    }
     setLoading(false);
   }, [clienteId, nutriologoId]);
 
@@ -94,6 +108,7 @@ export function CitasCliente({ clienteId, nutriologoId }) {
   const solicitarCita = async () => {
     if (!selectedSlot) return;
     setSaving(true);
+    setErrorReq("");
     try {
       await dbPost("citas", {
         cliente_id: clienteId,
@@ -104,225 +119,332 @@ export function CitasCliente({ clienteId, nutriologoId }) {
       });
       setExito(true);
       setShowModal(false);
-      setSelectedDate(""); setSelectedSlot(null);
+      setSelectedDate(""); 
+      setSelectedSlot(null);
       await loadData();
     } catch (e) {
-      // el horario pudo haberse llenado
       console.error(e);
+      setErrorReq("Ocurrió un error al agendar la cita. Es posible que el horario ya se haya llenado o no tengas conexión.");
     }
     setSaving(false);
   };
 
   const diasDisponibles = [...new Set(disponibilidad.map(d => d.dia_semana))];
 
-  // Calcular fecha mínima (mañana)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
+  // Calcular fecha mínima (mañana) usando la hora LOCAL, evitando el bug del UTC
+  const today = new Date();
+  today.setDate(today.getDate() + 1); // Mañana
+  const minYear = today.getFullYear();
+  const minMonth = String(today.getMonth() + 1).padStart(2, "0");
+  const minDay = String(today.getDate()).padStart(2, "0");
+  const minDate = `${minYear}-${minMonth}-${minDay}`;
 
   const citasProximas = citas.filter(c => new Date(c.fecha_hora) >= new Date() && c.estado !== "cancelada" && c.estado !== "rechazada");
   const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || c.estado === "cancelada" || c.estado === "rechazada");
 
   return (
-    <div className="animate-in">
-
-      {/* Aviso de éxito */}
-      {exito && (
-        <div style={{
-          background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.25)",
-          borderRadius: 14, padding: "16px 20px", marginBottom: 20,
-          display: "flex", alignItems: "center", gap: 12
-        }}>
-          <span style={{ fontSize: 24 }}>🎉</span>
+    <div className="h-full flex flex-col">
+      {/* ── Header ── */}
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div style={{ fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>¡Solicitud enviada!</div>
-            <div style={{ fontSize: 13, color: C.muted }}>Espera la confirmación de la clínica. Te avisaremos pronto.</div>
+            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+              Agenda
+            </p>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+              Mis Citas
+            </h1>
+            {cliente?.nombre && (
+              <p className="text-sm text-[#6B7A8D] mt-1">
+                Paciente: <span className="text-[var(--brand-primary)] font-medium">{cliente.nombre}</span>
+              </p>
+            )}
           </div>
-          <Btn small outline color={C.muted} onClick={() => setExito(false)} style={{ marginLeft: "auto" }}>✕</Btn>
+          
+          {disponibilidad.length > 0 && (
+            <button
+              onClick={() => { setShowModal(true); setExito(false); setErrorReq(""); }}
+              className="flex items-center gap-2 bg-[var(--brand-primary)] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity"
+            >
+              <CalendarDays size={18} />
+              Solicitar cita
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mensaje de Éxito Flotante */}
+      {exito && (
+        <div className="mx-6 md:mx-8 mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={24} />
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-emerald-800">¡Solicitud enviada con éxito!</h4>
+            <p className="text-xs text-emerald-600 mt-1">
+              Tu nutriólogo revisará la solicitud y te confirmará en breve. Podrás ver el estatus en tus citas próximas.
+            </p>
+          </div>
+          <button onClick={() => setExito(false)} className="text-emerald-400 hover:text-emerald-600 p-1">
+            <X size={18} />
+          </button>
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h2 style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 24, color: C.text }}>
-            📅 Mis Citas
-          </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
-            {citasProximas.length > 0
-              ? `${citasProximas.length} cita${citasProximas.length > 1 ? "s" : ""} próxima${citasProximas.length > 1 ? "s" : ""}`
-              : "Sin citas próximas"}
+      {/* ── Main Content ── */}
+      <div className="px-6 md:px-8 flex-1 overflow-y-auto pb-8">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-[#6B7A8D]">
+            <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />
+            <p className="text-sm font-medium">Cargando agenda...</p>
           </div>
-        </div>
-        {disponibilidad.length > 0 && (
-          <Btn grad onClick={() => { setShowModal(true); setExito(false); }}>+ Solicitar cita</Btn>
+        ) : citas.length === 0 && disponibilidad.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
+            <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
+              <CalendarDays size={32} className="text-[#6B7A8D]" />
+            </div>
+            <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+              Agenda no disponible
+            </h3>
+            <p className="text-sm text-[#6B7A8D] max-w-sm">
+              Tu nutriólogo aún no ha configurado sus horarios de atención. Podrás solicitar citas cuando el sistema esté habilitado.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Próximas Citas */}
+            {citasProximas.length > 0 && (
+              <div className="mb-8">
+                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-4">
+                  Citas Próximas
+                </p>
+                <div className="space-y-4">
+                  {citasProximas.map(cita => {
+                    const estado = ESTADOS[cita.estado];
+                    const { dia, hora } = fmtFechaHora(cita.fecha_hora);
+                    return (
+                      <div key={cita.id} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden flex relative">
+                        {/* Status color bar */}
+                        <div className={`w-1.5 flex-shrink-0 ${estado.bg} ${estado.border} border-l`} style={{ backgroundColor: "currentColor", color: `var(--brand-primary)` }} />
+                        
+                        <div className="p-5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${estado.bg} ${estado.border} ${estado.text}`}>
+                              {estado.icon}
+                              {estado.label}
+                            </div>
+                            
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D] text-[11px] font-semibold">
+                              {cita.modalidad === "virtual" ? <Video size={12}/> : <MapPin size={12}/>}
+                              <span className="capitalize">{cita.modalidad}</span>
+                            </div>
+                          </div>
+
+                          <h3 className="text-lg font-bold text-[#0B1929] capitalize tracking-tight mb-1">
+                            {dia}
+                          </h3>
+                          <p className="text-sm font-semibold text-[var(--brand-primary)] flex items-center gap-2">
+                            <Clock size={16} />
+                            {hora}
+                          </p>
+
+                          {cita.motivo_rechazo && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 flex gap-2 items-start">
+                              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                              <p><strong className="font-semibold">Motivo de rechazo:</strong> {cita.motivo_rechazo}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Historial */}
+            {citasPasadas.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-4">
+                  Historial de Citas
+                </p>
+                <div className="space-y-3">
+                  {citasPasadas.map(cita => {
+                    const estado = ESTADOS[cita.estado] || ESTADOS.cancelada;
+                    return (
+                      <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-[#0B1929] capitalize">
+                            {fmtFechaCorta(cita.fecha_hora)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${estado.bg} ${estado.border} ${estado.text}`}>
+                            {estado.label}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D]">
+                            {cita.modalidad === "virtual" ? "Virtual" : "Presencial"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {citas.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
+                <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
+                  <Plus size={32} className="text-[#CBD5E1]" />
+                </div>
+                <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+                  Sin citas agendadas
+                </h3>
+                <p className="text-sm text-[#6B7A8D] max-w-sm">
+                  Aún no tienes un historial de citas. Utiliza el botón superior para programar tu primer consulta con tu nutriólogo.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.border}`, borderTopColor: C.accent, animation: "rotateSlow 0.8s linear infinite", margin: "0 auto 14px" }} />
-          Cargando citas…
-        </div>
-      ) : citas.length === 0 && disponibilidad.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "80px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-          <div style={{ fontSize: 52, marginBottom: 16, opacity: 0.4 }}>📅</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Sistema de citas próximamente</div>
-          <div style={{ fontSize: 13 }}>Tu nutriólogo aún no ha configurado su horario de atención.</div>
-        </div>
-      ) : (
-        <>
-          {/* Próximas */}
-          {citasProximas.length > 0 && (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 12 }}>Próximas</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {citasProximas.map((cita, i) => {
-                  const estado = ESTADO_COLOR[cita.estado];
-                  return (
-                    <div key={cita.id} className="animate-in" style={{
-                      animationDelay: `${i * 0.05}s`,
-                      background: "linear-gradient(145deg, rgba(10,20,40,0.85), rgba(7,13,24,0.95))",
-                      borderRadius: 16, border: "1px solid rgba(46,92,184,0.12)",
-                      padding: "16px 20px", position: "relative", overflow: "hidden"
-                    }}>
-                      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: estado.text, borderRadius: "4px 0 0 4px", boxShadow: `0 0 12px ${estado.text}55` }} />
-                      <div style={{ paddingLeft: 14 }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6, fontFamily: "'Space Grotesk',sans-serif", textTransform: "capitalize" }}>
-                          {fmtFechaHora(cita.fecha_hora)}
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <Tag size="sm" color={estado.text}>{estado.label}</Tag>
-                          <Tag size="sm" color={C.accentMid}>{cita.modalidad === "virtual" ? "💻 Virtual" : "🏢 Presencial"}</Tag>
-                        </div>
-                        {cita.motivo_rechazo && (
-                          <div style={{ marginTop: 10, fontSize: 12, color: "#f87171", background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "8px 12px", border: "1px solid rgba(239,68,68,0.15)", lineHeight: 1.6 }}>
-                            <strong>Motivo:</strong> {cita.motivo_rechazo}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Historial */}
-          {citasPasadas.length > 0 && (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 12 }}>Historial</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {citasPasadas.slice(0, 5).map(cita => {
-                  const estado = ESTADO_COLOR[cita.estado] || ESTADO_COLOR.cancelada;
-                  return (
-                    <div key={cita.id} style={{
-                      background: "rgba(7,13,24,0.5)", borderRadius: 12,
-                      border: "1px solid rgba(46,92,184,0.06)",
-                      padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap"
-                    }}>
-                      <div style={{ flex: 1, fontSize: 13, color: C.muted }}>{fmtFechaCorta(cita.fecha_hora)}</div>
-                      <Tag size="sm" color={estado.text}>{estado.label}</Tag>
-                      <Tag size="sm" color={C.accentMid}>{cita.modalidad === "virtual" ? "💻" : "🏢"}</Tag>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {citas.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
-              <div style={{ fontSize: 48, marginBottom: 14, opacity: 0.3 }}>📅</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Sin citas aún</div>
-              <div style={{ fontSize: 13, marginBottom: 20 }}>Solicita tu primera cita con el botón de arriba</div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Modal solicitar cita */}
+      {/* ── Modal Agendar Cita ── */}
       {showModal && (
-        <Modal title="📅 Solicitar cita" onClose={() => { setShowModal(false); setSelectedDate(""); setSelectedSlot(null); }}>
-          {/* Días disponibles */}
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, background: "rgba(46,92,184,0.07)", borderRadius: 10, padding: "10px 14px", lineHeight: 1.6 }}>
-            📆 Días disponibles: <strong style={{ color: C.text }}>
-              {diasDisponibles.map(d => DIAS_FULL[d]).join(", ")}
-            </strong>
-          </div>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full sm:w-[480px] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-8">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl sm:rounded-2xl">
+              <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+                Agendar nueva cita
+              </h3>
+              <button 
+                onClick={() => { setShowModal(false); setSelectedDate(""); setSelectedSlot(null); }}
+                className="text-[#9BA5B0] hover:text-[#0B1929] hover:bg-[#F0F4FA] p-1.5 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-          <Field label="Selecciona la fecha">
-            <input
-              type="date"
-              value={selectedDate}
-              min={minDate}
-              onChange={e => setSelectedDate(e.target.value)}
-            />
-          </Field>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              
+              {/* Días Disponibles Info */}
+              <div className="bg-[#F0F4FA] rounded-xl p-3.5 border border-[#E2E8F0] flex gap-3 items-start">
+                <CalendarDays size={18} className="text-[var(--brand-primary)] mt-0.5" />
+                <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                  Días que atiende el nutriólogo: <br />
+                  <strong className="text-[#0B1929]">{diasDisponibles.map(d => DIAS_FULL[d]).join(", ")}</strong>
+                </p>
+              </div>
 
-          {/* Horarios disponibles */}
-          {selectedDate && (
-            <Field label="Selecciona el horario">
-              {slots.length === 0 ? (
-                <div style={{ fontSize: 13, color: C.muted, padding: "12px 0" }}>
-                  No hay horarios disponibles para este día. Selecciona otro.
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {slots.map(slot => (
-                    <button
-                      key={slot.iso}
-                      disabled={slot.ocupado}
-                      onClick={() => setSelectedSlot(slot)}
-                      style={{
-                        padding: "8px 16px", borderRadius: 9, fontSize: 13, fontWeight: 600,
-                        fontFamily: "'Inter',sans-serif", cursor: slot.ocupado ? "not-allowed" : "pointer",
-                        opacity: slot.ocupado ? 0.35 : 1, transition: "all 0.18s",
-                        background: selectedSlot?.iso === slot.iso
-                          ? "rgba(46,92,184,0.35)"
-                          : "rgba(46,92,184,0.08)",
-                        border: `1px solid ${selectedSlot?.iso === slot.iso
-                          ? "rgba(46,92,184,0.6)"
-                          : "rgba(46,92,184,0.18)"}`,
-                        color: selectedSlot?.iso === slot.iso ? C.accent : C.muted
-                      }}
-                    >
-                      {slot.hora} {slot.ocupado ? "🔒" : ""}
-                    </button>
-                  ))}
+              {/* Selector de Fecha */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-widest mb-2">
+                  1. Selecciona la Fecha
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={minDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-shadow"
+                />
+              </div>
+
+              {/* Selector de Horario */}
+              {selectedDate && (
+                <div className="animate-in fade-in slide-in-from-top-2">
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-widest mb-2">
+                    2. Selecciona el Horario
+                  </label>
+                  {slots.length === 0 ? (
+                    <div className="text-sm text-[#6B7A8D] bg-white border border-[#E2E8F0] border-dashed rounded-xl p-4 text-center">
+                      No hay horarios disponibles para este día. Por favor selecciona otro.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {slots.map(slot => (
+                        <button
+                          key={slot.iso}
+                          disabled={slot.ocupado}
+                          onClick={() => setSelectedSlot(slot)}
+                          className={`py-2 rounded-lg text-sm font-mono font-semibold transition-all border ${
+                            slot.ocupado 
+                              ? "bg-[#F7F9FC] border-[#E2E8F0] text-[#CBD5E1] opacity-50 cursor-not-allowed" 
+                              : selectedSlot?.iso === slot.iso
+                                ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-md"
+                                : "bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+                          }`}
+                        >
+                          {slot.hora} {slot.ocupado && "🔒"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </Field>
-          )}
 
-          <Field label="Modalidad">
-            <div style={{ display: "flex", gap: 10 }}>
-              {[["presencial", "🏢 Presencial"], ["virtual", "💻 Virtual"]].map(([v, lb]) => (
-                <button key={v} onClick={() => setModalidad(v)} style={{
-                  flex: 1, padding: "10px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                  fontFamily: "'Inter',sans-serif", cursor: "pointer", transition: "all 0.18s",
-                  background: modalidad === v ? "rgba(46,92,184,0.25)" : "rgba(46,92,184,0.07)",
-                  border: `1px solid ${modalidad === v ? "rgba(46,92,184,0.5)" : "rgba(46,92,184,0.15)"}`,
-                  color: modalidad === v ? C.accent : C.muted
-                }}>{lb}</button>
-              ))}
+              {/* Selector de Modalidad */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-widest mb-2">
+                  3. Modalidad
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setModalidad("presencial")}
+                    className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border transition-all ${
+                      modalidad === "presencial"
+                        ? "border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
+                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
+                    }`}
+                  >
+                    <MapPin size={20} />
+                    <span className="text-xs font-semibold">Presencial</span>
+                  </button>
+                  <button
+                    onClick={() => setModalidad("virtual")}
+                    className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border transition-all ${
+                      modalidad === "virtual"
+                        ? "border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
+                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
+                    }`}
+                  >
+                    <Video size={20} />
+                    <span className="text-xs font-semibold">Virtual</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Error si falló al guardar */}
+              {errorReq && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
+                  <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-red-700 leading-relaxed">{errorReq}</p>
+                </div>
+              )}
+
             </div>
-          </Field>
 
-          {selectedSlot && (
-            <div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.muted, marginBottom: 8, lineHeight: 1.6 }}>
-              ✅ Tu solicitud será para el <strong style={{ color: C.text }}>{fmtFechaHora(selectedSlot.iso)}</strong> modalidad <strong style={{ color: C.text }}>{modalidad}</strong>.
-              <br />La clínica la confirmará pronto.
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[#E2E8F0] bg-white rounded-b-2xl sm:rounded-b-2xl flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={() => { setShowModal(false); setSelectedDate(""); setSelectedSlot(null); }}
+                className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm border border-[#E2E8F0] text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={solicitarCita}
+                disabled={!selectedSlot || saving}
+                className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              >
+                {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {saving ? "Procesando..." : "Confirmar Cita"}
+              </button>
             </div>
-          )}
-
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => { setShowModal(false); setSelectedDate(""); setSelectedSlot(null); }}>Cancelar</Btn>
-            <Btn grad onClick={solicitarCita} disabled={!selectedSlot || saving}>
-              {saving ? "Enviando…" : "Solicitar cita"}
-            </Btn>
           </div>
-        </Modal>
+        </div>
       )}
     </div>
   );

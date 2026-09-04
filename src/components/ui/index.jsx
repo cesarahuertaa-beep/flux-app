@@ -3,6 +3,7 @@ import { useBrand } from "../BrandContext";
 import { createPortal } from "react-dom";
 
 export const OrbBackground = () => null;
+export { AppLayout } from "./AppLayout";
 
 export const Btn = ({ children, onClick, grad, color, outline, small, danger, disabled, style = {}, className = "" }) => {
   const isGrad = grad && !danger && !outline;

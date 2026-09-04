@@ -14,8 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field } from "../ui";
+import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Lock, X, Utensils, Dumbbell, BarChart2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
@@ -97,8 +96,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
            return copy;
         })
       }));
-      setMsg("✅ Rutina cargada del historial");
-    } catch(err) { setMsg("❌ Error cargando rutina"); }
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina cargada del historial</div>);
+    } catch(err) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando rutina</div>); }
     setLoading(false);
   };
 
@@ -121,8 +120,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
            return copy;
         })
       }));
-      setMsg("✅ Día cargado del historial");
-    } catch(err) { setMsg("❌ Error cargando día"); }
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día cargado del historial</div>);
+    } catch(err) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando día</div>); }
     setLoading(false);
   };
 
@@ -135,7 +134,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       // Seleccionar el ciclo activo por defecto
       const activo = cs.find(c => c.activo) || cs[0] || null;
       setCicloSel(activo);
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
   }, [selected]);
 
   // ── Cargar datos del ciclo seleccionado ──
@@ -158,7 +157,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&order=orden.asc`);
       setRutinas(await Promise.all(rs.map(async r => ({ ...r, ejercicios:await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) }))));
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
     setLoading(false);
   }, [selected, cicloSel]);
 
@@ -175,7 +174,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`);
       const ruts   = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`);
       if (nutris.length > 0 || ruts.length > 0) {
-        setMsg("⚠️ No puedes borrar un ciclo que tiene planes o rutinas. Primero elimina su contenido.");
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> No puedes borrar un ciclo que tiene planes o rutinas. Primero elimina su contenido.</div>);
         return;
       }
       if (!confirm(`¿Eliminar el ciclo "${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
@@ -188,15 +187,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
           setMsg(`✅ Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`);
         } else {
-          setMsg("✅ Ciclo eliminado.");
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
         }
       } else {
-        setMsg("✅ Ciclo eliminado.");
+        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
       }
 
       await dbDel(`ciclos?id=eq.${ciclo.id}`);
       await loadCiclos();
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
   };
 
   // ── Operaciones de Nutrición ──
@@ -213,8 +212,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         setNutri(r[0]);
       }
-      setMsg("✅ Macros guardados");
-    } catch(e) { setMsg("❌ " + e.message); }
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Macros guardados</div>);
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
     setSaving(false);
   };
 
@@ -222,12 +221,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
 
   const saveDia = async () => {
-    if (!nutri && !diaForm.crear_ciclo) { setMsg("⚠️ Guarda los macros primero"); return; }
+    if (!nutri && !diaForm.crear_ciclo) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Guarda los macros primero</div>); return; }
     setSaving(true);
     try {
       let currentNutri = nutri;
       if (diaForm.crear_ciclo) {
-        if (!diaForm.ciclo_nombre.trim()) { setMsg("⚠️ Escribe el nombre del nuevo ciclo"); setSaving(false); return; }
+        if (!diaForm.ciclo_nombre.trim()) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del nuevo ciclo</div>); setSaving(false); return; }
         if (ciclos.some(c => c.activo)) {
           await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
         }
@@ -273,12 +272,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbPost("comidas", data);
         }
       }
-      setShowDiaModal(false); setMsg("✅ Día guardado"); await loadData();
-    } catch(e) { setMsg("❌ " + e.message); }
+      setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
     setSaving(false);
   };
 
-  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg("🗑️ Día eliminado"); await loadData(); };
+  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>); await loadData(); };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
@@ -292,7 +291,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     try {
       let activeCiclo = cicloSel;
       if (rutinaForm.crear_ciclo) {
-        if (!rutinaForm.ciclo_nombre.trim()) { setMsg("⚠️ Escribe el nombre del nuevo ciclo"); setSaving(false); return; }
+        if (!rutinaForm.ciclo_nombre.trim()) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del nuevo ciclo</div>); setSaving(false); return; }
         if (ciclos.some(c => c.activo)) {
           await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
         }
@@ -335,12 +334,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbPost("ejercicios", data);
         }
       }
-      setShowRutinaModal(false); setMsg("✅ Rutina guardada"); await loadData();
-    } catch(e) { setMsg("❌ " + e.message); }
+      setShowRutinaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>); await loadData();
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
     setSaving(false);
   };
 
-  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg("🗑️ Rutina eliminada"); await loadData(); };
+  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>); await loadData(); };
   const addEj = (ej) => {
     if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
     setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { _dndId: Math.random().toString(36).slice(2,9), biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
@@ -420,71 +419,56 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   if (!selected) return null;
 
   return (
-    <div style={{paddingBottom: 100}}>
+    <div className="pb-[100px]">
       {/* ── Cabecera cliente ── */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-        <div style={{background:C.accentDeep+"50",border:`1px solid color-mix(in srgb, ${C.accent} 25%, transparent)`,borderRadius:10,padding:"8px 16px"}}>
-          <span style={{fontWeight:700,color:C.accent}}>{selected.nombre}</span>
-          <span style={{fontSize:12,color:C.muted,marginLeft:8}}>{selected.email}</span>
+      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
+        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-xl px-4 py-2">
+          <span className="font-bold text-[var(--brand-primary)]">{selected.nombre}</span>
+          <span className="text-xs text-[#6B7A8D] ml-2">{selected.email}</span>
         </div>
-        <Btn small outline color={C.muted} onClick={()=>setSelected(null)}>Cambiar</Btn>
+        <button className="text-xs px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setSelected(null)}>
+          Cambiar
+        </button>
       </div>
 
       {/* ── Selector de Ciclos ── */}
-      <div style={{marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <span style={{fontSize:13,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Ciclos / Períodos</span>
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-[13px] font-bold text-[#6B7A8D] uppercase tracking-[0.8px]">Ciclos / Períodos</span>
         </div>
 
         {ciclos.length === 0 ? (
-          <div style={{background:C.card,borderRadius:12,border:`1px solid ${C.border}`,padding:"20px",textAlign:"center",color:C.muted,fontSize:13}}>
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 text-center text-[#6B7A8D] text-[13px]">
             Sin ciclos aún. Crea el primer ciclo para comenzar a registrar planes con historial.
           </div>
         ) : (
-          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {ciclos.map(c => (
-              <div key={c.id} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                <button onClick={()=>setCicloSel(c)}
-                  style={{
-                    padding:"10px 18px", borderRadius:"20px 0 0 20px",
-                    background: cicloSel?.id === c.id
-                      ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
-                      : (c.activo ? "rgba(46,92,184,0.12)" : "rgba(100,116,139,0.1)"),
-                    color: cicloSel?.id === c.id
-                      ? (c.activo ? "#000" : "#e2eeff")
-                      : (c.activo ? C.accent : C.muted),
-                    fontWeight: cicloSel?.id === c.id ? 700 : 500,
-                    fontSize:13, cursor:"pointer",
-                    border: cicloSel?.id === c.id
-                      ? `1px solid ${c.activo ? C.accent : "#64748b"}`
-                      : `1px solid ${c.activo ? "rgba(46,92,184,0.25)" : "rgba(100,116,139,0.2)"}`,
-                    borderRight:"none",
-                    transition:"all 0.2s", whiteSpace:"nowrap", fontFamily:"'Inter',sans-serif"
-                  }}
+              <div key={c.id} className="flex items-center flex-shrink-0 group">
+                <button 
+                  onClick={() => setCicloSel(c)}
+                  className={`px-4 py-2 text-[13px] transition-colors border ${
+                    cicloSel?.id === c.id 
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold" 
+                      : c.activo 
+                        ? "bg-blue-50/50 border-blue-200 text-[var(--brand-primary)] hover:bg-blue-50 font-medium" 
+                        : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium"
+                  } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
                 >
                   {c.nombre}
-                  {c.fecha_inicio && <span style={{fontSize:10,opacity:0.7,marginLeft:6}}>{fmtFecha(c.fecha_inicio)}</span>}
+                  {c.fecha_inicio && <span className="text-[10px] opacity-70 ml-1.5">{fmtFecha(c.fecha_inicio)}</span>}
                 </button>
-                {/* Botón de borrar — solo visible al seleccionar ese ciclo */}
                 {cicloSel?.id === c.id && (
                   <button
                     onClick={(e) => eliminarCiclo(c, e)}
                     title="Eliminar este ciclo"
-                    style={{
-                      padding:"10px 10px", borderRadius:"0 20px 20px 0",
-                      background: cicloSel?.id === c.id
-                        ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)")
-                        : "rgba(239,68,68,0.08)",
-                      border: `1px solid ${c.activo ? C.accent : "#64748b"}`,
-                      borderLeft: `1px solid ${c.activo ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)"}`,
-                      color: c.activo ? "rgba(0,0,0,0.5)" : "rgba(248,113,113,0.8)",
-                      cursor:"pointer", fontSize:12, transition:"all 0.2s",
-                      display:"flex", alignItems:"center"
-                    }}
-                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(239,68,68,0.2)";e.currentTarget.style.color="#f87171";}}
-                    onMouseLeave={e=>{e.currentTarget.style.background=cicloSel?.id===c.id?(c.activo?C.gradBtn:"rgba(100,116,139,0.3)"):"rgba(239,68,68,0.08)";e.currentTarget.style.color=c.activo?"rgba(0,0,0,0.5)":"rgba(248,113,113,0.8)";}}
+                    className={`px-2.5 py-2 rounded-r-xl border-y border-r flex items-center transition-colors ${
+                      c.activo 
+                        ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white/60 hover:text-white hover:bg-red-500 hover:border-red-500" 
+                        : "bg-red-50 border-red-100 text-red-400 hover:text-red-600 hover:bg-red-100"
+                    }`}
                   >
-                    🗑
+                    <Trash2 className="w-[14px] h-[14px]" />
                   </button>
                 )}
               </div>
@@ -492,60 +476,74 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           </div>
         )}
 
-        {/* Badge de modo lectura */}
         {isReadOnly && (
-          <div style={{marginTop:10,padding:"8px 14px",background:"rgba(100,116,139,0.1)",borderRadius:10,border:"1px solid rgba(100,116,139,0.2)",fontSize:12,color:"#94a3b8",display:"flex",alignItems:"center",gap:8}}>
-            🔒 Estás viendo el historial de <strong style={{color:"#e2eeff"}}>{cicloSel.nombre}</strong>. Solo lectura — el ciclo activo es el verde.
+          <div className="mt-2.5 px-3.5 py-2 bg-gray-50 rounded-xl border border-[#E2E8F0] text-xs text-[#6B7A8D] flex items-center gap-2">
+            <Lock className="w-[14px] h-[14px]" /> Estás viendo el historial de <strong className="text-[#0B1929]">{cicloSel.nombre}</strong>. Solo lectura — el ciclo activo es el resaltado.
           </div>
         )}
       </div>
 
       {/* ── Sub-tabs ── */}
-      <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["nutri","🥗","Nutrición"],["deporte","🏋️","Rutinas"],["progreso","📊","Progreso"]].map(([k,ic,lb])=>(
-          <button key={k} onClick={()=>setSubtab(k)} style={{padding:"8px 20px",borderRadius:20,background:subtab===k?C.gradBtn:C.card,color:subtab===k?"#000":C.muted,fontWeight:subtab===k?700:400,fontSize:13,border:`1px solid ${subtab===k?C.accent:C.border}`,cursor:"pointer",fontFamily:"'Inter',sans-serif",transition:"all 0.2s"}}>
+      <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 inline-flex w-max">
+        {[
+          { k: "nutri", ic: <Utensils className="w-4 h-4"/>, lb: "Nutrición" },
+          { k: "deporte", ic: <Dumbbell className="w-4 h-4"/>, lb: "Rutinas" },
+          { k: "progreso", ic: <BarChart2 className="w-4 h-4"/>, lb: "Progreso" }
+        ].map(({ k, ic, lb }) => (
+          <button 
+            key={k} 
+            onClick={() => setSubtab(k)} 
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[13px] transition-all ${
+              subtab === k 
+                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent" 
+                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+            }`}
+          >
             {ic} {lb}
           </button>
         ))}
       </div>
 
-      {loading ? <div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div> : <>
+      {loading ? <div className="text-[#6B7A8D] text-center p-10">Cargando…</div> : <>
 
         {/* ── NUTRICIÓN ── */}
-        {subtab==="nutri"&&(
+        {subtab === "nutri" && (
           <div>
             {!cicloSel && (
-              <div style={{marginBottom:12,padding:"10px 14px",background:"rgba(245,158,11,0.08)",borderRadius:10,border:"1px solid rgba(245,158,11,0.2)",fontSize:12,color:"#fbbf24"}}>
-                ⚠️ Estás viendo planes sin ciclo asignado. Crea un ciclo para organizar el historial.
+              <div className="mb-3 px-3.5 py-2.5 bg-yellow-50 rounded-xl border border-yellow-200 text-xs text-yellow-600 flex items-center gap-2">
+                <AlertCircle className="w-[14px] h-[14px]" /> Estás viendo planes sin ciclo asignado. Crea un ciclo para organizar el historial.
               </div>
             )}
-            <div style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:14,opacity:isReadOnly?0.75:1}}>
-              <div style={{fontWeight:600,marginBottom:14,color:C.accent}}>Macros diarios</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                {[["calorias","Calorías (kcal)"],["proteina","Proteína (g)"],["carbohidratos","Carbohidratos (g)"],["grasas","Grasas (g)"]].map(([k,lb])=>(
-                  <Field key={k} label={lb}><input type="number" value={macros[k]} onChange={e=>setMacros(p=>({...p,[k]:e.target.value}))} placeholder="0" disabled={isReadOnly}/></Field>
+            <div className={`bg-white rounded-2xl border border-[#E2E8F0] p-4 mb-3.5 ${isReadOnly ? 'opacity-75' : ''}`}>
+              <div className="font-semibold mb-3.5 text-[var(--brand-primary)]">Macros diarios</div>
+              <div className="grid grid-cols-2 gap-2.5">
+                {[["calorias", "Calorías (kcal)"], ["proteina", "Proteína (g)"], ["carbohidratos", "Carbohidratos (g)"], ["grasas", "Grasas (g)"]].map(([k, lb]) => (
+                  <div key={k} className="mb-3">
+                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">{lb}</label>
+                    <input type="number" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] disabled:opacity-50" value={macros[k]} onChange={e => setMacros(p => ({ ...p, [k]: e.target.value }))} placeholder="0" disabled={isReadOnly} />
+                  </div>
                 ))}
               </div>
-              {!isReadOnly && <Btn small grad onClick={saveMacros} disabled={saving}>{saving?"Guardando…":"Guardar macros"}</Btn>}
+              {!isReadOnly && <button className="text-xs px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveMacros} disabled={saving}>{saving ? "Guardando…" : "Guardar macros"}</button>}
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <span style={{fontWeight:600}}>Días del plan <span style={{color:C.muted,fontWeight:400}}>({dias.length})</span></span>
-              {!isReadOnly && <Btn small grad onClick={openNewDia}>+ Día</Btn>}
+            <div className="flex justify-between items-center mb-2.5">
+              <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
+              {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewDia}><Plus className="w-3.5 h-3.5" /> Día</button>}
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
-                {dias.map(d=>(
+                {dias.map(d => (
                   <SortableItem key={d.id} id={d.id}>
                     {({ dragHandle, isDragging }) => (
-                      <div style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
                           {!isReadOnly && dragHandle}
-                          <div><span style={{fontWeight:600}}>{d.dia}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{d.comidas.length} comidas</span></div>
+                          <div><span className="font-semibold">{d.dia}</span><span className="text-xs text-[#6B7A8D] ml-2.5">{d.comidas.length} comidas</span></div>
                         </div>
                         {!isReadOnly && (
-                          <div style={{display:"flex",gap:6}}>
-                            <Btn small outline color={C.accent} onClick={()=>openEditDia(d)}>Editar</Btn>
-                            <Btn small danger onClick={()=>deleteDia(d)}>Borrar</Btn>
+                          <div className="flex gap-1.5">
+                            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
+                            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
                           </div>
                         )}
                       </div>
@@ -558,27 +556,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
 
         {/* ── RUTINAS ── */}
-        {subtab==="deporte"&&(
+        {subtab === "deporte" && (
           <div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <span style={{fontWeight:600}}>Rutinas <span style={{color:C.muted,fontWeight:400}}>({rutinas.length})</span></span>
-              {!isReadOnly && <Btn small grad onClick={openNewRutina}>+ Rutina</Btn>}
+            <div className="flex justify-between items-center mb-3">
+              <span className="font-semibold">Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span></span>
+              {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewRutina}><Plus className="w-3.5 h-3.5" /> Rutina</button>}
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
-                {rutinas.map(r=>(
+                {rutinas.map(r => (
                   <SortableItem key={r.id} id={r.id}>
                     {({ dragHandle, isDragging }) => (
-                      <div style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,padding:"10px 14px",marginBottom:8,opacity:isReadOnly?0.75:1}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 ${isReadOnly ? 'opacity-75' : ''}`}>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
                             {!isReadOnly && dragHandle}
-                            <div><span style={{fontWeight:600}}>{r.nombre}</span><span style={{fontSize:12,color:C.muted,marginLeft:10}}>{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
+                            <div><span className="font-semibold">{r.nombre}</span><span className="text-xs text-[#6B7A8D] ml-2.5">{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
                           </div>
                           {!isReadOnly && (
-                            <div style={{display:"flex",gap:6}}>
-                              <Btn small outline color={C.accentDark} onClick={()=>openEditRutina(r)}>Editar</Btn>
-                              <Btn small danger onClick={()=>deleteRutina(r)}>Borrar</Btn>
+                            <div className="flex gap-1.5">
+                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditRutina(r)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
+                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteRutina(r)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
                             </div>
                           )}
                         </div>
@@ -588,227 +586,229 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 ))}
               </SortableContext>
             </DndContext>
-            {rutinas.length===0 && !isReadOnly && (
-              <div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontSize:13}}>Sin rutinas en este ciclo. ¡Agrega la primera!</div>
+            {rutinas.length === 0 && !isReadOnly && (
+              <div className="text-center py-8 text-[#6B7A8D] text-[13px]">Sin rutinas en este ciclo. ¡Agrega la primera!</div>
             )}
           </div>
         )}
 
-        {subtab==="progreso"&&(
+        {subtab === "progreso" && (
           <ProgresoCliente selected={selected} setMsg={setMsg}/>
         )}
       </>}
 
-
-
       {/* ── Modal Nuevo/Editar Día ── */}
-      {showDiaModal&&(
-        <Modal title={editDia?`Editar: ${editDia.dia}`:"Nuevo día"} onClose={()=>setShowDiaModal(false)} wide>
-          {!editDia && (
-            <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
-              {historialDias.length > 0 && (
-                <div style={{marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}`}}>
-                  <div style={{fontSize:12, fontWeight:600, color:C.muted, marginBottom:6}}>IMPORTAR DESDE HISTORIAL</div>
-                  <select onChange={onSelectHistorialDia} style={{width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:C.surface, color:C.text}}>
-                    <option value="">-- Seleccionar día preexistente --</option>
-                    {historialDias.map(hd => (
-                      <option key={hd.id} value={hd.id}>{hd.dia} (de {getClientName(hd.cliente_id)})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:diaForm.crear_ciclo?12:0}}>
-                <label style={{
-                  display:"flex",alignItems:"flex-start",justifyContent:"flex-start",gap:10,fontSize:13,cursor:"pointer",
-                  background: !diaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
-                  border: `1px solid ${!diaForm.crear_ciclo ? C.accent : C.border}`,
-                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
-                }}>
-                  <input type="radio" checked={!diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:false}))} style={{accentColor: C.accent, flexShrink:0, marginTop:2}}/>
-                  <div style={{lineHeight:1.3, textAlign:"left"}}>
-                    <div style={{fontWeight:500}}>Usar ciclo actual</div>
-                    <div style={{opacity:0.6,fontSize:11,marginTop:3}}>{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
-                  </div>
-                </label>
-                
-                <label style={{
-                  display:"flex",alignItems:"flex-start",justifyContent:"flex-start",gap:10,fontSize:13,cursor:"pointer",
-                  background: diaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
-                  border: `1px solid ${diaForm.crear_ciclo ? C.accent : C.border}`,
-                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
-                }}>
-                  <input type="radio" checked={diaForm.crear_ciclo} onChange={()=>setDiaForm(p=>({...p,crear_ciclo:true}))} style={{accentColor: C.accent, flexShrink:0, marginTop:2}}/>
-                  <div style={{lineHeight:1.3, textAlign:"left"}}>
-                    <div style={{fontWeight:500}}>Crear nuevo</div>
-                    <div style={{opacity:0.6,fontSize:11,marginTop:3}}>Ciclo / Período</div>
-                  </div>
-                </label>
-              </div>
-              {diaForm.crear_ciclo && (
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <Field label="Nombre del ciclo"><input value={diaForm.ciclo_nombre} onChange={e=>setDiaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2"/></Field>
-                  <Field label="Fecha inicio del ciclo"><input type="date" value={diaForm.ciclo_fecha} onChange={e=>setDiaForm(p=>({...p,ciclo_fecha:e.target.value}))}/></Field>
-                </div>
-              )}
+      {showDiaModal && (
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
+              <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar: ${editDia.dia}` : "Nuevo día"}</h3>
+              <button onClick={() => setShowDiaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          )}
-          <Field label="Nombre del día"><input value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…"/></Field>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <span style={{fontWeight:600,fontSize:14}}>Comidas</span>
-            <Btn small outline color={C.accent} onClick={addComida}>+ Comida</Btn>
-          </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
-            <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
-              {diaForm.comidas.map((c,i)=>(
-                <SortableItem key={c._dndId} id={c._dndId}>
-                  {({ dragHandle, isDragging }) => (
-                    <div style={{background:C.bg,borderRadius:10,border:`1px solid ${C.border}`,padding:12,marginBottom:10}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,alignItems:"center"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          {dragHandle}
-                          <span style={{fontSize:12,color:C.muted}}>Comida {i+1}</span>
-                        </div>
-                        <button onClick={()=>remComida(i)} style={{background:"none",color:"#f87171",fontSize:18,cursor:"pointer",border:"none"}}>×</button>
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                        <Field label="Hora"><input value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am"/></Field>
-                        <Field label="Nombre"><input value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno"/></Field>
-                      </div>
-                      <Field label="Opción 1"><textarea value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…"/></Field>
-                      <Field label="Opción 2"><textarea value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…"/></Field>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
-                        {[["calorias","Kcal"],["proteina","Prot g"],["carbohidratos","Carbs g"],["grasas","Grasas g"]].map(([f,lb])=>(
-                          <Field key={f} label={lb}><input type="number" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0"/></Field>
+            <div className="p-5 overflow-y-auto">
+              {!editDia && (
+                <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                  {historialDias.length > 0 && (
+                    <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
+                      <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
+                      <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
+                        <option value="">-- Seleccionar día preexistente --</option>
+                        {historialDias.map(hd => (
+                          <option key={hd.id} value={hd.id}>{hd.dia} (de {getClientName(hd.cliente_id)})</option>
                         ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className={`grid grid-cols-2 gap-2.5 ${diaForm.crear_ciclo ? 'mb-3' : ''}`}>
+                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${!diaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
+                      <input type="radio" checked={!diaForm.crear_ciclo} onChange={() => setDiaForm(p => ({ ...p, crear_ciclo: false }))} className="mt-1 accent-[var(--brand-primary)]" />
+                      <div className="leading-tight">
+                        <div className="font-medium text-[#0B1929]">Usar ciclo actual</div>
+                        <div className="text-[11px] text-[#6B7A8D] mt-1">{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
+                      </div>
+                    </label>
+                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${diaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
+                      <input type="radio" checked={diaForm.crear_ciclo} onChange={() => setDiaForm(p => ({ ...p, crear_ciclo: true }))} className="mt-1 accent-[var(--brand-primary)]" />
+                      <div className="leading-tight">
+                        <div className="font-medium text-[#0B1929]">Crear nuevo</div>
+                        <div className="text-[11px] text-[#6B7A8D] mt-1">Ciclo / Período</div>
+                      </div>
+                    </label>
+                  </div>
+                  {diaForm.crear_ciclo && (
+                    <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del ciclo</label>
+                        <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.ciclo_nombre} onChange={e=>setDiaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio del ciclo</label>
+                        <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.ciclo_fecha} onChange={e=>setDiaForm(p=>({...p,ciclo_fecha:e.target.value}))} />
                       </div>
                     </div>
                   )}
-                </SortableItem>
-              ))}
-            </SortableContext>
-          </DndContext>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <Btn outline color={C.muted} onClick={()=>setShowDiaModal(false)}>Cancelar</Btn>
-            <Btn grad onClick={saveDia} disabled={saving}>{saving?"Guardando…":"Guardar día"}</Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Modal Nueva/Editar Rutina ── */}
-      {showRutinaModal&&(
-        <Modal title={editRutina?`Editar: ${editRutina.nombre}`:"Nueva rutina"} onClose={()=>setShowRutinaModal(false)} wide>
-          {!editRutina && (
-            <div style={{marginBottom:16,background:C.card,borderRadius:10,padding:12,border:`1px solid ${C.border}`}}>
-              {historialRutinas.length > 0 && (
-                <div style={{marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}`}}>
-                  <div style={{fontSize:12, fontWeight:600, color:C.muted, marginBottom:6}}>IMPORTAR DESDE HISTORIAL</div>
-                  <select onChange={onSelectHistorialRutina} style={{width:"100%", padding:"8px", borderRadius:8, border:`1px solid ${C.border}`, background:C.surface, color:C.text}}>
-                    <option value="">-- Seleccionar rutina preexistente --</option>
-                    {historialRutinas.map(hr => (
-                      <option key={hr.id} value={hr.id}>{hr.nombre} (de {getClientName(hr.cliente_id)})</option>
-                    ))}
-                  </select>
                 </div>
               )}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:rutinaForm.crear_ciclo?12:0}}>
-                <label style={{
-                  display:"flex",alignItems:"flex-start",justifyContent:"flex-start",gap:10,fontSize:13,cursor:"pointer",
-                  background: !rutinaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
-                  border: `1px solid ${!rutinaForm.crear_ciclo ? C.accent : C.border}`,
-                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
-                }}>
-                  <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:false}))} style={{accentColor: C.accent, flexShrink:0, marginTop:2}}/>
-                  <div style={{lineHeight:1.3, textAlign:"left"}}>
-                    <div style={{fontWeight:500}}>Usar ciclo actual</div>
-                    <div style={{opacity:0.6,fontSize:11,marginTop:3}}>{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
-                  </div>
-                </label>
-                
-                <label style={{
-                  display:"flex",alignItems:"flex-start",justifyContent:"flex-start",gap:10,fontSize:13,cursor:"pointer",
-                  background: rutinaForm.crear_ciclo ? "rgba(46,92,184,0.15)" : "transparent",
-                  border: `1px solid ${rutinaForm.crear_ciclo ? C.accent : C.border}`,
-                  padding: "10px 14px", borderRadius: 8, transition: "all 0.2s"
-                }}>
-                  <input type="radio" checked={rutinaForm.crear_ciclo} onChange={()=>setRutinaForm(p=>({...p,crear_ciclo:true}))} style={{accentColor: C.accent, flexShrink:0, marginTop:2}}/>
-                  <div style={{lineHeight:1.3, textAlign:"left"}}>
-                    <div style={{fontWeight:500}}>Crear nuevo</div>
-                    <div style={{opacity:0.6,fontSize:11,marginTop:3}}>Ciclo / Período</div>
-                  </div>
-                </label>
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del día</label>
+                <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…" />
               </div>
-              {rutinaForm.crear_ciclo && (
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <Field label="Nombre del ciclo"><input value={rutinaForm.ciclo_nombre} onChange={e=>setRutinaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2"/></Field>
-                  <Field label="Fecha inicio del ciclo"><input type="date" value={rutinaForm.ciclo_fecha} onChange={e=>setRutinaForm(p=>({...p,ciclo_fecha:e.target.value}))}/></Field>
-                </div>
-              )}
-            </div>
-          )}
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10}}>
-            <Field label="Nombre"><input value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1"/></Field>
-            <Field label="Semanas"><input type="number" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))}/></Field>
-            <Field label="Fecha inicio"><input type="date" value={rutinaForm.fecha_inicio} onChange={e=>setRutinaForm(p=>({...p,fecha_inicio:e.target.value}))}/></Field>
-          </div>
-          <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
-          {rutinaForm.ejercicios.length>0&&(
-            <div style={{marginTop:12}}>
-              <div style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:6,alignItems:"center"}}>
-                <span/><span/><span style={{fontSize:11,color:C.muted,fontWeight:600}}>EJERCICIO</span>
-                <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:"center"}}>SERIES</span>
-                <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:"center"}}>REPS</span>
-                <span/>
+              <div className="flex justify-between items-center mb-2.5">
+                <span className="font-semibold text-[14px]">Comidas</span>
+                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={addComida}><Plus className="w-3.5 h-3.5" /> Comida</button>
               </div>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
-                <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
-                  {rutinaForm.ejercicios.map((e,i)=>(
-                    <SortableItem key={e._dndId} id={e._dndId}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
+                <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
+                  {diaForm.comidas.map((c, i) => (
+                    <SortableItem key={c._dndId} id={c._dndId}>
                       {({ dragHandle, isDragging }) => (
-                        <div style={{display:"grid",gridTemplateColumns:"24px 40px 1fr 80px 80px 32px",gap:6,marginBottom:8,alignItems:"center",background:isDragging?C.card:"transparent",borderRadius:isDragging?8:0}}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {dragHandle}
+                        <div className="bg-gray-50 rounded-xl border border-[#E2E8F0] p-3 mb-2.5">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              {dragHandle}
+                              <span className="text-xs text-[#6B7A8D] font-medium">Comida {i + 1}</span>
+                            </div>
+                            <button onClick={() => remComida(i)} className="text-red-400 hover:text-red-600 transition-colors border-none bg-transparent">
+                              <Trash2 className="w-[18px] h-[18px]" />
+                            </button>
                           </div>
-                          <div style={{width:36,height:36,borderRadius:6,overflow:"hidden",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {e.gif_url?<img src={e.gif_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:18}}>🏋️</span>}
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Hora</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am" /></div>
+                            <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno" /></div>
                           </div>
-                          <div style={{fontSize:13,fontWeight:500}}>{e.nombre}<br/><span style={{fontSize:10,color:C.muted}}>{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
-                          <input type="number" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" style={{textAlign:"center"}}/>
-                          <input type="number" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" style={{textAlign:"center"}}/>
-                          <button onClick={()=>remEj(i)} style={{background:"#ef444430",color:"#ef4444",borderRadius:6,padding:6,cursor:"pointer",fontSize:14,border:"none"}}>×</button>
+                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 1</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…" /></div>
+                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 2</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…" /></div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[["calorias", "Kcal"], ["proteina", "Prot g"], ["carbohidratos", "Carbs g"], ["grasas", "Grasas g"]].map(([f, lb]) => (
+                              <div key={f}><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">{lb}</label><input type="number" className="w-full px-2 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </SortableItem>
                   ))}
                 </SortableContext>
               </DndContext>
+              <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
+                <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowDiaModal(false)}>Cancelar</button>
+                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveDia} disabled={saving}>{saving ? "Guardando…" : "Guardar día"}</button>
+              </div>
             </div>
-          )}
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:"auto",paddingTop:16}}>
-            <Btn outline color={C.muted} onClick={()=>setShowRutinaModal(false)}>Cancelar</Btn>
-            <Btn grad onClick={saveRutina} disabled={saving}>{saving?"Guardando…":"Guardar rutina"}</Btn>
           </div>
-        </Modal>
+        </div>
+      )}
+
+      {/* ── Modal Nueva/Editar Rutina ── */}
+      {showRutinaModal && (
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
+              <h3 className="text-lg font-bold text-[#0B1929]">{editRutina ? `Editar: ${editRutina.nombre}` : "Nueva rutina"}</h3>
+              <button onClick={() => setShowRutinaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              {!editRutina && (
+                <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                  {historialRutinas.length > 0 && (
+                    <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
+                      <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
+                      <select onChange={onSelectHistorialRutina} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
+                        <option value="">-- Seleccionar rutina preexistente --</option>
+                        {historialRutinas.map(hr => (
+                          <option key={hr.id} value={hr.id}>{hr.nombre} (de {getClientName(hr.cliente_id)})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className={`grid grid-cols-2 gap-2.5 ${rutinaForm.crear_ciclo ? 'mb-3' : ''}`}>
+                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${!rutinaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
+                      <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={() => setRutinaForm(p => ({ ...p, crear_ciclo: false }))} className="mt-1 accent-[var(--brand-primary)]" />
+                      <div className="leading-tight">
+                        <div className="font-medium text-[#0B1929]">Usar ciclo actual</div>
+                        <div className="text-[11px] text-[#6B7A8D] mt-1">{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
+                      </div>
+                    </label>
+                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${rutinaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
+                      <input type="radio" checked={rutinaForm.crear_ciclo} onChange={() => setRutinaForm(p => ({ ...p, crear_ciclo: true }))} className="mt-1 accent-[var(--brand-primary)]" />
+                      <div className="leading-tight">
+                        <div className="font-medium text-[#0B1929]">Crear nuevo</div>
+                        <div className="text-[11px] text-[#6B7A8D] mt-1">Ciclo / Período</div>
+                      </div>
+                    </label>
+                  </div>
+                  {rutinaForm.crear_ciclo && (
+                    <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del ciclo</label>
+                        <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.ciclo_nombre} onChange={e=>setRutinaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio del ciclo</label>
+                        <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.ciclo_fecha} onChange={e=>setRutinaForm(p=>({...p,ciclo_fecha:e.target.value}))} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-[2fr_1fr_1fr] gap-2.5 mb-3">
+                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1" /></div>
+                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Semanas</label><input type="number" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))} /></div>
+                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio</label><input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.fecha_inicio} onChange={e=>setRutinaForm(p=>({...p,fecha_inicio:e.target.value}))} /></div>
+              </div>
+              <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
+              {rutinaForm.ejercicios.length > 0 && (
+                <div className="mt-3">
+                  <div className="grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-1.5 items-center">
+                    <span/><span/><span className="text-[11px] text-[#6B7A8D] font-semibold">EJERCICIO</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">SERIES</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">REPS</span>
+                    <span/>
+                  </div>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
+                    <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
+                      {rutinaForm.ejercicios.map((e, i) => (
+                        <SortableItem key={e._dndId} id={e._dndId}>
+                          {({ dragHandle, isDragging }) => (
+                            <div className={`grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-2 items-center ${isDragging ? 'bg-white rounded-lg shadow-sm border border-[#E2E8F0]' : 'bg-transparent'}`}>
+                              <div className="flex items-center justify-center">{dragHandle}</div>
+                              <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
+                                {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
+                              </div>
+                              <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
+                              <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                              <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                              <button onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none">
+                                <Trash2 className="w-[14px] h-[14px]" />
+                              </button>
+                            </div>
+                          )}
+                        </SortableItem>
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              )}
+              <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
+                <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowRutinaModal(false)}>Cancelar</button>
+                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveRutina} disabled={saving}>{saving ? "Guardando…" : "Guardar rutina"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── FAB PARA PDF ── */}
       {subtab === "nutri" && dias.length > 0 && (
-        <div style={{
-          position: "fixed", bottom: 32, right: 24, zIndex: 50,
-          animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
-        }}>
+        <div className="fixed bottom-8 right-6 z-50 animate-slideUp">
           <button
             onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
-            style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "14px 22px", borderRadius: 30, border: "none", cursor: "pointer",
-              background: C.gradBtn, color: "#000", fontWeight: 700, fontSize: 14,
-              boxShadow: "0 8px 24px rgba(46,92,184,0.4)", fontFamily: "'Inter', sans-serif",
-              transition: "transform 0.2s, box-shadow 0.2s"
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 12px 30px rgba(46,92,184,0.5)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(46,92,184,0.4)"; }}
+            className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-[var(--brand-primary)] text-white font-bold text-sm shadow-[0_8px_24px_rgba(46,92,184,0.4)] transition-all hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(46,92,184,0.5)] border-none"
           >
-            <span style={{ fontSize: 18 }}>📄</span>
+            <FileText className="w-[18px] h-[18px]" />
             Descargar Plan PDF
           </button>
         </div>

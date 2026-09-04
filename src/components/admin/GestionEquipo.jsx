@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field, Tag } from "../ui";
+import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from "lucide-react";
 import { authInvite, dbGet, dbPatch, getProfileId } from "../../lib/supabase";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
@@ -75,109 +74,101 @@ export function GestionEquipo({ setMsg, profileId }) {
   return (
     <div className="animate-in">
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+      <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
         <div>
-          <h2 style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 24, color: C.text, letterSpacing: "0.5px" }}>
-            👥 Equipo Administrativo
+          <h2 className="font-['Rajdhani'] font-bold text-2xl text-[#0B1929] tracking-[0.5px] flex items-center gap-2">
+            <Users className="w-6 h-6 text-[#3B82F6]" /> Equipo Administrativo
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+          <div className="text-sm text-[#6B7A8D] mt-0.5">
             {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
           </div>
         </div>
-        <Btn grad onClick={() => setShowInvite(true)}>+ Invitar colaborador</Btn>
+        <button 
+          onClick={() => setShowInvite(true)}
+          className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+        >
+          + Invitar colaborador
+        </button>
       </div>
 
       {/* Explicación */}
-      <div style={{
-        background: "rgba(46,92,184,0.07)", border: "1px solid rgba(46,92,184,0.15)",
-        borderRadius: 12, padding: "13px 18px", fontSize: 13, color: C.muted,
-        marginBottom: 22, lineHeight: 1.7
-      }}>
-        <strong style={{ color: C.text }}>¿Qué puede hacer un colaborador?</strong><br />
+      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
+        <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         Tiene acceso únicamente a la lista de clientes y a la gestión de citas.
-        <strong style={{ color: C.text }}> No puede</strong> ver ni editar dietas, rutinas ni la biblioteca.
+        <strong className="text-[#0B1929]"> No puede</strong> ver ni editar dietas, rutinas ni la biblioteca.
         Puedes suspender su acceso en cualquier momento.
       </div>
 
       {/* Lista */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${C.border}`, borderTopColor: C.accent, animation: "rotateSlow 0.8s linear infinite", margin: "0 auto 14px" }} />
+        <div className="text-center py-16 text-[#6B7A8D] flex flex-col items-center">
+          <Loader2 className="w-9 h-9 text-[#3B82F6] animate-spin mb-3.5" />
           Cargando equipo…
         </div>
       ) : equipo.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "80px 0", color: C.muted, background: "rgba(7,13,24,0.4)", borderRadius: 16, border: "1px solid rgba(46,92,184,0.06)" }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>🗂️</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: C.text }}>Sin colaboradores aún</div>
-          <div style={{ fontSize: 13 }}>Invita a tu primer secretario o administrativo para comenzar</div>
-          <div style={{ marginTop: 20 }}>
-            <Btn grad onClick={() => setShowInvite(true)}>+ Invitar primer colaborador</Btn>
+        <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col items-center">
+          <Folder className="w-12 h-12 text-[#94A3B8] mb-4" />
+          <div className="text-base font-semibold mb-2 text-[#0B1929]">Sin colaboradores aún</div>
+          <div className="text-sm">Invita a tu primer secretario o administrativo para comenzar</div>
+          <div className="mt-5">
+            <button 
+              onClick={() => setShowInvite(true)}
+              className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+            >
+              + Invitar primer colaborador
+            </button>
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-col gap-3">
           {equipo.map((p, i) => (
-            <div key={p.id} className="card-hover animate-in" style={{
-              animationDelay: `${i * 0.05}s`,
-              background: "linear-gradient(145deg, rgba(10,20,40,0.8), rgba(7,13,24,0.9))",
-              borderRadius: 16, border: "1px solid rgba(46,92,184,0.09)",
-              padding: "16px 20px", display: "flex",
-              alignItems: "center", justifyContent: "space-between",
-              flexWrap: "wrap", gap: 12, position: "relative", overflow: "hidden",
-              backdropFilter: "blur(12px)"
-            }}>
+            <div key={p.id} className="animate-in bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between flex-wrap gap-3 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
               {/* Barra lateral de estado */}
-              <div style={{
-                position: "absolute", left: 0, top: "15%", bottom: "15%", width: 3,
-                borderRadius: "0 3px 3px 0",
-                background: p.activo !== false
-                  ? "linear-gradient(180deg,#38bdf8,#818cf8)"
-                  : "rgba(239,68,68,0.6)",
-                boxShadow: p.activo !== false
-                  ? "0 0 12px rgba(56,189,248,0.4)"
-                  : "0 0 8px rgba(239,68,68,0.3)"
-              }} />
+              <div className={`absolute left-0 top-[15%] bottom-[15%] w-1 rounded-r-md ${p.activo !== false ? 'bg-gradient-to-b from-[#38bdf8] to-[#818cf8]' : 'bg-[#EF4444]'}`} />
 
               {/* Info */}
-              <div style={{ paddingLeft: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 3, fontFamily: "'Space Grotesk',sans-serif" }}>
+              <div className="pl-3.5">
+                <div className="font-bold text-[15px] text-[#0B1929] mb-1 font-['Space_Grotesk']">
                   {p.nombre || "—"}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div className="text-xs text-[#6B7A8D] flex items-center gap-2.5 flex-wrap">
                   {p.email || "Sin email"}
                   {p.telefono && (
                     <a
                       href={`https://wa.me/${p.telefono.replace(/\D/g, "")}`}
                       target="_blank" rel="noreferrer"
                       onClick={e => e.stopPropagation()}
-                      style={{ color: "#22c55e", textDecoration: "none", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}
+                      className="text-[#22c55e] no-underline font-semibold inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                     >
-                      <span style={{ fontSize: 14 }}>💬</span> WhatsApp
+                      <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                     </a>
                   )}
                 </div>
-                <div style={{ marginTop: 6 }}>
-                  <Tag color={p.activo !== false ? C.accent : "#f87171"} size="sm">
-                    {p.activo !== false ? "● Activo" : "○ Suspendido"}
-                  </Tag>
+                <div className="mt-1.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${p.activo !== false ? 'bg-[#EFF6FF] text-[#3B82F6]' : 'bg-[#FEF2F2] text-[#EF4444]'}`}>
+                    {p.activo !== false ? <Circle className="w-3 h-3 fill-current" /> : <CircleDashed className="w-3 h-3" />}
+                    {p.activo !== false ? "Activo" : "Suspendido"}
+                  </span>
                 </div>
               </div>
 
               {/* Acciones */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <Btn small outline color={C.muted} onClick={() => {
-                  setEditUser(p);
-                  setEditForm({ nombre: p.nombre || "", telefono: p.telefono || "" });
-                }}>
-                  ✏️ Editar
-                </Btn>
-                <Btn
-                  small outline
-                  color={p.activo !== false ? "#ef4444" : C.accent}
+              <div className="flex gap-2 items-center flex-wrap">
+                <button 
+                  onClick={() => {
+                    setEditUser(p);
+                    setEditForm({ nombre: p.nombre || "", telefono: p.telefono || "" });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors flex items-center gap-1.5"
+                >
+                  <Edit2 className="w-3.5 h-3.5" /> Editar
+                </button>
+                <button
                   onClick={() => toggleActivo(p)}
+                  className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 ${p.activo !== false ? 'border-[#FEE2E2] text-[#EF4444] hover:bg-[#FEF2F2]' : 'border-[#E0E7FF] text-[#4F46E5] hover:bg-[#EEF2FF]'}`}
                 >
                   {p.activo !== false ? "Suspender acceso" : "Activar acceso"}
-                </Btn>
+                </button>
               </div>
             </div>
           ))}
@@ -186,74 +177,131 @@ export function GestionEquipo({ setMsg, profileId }) {
 
       {/* Modal Invitar */}
       {showInvite && (
-        <Modal title="🗂️ Invitar colaborador administrativo" onClose={() => setShowInvite(false)}>
-          <Field label="Nombre completo">
-            <input
-              value={form.nombre}
-              onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
-              placeholder="Ej. Sofía López"
-            />
-          </Field>
-          <Field label="Email">
-            <input
-              type="email"
-              value={form.email}
-              onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-              placeholder="sofia@clinica.com"
-            />
-          </Field>
-          <Field label="Teléfono (WhatsApp)">
-            <input
-              type="tel"
-              value={form.telefono}
-              onChange={e => setForm(p => ({ ...p, telefono: e.target.value }))}
-              placeholder="Ej. +525512345678"
-            />
-          </Field>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
+                <Folder className="w-5 h-5 text-[#3B82F6]" /> Invitar colaborador
+              </h3>
+              <button onClick={() => setShowInvite(false)} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors">
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
 
-          <div style={{
-            background: "rgba(46,92,184,0.08)", border: "1px solid rgba(46,92,184,0.15)",
-            borderRadius: 10, padding: "11px 14px",
-            fontSize: 12, color: C.muted, marginBottom: 20, lineHeight: 1.6
-          }}>
-            📧 El colaborador recibirá un email de invitación para crear su contraseña.
-            Solo tendrá acceso a <strong style={{ color: C.text }}>Clientes</strong> y{" "}
-            <strong style={{ color: C.text }}>Agenda</strong> — sin acceso a información clínica.
-          </div>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[#475569] mb-1">Nombre completo</label>
+                <input
+                  value={form.nombre}
+                  onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
+                  placeholder="Ej. Sofía López"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#475569] mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="sofia@clinica.com"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#475569] mb-1">Teléfono (WhatsApp)</label>
+                <input
+                  type="tel"
+                  value={form.telefono}
+                  onChange={e => setForm(p => ({ ...p, telefono: e.target.value }))}
+                  placeholder="Ej. +525512345678"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                />
+              </div>
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn outline color={C.muted} onClick={() => setShowInvite(false)}>Cancelar</Btn>
-            <Btn grad onClick={invite} disabled={saving}>
-              {saving ? "Enviando invitación…" : "Invitar colaborador"}
-            </Btn>
+              <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs text-[#6B7A8D] leading-relaxed mt-2 flex gap-2">
+                <Mail className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
+                <span>
+                  El colaborador recibirá un email de invitación para crear su contraseña.
+                  Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{" "}
+                  <strong className="text-[#0B1929]">Agenda</strong> — sin acceso a información clínica.
+                </span>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-2">
+                <button 
+                  onClick={() => setShowInvite(false)}
+                  className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={invite} 
+                  disabled={saving}
+                  className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {saving ? "Enviando invitación…" : "Invitar colaborador"}
+                </button>
+              </div>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* Modal Editar */}
       {editUser && (
-        <Modal title={`✏️ Editar colaborador — ${editUser.email}`} onClose={() => setEditUser(null)}>
-          <Field label="Nombre completo">
-            <input
-              value={editForm.nombre}
-              onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))}
-            />
-          </Field>
-          <Field label="Teléfono (WhatsApp)">
-            <input
-              type="tel"
-              value={editForm.telefono}
-              onChange={e => setEditForm(p => ({ ...p, telefono: e.target.value }))}
-              placeholder="Ej. +525512345678"
-            />
-          </Field>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
-            <Btn outline color={C.muted} onClick={() => setEditUser(null)}>Cancelar</Btn>
-            <Btn grad onClick={saveEdit} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar cambios"}
-            </Btn>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 truncate">
+                <Edit2 className="w-5 h-5 text-[#3B82F6]" /> Editar colaborador
+              </h3>
+              <button onClick={() => setEditUser(null)} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors shrink-0">
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="text-sm text-[#6B7A8D] mb-4 truncate">{editUser.email}</div>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[#475569] mb-1">Nombre completo</label>
+                <input
+                  value={editForm.nombre}
+                  onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#475569] mb-1">Teléfono (WhatsApp)</label>
+                <input
+                  type="tel"
+                  value={editForm.telefono}
+                  onChange={e => setEditForm(p => ({ ...p, telefono: e.target.value }))}
+                  placeholder="Ej. +525512345678"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                />
+              </div>
+              <div className="flex gap-2 justify-end mt-2">
+                <button 
+                  onClick={() => setEditUser(null)}
+                  className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={saveEdit} 
+                  disabled={saving}
+                  className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {saving ? "Guardando…" : "Guardar cambios"}
+                </button>
+              </div>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
     </div>
   );
