@@ -23,7 +23,7 @@ export default function ClienteView({ session, onLogout }) {
   const { data: cliente } = session;
   const brand = useBrand();
   
-  const [tab, setTab] = useState("inicio");
+  const [tab, setTab] = useState("perfil");
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -99,11 +99,9 @@ export default function ClienteView({ session, onLogout }) {
 
   const isLibre = !cliente.nutriologo_id;
   const SIDEBAR_ITEMS = isLibre ? [
-    { id: "inicio", label: "Inicio", icon: <BarChart2 size={18} strokeWidth={1.5} /> },
     { id: "tienda", label: "Tienda Oficial", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
     { id: "directorio", label: "Especialistas", icon: <MapPin size={18} strokeWidth={1.5} /> },
   ] : [
-    { id: "inicio",   label: "Inicio",          icon: <BarChart2 size={18} strokeWidth={1.5} /> },
     { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
@@ -131,40 +129,6 @@ export default function ClienteView({ session, onLogout }) {
         <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
       ) : (
         <>
-          {tab === "inicio" && (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              {isLibre ? (
-                <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-[#E2E8F0] max-w-2xl w-full">
-                  <div className="w-16 h-16 bg-blue-50 text-[var(--brand-primary)] rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <MapPin size={32} />
-                  </div>
-                  <h2 className="text-3xl font-extrabold text-[#0B1929] mb-4 font-['Space_Grotesk',sans-serif]">
-                    ¡Bienvenido a Flux, {cliente.nombre.split(" ")[0]}!
-                  </h2>
-                  <p className="text-[#6B7A8D] mb-8 text-lg">
-                    Aún no tienes un plan clínico asignado. Explora nuestra tienda o lleva tus resultados al siguiente nivel contratando a un especialista.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button onClick={() => setTab("directorio")} className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-8 py-3.5 rounded-2xl text-[15px] font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
-                      <Search size={18} /> Ver Directorio Médico
-                    </button>
-                    <button onClick={() => setTab("tienda")} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-8 py-3.5 rounded-2xl text-[15px] font-bold transition-all flex items-center justify-center gap-2">
-                      <ShoppingBag size={18} /> Ir a la Tienda
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="opacity-60">
-                  <img src={brand?.logo_url || "/logo.png"} alt="Flux Logo" style={{ width: 140, marginBottom: 20, opacity: 0.4, filter: "grayscale(100%) brightness(1.5)" }} />
-                  <h2 className="text-2xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                    Hola, {cliente.nombre.split(" ")[0]}
-                  </h2>
-                  <p className="text-sm text-[#6B7A8D]">Selecciona una opción en el menú para comenzar.</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {tab === "tienda" && (
             <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
               <ShoppingBag size={48} className="mb-4 opacity-50" />

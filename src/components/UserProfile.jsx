@@ -47,34 +47,34 @@ export default function UserProfile({ session, onLogout }) {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8 text-center md:text-left">
+    <div className="p-6 max-w-md mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+      <div className="mb-6 text-center md:text-left">
         <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
         <p className="text-[#6B7A8D] mt-1">Actualiza tu información personal</p>
       </div>
 
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[#E2E8F0]">
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2E8F0]">
         
         {msg && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <CheckCircle2 size={18} className="text-green-600" /> {msg}
+            <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" /> <span className="truncate">{msg}</span>
           </div>
         )}
         
         {err && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <AlertCircle size={18} className="text-red-500" /> {err}
+            <AlertCircle size={18} className="text-red-500 flex-shrink-0" /> <span className="line-clamp-2">{err}</span>
           </div>
         )}
 
-        <div className="flex items-center gap-4 mb-8 pb-8 border-b border-[#E2E8F0]">
-          <div className="w-16 h-16 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center shadow-md">
+        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#E2E8F0]">
+          <div className="w-16 h-16 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center shadow-md flex-shrink-0">
             <User size={28} />
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-[#0B1929]">{user?.nombre}</h2>
-            <p className="text-[#6B7A8D] text-sm flex items-center gap-1 mt-0.5">
-              <Mail size={14} /> {user?.email}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-bold text-[#0B1929] truncate">{user?.nombre}</h2>
+            <p className="text-[#6B7A8D] text-sm flex items-center gap-1 mt-0.5 truncate">
+              <Mail size={14} className="flex-shrink-0" /> <span className="truncate">{user?.email}</span>
             </p>
           </div>
         </div>
