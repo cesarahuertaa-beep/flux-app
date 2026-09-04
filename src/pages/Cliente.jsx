@@ -7,6 +7,7 @@ import { CitasCliente } from "../components/CitasCliente";
 import Nutrition from "../components/cliente/Nutrition";
 import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
+import UserProfile from "../components/UserProfile";
 import { BarChart2, UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin, Search } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -200,6 +201,10 @@ export default function ClienteView({ session, onLogout }) {
 
           {tab === "citas" && !isLibre && (
             <CitasCliente cliente={cliente} />
+          )}
+
+          {tab === "perfil" && (
+            <UserProfile session={session} />
           )}
         </>
       )}

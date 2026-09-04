@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, User, LogOut } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
@@ -53,7 +53,7 @@ export function AppLayout({ children, nav, active, setActive, session, onLogout 
 
         {/* User Pill */}
         {!collapsed ? (
-          <div className="mx-3 mt-4 mb-1 px-3 py-2.5 rounded-xl bg-white border border-[#E2E5EA] flex items-center gap-2.5 shadow-sm">
+          <button onClick={() => setActive("perfil")} className={`mx-3 mt-4 mb-1 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active === "perfil" ? "bg-white border-[var(--brand-primary)] shadow-sm" : "bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
               <User size={13} strokeWidth={2} className="text-white" />
             </div>
@@ -61,11 +61,11 @@ export function AppLayout({ children, nav, active, setActive, session, onLogout 
               <p className="text-xs font-semibold text-[#0B1929] truncate leading-tight">{userName}</p>
               <p className="text-[10px] text-[#6B7A8D] leading-tight truncate">{subtitle}</p>
             </div>
-          </div>
+          </button>
         ) : (
-          <div className="mx-auto mt-4 mb-1 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--brand-primary)" }}>
+          <button onClick={() => setActive("perfil")} className={`mx-auto mt-4 mb-1 w-8 h-8 rounded-full flex items-center justify-center transition-all ${active === "perfil" ? "ring-2 ring-offset-2 ring-[var(--brand-primary)]" : "hover:scale-105"}`} style={{ background: "var(--brand-primary)" }}>
             <User size={13} strokeWidth={2} className="text-white" />
-          </div>
+          </button>
         )}
 
         {/* Nav links */}
@@ -143,28 +143,46 @@ export function AppLayout({ children, nav, active, setActive, session, onLogout 
       ══════════════════════════════════════════════ */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] flex items-stretch"
            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {nav.map(({ id, label, icon }) => {
+        {nav.map(({ id, label, icon }, index) => {
           const isActive = active === id;
+          const isMid = index === Math.ceil(nav.length / 2);
+          const isPerfilActive = active === "perfil";
+          
           return (
-            <button
-              key={id}
-              onClick={() => setActive(id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${
-                isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"
-              }`}
-            >
-              {/* Indicador activo encima del ícono */}
-              <span
-                className="block h-0.5 w-5 rounded-full mb-1 transition-all"
-                style={{ background: isActive ? "var(--brand-primary)" : "transparent" }}
-              />
-              <span className={`transition-transform ${isActive ? "scale-110" : "scale-100"}`}>
-                {icon}
-              </span>
-              <span className={`text-[10px] font-medium leading-none mt-0.5 ${isActive ? "font-semibold" : ""}`}>
-                {label}
-              </span>
-            </button>
+            <React.Fragment key={id}>
+              {isMid && (
+                <button
+                  onClick={() => setActive("perfil")}
+                  className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
+                >
+                  <span className="block h-0.5 w-5 rounded-full mb-1 transition-all" style={{ background: isPerfilActive ? "var(--brand-primary)" : "transparent" }} />
+                  <span className={`transition-transform ${isPerfilActive ? "scale-110" : "scale-100"}`}>
+                    <User size={18} strokeWidth={1.5} />
+                  </span>
+                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${isPerfilActive ? "font-semibold" : ""}`}>
+                    Perfil
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={() => setActive(id)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${
+                  isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"
+                }`}
+              >
+                {/* Indicador activo encima del ícono */}
+                <span
+                  className="block h-0.5 w-5 rounded-full mb-1 transition-all"
+                  style={{ background: isActive ? "var(--brand-primary)" : "transparent" }}
+                />
+                <span className={`transition-transform ${isActive ? "scale-110" : "scale-100"}`}>
+                  {icon}
+                </span>
+                <span className={`text-[10px] font-medium leading-none mt-0.5 ${isActive ? "font-semibold" : ""}`}>
+                  {label}
+                </span>
+              </button>
+            </React.Fragment>
           );
         })}
 
