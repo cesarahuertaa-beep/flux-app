@@ -478,7 +478,7 @@ export default function Landing({ session, onLogout }) {
       } catch (e) { console.error('Error cargando productos', e); }
 
       try {
-        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,rating,verificado,logo_url');
+        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url');
         if (Array.isArray(nutris) && nutris.length > 0) {
           const formattedNutris = nutris.map(n => ({
             id: n.id,
