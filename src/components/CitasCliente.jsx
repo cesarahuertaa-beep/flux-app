@@ -46,12 +46,20 @@ const generarSlots = (disponibilidad, citasOcupadas, selectedDate) => {
     let hora = hIni * 60 + mIni;
     const fin = hFin * 60 + mFin;
     while (hora + 60 <= fin) {
-      const hStr = `${String(Math.floor(hora / 60)).padStart(2, "0")}:${String(hora % 60).padStart(2, "0")}`;
-      const isoSlot = `${selectedDate}T${hStr}:00`;
-      const ocupado = citasOcupadas.some(c =>
-        c.estado !== "rechazada" && c.estado !== "cancelada" &&
-        c.fecha_hora?.startsWith(isoSlot.slice(0, 16))
-      );
+      const h = Math.floor(hora / 60);
+      const m = hora % 60;
+      const hStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      
+      const [y, mo, dDay] = selectedDate.split("-").map(Number);
+      const slotDate = new Date(y, mo - 1, dDay, h, m, 0);
+      const isoSlot = slotDate.toISOString();
+
+      const ocupado = citasOcupadas.some(c => {
+        if (c.estado === "rechazada" || c.estado === "cancelada") return false;
+        if (!c.fecha_hora) return false;
+        return new Date(c.fecha_hora).getTime() === slotDate.getTime();
+      });
+
       slots.push({ hora: hStr, iso: isoSlot, ocupado });
       hora += 60;
     }
