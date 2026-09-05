@@ -10,6 +10,7 @@ import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
+import Directorio from "../components/cliente/Directorio";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 
@@ -30,7 +31,25 @@ const SubComponentWrapper = ({ children, title }) => (
 
 export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
   const brand = useBrand();
-  const [tab, setTab]                       = useState("clientes");
+  const [tab, setTab] = useState("clientes");
+  
+  const SIDEBAR_ITEMS = role === "administrativo"
+    ? [
+        { id: "clientes", label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
+      ]
+    : [
+        { id: "clientes",   label: "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
+        { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+        { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
+        ...(isSuperadmin ? [
+          { id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> },
+          { id: "directorio", label: "Directorio Público", icon: <Search size={18} strokeWidth={1.5} /> },
+          { id: "tienda", label: "Tienda (Admin)", icon: <Search size={18} strokeWidth={1.5} /> }
+        ] : [])
+      ];
+
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -413,6 +432,16 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
       {tab === "perfil" && (
         <UserProfile session={{ data: { id: myId, nombre: "Admin" }, role }} onLogout={onLogout} />
+      )}
+
+      {tab === "directorio" && isSuperadmin && (
+        <Directorio />
+      )}
+
+      {tab === "tienda" && isSuperadmin && (
+        <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
+          <p>Módulo de E-Commerce en construcción...</p>
+        </div>
       )}
     </AppLayout>
   );
