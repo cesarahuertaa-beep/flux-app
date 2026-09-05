@@ -43,7 +43,7 @@ function Stars({ n }) {
 
 function Navbar({ session }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const links = ["Suplementos", "Ropa", "Nutriólogos", "Mapa"];
+  const links = ["Suplementos", "Ropa", "Nutriólogos"];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#E2E5EA]">
@@ -485,7 +485,7 @@ export default function Landing({ session }) {
       <SupplementsSection supplements={activeSupplements} />
       <ApparelSection apparel={activeApparel} />
       <NutritionistsSection nutritionists={activeNutritionists} />
-      <MapSection mapPins={activeMapPins} />
+      {/* <MapSection mapPins={activeMapPins} /> */}
       <Downloads />
       <Footer />
     </div>

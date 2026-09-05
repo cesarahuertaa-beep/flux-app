@@ -10,6 +10,7 @@ import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
+import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import Directorio from "../components/cliente/Directorio";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
@@ -418,7 +419,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       )}
 
       {tab === "perfil" && (
-        <UserProfile session={{ data: { id: myId, nombre: "Admin" }, role }} onLogout={onLogout} />
+        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} />
       )}
 
       {tab === "directorio" && isSuperadmin && (
