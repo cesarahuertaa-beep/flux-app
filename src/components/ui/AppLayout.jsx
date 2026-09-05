@@ -77,7 +77,21 @@ export function AppLayout({ children, nav, active, setActive, session }) {
             return (
               <button
                 key={id}
-                onClick={() => { if (id === "tienda_link") window.location.href = "/"; else setActive(id); }}
+                onClick={() => {
+                  if (id === "tienda_link") {
+                    const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
+                    if (isElectron) {
+                      // En Electron (app://), abrimos el navegador web real del sistema operativo
+                      // NOTA: Reemplazar esta URL con tu dominio final de producción
+                      window.open("https://flux-app-xi-three.vercel.app", "_blank"); 
+                    } else {
+                      // En web (https://), simplemente navegamos a la raíz (landing page)
+                      window.location.href = "/";
+                    }
+                  } else {
+                    setActive(id);
+                  }
+                }}
                 title={collapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
                   isActive
@@ -154,7 +168,21 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 </button>
               )}
               <button
-                onClick={() => { if (id === "tienda_link") window.location.href = "/"; else setActive(id); }}
+                onClick={() => {
+                  if (id === "tienda_link") {
+                    const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
+                    if (isElectron) {
+                      // En Electron (app://), abrimos el navegador web real del sistema operativo
+                      // NOTA: Reemplazar esta URL con tu dominio final de producción
+                      window.open("https://flux-app-xi-three.vercel.app", "_blank"); 
+                    } else {
+                      // En web (https://), simplemente navegamos a la raíz (landing page)
+                      window.location.href = "/";
+                    }
+                  } else {
+                    setActive(id);
+                  }
+                }}
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${
                   isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"
                 }`}
