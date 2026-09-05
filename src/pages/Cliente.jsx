@@ -98,15 +98,12 @@ export default function ClienteView({ session, onLogout }) {
     }
   };
 
-  const isLibre = !cliente.nutriologo_id;
-  const SIDEBAR_ITEMS = isLibre ? [
-    { id: "tienda", label: "Tienda Oficial", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
-    { id: "directorio", label: "Especialistas", icon: <MapPin size={18} strokeWidth={1.5} /> },
-  ] : [
+  const SIDEBAR_ITEMS = [
     { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
     { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+    { id: "tienda_link", label: "Ir a Tienda",  icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
   ];
 
   const currentCycleWeek = (() => {
@@ -130,22 +127,11 @@ export default function ClienteView({ session, onLogout }) {
         <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
       ) : (
         <>
-          {tab === "tienda" && (
-            <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
-              <ShoppingBag size={48} className="mb-4 opacity-50" />
-              <p>Módulo de E-Commerce en construcción...</p>
-            </div>
-          )}
-
-          {tab === "directorio" && (
-            <Directorio />
-          )}
-
-          {tab === "nutricion" && !isLibre && (
+          {tab === "nutricion" && (
             <Nutrition dias={dias} cliente={cliente} nutri={nutri} />
           )}
 
-          {tab === "deporte" && !isLibre && (
+          {tab === "deporte" && (
             <Training 
               rutinas={rutinas} 
               progreso={progreso}
@@ -157,11 +143,11 @@ export default function ClienteView({ session, onLogout }) {
             />
           )}
 
-          {tab === "progreso" && !isLibre && (
+          {tab === "progreso" && (
             <Progreso cliente={cliente} />
           )}
 
-          {tab === "citas" && !isLibre && (
+          {tab === "citas" && (
             <CitasCliente cliente={cliente} />
           )}
 
