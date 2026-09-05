@@ -334,9 +334,15 @@ function NutritionistsSection({ nutritionists }) {
                   <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating || 5.0}
                 </div>
               </div>
-              <button className="w-full mt-4 bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all">
-                Ver perfil completo
-              </button>
+              {n.mapa_url ? (
+                <a href={n.mapa_url} target="_blank" rel="noopener noreferrer" className="w-full mt-4 bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center">
+                  Ver ubicación en Google Maps
+                </a>
+              ) : (
+                <button className="w-full mt-4 bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all">
+                  Contacto (Próximamente)
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -444,7 +450,7 @@ export default function Landing({ session }) {
       } catch (e) { console.error('Error cargando productos', e); }
 
       try {
-        const nutris = await dbGet('profiles?role=eq.nutriologo&activo=eq.true&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,pin_top,pin_left,rating,verificado,logo_url');
+        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,rating,verificado,logo_url');
         if (Array.isArray(nutris) && nutris.length > 0) {
           const formattedNutris = nutris.map(n => ({
             id: n.id,
@@ -455,7 +461,8 @@ export default function Landing({ session }) {
             patients: 0,
             available: true,
             img: n.logo_url || 'photo-1559839734-2b71ea197ec2',
-            verified: n.verificado || false
+            verified: n.verificado || false,
+            mapa_url: n.mapa_url || ''
           }));
           setDbNutritionists(formattedNutris);
 
