@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { dbGet, dbPost } from "../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
-  AlertCircle, Plus, CheckCircle2, ChevronRight
+  AlertCircle, Plus, CheckCircle2, ChevronRight, Star
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ const fmtFechaCorta = (iso) => {
 const ESTADOS = {
   pendiente:  { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: <Clock size={14}/>, label: "Pendiente" },
   confirmada: { text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: <Check size={14}/>, label: "Confirmada" },
+  completada: { text: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200", icon: <CheckCircle2 size={14}/>, label: "Completada" },
   rechazada:  { text: "text-red-600", bg: "bg-red-50", border: "border-red-200", icon: <X size={14}/>, label: "Rechazada" },
   cancelada:  { text: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200", icon: <AlertCircle size={14}/>, label: "Cancelada" },
 };
@@ -66,13 +67,17 @@ export function CitasCliente({ cliente }) {
 
   const [citas, setCitas] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
+  const [ratedCitas, setRatedCitas] = useState({});
   const [loading, setLoading] = useState(true);
   
-  // Estados del Modal
+  // Estados del Modal de Agendar
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorReq, setErrorReq] = useState("");
   const [exito, setExito] = useState(false);
+  
+  // Estados del Modal de Calificar
+  const [ratingModal, setRatingModal] = useState({ open: false, citaId: null, puntuacion: 5, comentario: "" });
   
   // Formulario
   const [selectedDate, setSelectedDate] = useState("");
@@ -83,14 +88,23 @@ export function CitasCliente({ cliente }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, d] = await Promise.all([
+      const [c, d, r] = await Promise.all([
         dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`),
-        dbGet(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`)
+        dbGet(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`),
+        dbGet(`citas_ratings?cliente_id=eq.${clienteId}&select=cita_id,puntuacion`)
       ]);
       setCitas(c);
       setDisponibilidad(d);
+      
+      const ratingMap = {};
+      if (Array.isArray(r)) {
+        r.forEach(rating => {
+          ratingMap[rating.cita_id] = rating.puntuacion;
+        });
+      }
+      setRatedCitas(ratingMap);
     } catch (e) {
-      console.error("Error al cargar citas", e);
+      console.error("Error al cargar citas o ratings", e);
     }
     setLoading(false);
   }, [clienteId, nutriologoId]);
@@ -104,6 +118,25 @@ export function CitasCliente({ cliente }) {
     setSlots(s);
     setSelectedSlot(null);
   }, [selectedDate, disponibilidad, citas]);
+
+  const submitRating = async () => {
+    if (!ratingModal.citaId || !ratingModal.puntuacion) return;
+    setSaving(true);
+    try {
+      await dbPost('citas_ratings', {
+        cita_id: ratingModal.citaId,
+        cliente_id: clienteId,
+        nutriologo_id: nutriologoId,
+        puntuacion: ratingModal.puntuacion,
+        comentario: ratingModal.comentario
+      });
+      setRatedCitas(prev => ({ ...prev, [ratingModal.citaId]: ratingModal.puntuacion }));
+      setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario: "" });
+    } catch (e) {
+      console.error("Error al calificar cita", e);
+    }
+    setSaving(false);
+  };
 
   const solicitarCita = async () => {
     if (!selectedSlot) return;
@@ -267,26 +300,36 @@ export function CitasCliente({ cliente }) {
                   Historial de Citas
                 </p>
                 <div className="space-y-3">
-                  {citasPasadas.map(cita => {
-                    const estado = ESTADOS[cita.estado] || ESTADOS.cancelada;
-                    return (
-                      <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-[#0B1929] capitalize">
-                            {fmtFechaCorta(cita.fecha_hora)}
-                          </p>
+                    {citasPasadas.map(cita => {
+                      const estado = ESTADOS[cita.estado] || ESTADOS.cancelada;
+                      const yaCalificado = ratedCitas[cita.id];
+                      return (
+                        <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-[#0B1929] capitalize">
+                              {fmtFechaCorta(cita.fecha_hora)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${estado.bg} ${estado.border} ${estado.text}`}>
+                              {estado.label}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D]">
+                              {cita.modalidad === "virtual" ? "Virtual" : "Presencial"}
+                            </span>
+                            {cita.estado === "completada" && (
+                              yaCalificado ? (
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md ml-2 border border-amber-200"><Star size={14} className="fill-amber-500"/> {yaCalificado}.0</span>
+                              ) : (
+                                <button onClick={() => setRatingModal({ open: true, citaId: cita.id, puntuacion: 5, comentario: "" })} className="text-xs font-semibold text-white bg-[var(--brand-primary)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm ml-2">
+                                  <Star size={12} className="fill-white"/> Calificar
+                                </button>
+                              )
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${estado.bg} ${estado.border} ${estado.text}`}>
-                            {estado.label}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D]">
-                            {cita.modalidad === "virtual" ? "Virtual" : "Presencial"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               </div>
             )}
@@ -442,6 +485,49 @@ export function CitasCliente({ cliente }) {
                 {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                 {saving ? "Procesando..." : "Confirmar Cita"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Calificación */}
+      {ratingModal.open && (
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <h3 className="text-xl font-bold text-[#0B1929] mb-2">Califica a tu Nutriólogo</h3>
+              <p className="text-sm text-[#6B7A8D] mb-6">Tu opinión nos ayuda a mantener la mejor calidad en el servicio.</p>
+              
+              <div className="flex justify-center gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button key={star} onClick={() => setRatingModal(prev => ({ ...prev, puntuacion: star }))} className="transition-transform hover:scale-110">
+                    <Star size={32} className={`${star <= ratingModal.puntuacion ? 'fill-amber-400 text-amber-400' : 'text-[#E2E8F0]'}`} />
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={ratingModal.comentario}
+                onChange={(e) => setRatingModal(prev => ({ ...prev, comentario: e.target.value }))}
+                placeholder="¿Qué te pareció la consulta? (Opcional)"
+                className="w-full h-24 bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl p-3 text-sm outline-none resize-none mb-6"
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario: "" })}
+                  className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm border border-[#E2E8F0] text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={submitRating}
+                  disabled={saving}
+                  className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm bg-amber-500 text-white shadow-sm hover:bg-amber-600 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {saving ? "Enviando..." : "Enviar Calificación"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

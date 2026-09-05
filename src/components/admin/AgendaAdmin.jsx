@@ -82,6 +82,7 @@ const fmtFechaHora = (iso) => {
 const ESTADO_COLOR = {
   pendiente:  { bg: "bg-yellow-50",  border: "border-yellow-200",  text: "text-yellow-700", bar: "bg-yellow-400", label: "Pendiente", Icon: Clock },
   confirmada: { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700", bar: "bg-green-400", label: "Confirmada", Icon: CheckCircle2 },
+  completada: { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700", bar: "bg-blue-400", label: "Completada", Icon: CheckCircle2 },
   rechazada:  { bg: "bg-red-50",     border: "border-red-200",     text: "text-red-700", bar: "bg-red-400", label: "Rechazada", Icon: XCircle },
   cancelada:  { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700", bar: "bg-slate-400", label: "Cancelada", Icon: Ban },
 };
@@ -140,6 +141,16 @@ export function AgendaAdmin({ setMsg, profileId }) {
     try {
       await dbPatch(`citas?id=eq.${cita.id}`, { estado: "confirmada" });
       setMsg("Cita confirmada");
+      loadCitas();
+    } catch (e) { setMsg(e.message); }
+    setSaving(false);
+  };
+
+  const marcarCompletada = async (cita) => {
+    setSaving(true);
+    try {
+      await dbPatch(`citas?id=eq.${cita.id}`, { estado: "completada" });
+      setMsg("Cita marcada como completada. El paciente ahora puede calificarla.");
       loadCitas();
     } catch (e) { setMsg(e.message); }
     setSaving(false);
@@ -236,6 +247,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             {[
               ["pendiente", "Pendientes", Clock], 
               ["confirmada", "Confirmadas", CheckCircle2], 
+              ["completada", "Completadas", CheckCircle2], 
               ["rechazada", "Rechazadas", XCircle], 
               ["todos", "Todas", ClipboardList]
             ].map(([k, lb, Icon]) => (
@@ -316,9 +328,14 @@ export function AgendaAdmin({ setMsg, profileId }) {
                           </>
                         )}
                         {cita.estado === "confirmada" && (
-                          <Btn small outline danger onClick={() => cancelar(cita)} disabled={saving}>
-                            <Ban className="w-4 h-4" /> Cancelar
-                          </Btn>
+                          <>
+                            <button onClick={() => marcarCompletada(cita)} disabled={saving} className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                              <CheckCircle2 size={12} /> Completada
+                            </button>
+                            <button onClick={() => cancelar(cita)} disabled={saving} className="text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                              <Ban size={12} /> Cancelar
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
