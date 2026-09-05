@@ -41,9 +41,10 @@ function Stars({ n }) {
   );
 }
 
-function Navbar({ session }) {
+function Navbar({ session, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const links = ["Suplementos", "Ropa", "Nutriólogos"];
+  const hasAppAccess = session && (session.role !== 'client' || !!session.data?.nutriologo_id);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#E2E5EA]">
@@ -61,15 +62,29 @@ function Navbar({ session }) {
           ))}
         </nav>
         <div className="hidden md:flex items-center gap-2 ml-auto flex-shrink-0">
-          {!session ? (<Link to="/login" className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#1A6FD4] font-medium transition-colors"><LogIn size={15} strokeWidth={1.5} /> Iniciar sesión</Link>) : (<Link to="/app" className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#1A6FD4] font-medium transition-colors"><User size={15} strokeWidth={1.5} /> Mi Panel</Link>)}
-          <div className="w-px h-5 bg-[#E2E5EA]" />
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
-            <Monitor size={14} strokeWidth={1.5} /> Escritorio
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
-            <Smartphone size={14} strokeWidth={1.5} /> Android / iOS
-          </button>
-          <Link to={session ? "/app" : "/login"} className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200"><Globe size={14} strokeWidth={2} /> Abrir app</Link>
+          {!session ? (
+            <Link to="/login" className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#1A6FD4] font-medium transition-colors"><LogIn size={15} strokeWidth={1.5} /> Iniciar sesión</Link>
+          ) : (
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] font-medium"><User size={15} strokeWidth={1.5}/> Hola, {session.data?.nombre || "Usuario"}</span>
+              <button onClick={onLogout} className="text-sm text-red-500 hover:text-red-600 font-medium">Salir</button>
+            </div>
+          )}
+          
+          {hasAppAccess && (
+            <>
+              <div className="w-px h-5 bg-[#E2E5EA] ml-2" />
+              <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
+                <Monitor size={14} strokeWidth={1.5} /> Escritorio
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
+                <Smartphone size={14} strokeWidth={1.5} /> Android / iOS
+              </button>
+              <Link to="/app" className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200">
+                <Globe size={14} strokeWidth={2} /> Ir a tu App
+              </Link>
+            </>
+          )}
         </div>
         <button className="md:hidden ml-auto text-[#0B1929]" onClick={() => setMobileOpen(!mobileOpen)}>
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
@@ -83,9 +98,22 @@ function Navbar({ session }) {
             ))}
           </nav>
           <div className="flex flex-col gap-3">
-            <Link to="/login" className="flex items-center gap-2 text-sm font-semibold text-[#6B7A8D]">
-              <LogIn size={16} /> {session ? 'Ir al Panel' : 'Iniciar sesión'}
-            </Link>
+            {!session ? (
+              <Link to="/login" className="flex items-center gap-2 text-sm font-semibold text-[#6B7A8D]">
+                <LogIn size={16} /> Iniciar sesión
+              </Link>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm font-semibold text-[#6B7A8D]"><User size={16}/> Mi Cuenta</span>
+                <button onClick={onLogout} className="text-sm text-red-500 font-medium">Salir</button>
+              </div>
+            )}
+            
+            {hasAppAccess && (
+              <Link to="/app" className="flex items-center gap-2 text-sm font-semibold text-[#1A6FD4] mt-2">
+                <Globe size={16} /> Ir a tu App
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -419,7 +447,7 @@ function Footer() {
   );
 }
 
-export default function Landing({ session }) {
+export default function Landing({ session, onLogout }) {
   const [dbSupplements, setDbSupplements] = useState([]);
   const [dbApparel, setDbApparel] = useState([]);
   const [dbNutritionists, setDbNutritionists] = useState([]);
@@ -486,7 +514,7 @@ export default function Landing({ session }) {
 
   return (
     <div className="min-h-screen bg-white text-[#0B1929] font-['Inter',sans-serif]">
-      <Navbar session={session} />
+      <Navbar session={session} onLogout={onLogout} />
       <Hero />
       <Features />
       <SupplementsSection supplements={activeSupplements} />

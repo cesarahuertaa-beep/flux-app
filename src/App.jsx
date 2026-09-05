@@ -53,7 +53,7 @@ export default function App() {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
           } else if (profileId) {
-            // Restaurar sesión de admin/nutriólogo/superadmin
+            // Restaurar sesión de admin/nutriologo/superadmin
             const profiles = await dbGet(`profiles?id=eq.${profileId}`);
             const role = profiles.length ? profiles[0].role : null;
             if (role && (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo")) {
@@ -116,6 +116,11 @@ export default function App() {
   const handleBackToAdmin = () => setAtletaData(null);
 
   const MainApp = () => {
+    // Si es un cliente huérfano (solo comprador de E-commerce), no tiene acceso a la App privada
+    if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
+      return <Navigate to="/" replace />;
+    }
+
     if (atletaData) return (
       <ClienteView
         session={{ role:"client", data:atletaData, token:session.token }}
@@ -133,14 +138,14 @@ export default function App() {
     <BrandProvider session={session}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Landing session={session} />} />
+          <Route path="/" element={<Landing session={session} onLogout={handleLogout} />} />
           <Route path="/login" element={
             restoring ? (
               <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
                 <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
               </div>
             ) : session ? (
-              <Navigate to="/app" replace />
+              <Navigate to="/" replace />
             ) : (
               <Login onLogin={handleLogin} />
             )
