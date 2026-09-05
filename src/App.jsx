@@ -118,7 +118,8 @@ export default function App() {
   const MainApp = () => {
     // Si es un cliente huérfano (solo comprador de E-commerce), no tiene acceso a la App privada
     if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
-      return <Navigate to={window.location.protocol === 'file:' ? "/login" : "/"} replace />;
+      const isElectron = window.location.protocol === 'file:' || window.location.protocol === 'app:';
+      return <Navigate to={isElectron ? "/login" : "/"} replace />;
     }
 
     if (atletaData) return (
@@ -134,7 +135,7 @@ export default function App() {
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };
 
-  const isFileProtocol = window.location.protocol === 'file:';
+  const isFileProtocol = window.location.protocol === 'file:' || window.location.protocol === 'app:';
   const Router = isFileProtocol ? HashRouter : BrowserRouter;
 
   return (
