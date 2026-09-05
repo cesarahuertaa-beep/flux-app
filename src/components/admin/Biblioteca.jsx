@@ -155,7 +155,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
                       />
                       {/* Play overlay */}
-                      <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0B1929] shadow-lg">
                           <Play size={20} className="ml-1" />
                         </div>

@@ -168,7 +168,7 @@ export default function GestorTienda({ setMsg }) {
                       {p.badge}
                     </span>
                   )}
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => {
                         setEditProd(p);
                         setForm({
