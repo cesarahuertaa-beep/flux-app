@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { dbGet, dbPost } from "../lib/supabase";
+import { dbGet, dbPost, dbPatch } from "../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
   AlertCircle, Plus, CheckCircle2, ChevronRight, Star
@@ -101,6 +101,21 @@ export function CitasCliente({ cliente }) {
         dbGet(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`),
         dbGet(`citas_ratings?cliente_id=eq.${clienteId}&select=cita_id,puntuacion`)
       ]);
+      
+      const now = new Date();
+      if (Array.isArray(c)) {
+        for (const cita of c) {
+          if (cita.estado === 'confirmada') {
+            const citaTime = new Date(cita.fecha_hora);
+            const diffHours = (now - citaTime) / (1000 * 60 * 60);
+            if (diffHours >= 1) {
+              cita.estado = 'completada';
+              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+            }
+          }
+        }
+      }
+      
       setCitas(c);
       setDisponibilidad(d);
       

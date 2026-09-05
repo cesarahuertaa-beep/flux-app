@@ -109,6 +109,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
       const rows = await dbGet(
         `citas?nutriologo_id=eq.${myId}&order=fecha_hora.asc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`
       );
+      
+      const now = new Date();
+      if (Array.isArray(rows)) {
+        for (const cita of rows) {
+          if (cita.estado === 'confirmada') {
+            const citaTime = new Date(cita.fecha_hora);
+            const diffHours = (now - citaTime) / (1000 * 60 * 60);
+            if (diffHours >= 1) {
+              cita.estado = 'completada';
+              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+            }
+          }
+        }
+      }
+      
       setCitas(rows);
     } catch { }
   }, [myId]);
