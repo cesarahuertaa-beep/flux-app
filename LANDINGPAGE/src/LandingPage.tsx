@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
   CheckCircle, Leaf, Zap, Shield, Users, X, Menu,
 } from "lucide-react";
+import fluxLogo from "@/imports/dreamina-2026-09-02-9270-Minimalist_standalone_app_icon__only_the....jpeg";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ const mapPins = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function Stars({ n }) {
+function Stars({ n }: { n: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1,2,3,4,5].map((i) => (
@@ -58,7 +58,7 @@ function Stars({ n }) {
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function Navbar({ session }) {
+function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const links = ["Suplementos", "Ropa", "Nutriólogos", "Mapa"];
 
@@ -67,7 +67,7 @@ function Navbar({ session }) {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-6">
         {/* Logo */}
         <div className="flex items-center gap-2.5 flex-shrink-0">
-          <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
+          <img src={fluxLogo} alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
           <div className="leading-tight">
             <p className="text-[15px] font-bold tracking-tight text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>FLUX</p>
             <p className="text-[8px] font-semibold tracking-widest text-[#1A6FD4] uppercase -mt-0.5">Health System</p>
@@ -227,7 +227,7 @@ function Features() {
 }
 
 function SupplementsSection() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<number[]>([]);
   return (
     <section id="suplementos" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6">
@@ -288,7 +288,7 @@ function SupplementsSection() {
 }
 
 function ApparelSection() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<number[]>([]);
   return (
     <section id="ropa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
       <div className="max-w-7xl mx-auto px-6">
@@ -418,7 +418,7 @@ function NutritionistsSection() {
 }
 
 function MapSection() {
-  const [activePin, setActivePin] = useState(null);
+  const [activePin, setActivePin] = useState<number | null>(null);
   return (
     <section id="mapa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
       <div className="max-w-7xl mx-auto px-6">
@@ -529,7 +529,7 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-3">
-              <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
+              <img src={fluxLogo} alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
               <div>
                 <p className="text-white font-bold text-sm">FLUX</p>
                 <p className="text-[9px] tracking-widest text-[#1A6FD4] uppercase">Health System</p>
@@ -571,7 +571,7 @@ function Footer() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function Landing({ session }) {
+export default function LandingPage() {
   return (
     <div className="min-h-full bg-white">
       <Navbar  />

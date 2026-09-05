@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
   CheckCircle, Leaf, Zap, Shield, Users, X, Menu,
 } from "lucide-react";
+import fluxLogo from "@/imports/dreamina-2026-09-02-9270-Minimalist_standalone_app_icon__only_the....jpeg";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ const mapPins = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function Stars({ n }) {
+function Stars({ n }: { n: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1,2,3,4,5].map((i) => (
@@ -58,7 +58,7 @@ function Stars({ n }) {
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function Navbar({ session }) {
+function Navbar({ onOpenApp }: { onOpenApp: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const links = ["Suplementos", "Ropa", "Nutriólogos", "Mapa"];
 
@@ -67,7 +67,7 @@ function Navbar({ session }) {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-6">
         {/* Logo */}
         <div className="flex items-center gap-2.5 flex-shrink-0">
-          <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
+          <img src={fluxLogo} alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
           <div className="leading-tight">
             <p className="text-[15px] font-bold tracking-tight text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>FLUX</p>
             <p className="text-[8px] font-semibold tracking-widest text-[#1A6FD4] uppercase -mt-0.5">Health System</p>
@@ -94,7 +94,7 @@ function Navbar({ session }) {
             <Smartphone size={14} strokeWidth={1.5} /> Android / iOS
           </button>
           <button
-            
+            onClick={onOpenApp}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200"
           >
             <Globe size={14} strokeWidth={2} /> Abrir app
@@ -117,7 +117,7 @@ function Navbar({ session }) {
             <button className="flex items-center gap-2 text-sm text-[#6B7A8D] font-medium"><LogIn size={14} /> Iniciar sesión</button>
             <button className="flex items-center gap-2 text-sm text-[#6B7A8D] font-medium"><Monitor size={14} /> Descargar escritorio</button>
             <button className="flex items-center gap-2 text-sm text-[#6B7A8D] font-medium"><Smartphone size={14} /> Android / iOS</button>
-            <button  className="flex items-center gap-2 justify-center px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl">
+            <button onClick={onOpenApp} className="flex items-center gap-2 justify-center px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl">
               <Globe size={14} /> Abrir app en línea
             </button>
           </div>
@@ -127,7 +127,7 @@ function Navbar({ session }) {
   );
 }
 
-function Hero() {
+function Hero({ onOpenApp }: { onOpenApp: () => void }) {
   return (
     <section className="pt-16 min-h-screen flex items-center relative overflow-hidden bg-white">
       {/* BG decoration */}
@@ -151,7 +151,7 @@ function Hero() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <button
-              
+              onClick={onOpenApp}
               className="flex items-center gap-2 px-6 py-3.5 bg-[#1A6FD4] text-white font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-lg shadow-blue-200 text-sm"
             >
               <Globe size={16} /> Abrir app en línea <ChevronRight size={15} />
@@ -227,7 +227,7 @@ function Features() {
 }
 
 function SupplementsSection() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<number[]>([]);
   return (
     <section id="suplementos" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6">
@@ -288,7 +288,7 @@ function SupplementsSection() {
 }
 
 function ApparelSection() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<number[]>([]);
   return (
     <section id="ropa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
       <div className="max-w-7xl mx-auto px-6">
@@ -418,7 +418,7 @@ function NutritionistsSection() {
 }
 
 function MapSection() {
-  const [activePin, setActivePin] = useState(null);
+  const [activePin, setActivePin] = useState<number | null>(null);
   return (
     <section id="mapa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
       <div className="max-w-7xl mx-auto px-6">
@@ -493,7 +493,7 @@ function MapSection() {
   );
 }
 
-function Downloads() {
+function Downloads({ onOpenApp }: { onOpenApp: () => void }) {
   return (
     <section className="py-24 bg-[#0B1929] text-white">
       <div className="max-w-4xl mx-auto px-6 text-center">
@@ -511,7 +511,7 @@ function Downloads() {
             <Smartphone size={18} strokeWidth={1.5} className="text-[#1A6FD4]" /> iOS
           </button>
           <button
-            
+            onClick={onOpenApp}
             className="flex items-center gap-2.5 px-6 py-3.5 bg-[#1A6FD4] text-white font-semibold rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/40 text-sm"
           >
             <Globe size={18} strokeWidth={1.5} /> Abrir app en línea
@@ -529,7 +529,7 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-3">
-              <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
+              <img src={fluxLogo} alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
               <div>
                 <p className="text-white font-bold text-sm">FLUX</p>
                 <p className="text-[9px] tracking-widest text-[#1A6FD4] uppercase">Health System</p>
@@ -571,17 +571,17 @@ function Footer() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function Landing({ session }) {
+export default function LandingPage({ onOpenApp }: { onOpenApp: () => void }) {
   return (
     <div className="min-h-full bg-white">
-      <Navbar  />
-      <Hero  />
+      <Navbar onOpenApp={onOpenApp} />
+      <Hero onOpenApp={onOpenApp} />
       <Features />
       <SupplementsSection />
       <ApparelSection />
       <NutritionistsSection />
       <MapSection />
-      <Downloads  />
+      <Downloads onOpenApp={onOpenApp} />
       <Footer />
     </div>
   );
