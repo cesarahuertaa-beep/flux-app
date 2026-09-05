@@ -23,8 +23,8 @@ function createWindow() {
 
   const distPath = path.join(__dirname, '../dist/index.html');
   const startUrl = process.env.ELECTRON_START_URL
-    ? process.env.ELECTRON_START_URL
-    : url.format({ pathname: distPath, protocol: 'file:', slashes: true });
+    ? process.env.ELECTRON_START_URL + '/#/login'
+    : url.format({ pathname: distPath, protocol: 'file:', slashes: true }) + '#/login';
 
   mainWindow.loadURL(startUrl);
   mainWindow.once('ready-to-show', function() { mainWindow.show(); });

@@ -118,7 +118,7 @@ export default function App() {
   const MainApp = () => {
     // Si es un cliente huérfano (solo comprador de E-commerce), no tiene acceso a la App privada
     if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
-      return <Navigate to="/" replace />;
+      return <Navigate to={window.location.protocol === 'file:' ? "/login" : "/"} replace />;
     }
 
     if (atletaData) return (
@@ -141,14 +141,18 @@ export default function App() {
     <BrandProvider session={session}>
       <Router>
         <Routes>
-          <Route path="/" element={<Landing session={session} onLogout={handleLogout} />} />
+          <Route path="/" element={
+            isFileProtocol
+              ? <Navigate to={session ? "/app" : "/login"} replace />
+              : <Landing session={session} onLogout={handleLogout} />
+          } />
           <Route path="/login" element={
             restoring ? (
               <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
                 <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
               </div>
             ) : session ? (
-              <Navigate to="/" replace />
+              <Navigate to="/app" replace />
             ) : (
               <Login onLogin={handleLogin} />
             )
@@ -164,7 +168,7 @@ export default function App() {
               <MainApp />
             )
           } />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={isFileProtocol ? "/login" : "/"} replace />} />
         </Routes>
       </Router>
       <InstallPrompt />
