@@ -266,7 +266,7 @@ function SupplementsSection({ supplements }) {
                     <span className="text-xs text-[#6B7A8D] font-mono">{s.rating} ({s.reviews})</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {s.flavors.map((f) => (
+                    {(s.flavors || []).map((f) => (
                       <span key={f} className="text-[10px] px-2 py-0.5 bg-[#F0F2F5] text-[#6B7A8D] rounded">{f}</span>
                     ))}
                   </div>
@@ -322,7 +322,7 @@ function ApparelSection({ apparel }) {
                     <span className="text-xs text-[#6B7A8D] font-mono">{a.rating} ({a.reviews})</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {a.sizes.map((sz) => (
+                    {(a.sizes || []).map((sz) => (
                       <span key={sz} className="text-[10px] px-2 py-0.5 border border-[#E2E5EA] text-[#6B7A8D] rounded font-mono">{sz}</span>
                     ))}
                   </div>
@@ -348,7 +348,7 @@ function ApparelSection({ apparel }) {
 function NutritionistsSection({ nutritionists }) {
   const [search, setSearch] = useState("");
   const filtered = nutritionists.filter(
-    (n) => n.name.toLowerCase().includes(search.toLowerCase()) || n.specialty.toLowerCase().includes(search.toLowerCase()) || n.location.toLowerCase().includes(search.toLowerCase())
+    (n) => (n.name || '').toLowerCase().includes(search.toLowerCase()) || (n.specialty || '').toLowerCase().includes(search.toLowerCase()) || (n.location || '').toLowerCase().includes(search.toLowerCase())
   );
   return (
     <section id="nutriólogos" className="py-24 bg-white border-t border-[#E2E5EA]">
@@ -594,8 +594,8 @@ export default function Landing({ session }) {
             reviews: p.num_reviews,
             tag: p.badge,
             img: p.imagen_url || 'photo-1593095948071-474c5cc2989d',
-            flavors: p.variantes || [],
-            sizes: p.variantes || [],
+            flavors: Array.isArray(p.variantes) ? p.variantes : (typeof p.variantes === 'string' ? JSON.parse(p.variantes || '[]') : []),
+            sizes: Array.isArray(p.variantes) ? p.variantes : (typeof p.variantes === 'string' ? JSON.parse(p.variantes || '[]') : []),
             badge: p.badge ? 'bg-blue-100 text-blue-700' : ''
           }));
           setDbSupplements(mappedProd.filter(p => p.categoria === 'suplemento'));
@@ -608,7 +608,7 @@ export default function Landing({ session }) {
         if (nutris && nutris.length > 0) {
           const formattedNutris = nutris.map(n => ({
             id: n.id,
-            name: n.nombre_marca || n.nombre,
+            name: n.nombre_marca || n.nombre || 'Especialista',
             specialty: n.especialidad || 'Nutrición Integral',
             location: n.ubicacion_texto || 'Consulta Online',
             rating: n.rating || 5.0,
@@ -622,7 +622,7 @@ export default function Landing({ session }) {
           const pins = nutris.filter(n => n.pin_top && n.pin_left).map(n => ({
             top: n.pin_top,
             left: n.pin_left,
-            name: n.nombre_marca || n.nombre,
+            name: n.nombre_marca || n.nombre || 'Especialista',
             available: true
           }));
           setDbMapPins(pins);
