@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { dbGet } from "../lib/supabase";
+import { useEffect } from "react";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
@@ -8,7 +10,7 @@ import {
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
-const supplements = [
+const MOCK_SUPPLEMENTS = [
   { id: 1, name: "Proteína Whey Flux", subtitle: "Aislada + Concentrada", price: 899, rating: 4.9, reviews: 218, tag: "Más vendido", img: "photo-1593095948071-474c5cc2989d", flavors: ["Chocolate", "Vainilla", "Fresa"], badge: "bg-blue-100 text-blue-700" },
   { id: 2, name: "Creatina Monohidratada", subtitle: "Fuerza y recuperación", price: 449, rating: 4.8, reviews: 143, tag: "Nuevo", img: "photo-1584308666744-24d5c474f2ae", flavors: ["Sin sabor"], badge: "bg-green-100 text-green-700" },
   { id: 3, name: "Pre-Entreno Flux Rush", subtitle: "Energía sostenida · Sin crash", price: 649, rating: 4.7, reviews: 97, tag: null, img: "photo-1571019614242-c5c5dee9f50b", flavors: ["Sandía", "Blue Raspberry"], badge: "" },
@@ -17,7 +19,7 @@ const supplements = [
   { id: 6, name: "Omega 3 Premium", subtitle: "2000 mg EPA/DHA · Corazón", price: 379, rating: 4.9, reviews: 201, tag: "Bestseller", img: "photo-1584308666744-24d5c474f2ae", flavors: ["Cápsula"], badge: "bg-amber-100 text-amber-700" },
 ];
 
-const apparel = [
+const MOCK_APPAREL = [
   { id: 1, name: "Playera Compression Pro", subtitle: "Tejido técnico anti-sudor", price: 699, rating: 4.9, reviews: 132, img: "photo-1521572163474-6864f9cf17ab", sizes: ["S","M","L","XL"], color: "#1A6FD4" },
   { id: 2, name: "Shorts Training Flux", subtitle: "Ergonómico · 4-way stretch", price: 549, rating: 4.7, reviews: 88, img: "photo-1605296867304-46d5465a13f1", sizes: ["S","M","L","XL","XXL"], color: "#0B1929" },
   { id: 3, name: "Leggings Performance", subtitle: "Compresión graduada", price: 799, rating: 4.8, reviews: 164, img: "photo-1518611012118-696072aa579a", sizes: ["XS","S","M","L","XL"], color: "#1A6FD4" },
@@ -26,7 +28,7 @@ const apparel = [
   { id: 6, name: "Gorra Flux Logo", subtitle: "5 paneles · Ajustable", price: 349, rating: 4.6, reviews: 55, img: "photo-1521572163474-6864f9cf17ab", sizes: ["Única"], color: "#0B1929" },
 ];
 
-const nutritionists = [
+const MOCK_NUTRITIONISTS = [
   { id: 1, name: "Dra. Andrea Torres", specialty: "Nutrición deportiva · Pérdida de grasa", location: "CDMX · Colonia Nápoles", rating: 4.9, patients: 312, available: true, img: "photo-1559839734-2b71ea197ec2", verified: true },
   { id: 2, name: "Dr. Miguel Sánchez", specialty: "Nutrición clínica · Masa muscular", location: "CDMX · Polanco", rating: 4.8, patients: 187, available: true, img: "photo-1612349317150-e413f6a5b16d", verified: true },
   { id: 3, name: "Dra. Laura Vega", specialty: "Nutrición holística · Vegana", location: "Guadalajara · Zapopan", rating: 4.9, patients: 245, available: false, img: "photo-1551836022-d5d88e9218df", verified: true },
@@ -35,7 +37,7 @@ const nutritionists = [
   { id: 6, name: "Dr. Javier Luna", specialty: "Nutrición oncológica · Metabólica", location: "Puebla · Centro", rating: 4.6, patients: 134, available: false, img: "photo-1612349317150-e413f6a5b16d", verified: true },
 ];
 
-const mapPins = [
+const MOCK_MAPPINS = [
   { top: "28%", left: "38%", name: "Dra. Andrea Torres", available: true },
   { top: "32%", left: "52%", name: "Dr. Miguel Sánchez", available: true },
   { top: "55%", left: "22%", name: "Dra. Laura Vega", available: false },
@@ -226,7 +228,7 @@ function Features() {
   );
 }
 
-function SupplementsSection() {
+function SupplementsSection({ supplements }) {
   const [cart, setCart] = useState([]);
   return (
     <section id="suplementos" className="py-24 bg-white">
@@ -287,7 +289,7 @@ function SupplementsSection() {
   );
 }
 
-function ApparelSection() {
+function ApparelSection({ apparel }) {
   const [cart, setCart] = useState([]);
   return (
     <section id="ropa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
@@ -343,7 +345,7 @@ function ApparelSection() {
   );
 }
 
-function NutritionistsSection() {
+function NutritionistsSection({ nutritionists }) {
   const [search, setSearch] = useState("");
   const filtered = nutritionists.filter(
     (n) => n.name.toLowerCase().includes(search.toLowerCase()) || n.specialty.toLowerCase().includes(search.toLowerCase()) || n.location.toLowerCase().includes(search.toLowerCase())
@@ -417,7 +419,7 @@ function NutritionistsSection() {
   );
 }
 
-function MapSection() {
+function MapSection({ mapPins }) {
   const [activePin, setActivePin] = useState(null);
   return (
     <section id="mapa" className="py-24 bg-[#F7F9FC] border-t border-[#E2E5EA]">
@@ -572,15 +574,78 @@ function Footer() {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Landing({ session }) {
+  const [dbSupplements, setDbSupplements] = useState([]);
+  const [dbApparel, setDbApparel] = useState([]);
+  const [dbNutritionists, setDbNutritionists] = useState([]);
+  const [dbMapPins, setDbMapPins] = useState([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const prod = await dbGet('productos?activo=eq.true');
+        if (prod && prod.length > 0) {
+          // Format for frontend mapping
+          const mappedProd = prod.map(p => ({
+            id: p.id,
+            name: p.nombre,
+            subtitle: p.subtitulo,
+            price: p.precio,
+            rating: p.rating,
+            reviews: p.num_reviews,
+            tag: p.badge,
+            img: p.imagen_url || 'photo-1593095948071-474c5cc2989d',
+            flavors: p.variantes || [],
+            sizes: p.variantes || [],
+            badge: p.badge ? 'bg-blue-100 text-blue-700' : ''
+          }));
+          setDbSupplements(mappedProd.filter(p => p.categoria === 'suplemento'));
+          setDbApparel(mappedProd.filter(p => p.categoria === 'ropa'));
+        }
+      } catch (e) { console.error('Error cargando productos', e); }
+
+      try {
+        const nutris = await dbGet('profiles?role=eq.nutriologo&activo=eq.true&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,pin_top,pin_left,rating,verificado,logo_url');
+        if (nutris && nutris.length > 0) {
+          const formattedNutris = nutris.map(n => ({
+            id: n.id,
+            name: n.nombre_marca || n.nombre,
+            specialty: n.especialidad || 'Nutrición Integral',
+            location: n.ubicacion_texto || 'Consulta Online',
+            rating: n.rating || 5.0,
+            patients: 0,
+            available: true,
+            img: n.logo_url || 'photo-1559839734-2b71ea197ec2',
+            verified: n.verificado || false
+          }));
+          setDbNutritionists(formattedNutris);
+
+          const pins = nutris.filter(n => n.pin_top && n.pin_left).map(n => ({
+            top: n.pin_top,
+            left: n.pin_left,
+            name: n.nombre_marca || n.nombre,
+            available: true
+          }));
+          setDbMapPins(pins);
+        }
+      } catch (e) { console.error('Error cargando nutris', e); }
+    };
+    loadData();
+  }, []);
+
+  const activeSupplements = dbSupplements.length > 0 ? dbSupplements : MOCK_SUPPLEMENTS;
+  const activeApparel = dbApparel.length > 0 ? dbApparel : MOCK_APPAREL;
+  const activeNutritionists = dbNutritionists.length > 0 ? dbNutritionists : MOCK_NUTRITIONISTS;
+  const activeMapPins = dbMapPins.length > 0 ? dbMapPins : MOCK_MAPPINS;
+
   return (
     <div className="min-h-full bg-white">
       <Navbar  />
       <Hero  />
       <Features />
-      <SupplementsSection />
-      <ApparelSection />
-      <NutritionistsSection />
-      <MapSection />
+      <SupplementsSection supplements={activeSupplements} />
+      <ApparelSection apparel={activeApparel} />
+      <NutritionistsSection nutritionists={activeNutritionists} />
+      <MapSection mapPins={activeMapPins} />
       <Downloads  />
       <Footer />
     </div>
