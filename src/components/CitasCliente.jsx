@@ -195,8 +195,8 @@ export function CitasCliente({ cliente }) {
   const minDay = String(today.getDate()).padStart(2, "0");
   const minDate = `${minYear}-${minMonth}-${minDay}`;
 
-  const citasProximas = citas.filter(c => new Date(c.fecha_hora) >= new Date() && c.estado !== "cancelada" && c.estado !== "rechazada");
-  const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || c.estado === "cancelada" || c.estado === "rechazada");
+  const citasProximas = citas.filter(c => new Date(c.fecha_hora) >= new Date() && !["cancelada", "rechazada", "completada"].includes(c.estado));
+  const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada", "rechazada", "completada"].includes(c.estado));
 
   return (
     <div className="h-full flex flex-col">
