@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
-  CheckCircle, Leaf, Zap, Shield, Users, X, Menu,
+  CheckCircle, Leaf, Zap, Shield, Users, User, X, Menu,
 } from "lucide-react";
 
 const MOCK_SUPPLEMENTS = [
