@@ -8,6 +8,7 @@ import Nutrition from "../components/cliente/Nutrition";
 import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
+import Directorio from "../components/cliente/Directorio";
 import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -137,10 +138,7 @@ export default function ClienteView({ session, onLogout }) {
           )}
 
           {tab === "directorio" && (
-            <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
-              <MapPin size={48} className="mb-4 opacity-50" />
-              <p>Módulo de Directorio Médico en construcción...</p>
-            </div>
+            <Directorio />
           )}
 
           {tab === "nutricion" && !isLibre && (
