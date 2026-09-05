@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
-    "electron:build": "vite build && electron-builder --win"
+    "electron:build": "vite build --mode development && electron-builder --win"
   },
   "build": {
     "appId": "com.fluxsport.app",
