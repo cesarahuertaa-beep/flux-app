@@ -9,7 +9,7 @@ export const useBrand = () => useContext(BrandContext);
 const FLUX_DEFAULT = { 
   nombre_marca: "FLUX", 
   color_primario: "#1A6FD4", 
-  logo_url: "/logo.png" 
+  logo_url: "/flux_logo.jpeg" 
 };
 
 export function BrandProvider({ children, session }) {
@@ -41,7 +41,7 @@ export function BrandProvider({ children, session }) {
             setBrand({
               nombre_marca: p.nombre_marca || "FLUX",
               color_primario: p.color_primario || "#1A6FD4",
-              logo_url: p.logo_url || "/logo.png"
+              logo_url: p.logo_url || "/flux_logo.jpeg"
             });
           }
         }

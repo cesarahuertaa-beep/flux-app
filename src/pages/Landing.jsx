@@ -8,7 +8,7 @@ export default function Landing({ session }) {
       {/* Navbar */}
       <nav className="w-full bg-white border-b border-[#E2E8F0] px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Flux Logo" className="h-8" />
+          <img src="/flux_logo.jpeg" alt="Flux Logo" className="h-8" />
           <span className="font-['Space_Grotesk',sans-serif] font-bold text-xl tracking-tight">FLUX</span>
         </div>
         <div className="flex items-center gap-4">

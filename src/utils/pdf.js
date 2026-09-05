@@ -31,7 +31,7 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   const dark    = darken(accent, 60);
   const light   = tint(accent, 210);
   const nombre  = escapeHtml(brand.nombre_marca || "FLUX Sport Supplements");
-  const logoUrl = brand.logo_url && brand.logo_url !== "/logo.png" ? safeUrl(brand.logo_url) : null;
+  const logoUrl = brand.logo_url && brand.logo_url !== "/flux_logo.jpeg" ? safeUrl(brand.logo_url) : null;
 
   const win = window.open("", "_blank");
   if (!win) return;
@@ -94,7 +94,7 @@ export const generateProgresoPDF = (cliente, metricas, brand) => {
   const win = window.open("", "_blank");
   if (!win) { alert("Por favor permite las ventanas emergentes (pop-ups) para generar el PDF."); return; }
   
-  const logoUrl = brand?.logo_url && brand.logo_url !== "/logo.png" ? safeUrl(brand.logo_url) : null;
+  const logoUrl = brand?.logo_url && brand.logo_url !== "/flux_logo.jpeg" ? safeUrl(brand.logo_url) : null;
   const nombre  = escapeHtml(brand?.nombre_marca || "FLUX");
   const accent  = brand?.color_primario || "#38bdf8";
   const dark    = darken(accent, 60);

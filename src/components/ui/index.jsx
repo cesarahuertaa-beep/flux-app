@@ -57,7 +57,7 @@ export const Tag = ({ children, color, size="sm" }) => (
 
 export const FluxLogo = ({ size=28, animated=false, large=false }) => {
   const brand = useBrand();
-  const logo = brand?.logo_url || "/logo.png";
+  const logo = brand?.logo_url || "/flux_logo.jpeg";
   const nombre = brand?.nombre_marca || "FLUX Sport Supplements";
   return large ? (
     <img src={logo} alt={nombre} className={animated?"float":""} style={{ height:160,objectFit:"contain" }}/>

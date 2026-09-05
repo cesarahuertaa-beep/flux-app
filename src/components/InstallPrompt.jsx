@@ -80,7 +80,7 @@ export default function InstallPrompt() {
       `}</style>
 
       {/* Ícono */}
-      <img src="/logo.png" alt="FLUX" style={{ width: 48, height: 48, objectFit: 'contain', flexShrink: 0 }} />
+      <img src="/flux_logo.jpeg" alt="FLUX" style={{ width: 48, height: 48, objectFit: 'contain', flexShrink: 0 }} />
 
       {/* Texto */}
       <div style={{ flex: 1, minWidth: 0 }}>

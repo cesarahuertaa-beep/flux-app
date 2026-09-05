@@ -130,7 +130,7 @@ export default function Login({ onLogin }) {
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
         <div className={`absolute inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[800ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <img src="/logo.png" alt="Flux Splash" className="w-[320px] h-auto" />
+          <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[320px] h-auto" />
         </div>
       )}
 

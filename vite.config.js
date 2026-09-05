@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'logo.png'],
+      includeAssets: ['favicon.svg', 'flux_logo.jpeg'],
       manifest: {
         name: 'FLUX Sport Supplements',
         short_name: 'FLUX',
@@ -22,13 +22,13 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/logo.png',
+            src: '/flux_logo.jpeg',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable',
           },
           {
-            src: '/logo.png',
+            src: '/flux_logo.jpeg',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',
