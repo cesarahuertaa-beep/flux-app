@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const url  = require('url');
 
@@ -12,6 +12,7 @@ function createWindow() {
     width: 1280, height: 800,
     minWidth: 375, minHeight: 600,
     title: 'FLUX',
+    icon: path.join(__dirname, '../public/favicon.svg'),
     backgroundColor: '#F7F9FC',
     webPreferences: {
       nodeIntegration: false,

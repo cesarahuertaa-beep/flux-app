@@ -17,7 +17,7 @@
     "productName": "FLUX",
     "directories": {
       "buildResources": "public",
-      "output": "release"
+      "output": "C:\\Users\\Nitro 5\\Desktop\\FLUX-Release"
     },
     "files": [
       "dist/**/*",
@@ -26,15 +26,11 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/flux_logo.jpeg"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "public/flux_logo.jpeg",
-      "uninstallerIcon": "public/flux_logo.jpeg",
-      "installerHeaderIcon": "public/flux_logo.jpeg",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "FLUX"

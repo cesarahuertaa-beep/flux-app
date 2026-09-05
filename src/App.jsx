@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
 import { dbUpsert } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
@@ -134,9 +134,12 @@ export default function App() {
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };
 
+  const isFileProtocol = window.location.protocol === 'file:';
+  const Router = isFileProtocol ? HashRouter : BrowserRouter;
+
   return (
     <BrandProvider session={session}>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Landing session={session} onLogout={handleLogout} />} />
           <Route path="/login" element={
@@ -163,7 +166,7 @@ export default function App() {
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
       <InstallPrompt />
     </BrandProvider>
   );
