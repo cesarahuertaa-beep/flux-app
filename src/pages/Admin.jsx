@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
-  Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X 
+  Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag 
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
@@ -11,7 +11,7 @@ import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import Directorio from "../components/cliente/Directorio";
+import GestorTienda from "../components/admin/GestorTienda";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 
@@ -160,8 +160,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
         ...(isSuperadmin ? [
           { id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> },
-          { id: "directorio", label: "Directorio Público", icon: <Search size={18} strokeWidth={1.5} /> },
-          { id: "tienda", label: "Tienda (Admin)", icon: <Search size={18} strokeWidth={1.5} /> }
+          { id: "tienda", label: "Tienda (Admin)", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
         ] : [])
       ];
 
@@ -422,14 +421,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} />
       )}
 
-      {tab === "directorio" && isSuperadmin && (
-        <Directorio />
-      )}
-
       {tab === "tienda" && isSuperadmin && (
-        <div className="flex flex-col h-full items-center justify-center text-[#6B7A8D]">
-          <p>Módulo de E-Commerce en construcción...</p>
-        </div>
+        <SubComponentWrapper><GestorTienda setMsg={setMsg}/></SubComponentWrapper>
       )}
     </AppLayout>
   );
