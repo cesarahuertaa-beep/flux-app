@@ -410,6 +410,10 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
           </div>
         </div>
       )}
+
+      {tab === "perfil" && (
+        <UserProfile session={{ data: { id: myId, nombre: "Admin" }, role }} onLogout={onLogout} />
+      )}
     </AppLayout>
   );
 }

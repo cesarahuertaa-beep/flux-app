@@ -8,7 +8,7 @@ import Nutrition from "../components/cliente/Nutrition";
 import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
-import { BarChart2, UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin, Search } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {

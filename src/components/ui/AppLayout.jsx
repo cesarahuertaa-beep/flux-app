@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, User, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 /**
@@ -13,9 +13,8 @@ import { useBrand } from "../BrandContext";
  * @param {string}   active   - Tab actual activa
  * @param {Function} setActive - Función para cambiar tab
  * @param {Object}   session  - Objeto de sesión (para nombre/rol)
- * @param {Function} onLogout - Función para cerrar sesión
  */
-export function AppLayout({ children, nav, active, setActive, session, onLogout }) {
+export function AppLayout({ children, nav, active, setActive, session }) {
   const [collapsed, setCollapsed] = useState(false);
   const brand = useBrand();
 
