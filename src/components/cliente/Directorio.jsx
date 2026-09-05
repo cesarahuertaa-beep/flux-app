@@ -20,14 +20,20 @@ export default function Directorio() {
     loadDirectorio();
   }, []);
 
-  const filtered = nutriologos.filter(n => 
-    n.nombre?.toLowerCase().includes(search.toLowerCase()) || 
-    n.nombre_marca?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = nutriologos.filter(n => {
+    const s = search.toLowerCase();
+    const nameMatch = n.nombre ? n.nombre.toLowerCase().includes(s) : false;
+    const brandMatch = n.nombre_marca ? n.nombre_marca.toLowerCase().includes(s) : false;
+    return nameMatch || brandMatch;
+  });
 
   const handleContactar = (telefono, email) => {
     if (telefono) {
-      const cleanPhone = telefono.replace(/\D/g, '');
+      let cleanPhone = telefono.replace(/\D/g, '');
+      // Si el usuario ingresó exactamente 10 dígitos (típico de México), asumimos +52
+      if (cleanPhone.length === 10) {
+        cleanPhone = '52' + cleanPhone;
+      }
       const msg = encodeURIComponent("¡Hola! Encontré tu perfil en Flux y me gustaría agendar una consulta.");
       window.open(`https://wa.me/${cleanPhone}?text=${msg}`, "_blank");
     } else if (email) {
