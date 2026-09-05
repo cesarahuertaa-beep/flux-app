@@ -33,23 +33,6 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
   const brand = useBrand();
   const [tab, setTab] = useState("clientes");
   
-  const SIDEBAR_ITEMS = role === "administrativo"
-    ? [
-        { id: "clientes", label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
-        { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
-      ]
-    : [
-        { id: "clientes",   label: "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
-        { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
-        { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
-        { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
-        ...(isSuperadmin ? [
-          { id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> },
-          { id: "directorio", label: "Directorio Público", icon: <Search size={18} strokeWidth={1.5} /> },
-          { id: "tienda", label: "Tienda (Admin)", icon: <Search size={18} strokeWidth={1.5} /> }
-        ] : [])
-      ];
-
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -174,7 +157,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
         { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
         { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
-        ...(isSuperadmin ? [{ id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> }] : [])
+        ...(isSuperadmin ? [
+          { id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> },
+          { id: "directorio", label: "Directorio Público", icon: <Search size={18} strokeWidth={1.5} /> },
+          { id: "tienda", label: "Tienda (Admin)", icon: <Search size={18} strokeWidth={1.5} /> }
+        ] : [])
       ];
 
   return (
