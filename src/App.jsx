@@ -48,7 +48,16 @@ export default function App() {
           } else if (profileId) {
             // Restaurar sesión de admin/nutriologo/superadmin
             const profiles = await dbGet(`profiles?id=eq.${profileId}`);
-            const role = profiles.length ? profiles[0].role : null;
+            let role = profiles.length ? profiles[0].role : null;
+            
+            // Si es un administrativo pero su jefe es el superadmin, lo elevamos a "staff" virtualmente
+            if (role === "administrativo" && profiles[0].nutriologo_id) {
+              const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
+              if (boss.length && boss[0].role === "superadmin") {
+                role = "staff";
+              }
+            }
+
             if (role && (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo" || role === "staff")) {
               if ((role === "nutriologo" || role === "administrativo" || role === "staff") && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();

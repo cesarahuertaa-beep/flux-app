@@ -17,18 +17,17 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const [editForm, setEditForm]     = useState({ nombre: "", telefono: "" });
 
   const myId = profileId || getProfileId();
-  const roleTarget = isSuperadmin ? "staff" : "administrativo";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const rows = await dbGet(
-        `profiles?role=eq.${roleTarget}&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
+        `profiles?role=eq.administrativo&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
       );
       setEquipo(rows);
     } catch { }
     setLoading(false);
-  }, [myId, roleTarget]);
+  }, [myId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -40,12 +39,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     setSaving(true);
     try {
       await authInvite(form.email, {
-        role: roleTarget,
+        role: "administrativo",
         nombre: form.nombre,
         telefono: form.telefono,
         nutriologo_id: myId,
       });
-      setMsg(`✅ Invitación enviada — el ${roleTarget === 'staff' ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
+      setMsg(`✅ Invitación enviada — el ${isSuperadmin ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
       setShowInvite(false);
       setForm({ nombre: "", email: "", telefono: "" });
       setTimeout(load, 2000);
