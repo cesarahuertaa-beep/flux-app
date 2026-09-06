@@ -6,12 +6,12 @@ import {
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { Nutriologos } from "../components/admin/Nutriologos";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import GestorTienda from "../components/admin/GestorTienda";
+import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 
@@ -154,12 +154,11 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
       ]
     : [
-        { id: "clientes",   label: "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
         { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
         { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
         { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
         ...(isSuperadmin ? [
-          { id: "nutriologos", label: "Nutriólogos", icon: <Building2 size={18} strokeWidth={1.5} /> },
           { id: "tienda", label: "Tienda (Admin)", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
         ] : [])
       ];
@@ -184,7 +183,16 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         </div>
       )}
 
-      {tab === "clientes" && (
+      {tab === "clientes" && isSuperadmin ? (
+        <DirectorioSuperadmin 
+          myId={myId} 
+          clientes={clientes} 
+          loadClientes={loadClientes} 
+          setMsg={setMsg} 
+          setSelected={setSelected} 
+          setTab={setTab} 
+        />
+      ) : tab === "clientes" && (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header */}
           <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4">
@@ -339,7 +347,6 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       {/* Legacy Dark Mode Sub-Components */}
       {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
       {tab === "programar" && <SubComponentWrapper title="Asignador de Dietas y Rutinas"><ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} /></SubComponentWrapper>}
-      {tab === "nutriologos" && isSuperadmin && <SubComponentWrapper><Nutriologos setMsg={setMsg}/></SubComponentWrapper>}
       {tab === "equipo" && role !== "administrativo" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
 
