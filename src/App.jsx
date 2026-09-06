@@ -29,8 +29,8 @@ export default function App() {
 
   // Restaurar sesión guardada al montar
   useEffect(() => {
-    // Interceptar tokens de acceso (invitaciones, recuperación de contraseña)
-    if (window.location.hash.includes("access_token")) {
+    // Interceptar tokens de acceso (invitaciones) o errores de link expirado
+    if (window.location.hash.includes("access_token") || window.location.hash.includes("error=unauthorized_client") || window.location.hash.includes("error_description")) {
       setAuthToken(null);
       setProfileId(null);
       saveRefreshToken(null);

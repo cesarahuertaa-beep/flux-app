@@ -35,6 +35,13 @@ export default function Login({ onLogin }) {
         }, 0);
         window.history.replaceState(null,"",window.location.pathname);
       }
+    } else if (hash.includes("error_description")) {
+      const params = new URLSearchParams(hash.replace("#","?"));
+      const desc = params.get("error_description");
+      if (desc) {
+        setErr("El enlace es inválido o ya expiró (recuerda que los enlaces de invitación son de un solo uso).");
+        window.history.replaceState(null,"",window.location.pathname);
+      }
     }
     return () => { clearTimeout(timer1); clearTimeout(timer2); };
   }, []);
