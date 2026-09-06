@@ -83,15 +83,36 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [editFormNutri, setEditFormNutri] = useState({ nombre:"", nombre_marca:"", color_primario:"", email:"", telefono:"", logo_url:"" });
   const [formClient, setFormClient] = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
 
+  const [resolvedOwnerId, setResolvedOwnerId] = useState(myId);
+
   const loadNutriologos = async () => {
     setLoading(true);
     try {
       const data = await dbGet("profiles?role=eq.nutriologo&order=created_at.desc");
-      const me = await dbGet(`profiles?id=eq.${myId}`);
-      if (me.length > 0) {
-        me[0].isSuperadmin = true;
-        me[0].nombre_marca = me[0].nombre_marca || "Flux Sports (Tú)";
-        setNutriologos([me[0], ...data]);
+      const currentUser = await dbGet(`profiles?id=eq.${myId}`);
+      
+      if (currentUser.length > 0) {
+        let owner = currentUser[0];
+        
+        // Si es staff/administrativo, el "dueño" del directorio es su jefe (el superadmin)
+        if (owner.role === "staff" || owner.role === "administrativo") {
+          if (owner.nutriologo_id) {
+            const boss = await dbGet(`profiles?id=eq.${owner.nutriologo_id}`);
+            if (boss.length > 0) owner = boss[0];
+          }
+        }
+
+        setResolvedOwnerId(owner.id);
+        
+        owner.isSuperadmin = true;
+        
+        if (currentUser[0].role !== "superadmin") {
+          owner.nombre_marca = owner.nombre_marca || "Flux Sports";
+        } else {
+          owner.nombre_marca = owner.nombre_marca || "Flux Sports (Tú)";
+        }
+        
+        setNutriologos([owner, ...data]);
       } else {
         setNutriologos(data);
       }
@@ -173,7 +194,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         objetivo: formClient.objetivo,
         email: formClient.email,
         telefono: formClient.telefono,
-        nutriologo_id: myId,
+        nutriologo_id: resolvedOwnerId,
         auth_id: authUser.id,
         activo: true
       });
@@ -247,7 +268,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
-                          {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">TÚ</span>}
+                          {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                             {n.activo !== false ? "Activo" : "Suspendido"}
                           </span>

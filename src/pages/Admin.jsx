@@ -48,7 +48,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
   const [searchClientes, setSearchClientes] = useState("");
 
   const myId = profileId || getProfileId();
-  const clientesFilter = isSuperadmin
+
+  const clientesFilter = (isSuperadmin || role === "staff")
     ? "clientes?order=created_at.asc"
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
   const bibliotecaFilter = "biblioteca_ejercicios?order=nombre.asc";
