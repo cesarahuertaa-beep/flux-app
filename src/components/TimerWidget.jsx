@@ -105,7 +105,7 @@ function DrumCol({ label, value, max, onChange }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-      <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: #9BA5B0, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6 }}>
         {label}
       </div>
       <div
@@ -264,7 +264,7 @@ export function TimerWidget() {
           position: "fixed", bottom: 24, right: 24, zIndex: 9000,
           width: miniLabel ? "auto" : 52, height: 52, minWidth: 52,
           padding: miniLabel ? "0 16px" : 0, borderRadius: 26,
-          border: `1.5px solid ${running ? accent : C.border}`,
+          border: `1.5px solid ${running ? accent : #E2E5EA}`,
           background: running ? `linear-gradient(135deg, ${accent}22, ${accent}10)` : "rgba(7,16,29,0.92)",
           backdropFilter: "blur(16px)",
           boxShadow: running ? `0 0 24px ${accent}44, 0 4px 20px rgba(0,0,0,0.5)` : "0 4px 20px rgba(0,0,0,0.5)",
@@ -274,7 +274,7 @@ export function TimerWidget() {
       >
         {/* Mini progress ring when running */}
         <svg width="28" height="28" viewBox="0 0 64 64" style={{ transform: "rotate(-90deg)", flexShrink: 0 }}>
-          <circle cx="32" cy="32" r={R} fill="none" stroke={`${running ? accent : C.muted}30`} strokeWidth="5"/>
+          <circle cx="32" cy="32" r={R} fill="none" stroke={`${running ? accent : #9BA5B0}30`} strokeWidth="5"/>
           {running && (
             <circle cx="32" cy="32" r={R} fill="none" stroke={accent} strokeWidth="5"
               strokeDasharray={circ} strokeDashoffset={circ * (1 - progress)}
@@ -282,9 +282,9 @@ export function TimerWidget() {
           )}
           {!running && (
             <g transform="rotate(90,32,32)">
-              <circle cx="32" cy="32" r="10" fill="none" stroke={C.muted} strokeWidth="2"/>
-              <line x1="32" y1="24" x2="32" y2="32" stroke={C.muted} strokeWidth="2" strokeLinecap="round"/>
-              <line x1="32" y1="32" x2="38" y2="36" stroke={C.muted} strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="32" cy="32" r="10" fill="none" stroke={#9BA5B0} strokeWidth="2"/>
+              <line x1="32" y1="24" x2="32" y2="32" stroke={#9BA5B0} strokeWidth="2" strokeLinecap="round"/>
+              <line x1="32" y1="32" x2="38" y2="36" stroke={#9BA5B0} strokeWidth="2" strokeLinecap="round"/>
             </g>
           )}
         </svg>
@@ -300,7 +300,7 @@ export function TimerWidget() {
         <div style={{
           position: "fixed", bottom: 86, right: 24, zIndex: 9001, width: 300,
           background: "linear-gradient(160deg, rgba(11,22,40,0.97) 0%, rgba(7,13,24,0.99) 100%)",
-          border: `1px solid ${C.borderMid}`, borderRadius: 24,
+          border: `1px solid ${#CBD5E1}`, borderRadius: 24,
           boxShadow: "0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(46,92,184,0.08)",
           backdropFilter: "blur(24px)", padding: "18px 16px 16px",
           animation: "timerSlideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)",
@@ -308,7 +308,7 @@ export function TimerWidget() {
 
           {/* ── Header ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: #9BA5B0, textTransform: "uppercase", letterSpacing: "0.8px" }}>
               Cronómetro
             </span>
             {mode === "running" && (
@@ -356,7 +356,7 @@ export function TimerWidget() {
                     color: done ? "#f87171" : "#fff", letterSpacing: 2,
                     animation: done ? "timerPulse 0.6s infinite" : "none",
                   }}>{done ? "¡Listo!" : fmt(remaining)}</span>
-                  {!done && <span style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>de {fmt(target)}</span>}
+                  {!done && <span style={{ fontSize: 10, color: #9BA5B0, marginTop: 2 }}>de {fmt(target)}</span>}
                 </div>
               </div>
             </div>
@@ -365,7 +365,7 @@ export function TimerWidget() {
           {/* ── Quick Access Circles ── */}
           {!addingPill && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: #9BA5B0, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>
                 Accesos rápidos
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -377,7 +377,7 @@ export function TimerWidget() {
                         width: 62, height: 62, borderRadius: "50%", cursor: "pointer",
                         background: selPill === pillSecs ? `${accent}18` : "rgba(46,92,184,0.07)",
                         border: `2px solid ${selPill === pillSecs ? accent : "rgba(46,92,184,0.2)"}`,
-                        color: selPill === pillSecs ? accent : C.mutedLight,
+                        color: selPill === pillSecs ? accent : #6B7A8D,
                         fontSize: 10, fontWeight: 700, fontFamily: "'Rajdhani',monospace",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         boxShadow: selPill === pillSecs ? `0 0 14px ${accent}44` : "none",
@@ -402,8 +402,8 @@ export function TimerWidget() {
                   style={{
                     width: 62, height: 62, borderRadius: "50%",
                     background: "rgba(46,92,184,0.05)",
-                    border: `2px dashed ${C.borderMid}`,
-                    color: C.muted, fontSize: 22, cursor: "pointer",
+                    border: `2px dashed ${#CBD5E1}`,
+                    color: #9BA5B0, fontSize: 22, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "all 0.2s",
                   }}
@@ -414,8 +414,8 @@ export function TimerWidget() {
 
           {/* ── Add pill mini drum picker ── */}
           {addingPill && (
-            <div style={{ marginBottom: 14, background: "rgba(46,92,184,0.06)", borderRadius: 14, padding: "10px 8px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>
+            <div style={{ marginBottom: 14, background: "rgba(46,92,184,0.06)", borderRadius: 14, padding: "10px 8px", border: `1px solid ${#E2E5EA}` }}>
+              <div style={{ fontSize: 10, color: #9BA5B0, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>
                 Nuevo acceso rápido
               </div>
               <div style={{ display: "flex", gap: 0, marginBottom: 8 }}>
@@ -427,7 +427,7 @@ export function TimerWidget() {
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => { setAddingPill(false); setPillErr(""); }} style={{
                   flex: 1, padding: "7px 0", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                  background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${#E2E5EA}`, color: #9BA5B0, cursor: "pointer",
                 }}>Cancelar</button>
                 <button onClick={confirmPill} style={{
                   flex: 2, padding: "7px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -446,7 +446,7 @@ export function TimerWidget() {
               style={{
                 width: "100%", padding: "13px 0", borderRadius: 50,
                 background: totalSecs === 0 ? "rgba(46,92,184,0.15)" : `linear-gradient(135deg, ${accent}, ${accent}cc)`,
-                border: "none", color: totalSecs === 0 ? C.muted : "#fff",
+                border: "none", color: totalSecs === 0 ? #9BA5B0 : "#fff",
                 fontSize: 15, fontWeight: 700, cursor: totalSecs === 0 ? "not-allowed" : "pointer",
                 boxShadow: totalSecs > 0 ? `0 4px 20px ${accent}55` : "none",
                 transition: "all 0.2s", letterSpacing: "0.5px",
