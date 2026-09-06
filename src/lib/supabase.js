@@ -34,7 +34,9 @@ export const refreshSession = async () => {
     setAuthToken(d.access_token);
     saveRefreshToken(d.refresh_token);
     return true;
-  } catch { return false; }
+  } catch { 
+    return "OFFLINE"; 
+  }
 };
 
 export const getAuthToken = () => _authToken;
@@ -55,16 +57,21 @@ const q = async (path, opts={}) => {
   const prefer = upsert
     ? "resolution=merge-duplicates,return=representation"
     : "return=representation";
-  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: SUPA_KEY,
-      Authorization: `Bearer ${_authToken || SUPA_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: prefer,
-      ...extraHeaders
-    },
-    ...restOpts
-  });
+  let r;
+  try {
+    r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: prefer,
+        ...extraHeaders
+      },
+      ...restOpts
+    });
+  } catch (err) {
+    throw new Error("OFFLINE");
+  }
   // Interceptar 401 — intentar renovar el token antes de cerrar sesión
   if (r.status === 401 && _authToken) {
     if (!_isRefreshing) {
@@ -73,6 +80,9 @@ const q = async (path, opts={}) => {
       _isRefreshing = false;
       _refreshQueue.forEach(resolve => resolve(ok));
       _refreshQueue = [];
+      if (ok === "OFFLINE") {
+        throw new Error("OFFLINE");
+      }
       if (!ok) {
         setAuthToken(null); setProfileId(null); saveRefreshToken(null);
         if (_onSessionExpired) _onSessionExpired();

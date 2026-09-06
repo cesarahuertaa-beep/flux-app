@@ -1,1 +1,1 @@
-{ version: 1.0.0, android: { versionCode: 1, downloadUrl: https://www.flux-sport.com/FLUX.apk, forceUpdate: false } }
+﻿{ version: 1.0.1, url: https://www.flux-sport.com/FLUX.apk, force: false }

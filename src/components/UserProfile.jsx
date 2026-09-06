@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { dbUpsert } from "../lib/supabase";
-import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut } from "lucide-react";
+import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut, ShoppingBag } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 
 export default function UserProfile({ session, onLogout }) {
   const user = session?.data || session; // Cliente o Admin
@@ -44,6 +45,15 @@ export default function UserProfile({ session, onLogout }) {
       setErr("Error al guardar: " + e.message);
     }
     setLoading(false);
+  };
+
+  const handleStore = () => {
+    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
+    if (isAppMode) {
+      window.open("https://www.flux-sport.com", "_blank"); 
+    } else {
+      window.location.href = "/";
+    }
   };
 
   return (
@@ -128,6 +138,13 @@ export default function UserProfile({ session, onLogout }) {
             className={`w-full mt-4 py-3.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--brand-primary)] hover:opacity-90'}`}
           >
             {loading ? "Guardando..." : <><Save size={18} /> Guardar Cambios</>}
+          </button>
+
+          <button 
+            onClick={handleStore}
+            className="w-full mt-2 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
+          >
+            <ShoppingBag size={18} /> Ir a Tienda
           </button>
 
           {onLogout && (

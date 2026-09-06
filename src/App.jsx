@@ -11,9 +11,6 @@ import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 
-// Auto-reload when a new SW version is waiting
-}
-
 // Helpers para persistir el tipo de sesión
 const saveSessionMeta = (role, clientId = null) => {
   localStorage.setItem("flux_role", role);

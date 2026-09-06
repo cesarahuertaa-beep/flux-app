@@ -103,7 +103,6 @@ export default function ClienteView({ session, onLogout }) {
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
     { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> },
-    { id: "tienda_link", label: "Ir a Tienda",  icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
   ];
 
   const currentCycleWeek = (() => {
