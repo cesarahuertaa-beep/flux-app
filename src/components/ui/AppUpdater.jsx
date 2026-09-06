@@ -12,12 +12,22 @@ export function AppUpdater() {
       if (!Capacitor.isNativePlatform()) return;
       try {
         const currentInfo = await App.getInfo();
-        const currentVersion = currentInfo.version;
+        const currentVersion = currentInfo.version || '1.0.0';
         const res = await fetch('https://www.flux-sport.com/version.json?t=' + Date.now());
         if (!res.ok) return;
         const data = await res.json();
+        const serverVersion = data.version || '1.0.0';
 
-        const isNewer = data.version.localeCompare(currentVersion, undefined, { numeric: true, sensitivity: 'base' }) > 0;
+        const parseVer = (v) => v.split('.').map(n => parseInt(n) || 0);
+        const curParts = parseVer(currentVersion);
+        const srvParts = parseVer(serverVersion);
+        
+        let isNewer = false;
+        for (let i = 0; i < 3; i++) {
+          if ((srvParts[i] || 0) > (curParts[i] || 0)) { isNewer = true; break; }
+          if ((srvParts[i] || 0) < (curParts[i] || 0)) { break; }
+        }
+
         if (isNewer) {
           setUpdateInfo(data);
         }

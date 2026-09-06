@@ -1,7 +1,7 @@
 {
   "name": "flux-app",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
-    "electron:build": "vite build --mode development && electron-builder --win"
+    "electron:build": "vite build --mode development && electron-builder --win",
+    "version": "node sync-version.cjs && git add android/app/build.gradle"
   },
   "build": {
     "appId": "com.fluxsport.app",
