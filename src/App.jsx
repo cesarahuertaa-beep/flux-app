@@ -49,8 +49,8 @@ export default function App() {
             // Restaurar sesión de admin/nutriologo/superadmin
             const profiles = await dbGet(`profiles?id=eq.${profileId}`);
             const role = profiles.length ? profiles[0].role : null;
-            if (role && (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo")) {
-              if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
+            if (role && (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo" || role === "staff")) {
+              if ((role === "nutriologo" || role === "administrativo" || role === "staff") && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
                 setSession({ role: role === "admin" ? "admin" : role, token, profileId });
@@ -123,7 +123,7 @@ export default function App() {
         onBackToAdmin={handleBackToAdmin}
       />
     );
-    if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo")
+    if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo" || session.role==="staff")
       return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta}/>;
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };

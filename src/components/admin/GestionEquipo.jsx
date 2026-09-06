@@ -7,7 +7,7 @@ import { authInvite, dbGet, dbPatch, getProfileId } from "../../lib/supabase";
 // El administrativo queda ligado al nutriologo_id del creador.
 // ────────────────────────────────────────────────────────────────────────────
 
-export function GestionEquipo({ setMsg, profileId }) {
+export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const [equipo, setEquipo]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showInvite, setShowInvite] = useState(false);
@@ -17,17 +17,18 @@ export function GestionEquipo({ setMsg, profileId }) {
   const [editForm, setEditForm]     = useState({ nombre: "", telefono: "" });
 
   const myId = profileId || getProfileId();
+  const roleTarget = isSuperadmin ? "staff" : "administrativo";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const rows = await dbGet(
-        `profiles?role=eq.administrativo&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
+        `profiles?role=eq.${roleTarget}&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
       );
       setEquipo(rows);
     } catch { }
     setLoading(false);
-  }, [myId]);
+  }, [myId, roleTarget]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -39,12 +40,12 @@ export function GestionEquipo({ setMsg, profileId }) {
     setSaving(true);
     try {
       await authInvite(form.email, {
-        role: "administrativo",
+        role: roleTarget,
         nombre: form.nombre,
         telefono: form.telefono,
         nutriologo_id: myId,
       });
-      setMsg("✅ Invitación enviada — el administrativo recibirá un email para crear su contraseña");
+      setMsg(`✅ Invitación enviada — el ${roleTarget === 'staff' ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
       setShowInvite(false);
       setForm({ nombre: "", email: "", telefono: "" });
       setTimeout(load, 2000);
@@ -223,8 +224,17 @@ export function GestionEquipo({ setMsg, profileId }) {
                 <Mail className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
                 <span>
                   El colaborador recibirá un email de invitación para crear su contraseña.
-                  Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{" "}
-                  <strong className="text-[#0B1929]">Agenda</strong> — sin acceso a información clínica.
+                  {isSuperadmin ? (
+                    <>
+                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Directorio</strong>,{" "}
+                      <strong className="text-[#0B1929]">Biblioteca</strong> y <strong className="text-[#0B1929]">Tienda</strong>.
+                    </>
+                  ) : (
+                    <>
+                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{" "}
+                      <strong className="text-[#0B1929]">Agenda</strong> — sin acceso a información clínica.
+                    </>
+                  )}
                 </span>
               </div>
 

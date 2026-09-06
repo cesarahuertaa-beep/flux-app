@@ -345,9 +345,9 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       )}
 
       {/* Legacy Dark Mode Sub-Components */}
-      {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
+      {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin || role === "staff"}/></SubComponentWrapper>}
       {tab === "programar" && <SubComponentWrapper title="Asignador de Dietas y Rutinas"><ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} /></SubComponentWrapper>}
-      {tab === "equipo" && role !== "administrativo" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
+      {tab === "equipo" && role !== "administrativo" && role !== "staff" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
@@ -428,7 +428,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} />
       )}
 
-      {tab === "tienda" && isSuperadmin && (
+      {tab === "tienda" && (isSuperadmin || role === "staff") && (
         <SubComponentWrapper><GestorTienda setMsg={setMsg}/></SubComponentWrapper>
       )}
     </AppLayout>
