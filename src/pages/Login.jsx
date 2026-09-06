@@ -25,6 +25,10 @@ export default function Login({ onLogin }) {
       const token = params.get("access_token");
       const type  = params.get("type");
       if (token && (type==="invite"||type==="recovery"||type==="signup")) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.email) setEmail(payload.email);
+        } catch(e) {}
         setTimeout(() => {
           setAccessToken(token); 
           setMode("set_password");

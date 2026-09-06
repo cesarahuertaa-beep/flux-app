@@ -29,6 +29,18 @@ export default function App() {
 
   // Restaurar sesión guardada al montar
   useEffect(() => {
+    // Interceptar tokens de acceso (invitaciones, recuperación de contraseña)
+    if (window.location.hash.includes("access_token")) {
+      setAuthToken(null);
+      setProfileId(null);
+      saveRefreshToken(null);
+      clearSessionMeta();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login" + window.location.hash;
+        return;
+      }
+    }
+
     const restore = async () => {
       const token = restoreSession();
       const profileId = restoreProfileId();
