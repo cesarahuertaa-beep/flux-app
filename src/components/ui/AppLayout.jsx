@@ -82,8 +82,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                     const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
                     if (isElectron) {
                       // En Electron (app://), abrimos el navegador web real del sistema operativo
-                      // NOTA: Reemplazar esta URL con tu dominio final de producción
-                      window.open("https://flux-app-xi-three.vercel.app", "_blank"); 
+                      window.open("https://www.flux-sport.com", "_blank"); 
                     } else {
                       // En web (https://), simplemente navegamos a la raíz (landing page)
                       window.location.href = "/";
@@ -173,8 +172,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                     const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
                     if (isElectron) {
                       // En Electron (app://), abrimos el navegador web real del sistema operativo
-                      // NOTA: Reemplazar esta URL con tu dominio final de producción
-                      window.open("https://flux-app-xi-three.vercel.app", "_blank"); 
+                      window.open("https://www.flux-sport.com", "_blank"); 
                     } else {
                       // En web (https://), simplemente navegamos a la raíz (landing page)
                       window.location.href = "/";
