@@ -148,20 +148,26 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-  const SIDEBAR_ITEMS = role === "administrativo"
+  const SIDEBAR_ITEMS = role === "staff"
     ? [
-        { id: "clientes", label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
-        { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
-      ]
-    : [
-        { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+        { id: "clientes",   label: "Directorio", icon: <Users size={18} strokeWidth={1.5} /> },
         { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
-        { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
-        { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
-        ...(isSuperadmin ? [
-          { id: "tienda", label: "Tienda (Admin)", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
-        ] : [])
-      ];
+        { id: "tienda",     label: "Tienda",     icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
+      ]
+    : role === "administrativo"
+      ? [
+          { id: "clientes", label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
+          { id: "agenda",   label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> }
+        ]
+      : [
+          { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+          { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
+          { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+          { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
+          ...(isSuperadmin ? [
+            { id: "tienda", label: "Tienda (Admin)", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
+          ] : [])
+        ];
 
   return (
     <AppLayout
@@ -183,7 +189,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         </div>
       )}
 
-      {tab === "clientes" && isSuperadmin ? (
+      {tab === "clientes" && (isSuperadmin || role === "staff") ? (
         <DirectorioSuperadmin 
           myId={myId} 
           clientes={clientes} 

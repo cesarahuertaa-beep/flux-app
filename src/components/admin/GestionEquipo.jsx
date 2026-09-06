@@ -22,7 +22,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     setLoading(true);
     try {
       const rows = await dbGet(
-        `profiles?role=eq.administrativo&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
+        `profiles?role=in.(administrativo,staff)&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
       );
       setEquipo(rows);
     } catch { }
@@ -38,6 +38,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     }
     setSaving(true);
     try {
+      // Si el que invita es superadmin, en la base de datos se puede guardar como staff o administrativo. 
+      // Por consistencia guardamos "administrativo", y el sistema lo eleva dinámicamente a "staff" al iniciar sesión.
       await authInvite(form.email, {
         role: "administrativo",
         nombre: form.nombre,
@@ -77,7 +79,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
         <div>
           <h2 className="font-['Rajdhani'] font-bold text-2xl text-[#0B1929] tracking-[0.5px] flex items-center gap-2">
-            <Users className="w-6 h-6 text-[#3B82F6]" /> Equipo Administrativo
+            <Users className="w-6 h-6 text-[#3B82F6]" /> {isSuperadmin ? "Staff Corporativo" : "Equipo Administrativo"}
           </h2>
           <div className="text-sm text-[#6B7A8D] mt-0.5">
             {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
@@ -94,9 +96,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       {/* Explicación */}
       <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
-        Tiene acceso únicamente a la lista de clientes y a la gestión de citas.
-        <strong className="text-[#0B1929]"> No puede</strong> ver ni editar dietas, rutinas ni la biblioteca.
-        Puedes suspender su acceso en cualquier momento.
+        {isSuperadmin 
+          ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa." 
+          : "Tiene acceso únicamente a la lista de clientes y a la gestión de citas. No puede ver ni editar dietas, rutinas ni la biblioteca."
+        }
+        {" "}Puedes suspender su acceso en cualquier momento.
       </div>
 
       {/* Lista */}
