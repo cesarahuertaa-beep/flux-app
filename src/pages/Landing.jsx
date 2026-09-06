@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { dbGet } from "../lib/supabase";
 import { useEffect } from "react";
+import { version } from "../../package.json";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
@@ -75,18 +76,18 @@ function Navbar({ session, onLogout }) {
             <>
               <div className="w-px h-5 bg-[#E2E5EA] ml-2" />
               <a
-                href="https://github.com/cesarahuertaa-beep/flux-app/releases/download/v1.0.0/FLUX.Setup.1.0.0.exe"
+                href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`}
                 download
                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
               >
-                <Monitor size={14} strokeWidth={1.5} /> Escritorio
+                <Monitor size={14} strokeWidth={1.5} /> Windows (v{version})
               </a>
               <a
                 href="/FLUX.apk"
                 download
                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
               >
-                <Smartphone size={14} strokeWidth={1.5} /> Android
+                <Smartphone size={14} strokeWidth={1.5} /> Android (v{version})
               </a>
               <Link to="/app" className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200">
                 <Globe size={14} strokeWidth={2} /> Ir a tu App
@@ -158,14 +159,14 @@ function Hero() {
             download
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1A6FD4]/10 border border-[#1A6FD4]/20 text-[#1A6FD4] text-sm font-semibold hover:bg-[#1A6FD4]/20 transition-all"
           >
-            <Smartphone size={16} /> Android (.apk)
+            <Smartphone size={16} /> Android (v{version})
           </a>
           <a
-            href="https://github.com/cesarahuertaa-beep/flux-app/releases/download/v1.0.0/FLUX.Setup.1.0.0.exe"
+            href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`}
             download
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 border border-[#E2E5EA] text-[#0B1929] text-sm font-semibold hover:bg-gray-200 transition-all"
           >
-            <Monitor size={16} /> Windows (.exe)
+            <Monitor size={16} /> Windows (v{version})
           </a>
         </div>
       </div>
