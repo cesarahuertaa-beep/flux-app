@@ -74,12 +74,20 @@ function Navbar({ session, onLogout }) {
           {hasAppAccess && (
             <>
               <div className="w-px h-5 bg-[#E2E5EA] ml-2" />
-              <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
+              <a
+                href="https://github.com/cesarahuertaa-beep/flux-app/releases/download/v1.0.0/FLUX.Setup.1.0.0.exe"
+                download
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
+              >
                 <Monitor size={14} strokeWidth={1.5} /> Escritorio
-              </button>
-              <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
-                <Smartphone size={14} strokeWidth={1.5} /> Android / iOS
-              </button>
+              </a>
+              <a
+                href="/FLUX.apk"
+                download
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
+              >
+                <Smartphone size={14} strokeWidth={1.5} /> Android
+              </a>
               <Link to="/app" className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200">
                 <Globe size={14} strokeWidth={2} /> Ir a tu App
               </Link>
@@ -140,6 +148,24 @@ function Hero() {
           </a>
           <a href="#nutriólogos" className="bg-white hover:bg-gray-50 text-[#0B1929] border border-[#E2E5EA] px-8 py-4 rounded-xl font-bold transition-all hover:border-[#1A6FD4]/30 shadow-sm flex items-center gap-2">
             Encontrar especialista <ChevronRight size={16} />
+          </a>
+        </div>
+        {/* Botones de descarga de la App */}
+        <div className="flex flex-wrap items-center gap-3 mt-6">
+          <p className="text-xs text-[#9BA5B0] w-full font-medium uppercase tracking-widest">Descarga la app:</p>
+          <a
+            href="/FLUX.apk"
+            download
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1A6FD4]/10 border border-[#1A6FD4]/20 text-[#1A6FD4] text-sm font-semibold hover:bg-[#1A6FD4]/20 transition-all"
+          >
+            <Smartphone size={16} /> Android (.apk)
+          </a>
+          <a
+            href="https://github.com/cesarahuertaa-beep/flux-app/releases/download/v1.0.0/FLUX.Setup.1.0.0.exe"
+            download
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 border border-[#E2E5EA] text-[#0B1929] text-sm font-semibold hover:bg-gray-200 transition-all"
+          >
+            <Monitor size={16} /> Windows (.exe)
           </a>
         </div>
       </div>
