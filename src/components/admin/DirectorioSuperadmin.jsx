@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
-import { User, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2 } from "lucide-react";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2 } from "lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -84,6 +84,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [formClient, setFormClient] = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
 
   const [resolvedOwnerId, setResolvedOwnerId] = useState(myId);
+  const [myName, setMyName] = useState("");
 
   const loadNutriologos = async () => {
     setLoading(true);
@@ -93,6 +94,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       
       if (currentUser.length > 0) {
         let owner = currentUser[0];
+        setMyName(owner.nombre || "Staff");
         
         // Si es staff/administrativo, el "dueño" del directorio es su jefe (el superadmin)
         if (owner.role === "staff" || owner.role === "administrativo") {
@@ -149,6 +151,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         nombre_marca: formNutri.nombre_marca,
         logo_url: formNutri.logo_url,
         color_primario: formNutri.color_primario,
+        creado_por_nombre: myName,
         activo: true
       });
       setShowInviteNutri(false);
@@ -279,6 +282,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                             <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700">
                               <MessageCircle size={12} /> WhatsApp
                             </a>
+                          )}
+                          {n.creado_por_nombre && !n.isSuperadmin && (
+                            <span className="flex items-center gap-1 text-slate-400 border-l border-slate-200 pl-3">
+                              <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
+                            </span>
                           )}
                         </div>
                       </div>
