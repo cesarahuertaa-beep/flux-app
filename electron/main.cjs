@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, shell, protocol } = require('electron');
+const { app, BrowserWindow, shell, protocol } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 
@@ -54,6 +54,13 @@ function createWindow() {
   mainWindow.on('closed', function() { mainWindow = null; });
 }
 
+const { autoUpdater } = require('electron-updater');
+const { dialog } = require('electron');
+
+// Configuración básica del autoUpdater
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
 app.whenReady().then(function() {
   // Servir el dist/ bajo app://flux/
   const distDir = path.join(__dirname, '../dist');
@@ -74,6 +81,28 @@ app.whenReady().then(function() {
   createWindow();
   app.on('activate', function() {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  // Check for updates (only in production)
+  if (!process.env.ELECTRON_START_URL) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
+});
+
+// Eventos del autoUpdater
+autoUpdater.on('update-downloaded', (info) => {
+  const dialogOpts = {
+    type: 'info',
+    buttons: ['Reiniciar y Actualizar', 'Más tarde'],
+    title: 'Actualización Disponible',
+    message: 'Una nueva versión de FLUX ha sido descargada.',
+    detail: '¿Deseas reiniciar la aplicación ahora para instalar la actualización?'
+  };
+
+  dialog.showMessageBox(dialogOpts).then((returnValue) => {
+    if (returnValue.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
   });
 });
 

@@ -178,3 +178,4 @@ export const StatCard = ({ icon, label, value, unit, color }) => (
     <div style={{ fontSize:11,color:C.muted,marginTop:6,fontWeight:500 }}>{label}</div>
   </div>
 );
+export * from "./AppUpdater";

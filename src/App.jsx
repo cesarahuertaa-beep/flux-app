@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
 import { BrandProvider } from "./components/BrandContext";
+import { AppUpdater } from "./components/ui/AppUpdater";
 import InstallPrompt from "./components/InstallPrompt";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
@@ -141,6 +142,7 @@ export default function App() {
 
   return (
     <BrandProvider session={session}>
+      <AppUpdater />
       <Router>
         <Routes>
           <Route path="/" element={
