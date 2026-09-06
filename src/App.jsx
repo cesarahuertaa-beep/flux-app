@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
 import { dbUpsert } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
@@ -118,8 +119,8 @@ export default function App() {
   const MainApp = () => {
     // Si es un cliente huérfano (solo comprador de E-commerce), no tiene acceso a la App privada
     if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
-      const isElectron = window.location.protocol === 'file:' || window.location.protocol === 'app:';
-      return <Navigate to={isElectron ? "/login" : "/"} replace />;
+      const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform();
+      return <Navigate to={isAppMode ? "/login" : "/"} replace />;
     }
 
     if (atletaData) return (
@@ -135,15 +136,15 @@ export default function App() {
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };
 
-  const isFileProtocol = window.location.protocol === 'file:' || window.location.protocol === 'app:';
-  const Router = isFileProtocol ? HashRouter : BrowserRouter;
+  const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform();
+  const Router = isAppMode ? HashRouter : BrowserRouter;
 
   return (
     <BrandProvider session={session}>
       <Router>
         <Routes>
           <Route path="/" element={
-            isFileProtocol
+            isAppMode
               ? <Navigate to={session ? "/app" : "/login"} replace />
               : <Landing session={session} onLogout={handleLogout} />
           } />
@@ -169,7 +170,7 @@ export default function App() {
               <MainApp />
             )
           } />
-          <Route path="*" element={<Navigate to={isFileProtocol ? "/login" : "/"} replace />} />
+          <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />
         </Routes>
       </Router>
       <InstallPrompt />

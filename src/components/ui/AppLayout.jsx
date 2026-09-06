@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
+import { Capacitor } from "@capacitor/core";
 
 /**
  * AppLayout — Mobile-First
@@ -79,12 +80,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 key={id}
                 onClick={() => {
                   if (id === "tienda_link") {
-                    const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
-                    if (isElectron) {
-                      // En Electron (app://), abrimos el navegador web real del sistema operativo
+                    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
+                    if (isAppMode) {
+                      // En App nativa (Electron o Android), abrimos el navegador web real
                       window.open("https://www.flux-sport.com", "_blank"); 
                     } else {
-                      // En web (https://), simplemente navegamos a la raíz (landing page)
+                      // En web (https://), navegamos a la raíz (landing page)
                       window.location.href = "/";
                     }
                   } else {
@@ -169,12 +170,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               <button
                 onClick={() => {
                   if (id === "tienda_link") {
-                    const isElectron = window.location.protocol === 'app:' || window.location.protocol === 'file:';
-                    if (isElectron) {
-                      // En Electron (app://), abrimos el navegador web real del sistema operativo
+                    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
+                    if (isAppMode) {
+                      // En App nativa (Electron o Android), abrimos el navegador web real
                       window.open("https://www.flux-sport.com", "_blank"); 
                     } else {
-                      // En web (https://), simplemente navegamos a la raíz (landing page)
+                      // En web (https://), navegamos a la raíz (landing page)
                       window.location.href = "/";
                     }
                   } else {
