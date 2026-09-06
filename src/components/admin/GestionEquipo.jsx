@@ -21,13 +21,15 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await dbGet(
-        `profiles?role=in.(administrativo,staff)&nutriologo_id=eq.${myId}&select=id,nombre,email,telefono,activo&order=nombre.asc`
+      const rows = await dbGet(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);
+      const myTeam = rows.filter(r => 
+        (r.role === "administrativo" && r.nutriologo_id === myId) || 
+        (isSuperadmin && r.role === "staff")
       );
-      setEquipo(rows);
+      setEquipo(myTeam);
     } catch { }
     setLoading(false);
-  }, [myId]);
+  }, [myId, isSuperadmin]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -38,14 +40,18 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     }
     setSaving(true);
     try {
-      // Si el que invita es superadmin, en la base de datos se puede guardar como staff o administrativo. 
-      // Por consistencia guardamos "administrativo", y el sistema lo eleva dinámicamente a "staff" al iniciar sesión.
-      await authInvite(form.email, {
+      const authUser = await authInvite(form.email, {
         role: "administrativo",
         nombre: form.nombre,
-        telefono: form.telefono,
-        nutriologo_id: myId,
+        telefono: form.telefono
       });
+      
+      // Explicitly update profile to ensure nutriologo_id is linked properly
+      await dbPatch(`profiles?id=eq.${authUser.id}`, {
+        nutriologo_id: myId,
+        role: isSuperadmin ? "staff" : "administrativo"
+      });
+
       setMsg(`✅ Invitación enviada — el ${isSuperadmin ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
       setShowInvite(false);
       setForm({ nombre: "", email: "", telefono: "" });
