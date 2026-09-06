@@ -53,9 +53,17 @@ export default function Login({ onLogin }) {
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
-      const role = profiles.length ? profiles[0].role : null;
-      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo") {
-        if ((role === "nutriologo" || role === "administrativo") && profiles[0].activo === false) {
+      let role = profiles.length ? profiles[0].role : null;
+      
+      if (role === "administrativo" && profiles[0].nutriologo_id) {
+        const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
+        if (boss.length && boss[0].role === "superadmin") {
+          role = "staff";
+        }
+      }
+
+      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo" || role === "staff") {
+        if ((role === "nutriologo" || role === "administrativo" || role === "staff") && profiles[0].activo === false) {
           setAuthToken(null); setProfileId(null);
           setErr("Tu cuenta está suspendida. Contacta a soporte.");
           setLoading(false); return;
