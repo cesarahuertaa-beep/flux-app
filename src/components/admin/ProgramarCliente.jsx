@@ -217,7 +217,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
+  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
   const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
 
   const saveDia = async () => {
@@ -244,10 +244,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setNutri(currentNutri);
       }
 
-      let diaId;
       if (editDia) { 
         await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); 
-        diaId = editDia.id; 
+        const diaId = editDia.id; 
         
         const oldIds = editDia.comidas.map(c => c.id);
         const newIds = diaForm.comidas.filter(c => c.id).map(c => c.id);
@@ -255,21 +254,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if (toDelete.length > 0) {
           await dbDel(`comidas?id=in.(${toDelete.join(",")})`);
         }
-      }
-      else { 
-        const r = await dbPost("nutricion_dias", { nutricion_id:currentNutri.id, dia:diaForm.dia, orden:diaForm.orden }); 
-        diaId=r[0].id; 
-      }
-      
-      for (let i=0; i<diaForm.comidas.length; i++) {
-        const c = diaForm.comidas[i];
-        const data = { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
-        delete data.id;
-        
-        if (c.id) {
-          await dbPatch(`comidas?id=eq.${c.id}`, data);
-        } else {
-          await dbPost("comidas", data);
+
+        for (let i=0; i<diaForm.comidas.length; i++) {
+          const c = diaForm.comidas[i];
+          const data = { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
+          delete data.id;
+          delete data._dndId;
+          
+          if (c.id) {
+            await dbPatch(`comidas?id=eq.${c.id}`, data);
+          } else {
+            await dbPost("comidas", data);
+          }
+        }
+      } else { 
+        // Creación masiva (Múltiples días) o normal
+        const dSeleccionados = diaForm.diasSeleccionados || [];
+        const creationDays = dSeleccionados.length > 0 ? dSeleccionados : [diaForm.dia || `Día ${dias.length + 1}`];
+        let orderCounter = diaForm.orden;
+
+        for (const dayCode of creationDays) {
+          let finalName = dayCode;
+          if (dSeleccionados.length > 0 && diaForm.tituloPersonalizado) {
+            finalName = `${dayCode} - ${diaForm.tituloPersonalizado}`;
+          }
+
+          const r = await dbPost("nutricion_dias", { nutricion_id:currentNutri.id, dia:finalName, orden:orderCounter }); 
+          const newDiaId = r[0].id; 
+          
+          for (let i=0; i<diaForm.comidas.length; i++) {
+            const c = diaForm.comidas[i];
+            const data = { ...c, dia_id:newDiaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
+            delete data.id;
+            delete data._dndId;
+            await dbPost("comidas", data);
+          }
+          orderCounter++;
         }
       }
       setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
@@ -661,10 +681,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   )}
                 </div>
               )}
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del día</label>
-                <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…" />
-              </div>
+                {!editDia ? (
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Días de la semana</label>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
+                        <button
+                          key={d}
+                          onClick={() => {
+                            setDiaForm(p => ({
+                              ...p,
+                              diasSeleccionados: p.diasSeleccionados?.includes(d) 
+                                ? p.diasSeleccionados.filter(x => x !== d) 
+                                : [...(p.diasSeleccionados || []), d]
+                            }));
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${diaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título Adicional / Nota (Opcional)</label>
+                    <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado || ""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen" />
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del día</label>
+                    <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…" />
+                  </div>
+                )}
               <div className="flex justify-between items-center mb-2.5">
                 <span className="font-semibold text-[14px]">Comidas</span>
                 <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={addComida}><Plus className="w-3.5 h-3.5" /> Comida</button>
