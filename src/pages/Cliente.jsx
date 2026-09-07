@@ -20,7 +20,7 @@ const offlineAwareUpsert = async (records) => {
   }
 };
 
-export default function ClienteView({ session, onLogout }) {
+export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin }) {
   const { data: cliente } = session;
   const brand = useBrand();
   
@@ -122,6 +122,19 @@ export default function ClienteView({ session, onLogout }) {
       session={session}
       onLogout={onLogout}
     >
+      {isAtletaMode && (
+        <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+          <div className="flex flex-col">
+            <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
+              <Dumbbell size={16} /> Estás en Modo Atleta
+            </span>
+            <span className="text-[#047857] text-xs md:text-sm hidden sm:block">Previsualiza tu app exactamente como lo verían tus pacientes.</span>
+          </div>
+          <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
+            Volver al Panel
+          </button>
+        </div>
+      )}
       {loading ? (
         <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
       ) : (

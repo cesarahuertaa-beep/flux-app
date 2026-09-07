@@ -49,6 +49,8 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   const myId = profileId || getProfileId();
 
+  const [myShadowClient, setMyShadowClient] = useState(null);
+
   const clientesFilter = (isSuperadmin || role === "staff")
     ? "clientes?order=created_at.asc"
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
@@ -56,9 +58,20 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
-    try { const r = await dbGet(clientesFilter); setClientes(r); } catch(e) { console.error("Error cargando clientes:", e); }
+    try { 
+      const r = await dbGet(clientesFilter); 
+      const me = await dbGet(`profiles?id=eq.${myId}&select=email`);
+      if (me.length > 0) {
+        const myEmail = me[0].email;
+        const clone = r.find(c => c.email === myEmail);
+        if (clone) setMyShadowClient(clone);
+        setClientes(r.filter(c => c.email !== myEmail));
+      } else {
+        setClientes(r);
+      }
+    } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
-  }, [clientesFilter]);
+  }, [clientesFilter, myId]);
 
   const loadBiblioteca = useCallback(async () => {
     try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch(e) { console.error("Error cargando biblioteca:", e); }
@@ -162,6 +175,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         ]
       : [
           { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+          { id: "mi_entrenamiento", label: "Mi Entrenamiento", icon: <Activity size={18} strokeWidth={1.5} /> },
           { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
           { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
           { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
@@ -353,6 +367,38 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
 
       {/* Legacy Dark Mode Sub-Components */}
       {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin || role === "staff"}/></SubComponentWrapper>}
+      
+      {tab === "mi_entrenamiento" && (
+        <SubComponentWrapper title="Mi Entrenamiento">
+          {myShadowClient ? (
+            <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white rounded-2xl m-4 md:m-8 shadow-sm border border-[#E2E8F0]">
+              <Activity className="w-16 h-16 text-[#9BA5B0] mb-4" />
+              <h2 className="text-xl font-bold text-[#0B1929] mb-2">Activa tu perfil de atleta</h2>
+              <p className="text-sm text-[#6B7A8D] max-w-md mb-6">Para poder configurarte dietas y rutinas, necesitas activar tu perfil interno. Solo toma un segundo.</p>
+              <button onClick={async () => {
+                setLoading(true);
+                try {
+                  const profiles = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`);
+                  if (profiles.length) {
+                    await dbPost("clientes", {
+                      nombre: profiles[0].nombre, email: profiles[0].email,
+                      objetivo: "Mi entrenamiento personal",
+                      nutriologo_id: myId, activo: true
+                    });
+                    await loadClientes();
+                  }
+                } catch(e) { setMsg("❌ Error: " + e.message); }
+                setLoading(false);
+              }} className="bg-[var(--brand-primary)] text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:opacity-90">
+                Activar Mi Perfil
+              </button>
+            </div>
+          )}
+        </SubComponentWrapper>
+      )}
+
       {tab === "programar" && <SubComponentWrapper title="Asignador de Dietas y Rutinas"><ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} /></SubComponentWrapper>}
       {tab === "equipo" && role !== "administrativo" && role !== "staff" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
