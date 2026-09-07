@@ -342,13 +342,14 @@ export function ProgresoCliente({ selected, setMsg }) {
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {ciclos.map(c => (
                   <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} style={{
-                    padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
-                    transition:"all 0.2s",border:"1px solid",
+                    padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: cicloSel?.id===c.id ? 700 : 500,
                     background: cicloSel?.id===c.id ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)") : "transparent",
                     color: cicloSel?.id===c.id ? (c.activo ? "#000" : C.text) : C.muted,
+                    border: `1px solid`,
                     borderColor: cicloSel?.id===c.id ? (c.activo ? C.accent : "#64748b") : C.border,
+                    cursor: "pointer", transition: "all 0.2s ease"
                   }}>
-                    {c.nombre}
+                    {c.nombre.split("|")[0]}
                     {c.activo && <span style={{marginLeft:5,display:"inline-block",width:6,height:6,borderRadius:"50%",background:"#4ade80",verticalAlign:"middle"}}/>}
                   </button>
                 ))}

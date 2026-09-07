@@ -37,12 +37,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [macros, setMacros] = useState({ calorias:"", proteina:"", carbohidratos:"", grasas:"" });
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [planForm, setPlanForm] = useState({ fecha_inicio: new Date().toISOString().split("T")[0], semanas: 4 });
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[] });
   const [showRutinaModal, setShowRutinaModal] = useState(false);
   const [editRutina, setEditRutina] = useState(null);
-  const [rutinaForm, setRutinaForm] = useState({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[] });
+  const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
+
+  const ORDINALES = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
 
   const isReadOnly = cicloSel && !cicloSel.activo;
 
@@ -198,16 +202,54 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
   };
 
-  // ── Operaciones de Nutrición ──
+  // ── Operaciones de Planes (Ciclos) ──
+  const getCycleWeeks = (c) => c?.nombre.includes("|") ? parseInt(c.nombre.split("|")[1]) : 4;
+
+  const savePlan = async () => {
+    setSaving(true);
+    try {
+      const start = new Date(planForm.fecha_inicio + "T12:00:00");
+      const end = new Date(start);
+      end.setDate(end.getDate() + (parseInt(planForm.semanas) * 7) - 1);
+      const options = { day: 'numeric', month: 'short' };
+      const rangeStr = `${start.toLocaleDateString('es-ES', options)} - ${end.toLocaleDateString('es-ES', options)}`;
+      
+      const idx = ciclos.length;
+      const ordinal = ORDINALES[idx] || `${idx + 1}º`;
+      const finalName = `${ordinal} Plan (${rangeStr})|${planForm.semanas}`;
+
+      if (ciclos.some(c => c.activo)) {
+        await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+      }
+      const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: finalName, fecha_inicio: planForm.fecha_inicio, activo: true });
+      await loadCiclos();
+      setCicloSel(cRes[0]);
+      setShowPlanModal(false);
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
+    } catch(e) { 
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+    }
+    setSaving(false);
+  };
+
+  const interceptNoPlan = () => {
+    if (!cicloSel) {
+      setShowPlanModal(true);
+      return true;
+    }
+    return false;
+  };
+
   const saveMacros = async () => {
     if (isReadOnly) return;
+    if (interceptNoPlan()) return;
     setSaving(true);
     try {
       if (nutri) await dbPatch(`nutricion?id=eq.${nutri.id}`, { ...macros, updated_at:new Date().toISOString() });
       else {
         const r = await dbPost("nutricion", {
           cliente_id: selected.id,
-          ciclo_id: cicloSel?.id || null,
+          ciclo_id: cicloSel.id,
           ...macros
         });
         setNutri(r[0]);
@@ -217,32 +259,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const openNewDia  = () => { setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
-  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowDiaModal(true); };
+  const openNewDia  = () => { if (interceptNoPlan()) return; setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
+  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) }); setShowDiaModal(true); };
 
   const saveDia = async () => {
-    if (!nutri && !diaForm.crear_ciclo) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Guarda los macros primero</div>); return; }
+    if (!nutri) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Guarda los macros primero</div>); return; }
     setSaving(true);
     try {
       let currentNutri = nutri;
-      if (diaForm.crear_ciclo) {
-        if (!diaForm.ciclo_nombre.trim()) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del nuevo ciclo</div>); setSaving(false); return; }
-        if (ciclos.some(c => c.activo)) {
-          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
-        }
-        const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: diaForm.ciclo_nombre.trim(), fecha_inicio: diaForm.ciclo_fecha, activo: true });
-        const activeCiclo = cRes[0];
-        await loadCiclos();
-        setCicloSel(activeCiclo);
-        
-        const nRes = await dbPost("nutricion", {
-          cliente_id: selected.id,
-          ciclo_id: activeCiclo.id,
-          ...macros
-        });
-        currentNutri = nRes[0];
-        setNutri(currentNutri);
-      }
 
       if (editDia) { 
         await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); 
@@ -303,27 +327,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
 
   // ── Operaciones de Rutinas ──
-  const openNewRutina  = () => { setEditRutina(null); setRutinaForm({ nombre:"", semanas:8, fecha_inicio:new Date().toISOString().split("T")[0], ejercicios:[], crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowRutinaModal(true); };
-  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, semanas:r.semanas, fecha_inicio:r.fecha_inicio||new Date().toISOString().split("T")[0], ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})), crear_ciclo: false, ciclo_nombre: "", ciclo_fecha: new Date().toISOString().split("T")[0] }); setShowRutinaModal(true); };
+  const openNewRutina  = () => { if (interceptNoPlan()) return; setEditRutina(null); setRutinaForm({ nombre:"", ejercicios:[] }); setShowRutinaModal(true); };
+  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) }); setShowRutinaModal(true); };
 
   const saveRutina = async () => {
     setSaving(true);
     try {
       let activeCiclo = cicloSel;
-      if (rutinaForm.crear_ciclo) {
-        if (!rutinaForm.ciclo_nombre.trim()) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del nuevo ciclo</div>); setSaving(false); return; }
-        if (ciclos.some(c => c.activo)) {
-          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
-        }
-        const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: rutinaForm.ciclo_nombre.trim(), fecha_inicio: rutinaForm.ciclo_fecha, activo: true });
-        activeCiclo = cRes[0];
-        await loadCiclos();
-        setCicloSel(activeCiclo);
-      }
 
       let rid;
       if (editRutina) {
-        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre, semanas:+rutinaForm.semanas, fecha_inicio:rutinaForm.fecha_inicio });
+        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre });
         rid=editRutina.id; 
         
         const oldIds = editRutina.ejercicios.map(e => e.id);
@@ -454,12 +468,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Selector de Ciclos ── */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[13px] font-bold text-[#6B7A8D] uppercase tracking-[0.8px]">Ciclos / Períodos</span>
+          <span className="text-[13px] font-bold text-[#6B7A8D] uppercase tracking-[0.8px]">Planes del Paciente</span>
+          {ciclos.length > 0 && (
+            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
+              <Plus className="w-3.5 h-3.5" /> Siguiente Plan
+            </button>
+          )}
         </div>
 
         {ciclos.length === 0 ? (
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 text-center text-[#6B7A8D] text-[13px]">
-            Sin ciclos aún. Crea el primer ciclo para comenzar a registrar planes con historial.
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 flex flex-col items-center gap-3">
+            <span className="text-[#6B7A8D] text-[13px]">Sin planes registrados.</span>
+            <button className="text-xs flex items-center gap-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 font-medium transition-opacity" onClick={() => setShowPlanModal(true)}>
+              <Plus className="w-3.5 h-3.5" /> Iniciar Primer Plan
+            </button>
           </div>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -475,30 +497,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                         : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium"
                   } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
                 >
-                  {c.nombre}
-                  {c.fecha_inicio && <span className="text-[10px] opacity-70 ml-1.5">{fmtFecha(c.fecha_inicio)}</span>}
+                  {c.nombre.split("|")[0]}
                 </button>
                 {cicloSel?.id === c.id && (
                   <button
                     onClick={(e) => eliminarCiclo(c, e)}
-                    title="Eliminar este ciclo"
-                    className={`px-2.5 py-2 rounded-r-xl border-y border-r flex items-center transition-colors ${
-                      c.activo 
-                        ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white/60 hover:text-white hover:bg-red-500 hover:border-red-500" 
-                        : "bg-red-50 border-red-100 text-red-400 hover:text-red-600 hover:bg-red-100"
-                    }`}
+                    title="Eliminar este plan"
+                    className="px-3 py-2 bg-[var(--brand-primary)] text-white/80 hover:text-white border-y border-r border-[var(--brand-primary)] rounded-r-xl transition-colors"
                   >
-                    <Trash2 className="w-[14px] h-[14px]" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
             ))}
           </div>
         )}
-
-        {isReadOnly && (
-          <div className="mt-2.5 px-3.5 py-2 bg-gray-50 rounded-xl border border-[#E2E8F0] text-xs text-[#6B7A8D] flex items-center gap-2">
-            <Lock className="w-[14px] h-[14px]" /> Estás viendo el historial de <strong className="text-[#0B1929]">{cicloSel.nombre}</strong>. Solo lectura — el ciclo activo es el resaltado.
+        {cicloSel && !cicloSel.activo && (
+          <div className="mt-2.5 text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 px-3 py-2 rounded-lg flex items-center gap-2">
+            <Lock className="w-[14px] h-[14px]" /> Estás viendo el historial de <strong className="text-[#0B1929]">{cicloSel.nombre.split("|")[0]}</strong>. Solo lectura — el plan activo es el resaltado.
           </div>
         )}
       </div>
@@ -627,6 +643,41 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
       </>}
 
+      {/* ── Modal Nuevo Plan ── */}
+      {showPlanModal && (
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
+              <h3 className="text-lg font-bold text-[#0B1929]">Configuración del Plan</h3>
+              <button onClick={() => setShowPlanModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-[#6B7A8D] mb-5">
+                Al iniciar un nuevo plan, se establecerá el rango de tiempo durante el cual la dieta y las rutinas estarán activas.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha de inicio</label>
+                  <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={planForm.fecha_inicio} onChange={e=>setPlanForm(p=>({...p,fecha_inicio:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Duración (Semanas)</label>
+                  <input type="number" min="1" max="52" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={planForm.semanas} onChange={e=>setPlanForm(p=>({...p,semanas:e.target.value}))} />
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5">
+              <button onClick={() => setShowPlanModal(false)} className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors text-[14px]">Cancelar</button>
+              <button onClick={savePlan} disabled={saving} className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white font-medium hover:opacity-90 transition-opacity text-[14px] shadow-sm disabled:opacity-50">
+                {saving ? "Creando..." : "Iniciar Plan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal Nuevo/Editar Día ── */}
       {showDiaModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -649,34 +700,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                           <option key={hd.id} value={hd.id}>{hd.dia} (de {getClientName(hd.cliente_id)})</option>
                         ))}
                       </select>
-                    </div>
-                  )}
-                  <div className={`grid grid-cols-2 gap-2.5 ${diaForm.crear_ciclo ? 'mb-3' : ''}`}>
-                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${!diaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
-                      <input type="radio" checked={!diaForm.crear_ciclo} onChange={() => setDiaForm(p => ({ ...p, crear_ciclo: false }))} className="mt-1 accent-[var(--brand-primary)]" />
-                      <div className="leading-tight">
-                        <div className="font-medium text-[#0B1929]">Usar ciclo actual</div>
-                        <div className="text-[11px] text-[#6B7A8D] mt-1">{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
-                      </div>
-                    </label>
-                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${diaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
-                      <input type="radio" checked={diaForm.crear_ciclo} onChange={() => setDiaForm(p => ({ ...p, crear_ciclo: true }))} className="mt-1 accent-[var(--brand-primary)]" />
-                      <div className="leading-tight">
-                        <div className="font-medium text-[#0B1929]">Crear nuevo</div>
-                        <div className="text-[11px] text-[#6B7A8D] mt-1">Ciclo / Período</div>
-                      </div>
-                    </label>
-                  </div>
-                  {diaForm.crear_ciclo && (
-                    <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-                      <div>
-                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del ciclo</label>
-                        <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.ciclo_nombre} onChange={e=>setDiaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio del ciclo</label>
-                        <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={diaForm.ciclo_fecha} onChange={e=>setDiaForm(p=>({...p,ciclo_fecha:e.target.value}))} />
-                      </div>
                     </div>
                   )}
                 </div>
@@ -780,41 +803,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                       </select>
                     </div>
                   )}
-                  <div className={`grid grid-cols-2 gap-2.5 ${rutinaForm.crear_ciclo ? 'mb-3' : ''}`}>
-                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${!rutinaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
-                      <input type="radio" checked={!rutinaForm.crear_ciclo} onChange={() => setRutinaForm(p => ({ ...p, crear_ciclo: false }))} className="mt-1 accent-[var(--brand-primary)]" />
-                      <div className="leading-tight">
-                        <div className="font-medium text-[#0B1929]">Usar ciclo actual</div>
-                        <div className="text-[11px] text-[#6B7A8D] mt-1">{cicloSel ? cicloSel.nombre : "Sin ciclo"}</div>
-                      </div>
-                    </label>
-                    <label className={`flex items-start gap-2.5 text-[13px] cursor-pointer p-2.5 rounded-lg border transition-all ${rutinaForm.crear_ciclo ? 'bg-blue-50/50 border-[var(--brand-primary)]' : 'border-[#E2E8F0]'}`}>
-                      <input type="radio" checked={rutinaForm.crear_ciclo} onChange={() => setRutinaForm(p => ({ ...p, crear_ciclo: true }))} className="mt-1 accent-[var(--brand-primary)]" />
-                      <div className="leading-tight">
-                        <div className="font-medium text-[#0B1929]">Crear nuevo</div>
-                        <div className="text-[11px] text-[#6B7A8D] mt-1">Ciclo / Período</div>
-                      </div>
-                    </label>
                   </div>
-                  {rutinaForm.crear_ciclo && (
-                    <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-                      <div>
-                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del ciclo</label>
-                        <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.ciclo_nombre} onChange={e=>setRutinaForm(p=>({...p,ciclo_nombre:e.target.value}))} placeholder="Ej. Mes 2" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio del ciclo</label>
-                        <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.ciclo_fecha} onChange={e=>setRutinaForm(p=>({...p,ciclo_fecha:e.target.value}))} />
-                      </div>
-                    </div>
-                  )}
+                )}
+                <div className="mb-3">
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la Rutina</label>
+                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
                 </div>
-              )}
-              <div className="grid grid-cols-[2fr_1fr_1fr] gap-2.5 mb-3">
-                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1" /></div>
-                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Semanas</label><input type="number" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.semanas} onChange={e=>setRutinaForm(p=>({...p,semanas:e.target.value}))} /></div>
-                <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha inicio</label><input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.fecha_inicio} onChange={e=>setRutinaForm(p=>({...p,fecha_inicio:e.target.value}))} /></div>
-              </div>
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
               {rutinaForm.ejercicios.length > 0 && (
                 <div className="mt-3">
