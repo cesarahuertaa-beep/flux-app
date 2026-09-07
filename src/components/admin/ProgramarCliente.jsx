@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Lock, X, Utensils, Dumbbell, BarChart2 } from "lucide-react";
+import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
@@ -515,7 +515,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </div>
             )}
             <div className={`bg-white rounded-2xl border border-[#E2E8F0] p-4 mb-3.5 ${isReadOnly ? 'opacity-75' : ''}`}>
-              <div className="font-semibold mb-3.5 text-[var(--brand-primary)]">Macros diarios</div>
+              <div className="flex justify-between items-center mb-3.5">
+                <div className="font-semibold text-[var(--brand-primary)]">Macros diarios</div>
+                {dias.length > 0 && (
+                  <button
+                    onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] text-xs font-semibold shadow-sm transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Descargar PDF
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {[["calorias", "Calorías (kcal)"], ["proteina", "Proteína (g)"], ["carbohidratos", "Carbohidratos (g)"], ["grasas", "Grasas (g)"]].map(([k, lb]) => (
                   <div key={k} className="mb-3">
@@ -801,19 +811,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         </div>
       )}
 
-      {/* ── FAB PARA PDF ── */}
-      {subtab === "nutri" && dias.length > 0 && (
-        <div className="fixed bottom-8 right-6 z-50 animate-slideUp">
-          <button
-            onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
-            className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-[var(--brand-primary)] text-white font-bold text-sm shadow-[0_8px_24px_rgba(46,92,184,0.4)] transition-all hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(46,92,184,0.5)] border-none"
-          >
-            <FileText className="w-[18px] h-[18px]" />
-            Descargar Plan PDF
-          </button>
-        </div>
-      )}
-
+      {/* ── Se removió el FAB para PDF y se integró en la cabecera ── */}
     </div>
   );
 }
