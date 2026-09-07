@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { dbGet, dbPatch, storageUpload } from "../../lib/supabase";
-import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, Home } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 export default function PerfilNutriologo({ profileId, onLogout, role }) {
@@ -94,6 +95,15 @@ export default function PerfilNutriologo({ profileId, onLogout, role }) {
   };
 
   const isTeam = role === "administrativo" || role === "staff";
+
+  const handleStore = () => {
+    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
+    if (isAppMode) {
+      window.open("https://www.flux-sport.com", "_blank"); 
+    } else {
+      window.location.href = "/";
+    }
+  };
 
   if (loading) {
     return (
@@ -206,6 +216,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role }) {
             {saving ? "Guardando..." : <><Save size={18} /> {isTeam ? "Guardar Cambios" : "Guardar Perfil Público"}</>}
           </button>
           
+          <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
+            <Home size={18} /> Ir a Landing Page
+          </button>
+
           <button onClick={onLogout} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 flex items-center justify-center gap-2 transition-all">
             <LogOut size={18} /> Salir
           </button>
