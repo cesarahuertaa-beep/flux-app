@@ -60,15 +60,20 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
     setLoading(true);
     try { 
       const r = await dbGet(clientesFilter); 
+      
+      // Obtener emails de todos los nutriólogos para ocultar TODOS los clones de la lista global
+      const allNutris = await dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`);
+      const nutriEmails = new Set(allNutris.map(n => n.email));
+
       const me = await dbGet(`profiles?id=eq.${myId}&select=email`);
       if (me.length > 0) {
         const myEmail = me[0].email;
         const clone = r.find(c => c.email === myEmail);
         if (clone) setMyShadowClient(clone);
-        setClientes(r.filter(c => c.email !== myEmail));
-      } else {
-        setClientes(r);
       }
+      
+      // Excluir a cualquier cliente cuyo email coincida con un Nutriólogo/Superadmin
+      setClientes(r.filter(c => !nutriEmails.has(c.email)));
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
   }, [clientesFilter, myId]);
