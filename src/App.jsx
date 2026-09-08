@@ -132,7 +132,8 @@ export default function App() {
   const MainApp = () => {
     // Si es un cliente huérfano (solo comprador de E-commerce), no tiene acceso a la App privada
     if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
-      const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform();
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
+      const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform() || isStandalone;
       return <Navigate to={isAppMode ? "/login" : "/"} replace />;
     }
 
@@ -149,7 +150,8 @@ export default function App() {
     return <ClienteView session={session} onLogout={handleLogout}/>;
   };
 
-  const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform();
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
+  const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform() || isStandalone;
   const Router = isAppMode ? HashRouter : BrowserRouter;
 
   return (

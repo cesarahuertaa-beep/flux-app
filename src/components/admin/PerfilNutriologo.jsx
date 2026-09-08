@@ -97,7 +97,8 @@ export default function PerfilNutriologo({ profileId, onLogout, role }) {
   const isTeam = role === "administrativo" || role === "staff";
 
   const handleStore = () => {
-    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
+    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform() || isStandalone;
     if (isAppMode) {
       window.open("https://www.flux-sport.com", "_blank"); 
     } else {
