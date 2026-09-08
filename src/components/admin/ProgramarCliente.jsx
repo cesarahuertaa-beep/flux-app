@@ -619,27 +619,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   return (
                       <SortableItem key={d.id} id={d.id}>
                         {({ dragHandle, isDragging }) => (
-                          <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                              <div className="flex items-start sm:items-center gap-2.5 flex-1 min-w-0">
-                                {!isReadOnly && <div className="mt-1 sm:mt-0 shrink-0">{dragHandle}</div>}
-                                <div className="flex flex-col min-w-0">
-                                  <div className="flex items-center flex-wrap gap-1.5 leading-tight">
-                                    {tab !== 'S/D' && (
-                                      <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] text-[#6B7A8D] shrink-0">{tab}</span>
-                                    )}
-                                    <span className="font-semibold text-[14px] text-[#0B1929] break-words">{title || "Sin título"}</span>
-                                  </div>
-                                  <span className="text-xs text-[#6B7A8D] mt-1 sm:mt-0.5">{d.comidas.length} comidas</span>
+                          <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center gap-2">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                              {!isReadOnly && <div className="shrink-0">{dragHandle}</div>}
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center flex-wrap gap-1.5 leading-tight">
+                                  {tab !== 'S/D' && (
+                                    <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] text-[#6B7A8D] shrink-0">{tab}</span>
+                                  )}
+                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                                 </div>
+                                <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{d.comidas.length} comidas</span>
                               </div>
-                              {!isReadOnly && (
-                                <div className="flex gap-1.5 self-end sm:self-auto shrink-0">
-                                  <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
-                                  <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
-                                </div>
-                              )}
                             </div>
+                            {!isReadOnly && (
+                              <div className="flex gap-1.5 shrink-0">
+                                <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors" onClick={() => openEditDia(d)}>
+                                  <Edit2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Editar</span>
+                                </button>
+                                <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" onClick={() => deleteDia(d)}>
+                                  <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Borrar</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </SortableItem>
@@ -665,27 +667,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   return (
                     <SortableItem key={r.id} id={r.id}>
                       {({ dragHandle, isDragging }) => (
-                        <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 ${isReadOnly ? 'opacity-75' : ''}`}>
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                            <div className="flex items-start sm:items-center gap-2.5 flex-1 min-w-0">
-                              {!isReadOnly && <div className="mt-1 sm:mt-0 shrink-0">{dragHandle}</div>}
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center flex-wrap gap-1.5 leading-tight">
-                                  {tab !== 'S/D' && (
-                                    <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
-                                  )}
-                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words">{title || "Sin título"}</span>
-                                </div>
-                                <span className="text-xs text-[#6B7A8D] mt-1 sm:mt-0.5">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
+                        <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center gap-2 ${isReadOnly ? 'opacity-75' : ''}`}>
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            {!isReadOnly && <div className="shrink-0">{dragHandle}</div>}
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center flex-wrap gap-1.5 leading-tight">
+                                {tab !== 'S/D' && (
+                                  <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
+                                )}
+                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                               </div>
+                              <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
                             </div>
-                            {!isReadOnly && (
-                              <div className="flex gap-1.5 self-end sm:self-auto shrink-0">
-                                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditRutina(r)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
-                                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteRutina(r)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
-                              </div>
-                            )}
                           </div>
+                          {!isReadOnly && (
+                            <div className="flex gap-1.5 shrink-0">
+                              <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors" onClick={() => openEditRutina(r)}>
+                                <Edit2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Editar</span>
+                              </button>
+                              <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" onClick={() => deleteRutina(r)}>
+                                <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Borrar</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </SortableItem>
