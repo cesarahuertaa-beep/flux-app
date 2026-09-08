@@ -188,7 +188,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
           { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
           { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
-            { id: "tienda", label: "Tienda (Admin)", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
+            { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
           ] : [])
         ];
 
