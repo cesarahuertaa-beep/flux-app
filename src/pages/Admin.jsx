@@ -182,7 +182,9 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       : [
           { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
           { id: "mi_entrenamiento", label: "Mi Entrenamiento", icon: <Activity size={18} strokeWidth={1.5} /> },
-          { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
+          ...(isSuperadmin ? [
+            { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
+          ] : []),
           { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
           { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
