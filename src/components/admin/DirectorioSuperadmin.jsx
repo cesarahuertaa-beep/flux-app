@@ -276,20 +276,20 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                             {n.activo !== false ? "Activo" : "Suspendido"}
                           </span>
                         </div>
-                        <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-2 mt-1">
-                          <span>{n.nombre}</span>
-                          <div className="flex flex-col items-start gap-1.5 text-xs">
+                        <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
+                          <div className="flex items-center gap-2">
+                            <span>{n.nombre}</span>
                             {n.telefono && (
                               <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
                                 <MessageCircle size={12} /> WhatsApp
                               </a>
                             )}
-                            {n.creado_por_nombre && !n.isSuperadmin && (
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
-                              </span>
-                            )}
                           </div>
+                          {n.creado_por_nombre && !n.isSuperadmin && (
+                            <span className="flex items-center gap-1 text-slate-400">
+                              <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
