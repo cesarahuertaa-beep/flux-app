@@ -261,7 +261,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   const openNewDia  = () => { if (interceptNoPlan()) return; setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
   const openEditDia = (d) => { 
-    const parts = d.dia.split('|');
+    const parts = (d.dia || "").split('|');
     const dayTab = parts.length > 1 ? parts[0] : '';
     const title = parts.length > 1 ? parts[1] : parts[0];
 
@@ -578,7 +578,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
                 {dias.map(d => {
-                  const parts = d.dia.split('|');
+                  const parts = (d.dia || "").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts[1] : parts[0];
                   return (
@@ -704,7 +704,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                       <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
                         <option value="">-- Seleccionar día preexistente --</option>
                         {historialDias.map(hd => (
-                          <option key={hd.id} value={hd.id}>{hd.dia.split('|').length > 1 ? hd.dia.split('|').join(' - ') : hd.dia} (de {getClientName(hd.cliente_id)})</option>
+                          <option key={hd.id} value={hd.id}>{(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de {getClientName(hd.cliente_id)})</option>
                         ))}
                       </select>
                     </div>
