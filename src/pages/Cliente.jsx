@@ -9,6 +9,7 @@ import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
 import Directorio from "../components/cliente/Directorio";
+import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -166,7 +167,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           )}
 
           {tab === "perfil" && (
-            <UserProfile session={session} onLogout={onLogout} />
+            isAtletaMode ? (
+              <div className="flex-1 overflow-y-auto">
+                <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
+              </div>
+            ) : (
+              <UserProfile session={session} onLogout={onLogout} />
+            )
           )}
         </>
       )}

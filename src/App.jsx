@@ -138,7 +138,7 @@ export default function App() {
 
     if (atletaData) return (
       <ClienteView
-        session={{ role:"client", data:atletaData, token:session.token }}
+        session={{ role:"client", data:atletaData, token:session.token, profileId: session.profileId, adminRole: session.role }}
         onLogout={handleLogout}
         isAtletaMode={true}
         onBackToAdmin={handleBackToAdmin}
