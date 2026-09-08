@@ -617,26 +617,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts[1] : parts[0];
                   return (
-                    <SortableItem key={d.id} id={d.id}>
-                      {({ dragHandle, isDragging }) => (
-                        <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            {!isReadOnly && dragHandle}
-                            <div>
-                              <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] mr-2 text-[#6B7A8D]">{tab}</span>
-                              <span className="font-semibold text-[14px] text-[#0B1929]">{title || "Sin título"}</span>
-                              <span className="text-xs text-[#6B7A8D] ml-2.5">{d.comidas.length} comidas</span>
+                      <SortableItem key={d.id} id={d.id}>
+                        {({ dragHandle, isDragging }) => (
+                          <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                              <div className="flex items-start sm:items-center gap-2.5 flex-1 min-w-0">
+                                {!isReadOnly && <div className="mt-1 sm:mt-0 shrink-0">{dragHandle}</div>}
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center flex-wrap gap-1.5 leading-tight">
+                                    {tab !== 'S/D' && (
+                                      <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] text-[#6B7A8D] shrink-0">{tab}</span>
+                                    )}
+                                    <span className="font-semibold text-[14px] text-[#0B1929] break-words">{title || "Sin título"}</span>
+                                  </div>
+                                  <span className="text-xs text-[#6B7A8D] mt-1 sm:mt-0.5">{d.comidas.length} comidas</span>
+                                </div>
+                              </div>
+                              {!isReadOnly && (
+                                <div className="flex gap-1.5 self-end sm:self-auto shrink-0">
+                                  <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
+                                  <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {!isReadOnly && (
-                            <div className="flex gap-1.5">
-                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
-                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </SortableItem>
+                        )}
+                      </SortableItem>
                   )})}
               </SortableContext>
             </DndContext>
@@ -660,19 +666,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     <SortableItem key={r.id} id={r.id}>
                       {({ dragHandle, isDragging }) => (
                         <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 ${isReadOnly ? 'opacity-75' : ''}`}>
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              {!isReadOnly && dragHandle}
-                              <div>
-                                {tab !== 'S/D' && (
-                                  <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded mr-2 uppercase">{tab}</span>
-                                )}
-                                <span className="font-semibold text-[14px] text-[#0B1929]">{title || "Sin título"}</span>
-                                <span className="text-xs text-[#6B7A8D] ml-2.5">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                            <div className="flex items-start sm:items-center gap-2.5 flex-1 min-w-0">
+                              {!isReadOnly && <div className="mt-1 sm:mt-0 shrink-0">{dragHandle}</div>}
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center flex-wrap gap-1.5 leading-tight">
+                                  {tab !== 'S/D' && (
+                                    <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
+                                  )}
+                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words">{title || "Sin título"}</span>
+                                </div>
+                                <span className="text-xs text-[#6B7A8D] mt-1 sm:mt-0.5">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
                               </div>
                             </div>
                             {!isReadOnly && (
-                              <div className="flex gap-1.5">
+                              <div className="flex gap-1.5 self-end sm:self-auto shrink-0">
                                 <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditRutina(r)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
                                 <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteRutina(r)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
                               </div>
