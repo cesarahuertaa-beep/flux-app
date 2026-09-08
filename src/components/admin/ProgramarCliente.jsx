@@ -887,34 +887,44 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
               {rutinaForm.ejercicios.length > 0 && (
                 <div className="mt-3">
-                  <div className="grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-1.5 items-center">
-                    <span/><span/><span className="text-[11px] text-[#6B7A8D] font-semibold">EJERCICIO</span>
-                    <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">SERIES</span>
-                    <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">REPS</span>
-                    <span/>
-                  </div>
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
-                    <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
-                      {rutinaForm.ejercicios.map((e, i) => (
-                        <SortableItem key={e._dndId} id={e._dndId}>
-                          {({ dragHandle, isDragging }) => (
-                            <div className={`grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-2 items-center ${isDragging ? 'bg-white rounded-lg shadow-sm border border-[#E2E8F0]' : 'bg-transparent'}`}>
-                              <div className="flex items-center justify-center">{dragHandle}</div>
-                              <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
-                                {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
+                    <div className="hidden sm:grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-1.5 items-center">
+                      <span/><span/><span className="text-[11px] text-[#6B7A8D] font-semibold">EJERCICIO</span>
+                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">SERIES</span>
+                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">REPS</span>
+                      <span/>
+                    </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
+                      <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
+                        {rutinaForm.ejercicios.map((e, i) => (
+                          <SortableItem key={e._dndId} id={e._dndId}>
+                            {({ dragHandle, isDragging }) => (
+                              <div className={`grid grid-cols-[24px_40px_1fr_32px] sm:grid-cols-[24px_40px_1fr_80px_80px_32px] gap-2 sm:gap-1.5 mb-2 sm:mb-1.5 items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded-lg sm:rounded-none border sm:border-none ${isDragging ? 'bg-white shadow-sm border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
+                                <div className="flex items-center justify-center">{dragHandle}</div>
+                                <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
+                                  {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
+                                </div>
+                                <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} • {e.tipo_movimiento}</span></div>
+                                
+                                <div className="col-span-4 sm:col-span-2 sm:col-start-4 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[80px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                  <div className="flex items-center gap-2 sm:block">
+                                    <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">SERIES</span>
+                                    <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                                  </div>
+                                  <div className="flex items-center gap-2 sm:block">
+                                    <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
+                                    <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                  </div>
+                                </div>
+
+                                <button onClick={() => remEj(i)} className="col-start-4 row-start-1 sm:col-start-6 sm:row-start-1 bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none self-start sm:self-auto mt-0.5 sm:mt-0">
+                                  <Trash2 className="w-[14px] h-[14px]" />
+                                </button>
                               </div>
-                              <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} · {e.tipo_movimiento}</span></div>
-                              <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
-                              <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
-                              <button onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none">
-                                <Trash2 className="w-[14px] h-[14px]" />
-                              </button>
-                            </div>
-                          )}
-                        </SortableItem>
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                            )}
+                          </SortableItem>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                 </div>
               )}
               <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
