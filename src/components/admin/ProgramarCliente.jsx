@@ -469,9 +469,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     <div className="pb-[100px]">
       {/* ── Cabecera cliente ── */}
       <div className="flex items-center gap-2.5 mb-5 flex-wrap">
-        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-xl px-4 py-2">
-          <span className="font-bold text-[var(--brand-primary)]">{selected.nombre}</span>
-          <span className="text-xs text-[#6B7A8D] ml-2">{selected.email}</span>
+        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-xl px-4 py-2 flex flex-col">
+          <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>
+          <span className="text-xs text-[#6B7A8D] leading-tight mt-0.5">{selected.email}</span>
         </div>
         <button className="text-xs px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setSelected(null)}>
           Cambiar
