@@ -183,44 +183,46 @@ export default function Training({
       <div className="px-6 md:px-8 flex gap-2 mb-4 overflow-x-auto scroll-hide">
         {rutinas.map((r, i) => {
           const isActive = activeRutinaIdx === i;
-          const parts = (r.nombre || "").split('|');
-          const tab = parts.length > 1 ? parts[0] : 'S/D';
-          const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
-          const displayTitle = title || "Sin título";
-          // Subtítulo: usamos el grupo del primer ejercicio si existe
-          const subLabel = r.ejercicios?.[0]?.musculo?.split("/")[0]?.trim() || "";
+          
+          let shortTab = `Día ${i + 1}`;
+          if (r.nombre) {
+            const parts = String(r.nombre).split('|');
+            if (parts.length > 1) {
+              shortTab = parts[0];
+            } else {
+              const firstWord = String(r.nombre).split(' ')[0];
+              shortTab = firstWord.length <= 5 ? firstWord : firstWord.substring(0, 3).toUpperCase();
+            }
+          }
+
           return (
             <button
               key={r.id || i}
               onClick={() => { setActiveRutinaIdx(i); setExpandedEx(0); }}
-              className={`flex-1 min-w-[52px] py-2.5 rounded-lg text-xs font-semibold transition-all flex flex-col items-center ${
+              className={`flex-1 min-w-[52px] py-2.5 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center ${
                 isActive
                   ? "bg-[var(--brand-primary)] text-white shadow-md"
                   : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
               }`}
             >
-              {tab !== 'S/D' && (
-                <span className={`text-[10px] uppercase font-bold mb-0.5 ${isActive ? 'text-blue-100' : 'text-[#A0AEC0]'}`}>
-                  {tab}
-                </span>
-              )}
-              <span>{displayTitle}</span>
-              {subLabel && (
-                <span className={`mt-0.5 text-[10px] ${isActive ? "text-blue-200" : "text-[#CBD5E1]"}`}>
-                  {subLabel}
-                </span>
-              )}
+              <span className="uppercase">{shortTab}</span>
             </button>
           );
         })}
       </div>
 
-      {/* ── Subtítulo del día activo ── */}
-      <div className="px-6 md:px-8 mb-3">
-        <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
-          {rutinaActiva?.nombre} — Semana {semanaActualCiclo}
-        </span>
-      </div>
+        {/* ✨ Subtítulo del día activo ✨ */}
+        <div className="px-6 md:px-8 mb-3">
+          <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
+            {(() => {
+              const nombre = rutinaActiva?.nombre;
+              if (!nombre) return `Rutina — Semana ${semanaActualCiclo}`;
+              const parts = String(nombre).split('|');
+              const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+              return `${title} — Semana ${semanaActualCiclo}`;
+            })()}
+          </span>
+        </div>
 
       {/* ── Lista de ejercicios ── */}
       <div className="px-6 md:px-8 flex-1 overflow-y-auto space-y-3 pb-8">
