@@ -260,7 +260,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const openNewDia  = () => { if (interceptNoPlan()) return; setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
-  const openEditDia = (d) => { setEditDia(d); setDiaForm({ dia:d.dia, orden:d.orden, comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) }); setShowDiaModal(true); };
+  const openEditDia = (d) => { 
+    const parts = d.dia.split('|');
+    const dayTab = parts.length > 1 ? parts[0] : '';
+    const title = parts.length > 1 ? parts[1] : parts[0];
+
+    setEditDia(d); 
+    setDiaForm({ 
+      dia:d.dia, 
+      diasSeleccionados: dayTab ? [dayTab] : [],
+      tituloPersonalizado: title,
+      orden:d.orden, 
+      comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) 
+    }); 
+    setShowDiaModal(true); 
+  };
 
   const saveDia = async () => {
     if (!nutri) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Guarda los macros primero</div>); return; }
@@ -269,7 +283,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       let currentNutri = nutri;
 
       if (editDia) { 
-        await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:diaForm.dia, orden:diaForm.orden }); 
+        const dayCode = diaForm.diasSeleccionados?.length > 0 ? diaForm.diasSeleccionados[0] : "S/D";
+        const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
+        await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:finalName, orden:diaForm.orden }); 
         const diaId = editDia.id; 
         
         const oldIds = editDia.comidas.map(c => c.id);
@@ -294,14 +310,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       } else { 
         // Creación masiva (Múltiples días) o normal
         const dSeleccionados = diaForm.diasSeleccionados || [];
-        const creationDays = dSeleccionados.length > 0 ? dSeleccionados : [diaForm.dia || `Día ${dias.length + 1}`];
+        const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
         let orderCounter = diaForm.orden;
 
         for (const dayCode of creationDays) {
-          let finalName = dayCode;
-          if (dSeleccionados.length > 0 && diaForm.tituloPersonalizado) {
-            finalName = `${dayCode} - ${diaForm.tituloPersonalizado}`;
-          }
+          const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
 
           const r = await dbPost("nutricion_dias", { nutricion_id:currentNutri.id, dia:finalName, orden:orderCounter }); 
           const newDiaId = r[0].id; 
@@ -564,24 +577,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
-                {dias.map(d => (
-                  <SortableItem key={d.id} id={d.id}>
-                    {({ dragHandle, isDragging }) => (
-                      <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          {!isReadOnly && dragHandle}
-                          <div><span className="font-semibold">{d.dia}</span><span className="text-xs text-[#6B7A8D] ml-2.5">{d.comidas.length} comidas</span></div>
-                        </div>
-                        {!isReadOnly && (
-                          <div className="flex gap-1.5">
-                            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
-                            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
+                {dias.map(d => {
+                  const parts = d.dia.split('|');
+                  const tab = parts.length > 1 ? parts[0] : 'S/D';
+                  const title = parts.length > 1 ? parts[1] : parts[0];
+                  return (
+                    <SortableItem key={d.id} id={d.id}>
+                      {({ dragHandle, isDragging }) => (
+                        <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            {!isReadOnly && dragHandle}
+                            <div>
+                              <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] mr-2 text-[#6B7A8D]">{tab}</span>
+                              <span className="font-semibold text-[14px] text-[#0B1929]">{title || "Sin título"}</span>
+                              <span className="text-xs text-[#6B7A8D] ml-2.5">{d.comidas.length} comidas</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </SortableItem>
-                ))}
+                          {!isReadOnly && (
+                            <div className="flex gap-1.5">
+                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditDia(d)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
+                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteDia(d)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </SortableItem>
+                  )})}
               </SortableContext>
             </DndContext>
           </div>
@@ -669,7 +690,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
-              <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar: ${editDia.dia}` : "Nuevo día"}</h3>
+              <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` : "Nuevo día"}</h3>
               <button onClick={() => setShowDiaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X className="w-5 h-5" />
               </button>
@@ -683,43 +704,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                       <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
                         <option value="">-- Seleccionar día preexistente --</option>
                         {historialDias.map(hd => (
-                          <option key={hd.id} value={hd.id}>{hd.dia} (de {getClientName(hd.cliente_id)})</option>
+                          <option key={hd.id} value={hd.id}>{hd.dia.split('|').length > 1 ? hd.dia.split('|').join(' - ') : hd.dia} (de {getClientName(hd.cliente_id)})</option>
                         ))}
                       </select>
                     </div>
                   )}
                 </div>
               )}
-                {!editDia ? (
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Días de la semana</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
-                        <button
-                          key={d}
-                          onClick={() => {
-                            setDiaForm(p => ({
-                              ...p,
-                              diasSeleccionados: p.diasSeleccionados?.includes(d) 
-                                ? p.diasSeleccionados.filter(x => x !== d) 
-                                : [...(p.diasSeleccionados || []), d]
-                            }));
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${diaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
-                        >
-                          {d}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título Adicional / Nota (Opcional)</label>
-                    <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado || ""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen" />
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => {
+                          setDiaForm(p => ({
+                            ...p,
+                            diasSeleccionados: editDia ? [d] : (p.diasSeleccionados?.includes(d) 
+                              ? p.diasSeleccionados.filter(x => x !== d) 
+                              : [...(p.diasSeleccionados || []), d])
+                          }));
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${diaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
+                      >
+                        {d}
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="mb-3">
-                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre del día</label>
-                    <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.dia} onChange={e=>setDiaForm(p=>({...p,dia:e.target.value}))} placeholder="Lunes, Día 1…" />
-                  </div>
-                )}
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2 mt-4">Título Libre (Subtítulo)</label>
+                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado || ""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen, Día de Pierna..." />
+                </div>
               <div className="flex justify-between items-center mb-2.5">
                 <span className="font-semibold text-[14px]">Comidas</span>
                 <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={addComida}><Plus className="w-3.5 h-3.5" /> Comida</button>

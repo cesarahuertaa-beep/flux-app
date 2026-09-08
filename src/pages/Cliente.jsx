@@ -140,7 +140,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       ) : (
         <>
           {tab === "nutricion" && (
-            <Nutrition dias={dias} cliente={cliente} nutri={nutri} />
+            <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} />
           )}
 
           {tab === "deporte" && (

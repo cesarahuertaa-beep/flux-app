@@ -6,21 +6,19 @@ import { generateNutriPDF } from "../../utils/pdf";
 const DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const DAY_FULL  = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-export default function Nutrition({ dias, cliente, nutri }) {
+export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 }) {
   const [activeDay, setActiveDay]     = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
   const brand = useBrand();
 
   if (!dias || dias.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white m-4 md:m-8 rounded-2xl border border-[#E2E8F0] shadow-sm">
-        <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
-          <Apple size={32} className="text-[#6B7A8D]" />
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
+        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+          <Apple className="w-8 h-8 text-[#94A3B8]" />
         </div>
-        <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
-          Sin plan de alimentación
-        </h2>
-        <p className="text-sm text-[#6B7A8D]">
+        <h3 className="text-[#0B1929] font-bold text-lg mb-2">Sin plan asignado</h3>
+        <p className="text-[#6B7A8D] text-sm max-w-[250px]">
           Tu nutriólogo aún no ha asignado tu dieta para este ciclo.
         </p>
       </div>
@@ -33,12 +31,17 @@ export default function Nutrition({ dias, cliente, nutri }) {
   const totalKcal  = comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0) || caloriasMeta;
   const clienteNombre = cliente?.nombre;
 
-  // Nombre corto del día: si viene "Lunes" lo acortamos, si viene índice puro usamos array
   const getDayShort = (nombre, i) => {
     if (!nombre) return DAY_SHORT[i] ?? `Día ${i + 1}`;
-    return nombre.substring(0, 3);
+    const parts = String(nombre).split('|');
+    return parts.length > 1 ? parts[0] : "S/D";
   };
-  const getDayFull = (nombre, i) => nombre || DAY_FULL[i] || `Día ${i + 1}`;
+  const getDayFull = (nombre, i) => {
+    if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
+    const parts = String(nombre).split('|');
+    const title = parts.length > 1 ? parts[1] : parts[0];
+    return `${title} — Semana ${semanaActualCiclo}`;
+  };
 
   const handleDownloadPDF = () => {
     generateNutriPDF(cliente, nutri, dias, brand);
