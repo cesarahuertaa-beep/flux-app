@@ -815,9 +815,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                           </div>
                           <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 1</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…" /></div>
                           <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 2</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…" /></div>
-                          <div className="grid grid-cols-4 gap-1.5">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-1.5 mt-2">
                             {[["calorias", "Kcal"], ["proteina", "Prot g"], ["carbohidratos", "Carbs g"], ["grasas", "Grasas g"]].map(([f, lb]) => (
-                              <div key={f}><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">{lb}</label><input type="number" className="w-full px-2 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
+                              <div key={f}><label className="block text-[11px] sm:text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1 sm:mb-1.5 truncate">{lb}</label><input type="number" className="w-full px-2 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-[#E2E8F0] bg-white text-[13px] sm:text-[14px] text-center sm:text-left" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
                             ))}
                           </div>
                         </div>
