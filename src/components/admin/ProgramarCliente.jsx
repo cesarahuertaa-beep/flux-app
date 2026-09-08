@@ -490,10 +490,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
           <div className="flex gap-2 overflow-x-auto pb-1">
             {ciclos.map(c => (
-              <div key={c.id} className="flex items-center flex-shrink-0 group">
+              <div key={c.id} className="flex items-stretch flex-shrink-0 group">
                 <button 
                   onClick={() => setCicloSel(c)}
-                  className={`px-4 py-2 text-[13px] transition-colors border ${
+                  className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
                     cicloSel?.id === c.id 
                       ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold" 
                       : c.activo 
@@ -507,7 +507,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   <button
                     onClick={(e) => eliminarCiclo(c, e)}
                     title="Eliminar este plan"
-                    className="px-3 py-2 bg-[var(--brand-primary)] text-white/80 hover:text-white border-y border-r border-[var(--brand-primary)] rounded-r-xl transition-colors"
+                    className="flex items-center justify-center px-3 bg-[var(--brand-primary)] text-white/80 hover:text-white border-y border-r border-[var(--brand-primary)] rounded-r-xl transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
