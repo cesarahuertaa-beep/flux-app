@@ -340,18 +340,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
 
   // ── Operaciones de Rutinas ──
-  const openNewRutina  = () => { if (interceptNoPlan()) return; setEditRutina(null); setRutinaForm({ nombre:"", ejercicios:[] }); setShowRutinaModal(true); };
-  const openEditRutina = (r) => { setEditRutina(r); setRutinaForm({ nombre:r.nombre, ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) }); setShowRutinaModal(true); };
+  const openNewRutina  = () => { 
+    if (interceptNoPlan()) return; 
+    setEditRutina(null); 
+    setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
+    setShowRutinaModal(true); 
+  };
+  const openEditRutina = (r) => { 
+    const parts = (r.nombre || "").split('|');
+    let dSel = [];
+    let tPers = r.nombre || "";
+    if (parts.length > 1) {
+      dSel = [parts[0].trim()];
+      tPers = parts.slice(1).join('|').trim();
+    } else if (["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].includes(r.nombre?.trim())) {
+      dSel = [r.nombre.trim()];
+      tPers = "";
+    }
+    setEditRutina(r); 
+    setRutinaForm({ 
+      diasSeleccionados: dSel,
+      tituloPersonalizado: tPers,
+      ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) 
+    }); 
+    setShowRutinaModal(true); 
+  };
 
   const saveRutina = async () => {
     setSaving(true);
     try {
       let activeCiclo = cicloSel;
+      const dSeleccionados = rutinaForm.diasSeleccionados || [];
 
-      let rid;
       if (editRutina) {
-        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre:rutinaForm.nombre });
-        rid=editRutina.id; 
+        const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${rutinaForm.tituloPersonalizado}` : rutinaForm.tituloPersonalizado;
+        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre: finalName });
+        const rid=editRutina.id; 
         
         const oldIds = editRutina.ejercicios.map(e => e.id);
         const newIds = rutinaForm.ejercicios.filter(e => e.id).map(e => e.id);
@@ -359,30 +383,41 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if (toDelete.length > 0) {
           await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
         }
-      } else {
-        const r = await dbPost("rutinas", {
-          cliente_id: selected.id,
-          ciclo_id: activeCiclo?.id || null,
-          nombre: rutinaForm.nombre,
-          semanas: +rutinaForm.semanas,
-          fecha_inicio: rutinaForm.fecha_inicio,
-          orden: rutinas.length
-        });
-        rid=r[0].id;
-      }
-      
-      for (let i=0; i<rutinaForm.ejercicios.length; i++) {
-        const e = rutinaForm.ejercicios[i];
-        const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
         
-        if (e.id) {
-          await dbPatch(`ejercicios?id=eq.${e.id}`, data);
-        } else {
-          await dbPost("ejercicios", data);
+        for (let i=0; i<rutinaForm.ejercicios.length; i++) {
+          const e = rutinaForm.ejercicios[i];
+          const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
+          if (e.id) await dbPatch(`ejercicios?id=eq.${e.id}`, data);
+          else await dbPost("ejercicios", data);
+        }
+      } else {
+        const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+        for (let idx=0; idx<diasToCreate.length; idx++) {
+          const d = diasToCreate[idx];
+          const finalName = d === "S/D" ? rutinaForm.tituloPersonalizado : `${d}|${rutinaForm.tituloPersonalizado}`;
+          const r = await dbPost("rutinas", {
+            cliente_id: selected.id,
+            ciclo_id: activeCiclo?.id || null,
+            nombre: finalName,
+            semanas: +rutinaForm.semanas || 4,
+            fecha_inicio: rutinaForm.fecha_inicio || null,
+            orden: rutinas.length + idx
+          });
+          const rid = r[0].id;
+          for (let i=0; i<rutinaForm.ejercicios.length; i++) {
+            const e = rutinaForm.ejercicios[i];
+            const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
+            await dbPost("ejercicios", data);
+          }
         }
       }
-      setShowRutinaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>); await loadData();
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
+      
+      setShowRutinaModal(false); 
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>); 
+      await loadData();
+    } catch(e) { 
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+    }
     setSaving(false);
   };
 
@@ -617,26 +652,37 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
-                {rutinas.map(r => (
-                  <SortableItem key={r.id} id={r.id}>
-                    {({ dragHandle, isDragging }) => (
-                      <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 ${isReadOnly ? 'opacity-75' : ''}`}>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            {!isReadOnly && dragHandle}
-                            <div><span className="font-semibold">{r.nombre}</span><span className="text-xs text-[#6B7A8D] ml-2.5">{r.ejercicios.length} ejercicios · {r.semanas} sem</span></div>
-                          </div>
-                          {!isReadOnly && (
-                            <div className="flex gap-1.5">
-                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditRutina(r)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
-                              <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteRutina(r)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
+                {rutinas.map(r => {
+                  const parts = (r.nombre || "").split('|');
+                  const tab = parts.length > 1 ? parts[0] : 'S/D';
+                  const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+                  return (
+                    <SortableItem key={r.id} id={r.id}>
+                      {({ dragHandle, isDragging }) => (
+                        <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 ${isReadOnly ? 'opacity-75' : ''}`}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              {!isReadOnly && dragHandle}
+                              <div>
+                                {tab !== 'S/D' && (
+                                  <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded mr-2 uppercase">{tab}</span>
+                                )}
+                                <span className="font-semibold text-[14px] text-[#0B1929]">{title || "Sin título"}</span>
+                                <span className="text-xs text-[#6B7A8D] ml-2.5">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
+                              </div>
                             </div>
-                          )}
+                            {!isReadOnly && (
+                              <div className="flex gap-1.5">
+                                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => openEditRutina(r)}><Edit2 className="w-3.5 h-3.5" /> Editar</button>
+                                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium" onClick={() => deleteRutina(r)}><Trash2 className="w-3.5 h-3.5" /> Borrar</button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </SortableItem>
-                ))}
+                      )}
+                    </SortableItem>
+                  );
+                })}
               </SortableContext>
             </DndContext>
             {rutinas.length === 0 && !isReadOnly && (
@@ -696,19 +742,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              {!editDia && (
+              {!editDia && historialDias.length > 0 && (
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
-                  {historialDias.length > 0 && (
-                    <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
-                      <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                      <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
-                        <option value="">-- Seleccionar día preexistente --</option>
-                        {historialDias.map(hd => (
-                          <option key={hd.id} value={hd.id}>{(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de {getClientName(hd.cliente_id)})</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
+                    <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
+                    <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
+                      <option value="">-- Seleccionar día preexistente --</option>
+                      {historialDias.map(hd => (
+                        <option key={hd.id} value={hd.id}>{(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de {getClientName(hd.cliente_id)})</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
                 <div className="mb-4">
@@ -790,24 +834,43 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              {!editRutina && (
+              {!editRutina && historialRutinas.length > 0 && (
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
-                  {historialRutinas.length > 0 && (
-                    <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
-                      <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                      <select onChange={onSelectHistorialRutina} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
-                        <option value="">-- Seleccionar rutina preexistente --</option>
-                        {historialRutinas.map(hr => (
-                          <option key={hr.id} value={hr.id}>{hr.nombre} (de {getClientName(hr.cliente_id)})</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
+                    <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
+                    <select onChange={onSelectHistorialRutina} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
+                      <option value="">-- Seleccionar rutina preexistente --</option>
+                      {historialRutinas.map(hr => (
+                        <option key={hr.id} value={hr.id}>{(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de {getClientName(hr.cliente_id)})</option>
+                      ))}
+                    </select>
                   </div>
-                )}
-                <div className="mb-3">
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la Rutina</label>
-                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.nombre} onChange={e=>setRutinaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
+                </div>
+              )}
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => {
+                          setRutinaForm(p => ({
+                            ...p,
+                            diasSeleccionados: editRutina ? [d] : (p.diasSeleccionados?.includes(d) 
+                              ? p.diasSeleccionados.filter(x => x !== d) 
+                              : [...(p.diasSeleccionados || []), d])
+                          }));
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${rutinaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título de la Rutina</label>
+                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.tituloPersonalizado || ""} onChange={e=>setRutinaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
                 </div>
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
               {rutinaForm.ejercicios.length > 0 && (

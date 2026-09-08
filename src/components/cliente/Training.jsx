@@ -183,6 +183,10 @@ export default function Training({
       <div className="px-6 md:px-8 flex gap-2 mb-4 overflow-x-auto scroll-hide">
         {rutinas.map((r, i) => {
           const isActive = activeRutinaIdx === i;
+          const parts = (r.nombre || "").split('|');
+          const tab = parts.length > 1 ? parts[0] : 'S/D';
+          const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+          const displayTitle = title || "Sin título";
           // Subtítulo: usamos el grupo del primer ejercicio si existe
           const subLabel = r.ejercicios?.[0]?.musculo?.split("/")[0]?.trim() || "";
           return (
@@ -195,7 +199,12 @@ export default function Training({
                   : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
               }`}
             >
-              <span>{r.nombre}</span>
+              {tab !== 'S/D' && (
+                <span className={`text-[10px] uppercase font-bold mb-0.5 ${isActive ? 'text-blue-100' : 'text-[#A0AEC0]'}`}>
+                  {tab}
+                </span>
+              )}
+              <span>{displayTitle}</span>
               {subLabel && (
                 <span className={`mt-0.5 text-[10px] ${isActive ? "text-blue-200" : "text-[#CBD5E1]"}`}>
                   {subLabel}
