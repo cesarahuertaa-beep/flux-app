@@ -516,14 +516,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Selector de Ciclos ── */}
       {ciclos.length > 0 && (
         <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">Planes del Paciente</span>
             <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
               <Plus className="w-3.5 h-3.5" /> Siguiente Plan
             </button>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex flex-wrap gap-2">
             {ciclos.map(c => (
               <div key={c.id} className="flex items-stretch flex-shrink-0 group">
                 <button 
