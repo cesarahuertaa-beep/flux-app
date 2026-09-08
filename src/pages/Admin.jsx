@@ -181,7 +181,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         ]
       : [
           { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
-          { id: "mi_entrenamiento", label: "Mi Entrenamiento", icon: <Activity size={18} strokeWidth={1.5} /> },
+          { id: "mi_entrenamiento", label: "Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
             { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
           ] : []),
@@ -367,7 +367,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       
       {tab === "mi_entrenamiento" && (
         <SubComponentWrapper 
-          title="Mi Entrenamiento"
+          title="Mi Plan"
           action={
             myShadowClient && !isSuperadmin ? (
               <button
