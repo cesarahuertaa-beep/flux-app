@@ -276,40 +276,44 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                             {n.activo !== false ? "Activo" : "Suspendido"}
                           </span>
                         </div>
-                        <div className="text-xs text-[#6B7A8D] flex items-center gap-3">
+                        <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-2 mt-1">
                           <span>{n.nombre}</span>
-                          {n.telefono && (
-                            <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700">
-                              <MessageCircle size={12} /> WhatsApp
-                            </a>
-                          )}
-                          {n.creado_por_nombre && !n.isSuperadmin && (
-                            <span className="flex items-center gap-1 text-slate-400 border-l border-slate-200 pl-3">
-                              <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
-                            </span>
-                          )}
+                          <div className="flex flex-col items-start gap-1.5 text-xs">
+                            {n.telefono && (
+                              <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
+                                <MessageCircle size={12} /> WhatsApp
+                              </a>
+                            )}
+                            {n.creado_por_nombre && !n.isSuperadmin && (
+                              <span className="flex items-center gap-1 text-slate-400">
+                                <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                      <Btn small outline onClick={() => {
-                        setShowEditNutri(n);
-                        setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
-                      }}>Editar</Btn>
-                      {!n.isSuperadmin && (
-                        <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
-                          {n.activo !== false ? "Suspender" : "Activar"}
-                        </Btn>
-                      )}
+                    <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
                       <button 
                         onClick={() => setExpandedNutri(isExpanded ? null : n.id)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                        className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
                       >
                         <Users size={16} />
                         <span>{nClients.length} Pacientes</span>
                         {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                       </button>
+                      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                        <Btn small outline onClick={() => {
+                          setShowEditNutri(n);
+                          setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
+                        }}>Editar</Btn>
+                        {!n.isSuperadmin && (
+                          <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
+                            {n.activo !== false ? "Suspender" : "Activar"}
+                          </Btn>
+                        )}
+                      </div>
                     </div>
                   </div>
 
