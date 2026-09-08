@@ -102,7 +102,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
-    { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+    ...(cliente?.objetivo !== "Mi entrenamiento personal" ? [
+      { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
+    ] : [])
   ];
 
   const currentCycleWeek = (() => {

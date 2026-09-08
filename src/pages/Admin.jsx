@@ -17,11 +17,12 @@ import { useBrand } from "../components/BrandContext";
 
 // Contenedor temporal para los sub-componentes oscuros (legacy)
 // Ocupa al menos el 100% de la altura para que no se corte el fondo
-const SubComponentWrapper = ({ children, title }) => (
+const SubComponentWrapper = ({ children, title, action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] overflow-hidden">
     {title && (
       <div className="px-4 md:px-8 py-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between shadow-sm z-10 shrink-0">
         <h1 className="text-lg font-bold tracking-tight text-[#0B1929]">{title}</h1>
+        {action}
       </div>
     )}
     <div className="flex-1 w-full relative p-4 md:p-8 overflow-y-auto">
@@ -222,7 +223,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header */}
           <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4">
-            {/* Cabecera superior: Título y Modo Atleta */}
+            {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -235,17 +236,6 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
                   {activeCount} pacientes activos de {clientes.length} totales
                 </p>
               </div>
-              
-              {!isSuperadmin && (
-                <button
-                  onClick={activarModoAtleta}
-                  className="flex items-center gap-1.5 px-3 py-2 md:px-4 md:py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs md:text-sm font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
-                >
-                  <Activity size={16} />
-                  <span className="hidden sm:inline">Modo Atleta</span>
-                  <span className="sm:hidden">Atleta</span>
-                </button>
-              )}
             </div>
             
             {/* Controles de búsqueda y acción */}
@@ -374,7 +364,20 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin || role === "staff"}/></SubComponentWrapper>}
       
       {tab === "mi_entrenamiento" && (
-        <SubComponentWrapper title="Mi Entrenamiento">
+        <SubComponentWrapper 
+          title="Mi Entrenamiento"
+          action={
+            myShadowClient && !isSuperadmin ? (
+              <button
+                onClick={activarModoAtleta}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
+              >
+                <Activity size={14} />
+                <span>Simular mi App (Atleta)</span>
+              </button>
+            ) : null
+          }
+        >
           {myShadowClient ? (
             <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} />
           ) : (
