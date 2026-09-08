@@ -523,17 +523,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         </div>
       )}
 
-      {/* ── Sub-tabs ── */}
-      <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 inline-flex w-max">
+      {/* ── 🔴 Sub-tabs 🔴 ── */}
+      <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
-          { k: "nutri", ic: <Utensils className="w-4 h-4"/>, lb: "Nutrición" },
-          { k: "deporte", ic: <Dumbbell className="w-4 h-4"/>, lb: "Rutinas" },
-          { k: "progreso", ic: <BarChart2 className="w-4 h-4"/>, lb: "Progreso" }
+          { k: "nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb: "Nutrición" },
+          { k: "deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb: "Rutinas" },
+          { k: "progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb: "Progreso" }
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
             onClick={() => setSubtab(k)} 
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[13px] transition-all ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none shrink-0 ${
               subtab === k 
                 ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent" 
                 : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
