@@ -52,41 +52,57 @@ export default function Login({ onLogin }) {
       const data = await authSignIn(email.trim(), pass);
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
+
+      let availableRoles = [];
+
+      // 1. Fetch from profiles
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
-      let role = profiles.length ? profiles[0].role : null;
-      
-      if (role === "administrativo" && profiles[0].nutriologo_id) {
+      let adminRole = profiles.length ? profiles[0].role : null;
+      if (adminRole === "administrativo" && profiles[0].nutriologo_id) {
         const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
         if (boss.length && boss[0].role === "superadmin") {
-          role = "staff";
+          adminRole = "staff";
         }
       }
 
-      if (role === "admin" || role === "superadmin" || role === "nutriologo" || role === "administrativo" || role === "staff") {
-        if ((role === "nutriologo" || role === "administrativo" || role === "staff") && profiles[0].activo === false) {
-          setAuthToken(null); setProfileId(null);
-          setErr("Tu cuenta está suspendida. Contacta a soporte.");
-          setLoading(false); return;
+      if (adminRole && ["admin", "superadmin", "nutriologo", "administrativo", "staff"].includes(adminRole)) {
+        if (["nutriologo", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
+           // Suspended admin account (ignore or we could error, but we skip to allow client login if any)
+        } else {
+           availableRoles.push({
+             role: adminRole === "admin" ? "admin" : adminRole,
+             data: profiles[0]
+           });
         }
-        onLogin({ role: role === "admin" ? "admin" : role, token: data.access_token, profileId: data.user.id });
-        return;
       }
-      const rows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
-      if (!rows.length) {
+
+      // 2. Fetch from clientes
+      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
+      for (const clientData of clientRows) {
+        if (clientData.nutriologo_id) {
+          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
+          if (nut.length && nut[0].activo === false) {
+            continue; // Suspended clinic, skip this client profile
+          }
+        }
+        availableRoles.push({
+          role: "client",
+          data: clientData
+        });
+      }
+
+      if (availableRoles.length === 0) {
         setAuthToken(null); setProfileId(null);
         setErr("No se encontró tu cuenta activa.");
         setLoading(false); return;
       }
-      const clientData = rows[0];
-      if (clientData.nutriologo_id) {
-        const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
-        if (nut.length && nut[0].activo === false) {
-          setAuthToken(null); setProfileId(null);
-          setErr("El servicio de tu clínica está suspendido temporalmente.");
-          setLoading(false); return;
-        }
+
+      if (availableRoles.length === 1) {
+        onLogin({ role: availableRoles[0].role, data: availableRoles[0].data, token: data.access_token, profileId: data.user.id });
+      } else {
+        // Multiple roles detected!
+        onLogin({ multiRoles: availableRoles, token: data.access_token, profileId: data.user.id });
       }
-      onLogin({ role:"client", data:clientData, token:data.access_token });
     } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { dbUpsert } from "../lib/supabase";
-import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut, ShoppingBag } from "lucide-react";
+import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut, ShoppingBag, RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 
-export default function UserProfile({ session, onLogout }) {
+export default function UserProfile({ session, onLogout, onChangeRole }) {
   const user = session?.data || session; // Cliente o Admin
   
   const [nombre, setNombre] = useState(user?.nombre || "");
@@ -140,6 +140,15 @@ export default function UserProfile({ session, onLogout }) {
           >
             {loading ? "Guardando..." : <><Save size={18} /> Guardar Cambios</>}
           </button>
+
+          {onChangeRole && (
+            <button 
+              onClick={onChangeRole}
+              className="w-full mt-2 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
+            >
+              <RefreshCw size={18} /> Cambiar Perfil
+            </button>
+          )}
 
           <button 
             onClick={handleStore}

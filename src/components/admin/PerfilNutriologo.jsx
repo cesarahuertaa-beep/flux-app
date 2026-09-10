@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { dbGet, dbPatch, storageUpload } from "../../lib/supabase";
 import { Capacitor } from "@capacitor/core";
-import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, Home } from "lucide-react";
+import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, Home, RefreshCw } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
-export default function PerfilNutriologo({ profileId, onLogout, role }) {
+export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole }) {
   const { setBrandColor } = useBrand();
   
   const [loading, setLoading] = useState(true);
@@ -217,6 +217,12 @@ export default function PerfilNutriologo({ profileId, onLogout, role }) {
             {saving ? "Guardando..." : <><Save size={18} /> {isTeam ? "Guardar Cambios" : "Guardar Perfil Público"}</>}
           </button>
           
+          {onChangeRole && (
+            <button onClick={onChangeRole} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
+              <RefreshCw size={18} /> Cambiar Perfil
+            </button>
+          )}
+
           <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <Home size={18} /> Ir a Landing Page
           </button>

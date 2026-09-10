@@ -31,9 +31,11 @@ const SubComponentWrapper = ({ children, title, action }) => (
   </div>
 );
 
-export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta, role }) {
+export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole }) {
   const brand = useBrand();
-  const [tab, setTab] = useState("clientes");
+  const { setBrandColor } = brand;
+  
+  const [tab, setTab] = useState(isSuperadmin ? "directorio" : "agenda");
   
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
@@ -488,7 +490,7 @@ export default function Admin({ onLogout, isSuperadmin, profileId, onModoAtleta,
       )}
 
       {tab === "perfil" && (
-        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} />
+        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} />
       )}
 
       {tab === "tienda" && (isSuperadmin || role === "staff") && (
