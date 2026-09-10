@@ -31,7 +31,7 @@ const SubComponentWrapper = ({ children, title, action }) => (
   </div>
 );
 
-export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole }) {
+export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles }) {
   const brand = useBrand();
   const { setBrandColor } = brand;
   
@@ -490,7 +490,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {tab === "perfil" && (
-        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} />
+        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
       )}
 
       {tab === "tienda" && (isSuperadmin || role === "staff") && (

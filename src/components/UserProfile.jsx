@@ -3,7 +3,7 @@ import { dbUpsert } from "../lib/supabase";
 import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut, ShoppingBag, RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 
-export default function UserProfile({ session, onLogout, onChangeRole }) {
+export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const user = session?.data || session; // Cliente o Admin
   
   const [nombre, setNombre] = useState(user?.nombre || "");
@@ -141,13 +141,36 @@ export default function UserProfile({ session, onLogout, onChangeRole }) {
             {loading ? "Guardando..." : <><Save size={18} /> Guardar Cambios</>}
           </button>
 
-          {onChangeRole && (
-            <button 
-              onClick={onChangeRole}
-              className="w-full mt-2 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
-            >
-              <RefreshCw size={18} /> Cambiar Perfil
-            </button>
+          {multiRoles && multiRoles.length > 1 && (
+            <div className="mt-8 border-t border-[#E2E8F0] pt-6 mb-2">
+              <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
+                <RefreshCw size={16} className="text-[#6B7A8D]" />
+                Cambiar Perfil (Sesión Múltiple)
+              </h3>
+              <div className="flex flex-col gap-2">
+                {multiRoles.map((r, i) => {
+                  const isActive = (session.role === "admin" ? "admin" : session.role) === (r.role === "admin" ? "admin" : r.role);
+                  return (
+                    <button
+                      key={i}
+                      disabled={isActive}
+                      onClick={() => onChangeRole && onChangeRole(r)}
+                      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}
+                    >
+                      <div className="text-left">
+                        <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                          {r.role === "client" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
+                        </p>
+                        <p className="text-xs text-[#6B7A8D]">
+                          {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
+                        </p>
+                      </div>
+                      {isActive && <CheckCircle2 size={18} className="text-[var(--brand-primary)]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <button 

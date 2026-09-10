@@ -100,8 +100,15 @@ export default function Login({ onLogin }) {
       if (availableRoles.length === 1) {
         onLogin({ role: availableRoles[0].role, data: availableRoles[0].data, token: data.access_token, profileId: data.user.id });
       } else {
-        // Multiple roles detected!
-        onLogin({ multiRoles: availableRoles, token: data.access_token, profileId: data.user.id });
+        // Auto-seleccionar el rol principal (administrativo sobre cliente) por defecto
+        const sorted = availableRoles.sort((a, b) => a.role === 'client' ? 1 : -1);
+        onLogin({ 
+          role: sorted[0].role, 
+          data: sorted[0].data, 
+          token: data.access_token, 
+          profileId: data.user.id,
+          multiRoles: sorted 
+        });
       }
     } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };

@@ -21,7 +21,7 @@ const offlineAwareUpsert = async (records) => {
   }
 };
 
-export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole }) {
+export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles }) {
   const { data: cliente } = session;
   const brand = useBrand();
   
@@ -172,7 +172,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                 <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
               </div>
             ) : (
-              <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} />
+              <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} multiRoles={multiRoles} />
             )
           )}
         </>

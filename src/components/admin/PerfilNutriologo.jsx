@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, Home, RefreshCw } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
-export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole }) {
+export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
   const { setBrandColor } = useBrand();
   
   const [loading, setLoading] = useState(true);
@@ -212,17 +212,43 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           )}
         </div>
 
+        {multiRoles && multiRoles.length > 1 && (
+          <div className="mt-8 border-t border-[#E2E8F0] pt-8">
+            <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
+              <RefreshCw size={16} className="text-[#6B7A8D]" />
+              Cambiar Perfil (Sesión Múltiple)
+            </h3>
+            <div className="flex flex-col gap-2">
+              {multiRoles.map((r, i) => {
+                const isActive = (role === "admin" ? "admin" : role) === (r.role === "admin" ? "admin" : r.role);
+                return (
+                  <button
+                    key={i}
+                    disabled={isActive}
+                    onClick={() => onChangeRole && onChangeRole(r)}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}
+                  >
+                    <div className="text-left">
+                      <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                        {r.role === "client" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
+                      </p>
+                      <p className="text-xs text-[#6B7A8D]">
+                        {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
+                      </p>
+                    </div>
+                    {isActive && <CheckCircle2 size={18} className="text-[var(--brand-primary)]" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-10 flex flex-col sm:flex-row gap-4">
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#0B1929] text-white hover:bg-[#1A2D45] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50">
             {saving ? "Guardando..." : <><Save size={18} /> {isTeam ? "Guardar Cambios" : "Guardar Perfil Público"}</>}
           </button>
           
-          {onChangeRole && (
-            <button onClick={onChangeRole} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
-              <RefreshCw size={18} /> Cambiar Perfil
-            </button>
-          )}
-
           <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <Home size={18} /> Ir a Landing Page
           </button>
