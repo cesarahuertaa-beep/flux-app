@@ -25,7 +25,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const { data: cliente } = session;
   const brand = useBrand();
   
-  const [tab, setTab] = useState("perfil");
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem("flux_cliente_tab");
+    return saved ? saved : "perfil";
+  });
+
+  useEffect(() => {
+    if (tab) localStorage.setItem("flux_cliente_tab", tab);
+  }, [tab]);
+
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
@@ -34,54 +42,64 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [cicloActivo, setCicloActivo] = useState(null);
   const [syncStatus, setSyncStatus] = useState("synced");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
-        const ciclo = cs.length ? cs[0] : null;
-        setCicloActivo(ciclo);
+  const loadData = async () => {
+    try {
+      const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
+      const ciclo = cs.length ? cs[0] : null;
+      setCicloActivo(ciclo);
 
-        const cicloFilter = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
+      const cicloFilter = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
 
-        const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`);
-        if (ns.length) {
-          setNutri(ns[0]);
-          const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`);
-          setDias(await Promise.all(ds.map(async d => ({ 
-            ...d, 
-            comidas: await dbGet(`comidas?dia_id=eq.${d.id}&order=orden.asc`) 
-          }))));
-        }
-
-        const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&order=orden.asc`);
-        const rsFull = await Promise.all(rs.map(async r => ({ 
-          ...r, 
-          ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) 
-        })));
-        setRutinas(rsFull);
-
-        const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
-        if (allIds.length) {
-          const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
-          if (ps && Array.isArray(ps)) {
-            const pm = {};
-            ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-            
-            try {
-              const pending = await getAll();
-              pending
-                .filter(p => p.cliente_id === cliente.id)
-                .forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-            } catch { /* if IndexedDB fails, just use Supabase data */ }
-            
-            setProgreso(pm);
-          }
-        }
-      } catch (e) { 
-        console.error(e); 
+      const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`);
+      if (ns.length) {
+        setNutri(ns[0]);
+        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`);
+        setDias(await Promise.all(ds.map(async d => ({ 
+          ...d, 
+          comidas: await dbGet(`comidas?dia_id=eq.${d.id}&order=orden.asc`) 
+        }))));
       }
-      setLoading(false);
-    })();
+
+      const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&order=orden.asc`);
+      const rsFull = await Promise.all(rs.map(async r => ({ 
+        ...r, 
+        ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) 
+      })));
+      setRutinas(rsFull);
+
+      const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
+      if (allIds.length) {
+        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
+        if (ps && Array.isArray(ps)) {
+          const pm = {};
+          ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+          
+          try {
+            const pending = await getAll();
+            pending.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+          } catch(err){}
+          
+          setProgreso(pm);
+        }
+      }
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') loadData();
+    };
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("visibilitychange", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("visibilitychange", onFocus);
+    };
   }, [cliente.id]);
 
   const handleProgressChange = async (ejId, wi, si, tipo, val, variante_id = "original") => {

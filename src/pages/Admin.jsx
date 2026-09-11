@@ -35,7 +35,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const brand = useBrand();
   const { setBrandColor } = brand;
   
-  const [tab, setTab] = useState(isSuperadmin ? "directorio" : "agenda");
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem("flux_admin_tab");
+    return saved ? saved : "perfil";
+  });
+
+  useEffect(() => {
+    if (tab) localStorage.setItem("flux_admin_tab", tab);
+  }, [tab]);
   
   const [clientes, setClientes]             = useState([]);
   const [selected, setSelected]             = useState(null);
@@ -85,7 +92,25 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch(e) { console.error("Error cargando biblioteca:", e); }
   }, [bibliotecaFilter]);
 
-  useEffect(() => { loadClientes(); loadBiblioteca(); }, [loadClientes, loadBiblioteca]);
+  useEffect(() => { 
+    loadClientes(); 
+    loadBiblioteca(); 
+
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadClientes();
+        loadBiblioteca();
+      }
+    };
+    
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("visibilitychange", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [loadClientes, loadBiblioteca]);
 
   useEffect(() => {
     if (tab === "programar" && !selected) {
