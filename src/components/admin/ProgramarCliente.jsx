@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2 } from "lucide-react";
+import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
@@ -336,9 +336,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>); await loadData(); };
-  const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }));
+  const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
+  
+  const uploadFotoComida = async (i, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSaving(true);
+    setMsg(<div className="flex items-center gap-1.5 text-blue-500">Subiendo foto...</div>);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+      const url = await storageUpload('comidas', path, file);
+      updComida(i, 'foto_url', url);
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto subida</div>);
+    } catch(err) {
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+    }
+    setSaving(false);
+  };
 
   // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { 
@@ -866,8 +883,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                             <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Hora</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am" /></div>
                             <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno" /></div>
                           </div>
-                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 1</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción…" /></div>
-                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 2</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción…" /></div>
+                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 1</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción..." /></div>
+                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 2</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción..." /></div>
+                          
+                          {/* Image Upload for Meal */}
+                          <div className="mb-2">
+                            <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Foto de referencia (opcional)</label>
+                            <div className="flex items-center gap-3">
+                              {c.foto_url && (
+                                <img src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
+                              )}
+                              <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[#1A6FD4] rounded-xl text-[#1A6FD4] text-xs font-bold cursor-pointer hover:bg-blue-50 transition-colors w-full sm:w-auto">
+                                <ImageIcon className="w-4 h-4" />
+                                <span>{c.foto_url ? "Cambiar foto" : "Subir foto"}</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadFotoComida(i, e)} disabled={saving} />
+                              </label>
+                              {c.foto_url && (
+                                <button onClick={() => updComida(i, "foto_url", "")} className="text-red-400 hover:text-red-600 p-2">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-1.5 mt-2">
                             {[["calorias", "Kcal"], ["proteina", "Prot g"], ["carbohidratos", "Carbs g"], ["grasas", "Grasas g"]].map(([f, lb]) => (
                               <div key={f}><label className="block text-[11px] sm:text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1 sm:mb-1.5 truncate">{lb}</label><input type="number" className="w-full px-2 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-[#E2E8F0] bg-white text-[13px] sm:text-[14px] text-center sm:text-left" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
