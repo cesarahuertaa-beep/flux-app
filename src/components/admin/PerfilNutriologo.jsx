@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { dbGet, dbPatch, storageUpload } from "../../lib/supabase";
 import { Capacitor } from "@capacitor/core";
-import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, Home, RefreshCw } from "lucide-react";
+import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, ShoppingBag, RefreshCw } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
@@ -300,14 +300,14 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           )}
         </div>
 
-        {multiRoles && multiRoles.length > 1 && (
+        {(multiRoles?.filter(r => r.role !== 'client') || []).length > 1 && (
           <div className="mt-8 border-t border-[#E2E8F0] pt-8">
             <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
               <RefreshCw size={16} className="text-[#6B7A8D]" />
               Cambiar Perfil (Sesión Múltiple)
             </h3>
             <div className="flex flex-col gap-2">
-              {multiRoles.map((r, i) => {
+              {multiRoles.filter(r => r.role !== 'client').map((r, i) => {
                 const isActive = (role === "admin" ? "admin" : role) === (r.role === "admin" ? "admin" : r.role);
                 return (
                   <button
@@ -338,7 +338,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           </button>
           
           <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
-            <Home size={18} /> Ir a Landing Page
+            <ShoppingBag size={18} /> Ir a la tienda FLUX
           </button>
 
           <button onClick={onLogout} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 flex items-center justify-center gap-2 transition-all">
