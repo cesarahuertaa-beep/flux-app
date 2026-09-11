@@ -17,7 +17,7 @@ import { SortableItem } from "../SortableItem";
 import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
-import { dbGet, dbPost, dbPatch, dbDel } from "../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { ProgresoCliente } from "./ProgresoCliente";
 
