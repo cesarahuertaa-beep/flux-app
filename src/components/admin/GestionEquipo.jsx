@@ -15,6 +15,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const [form, setForm]             = useState({ nombre: "", email: "", telefono: "" });
   const [editUser, setEditUser]     = useState(null);
   const [editForm, setEditForm]     = useState({ nombre: "", telefono: "" });
+  
+  // Interceptor State
+  const [conflictUser, setConflictUser] = useState(null);
 
   const myId = profileId || getProfileId();
 
@@ -40,6 +43,22 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     }
     setSaving(true);
     try {
+      // INTERCEPTOR: Detectar si el correo ya existe
+      const existingProfiles = await dbGet(`profiles?email=eq.${form.email}`);
+      const existingClientes = await dbGet(`clientes?email=eq.${form.email}`);
+      
+      if (existingProfiles.length > 0 || existingClientes.length > 0) {
+        setConflictUser({ 
+          profile: existingProfiles[0], 
+          cliente: existingClientes[0], 
+          email: form.email,
+          typedData: { nombre: form.nombre, telefono: form.telefono }
+        });
+        setShowInvite(false);
+        setSaving(false);
+        return;
+      }
+
       const authUser = await authInvite(form.email, {
         role: "administrativo",
         nombre: form.nombre,
@@ -56,7 +75,55 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       setShowInvite(false);
       setForm({ nombre: "", email: "", telefono: "" });
       setTimeout(load, 2000);
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { 
+      // Supabase lanza error si el usuario ya existe en auth.users pero no lo encontramos en profiles
+      if (e.message?.includes("already been registered")) {
+        setMsg("❌ Este usuario ya tiene cuenta, pero está oculto en la bóveda. Búscalo en Authentication.");
+      } else {
+        setMsg("❌ " + e.message); 
+      }
+    }
+    setSaving(false);
+  };
+
+  const resolveConflict = async (useNewData) => {
+    setSaving(true);
+    try {
+      const p = conflictUser.profile;
+      const c = conflictUser.cliente;
+      const targetId = p?.id || c?.id; // Usamos el ID del perfil o cliente
+      
+      // Los datos finales a guardar
+      const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
+      const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
+      const newRole = isSuperadmin ? "staff" : "administrativo";
+
+      // 1. Asegurarnos que exista en profiles y tenga el rol administrativo
+      if (p) {
+        await dbPatch(`profiles?id=eq.${p.id}`, {
+          role: newRole,
+          nutriologo_id: myId,
+          nombre: finalNombre,
+          telefono: finalTelefono,
+          activo: true
+        });
+      }
+
+      // 2. Si existe en clientes, actualizar su información ahí también para sincronizar
+      if (c) {
+        await dbPatch(`clientes?id=eq.${c.id}`, {
+          nombre: finalNombre,
+          telefono: finalTelefono
+        });
+      }
+
+      setMsg(`✅ Permisos otorgados exitosamente sin necesidad de registro. Al usuario le aparecerá el Selector de Roles.`);
+      setConflictUser(null);
+      setForm({ nombre: "", email: "", telefono: "" });
+      load();
+    } catch (e) {
+      setMsg("❌ Error al otorgar accesos: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -182,6 +249,71 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal Interceptor (Conflicto de Rol Existente) */}
+      {conflictUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-500" />
+                Usuario Existente
+              </h3>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-xl text-sm mb-5">
+              El correo <strong>{conflictUser.email}</strong> ya está registrado en tu plataforma (posiblemente como paciente).
+              <br/><br/>
+              <strong>Datos Actuales Registrados:</strong><br/>
+              Nombre: {conflictUser.profile?.nombre || conflictUser.cliente?.nombre || "Sin nombre"}<br/>
+              Teléfono: {conflictUser.profile?.telefono || conflictUser.cliente?.telefono || "Sin teléfono"}
+            </div>
+
+            <p className="text-[#6B7A8D] text-sm mb-5">
+              Al otorgarle permisos administrativos, el usuario podrá ingresar a este panel usando su <strong>misma contraseña actual</strong>. ¿Qué datos deseas usar para su nuevo rol administrativo?
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => resolveConflict(false)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div>
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Usar sus datos actuales</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Ignora lo que escribiste y vincula su rol administrativo usando el nombre y teléfono que ya tenía registrado.</div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => resolveConflict(true)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] group-hover:border-[#3B82F6] flex items-center justify-center">
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Actualizar todo con los datos nuevos</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Sobrescribe su nombre y teléfono en todos sus roles usando la nueva información que escribiste.</div>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end mt-6 pt-4 border-t border-[#E2E8F0]">
+              <button 
+                onClick={() => setConflictUser(null)}
+                disabled={saving}
+                className="px-5 py-2.5 text-sm font-bold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC] transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
