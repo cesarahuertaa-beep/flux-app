@@ -43,6 +43,8 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       const deactivatedAt = c.deactivated_at ? new Date(c.deactivated_at) : null;
       
       let diasCobrar = 0;
+      let fechaInicioCobro = lastCutoff;
+      let fechaFinCobro = nextCutoff;
       
       if (isActivo) {
         activePatientsCount++;
@@ -53,18 +55,21 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
           const diffTime = Math.abs(nextCutoff - createdAt);
           diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           if (diasCobrar > 30) diasCobrar = 30;
+          fechaInicioCobro = createdAt;
         }
       } else if (deactivatedAt && deactivatedAt > lastCutoff) {
         // Cliente desactivado recientemente (en este ciclo). 
-        // Lógica del mes forzoso: cobramos los días proporcionales de su mes forzoso pendiente.
-        // Simplificado para V1: Calculamos cuántos días estuvo activo este mes antes de la baja.
         const start = createdAt > lastCutoff ? createdAt : lastCutoff;
         const diffTime = Math.abs(deactivatedAt - start);
         diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         if (diasCobrar > 30) diasCobrar = 30;
+        fechaInicioCobro = start;
+        fechaFinCobro = deactivatedAt;
       }
       
-      return { ...c, diasCobrar };
+      const periodoStr = `${fechaInicioCobro.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})} al ${fechaFinCobro.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})}`;
+      
+      return { ...c, diasCobrar, periodoStr };
     }).filter(c => c.diasCobrar > 0);
 
     // Calcular tarifa
@@ -237,14 +242,15 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                     <tr className="bg-gray-50 border-b border-[#E2E8F0]">
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Alta</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días facturados</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Periodo Facturado</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días Facturados</th>
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Costo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {desglose.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</td>
+                        <td colSpan="5" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</td>
                       </tr>
                     ) : (
                       desglose.map((c, i) => (
@@ -252,6 +258,9 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                           <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
                           <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
                             {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
+                          </td>
+                          <td className="py-3 px-6 text-xs text-[#6B7A8D] text-center font-medium">
+                            {c.periodoStr}
                           </td>
                           <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
                             {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
