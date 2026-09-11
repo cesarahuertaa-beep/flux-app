@@ -242,10 +242,10 @@ export function ProgresoCliente({ selected, setMsg }) {
     <div className="pb-24">
       {/* Sub-nav */}
       <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex gap-1 mb-5">
-        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ? "bg-white shadow-sm text-[#1A6FD4] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <BarChart2 className="w-4 h-4" /> Evaluaciones
         </button>
-        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ? "bg-white shadow-sm text-[#1A6FD4] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <Dumbbell className="w-4 h-4" /> Rutinas del cliente
         </button>
       </div>
@@ -261,7 +261,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                   <FileText className="w-4 h-4" /> PDF
                 </button>
               )}
-              <button onClick={()=>{setForm(emptyForm());setShowModal(true);}} className="bg-[#1A6FD4] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+              <button onClick={()=>{setForm(emptyForm());setShowModal(true);}} className="bg-[var(--brand-primary)] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5">
                 <Plus className="w-4 h-4" /> Nueva evaluación
               </button>
             </div>
@@ -278,8 +278,8 @@ export function ProgresoCliente({ selected, setMsg }) {
               <div key={m.id} className="bg-white rounded-[14px] border border-[#E2E8F0] p-4 mb-3 shadow-sm">
                 <div className="flex justify-between items-center mb-3.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#1A6FD4] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
-                    {idx===0&&<span className="bg-[#1A6FD4]/10 text-[#1A6FD4] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
+                    <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
+                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
                   </div>
                   <div className="flex gap-1.5">
                     <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1">
@@ -346,7 +346,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                 {ciclos.map(c => (
                   <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
                     cicloSel?.id===c.id 
-                      ? (c.activo ? "bg-[#1A6FD4] text-white border-[#1A6FD4] font-bold shadow-md" : "bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
+                      ? (c.activo ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" : "bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
                       : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
                   }`}>
                     {c.nombre.split("|")[0]}
@@ -366,7 +366,7 @@ export function ProgresoCliente({ selected, setMsg }) {
             const tieneData = r.ejercicios.some(ej=>semanas.some((_,wi)=>Array.from({length:ej.num_series||4},(_,si)=>progreso[`${ej.id}-${wi}-${si}-peso`]||progreso[`${ej.id}-${wi}-${si}-reps`]).some(Boolean)));
             return (
               <div key={r.id} className="mb-6">
-                <div className="font-bold text-[15px] mb-2.5 text-[#1A6FD4] flex items-center gap-2">
+                <div className="font-bold text-[15px] mb-2.5 text-[var(--brand-primary)] flex items-center gap-2">
                   <Dumbbell className="w-4 h-4" /> {r.nombre}
                   {!tieneData&&<span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
                 </div>
@@ -378,7 +378,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                           <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left min-w-[120px]">Ejercicio</th>
                           <th className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center min-w-[40px]">Serie</th>
                           {semanas.map((s,i)=>(
-                            <th key={i} colSpan={2} className="bg-gray-50 text-[#1A6FD4] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] whitespace-nowrap">{s.label}</th>
+                            <th key={i} colSpan={2} className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] whitespace-nowrap">{s.label}</th>
                           ))}
                         </tr>
                         <tr>
@@ -408,7 +408,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                             const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
                             
                             const rowBg = eji % 2 === 0 ? "bg-white" : "bg-gray-50/30";
-                            const highlight = !isOriginal ? "bg-[#1A6FD4]/5" : rowBg;
+                            const highlight = !isOriginal ? "bg-[var(--brand-primary)]/5" : rowBg;
 
                             return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
                               <tr key={`${ej.id}-${vid}-${si}`} className={highlight}>
@@ -416,12 +416,12 @@ export function ProgresoCliente({ selected, setMsg }) {
                                   <td rowSpan={exObj.num_series || ej.num_series || 4} className="px-3 py-2 border border-[#E2E8F0] font-bold align-middle">
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-[#0B1929]">{exObj.nombre}</span>
-                                      {!isOriginal && <span className="text-[9px] bg-[#1A6FD4] text-white px-1 py-0.5 rounded font-bold">ALT</span>}
+                                      {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold">ALT</span>}
                                     </div>
                                     <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5">{exObj.grupo_muscular || ej.grupo_muscular}</div>
                                   </td>
                                 )}
-                                <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[#1A6FD4] font-bold font-['Rajdhani']">{si+1}</td>
+                                <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
                                 {semanas.map((_, wi) => {
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
@@ -443,10 +443,10 @@ export function ProgresoCliente({ selected, setMsg }) {
 
                                   return (
                                     <Fragment key={`w${wi}`}>
-                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ? "bg-[#1A6FD4]/10" : ""}`}>
-                                        <span className={`text-[11px] ${pVal ? "text-[#1A6FD4] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
+                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ? "bg-[var(--brand-primary)]/10" : ""}`}>
+                                        <span className={`text-[11px] ${pVal ? "text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
                                       </td>
-                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ? "bg-[#1A6FD4]/5" : ""}`}>
+                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ? "bg-[var(--brand-primary)]/5" : ""}`}>
                                         <span className={`text-[11px] ${rVal ? "text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
                                       </td>
                                     </Fragment>
@@ -477,7 +477,7 @@ export function ProgresoCliente({ selected, setMsg }) {
             
             <div className="flex flex-col gap-1.5 mb-6">
               <label className="text-sm font-bold text-[#0B1929]">Fecha de evaluación</label>
-              <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20" />
+              <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20" />
             </div>
 
             {METRIC_GROUPS.map(group=>(
@@ -494,7 +494,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                         value={form[f.key]}
                         readOnly={!!f.readOnly}
                         placeholder={f.readOnly?"Auto":(f.placeholder||"")}
-                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20 ${f.readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                         onChange={e=>!f.readOnly&&updForm(f.key,e.target.value)}
                       />
                     </div>
@@ -505,7 +505,7 @@ export function ProgresoCliente({ selected, setMsg }) {
             
             <div className="flex flex-col gap-1.5 mb-6">
               <label className="text-sm font-bold text-[#0B1929]">Notas</label>
-              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20 min-h-[100px]" />
+              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
             </div>
 
             {/* Fotos existentes cuando se edita */}
@@ -526,7 +526,7 @@ export function ProgresoCliente({ selected, setMsg }) {
             {/* Foto upload */}
             <div className="mb-6">
               <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
-              <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[#1A6FD4] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[#1A6FD4] font-bold hover:bg-[#1A6FD4]/5 transition-colors">
+              <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
                 <Plus className="w-4 h-4" /> Agregar fotos
                 <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
               </label>
@@ -534,7 +534,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                 <div className="flex gap-2 flex-wrap mt-3">
                   {previewUrls.map((url,i)=>(
                     <div key={i} className="relative w-20 h-20">
-                      <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#1A6FD4]" alt=""/>
+                      <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[var(--brand-primary)]" alt=""/>
                       <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
                     </div>
                   ))}
@@ -544,7 +544,7 @@ export function ProgresoCliente({ selected, setMsg }) {
 
             <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
               <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">Cancelar</button>
-              <button onClick={saveMetrica} disabled={saving} className="bg-[#1A6FD4] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={saveMetrica} disabled={saving} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
               </button>
             </div>
