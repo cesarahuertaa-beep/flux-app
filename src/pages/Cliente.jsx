@@ -109,13 +109,25 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   ];
 
   const currentCycleWeek = (() => {
-    if (!cicloActivo?.fecha_inicio) return 1;
-    const t0 = new Date(cicloActivo.fecha_inicio);
+    // Si hay un ciclo activo, usamos su fecha. Si no, usamos la fecha de creación de la primera rutina (planes legacy)
+    const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : null);
+    if (!startStr) return 1;
+    
+    let t0;
+    if (startStr.includes("T")) {
+      t0 = new Date(startStr);
+    } else {
+      const [y, m, d] = startStr.split("-").map(Number);
+      t0 = new Date(y, m - 1, d);
+    }
+    
     t0.setHours(0,0,0,0);
     const now = new Date();
     now.setHours(0,0,0,0);
+    
     const diffDays = Math.floor((now.getTime() - t0.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(1, Math.floor(diffDays / 7) + 1);
+    const wk = Math.floor(diffDays / 7) + 1;
+    return isNaN(wk) ? 1 : Math.max(1, wk);
   })();
 
   return (
