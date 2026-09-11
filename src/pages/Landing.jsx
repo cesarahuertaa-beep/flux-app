@@ -145,7 +145,7 @@ function Hero() {
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <a href="#suplementos" className="bg-[#0B1929] hover:bg-[#1A2D45] text-white px-8 py-4 rounded-xl font-bold transition-colors shadow-lg shadow-black/10">
-            Ver tienda
+            Ir a la tienda FLUX
           </a>
           <a href="#nutriólogos" className="bg-white hover:bg-gray-50 text-[#0B1929] border border-[#E2E5EA] px-8 py-4 rounded-xl font-bold transition-all hover:border-[#1A6FD4]/30 shadow-sm flex items-center gap-2">
             Encontrar especialista <ChevronRight size={16} />

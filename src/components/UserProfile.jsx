@@ -177,7 +177,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
             onClick={handleStore}
             className="w-full mt-2 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
           >
-            <ShoppingBag size={18} /> Ir a Tienda
+            <ShoppingBag size={18} /> Ir a la tienda FLUX
           </button>
 
           {onLogout && (
