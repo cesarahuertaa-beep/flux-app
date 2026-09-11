@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // ── Cronómetro inline (exactamente como Figma: tarjeta oscura dentro del scroll) ──
@@ -48,10 +48,11 @@ function TimerCard({ brandColor }) {
 export default function Training({
   rutinas,
   progreso,
-  progresoSemanaAnterior = {}, // Datos de la semana anterior para usar como placeholder
+  progresoSemanaAnterior = {}, 
   clienteNombre,
   onProgressChange,
   semanaActualCiclo = 1,
+  syncStatus = "synced",
 }) {
   // Semana actual (índice 0-based para leer de progreso)
   const wi = Math.max(0, semanaActualCiclo - 1);
@@ -430,14 +431,13 @@ export default function Training({
                     })}
                   </div>
 
-                  <div className="flex items-center gap-2 mt-4">
-                    <button
-                      onClick={() => {}}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#F0F4FA] text-[var(--brand-primary)] rounded-lg text-sm font-medium transition-all"
-                    >
-                      <Save size={14} />
-                      Guardado Automático
-                    </button>
+                  <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
+                    {syncStatus === "saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
+                    {syncStatus === "local" && <Check size={14} />}
+                    {syncStatus === "synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
+                    <span>
+                      {syncStatus === "saving" ? "Guardando..." : syncStatus === "local" ? "Guardado localmente" : "Sincronizado"}
+                    </span>
                   </div>
                 </div>
               )}

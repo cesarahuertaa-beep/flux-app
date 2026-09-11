@@ -32,6 +32,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [progreso, setProgreso] = useState({});
   const [loading, setLoading] = useState(true);
   const [cicloActivo, setCicloActivo] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("synced");
 
   useEffect(() => {
     (async () => {
@@ -87,6 +88,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
     try {
+      setSyncStatus("saving");
       await offlineAwareUpsert({ 
         ejercicio_id: ejId, 
         cliente_id: cliente.id, 
@@ -97,8 +99,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         variante_id,
         updated_at: new Date().toISOString() 
       });
+      setSyncStatus(navigator.onLine ? "synced" : "local");
     } catch(e) {
       console.error("Error guardando progreso:", e);
+      setSyncStatus("local");
     }
   };
 
@@ -172,6 +176,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               onSaveExercise={async () => {}}
               onProgressChange={handleProgressChange}
               semanaActualCiclo={currentCycleWeek}
+              syncStatus={syncStatus}
             />
           )}
 
