@@ -109,11 +109,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   ];
 
   const currentCycleWeek = (() => {
-    if (!cicloActivo?.fecha_inicio) return 0;
-    const t0 = new Date(cicloActivo.fecha_inicio).getTime();
-    const now = new Date().getTime();
-    const diffDays = Math.floor((now - t0) / (1000 * 60 * 60 * 24));
-    return Math.max(0, Math.floor(diffDays / 7));
+    if (!cicloActivo?.fecha_inicio) return 1;
+    const t0 = new Date(cicloActivo.fecha_inicio);
+    t0.setHours(0,0,0,0);
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    const diffDays = Math.floor((now.getTime() - t0.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(1, Math.floor(diffDays / 7) + 1);
   })();
 
   return (
