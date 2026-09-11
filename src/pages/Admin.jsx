@@ -102,10 +102,50 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     }).catch(() => {});
   }, [isSuperadmin]);
 
+  const [conflictClient, setConflictClient] = useState(null);
+
   const createClient = async () => {
     if (!newClient.email||!newClient.nombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
+      // INTERCEPTOR: Detectar si el correo ya existe
+      const existingProfiles = await dbGet(`profiles?email=eq.${newClient.email}`);
+      const existingClientes = await dbGet(`clientes?email=eq.${newClient.email}`);
+      
+      if (existingProfiles.length > 0 || existingClientes.length > 0) {
+        const profile = existingProfiles[0];
+        
+        // Bloqueo / Consentimiento: Si es un colega o rol superior
+        if (profile && ["nutriologo", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+          const me = await dbGet(`profiles?id=eq.${myId}`);
+          const myName = me[0]?.nombre || 'Nutriólogo';
+          
+          await dbPost("solicitudes_entrenamiento", {
+            from_nutriologo_id: myId,
+            from_nutriologo_nombre: myName,
+            to_email: newClient.email,
+            estado: "pendiente"
+          });
+
+          setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
+          setShowNewClient(false); 
+          setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+          setSaving(false);
+          return;
+        }
+
+        // Es un paciente de alguien más o un usuario normal
+        setConflictClient({ 
+          profile: existingProfiles[0], 
+          cliente: existingClientes[0], 
+          email: newClient.email,
+          typedData: { nombre: newClient.nombre, telefono: newClient.telefono, objetivo: newClient.objetivo }
+        });
+        setShowNewClient(false);
+        setSaving(false);
+        return;
+      }
+
       const authUser = await authInvite(newClient.email, { role: "cliente", nombre: newClient.nombre });
       await dbPost("clientes", {
         nombre: newClient.nombre,
@@ -118,7 +158,48 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       });
       setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
       await loadClientes(); setMsg("✅ Cliente creado - se le envió email de invitación");
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { 
+      if (e.message?.includes("already been registered")) {
+        setMsg("❌ Este usuario ya tiene cuenta (oculta). Verifica en Authentication.");
+      } else {
+        setMsg("❌ "+e.message); 
+      }
+    }
+    setSaving(false);
+  };
+
+  const resolveConflict = async (useNewData) => {
+    setSaving(true);
+    try {
+      const p = conflictClient.profile;
+      const c = conflictClient.cliente;
+      
+      const finalNombre = useNewData ? conflictClient.typedData.nombre : (c?.nombre || p?.nombre || conflictClient.typedData.nombre);
+      const finalTelefono = useNewData ? conflictClient.typedData.telefono : (c?.telefono || p?.telefono || conflictClient.typedData.telefono);
+
+      // Creamos una nueva fila de cliente en la tabla clientes
+      await dbPost("clientes", {
+        nombre: finalNombre,
+        objetivo: conflictClient.typedData.objetivo || "Mejorar salud",
+        email: conflictClient.email,
+        telefono: finalTelefono,
+        auth_id: p?.id || c?.auth_id,
+        activo: true,
+        nutriologo_id: myId
+      });
+
+      // Sincronizar datos si eligió actualizarlos
+      if (useNewData) {
+        if (p) await dbPatch(`profiles?id=eq.${p.id}`, { nombre: finalNombre, telefono: finalTelefono });
+      }
+
+      setMsg(`✅ Paciente vinculado exitosamente a tu lista.`);
+      setConflictClient(null);
+      setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+      loadClientes();
+    } catch (e) {
+      setMsg("❌ Error al vincular paciente: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -416,6 +497,58 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
+      {conflictClient && (
+        <div className="fixed inset-0 bg-[#0B1929]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95">
+            <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-5">
+              <AlertCircle className="w-5 h-5 text-yellow-500" /> Usuario Existente
+            </h3>
+            
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-xl text-sm mb-5">
+              El correo <strong>{conflictClient.email}</strong> ya pertenece a otro paciente de la plataforma.
+              <br/><br/>
+              <strong>Datos Actuales:</strong><br/>
+              Nombre: {conflictClient.cliente?.nombre || conflictClient.profile?.nombre || "Sin nombre"}<br/>
+              Teléfono: {conflictClient.cliente?.telefono || conflictClient.profile?.telefono || "Sin teléfono"}
+            </div>
+
+            <p className="text-[#6B7A8D] text-sm mb-5">
+              Al agregarlo a tu lista, el paciente podrá ver tus rutinas usando su misma cuenta actual. ¿Qué datos deseas usar para su expediente contigo?
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => resolveConflict(false)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center"><div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div></div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Usar sus datos actuales</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Ignora lo que escribiste y vincúlalo usando el nombre y teléfono que ya tenía registrado.</div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => resolveConflict(true)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] flex items-center justify-center"></div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Actualizar todo con los datos nuevos</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Sobrescribe su nombre y teléfono globalmente usando la información que acabas de escribir.</div>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end mt-6 pt-4 border-t border-[#E2E8F0]">
+              <button onClick={() => setConflictClient(null)} disabled={saving} className="px-5 py-2.5 text-sm font-bold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC]">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showNewClient && (
         <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">

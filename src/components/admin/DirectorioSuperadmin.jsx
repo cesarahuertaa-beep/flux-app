@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2 } from "lucide-react";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle } from "lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -144,6 +144,22 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     if(!formNutri.email || !formNutri.nombre){ setMsg("❌ Nombre y email requeridos"); return; }
     setSaving(true);
     try {
+      const existingProfiles = await dbGet(`profiles?email=eq.${formNutri.email}`);
+      const existingClientes = await dbGet(`clientes?email=eq.${formNutri.email}`);
+      
+      if (existingProfiles.length > 0 || existingClientes.length > 0) {
+        setConflictUser({ 
+          profile: existingProfiles[0], 
+          cliente: existingClientes[0], 
+          email: formNutri.email,
+          typedData: { ...formNutri }
+        });
+        setConflictType("nutri");
+        setShowInviteNutri(false);
+        setSaving(false);
+        return;
+      }
+
       const authUser = await authInvite(formNutri.email, { role: "nutriologo", nombre: formNutri.nombre });
       await updateProfile(authUser.id, {
         nombre: formNutri.nombre,
@@ -159,7 +175,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       loadNutriologos();
       setMsg("✅ Invitación enviada");
     } catch(e) {
-      setMsg("❌ " + e.message);
+      if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
+      else setMsg("❌ " + e.message);
     }
     setSaving(false);
   };
@@ -191,6 +208,40 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     if (!formClient.email || !formClient.nombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
+      const existingProfiles = await dbGet(`profiles?email=eq.${formClient.email}`);
+      const existingClientes = await dbGet(`clientes?email=eq.${formClient.email}`);
+      
+      if (existingProfiles.length > 0 || existingClientes.length > 0) {
+        const profile = existingProfiles[0];
+
+        // Consentimiento si es colega o rol superior (solo para cuando lo invitan como paciente)
+        if (profile && ["nutriologo", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+          await dbPost("solicitudes_entrenamiento", {
+            from_nutriologo_id: myId,
+            from_nutriologo_nombre: myName || 'Superadmin',
+            to_email: formClient.email,
+            estado: "pendiente"
+          });
+
+          setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
+          setShowNewClient(false); 
+          setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+          setSaving(false);
+          return;
+        }
+
+        setConflictUser({ 
+          profile: existingProfiles[0], 
+          cliente: existingClientes[0], 
+          email: formClient.email,
+          typedData: { ...formClient }
+        });
+        setConflictType("client");
+        setShowNewClient(false);
+        setSaving(false);
+        return;
+      }
+
       const authUser = await authInvite(formClient.email, { role: "cliente", nombre: formClient.nombre });
       await dbPost("clientes", {
         nombre: formClient.nombre,
@@ -205,7 +256,60 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
       await loadClientes(); 
       setMsg("✅ Paciente creado (asignado a ti)");
-    } catch(e) { setMsg("❌ "+e.message); }
+    } catch(e) { 
+      if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
+      else setMsg("❌ "+e.message); 
+    }
+    setSaving(false);
+  };
+
+  const resolveConflict = async (useNewData) => {
+    setSaving(true);
+    try {
+      const p = conflictUser.profile;
+      const c = conflictUser.cliente;
+      const targetId = p?.id || c?.auth_id;
+      
+      const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
+      const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
+
+      if (conflictType === "nutri") {
+        if (p) {
+          await dbPatch(`profiles?id=eq.${p.id}`, {
+            role: "nutriologo",
+            nombre: finalNombre,
+            telefono: finalTelefono,
+            nombre_marca: useNewData ? conflictUser.typedData.nombre_marca : p.nombre_marca,
+            logo_url: useNewData ? conflictUser.typedData.logo_url : p.logo_url,
+            color_primario: useNewData ? conflictUser.typedData.color_primario : p.color_primario,
+            creado_por_nombre: myName,
+            activo: true
+          });
+        }
+        if (useNewData && c) await dbPatch(`clientes?id=eq.${c.id}`, { nombre: finalNombre, telefono: finalTelefono });
+        loadNutriologos();
+      } else {
+        await dbPost("clientes", {
+          nombre: finalNombre,
+          objetivo: conflictUser.typedData.objetivo || "Mejorar salud",
+          email: conflictUser.email,
+          telefono: finalTelefono,
+          nutriologo_id: resolvedOwnerId,
+          auth_id: targetId,
+          activo: true
+        });
+        if (useNewData && p) await dbPatch(`profiles?id=eq.${p.id}`, { nombre: finalNombre, telefono: finalTelefono });
+        loadClientes();
+      }
+
+      setMsg(`✅ Permisos otorgados exitosamente.`);
+      setConflictUser(null);
+      setConflictType(null);
+      setFormNutri({ nombre:"", email:"", telefono:"", nombre_marca:"", logo_url:"", color_primario:"#56CCF2" });
+      setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+    } catch (e) {
+      setMsg("❌ Error al resolver: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -353,6 +457,58 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       </div>
 
       {/* Modals */}
+      {conflictUser && (
+        <div className="fixed inset-0 bg-[#0B1929]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95">
+            <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-5">
+              <AlertCircle className="w-5 h-5 text-yellow-500" /> Usuario Existente
+            </h3>
+            
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-xl text-sm mb-5">
+              El correo <strong>{conflictUser.email}</strong> ya pertenece a otro usuario de la plataforma.
+              <br/><br/>
+              <strong>Datos Actuales:</strong><br/>
+              Nombre: {conflictUser.cliente?.nombre || conflictUser.profile?.nombre || "Sin nombre"}<br/>
+              Teléfono: {conflictUser.cliente?.telefono || conflictUser.profile?.telefono || "Sin teléfono"}
+            </div>
+
+            <p className="text-[#6B7A8D] text-sm mb-5">
+              ¿Qué datos deseas usar para su expediente en este nuevo rol?
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => resolveConflict(false)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center"><div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div></div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Usar sus datos actuales</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Ignora lo que escribiste y vincúlalo usando el nombre y teléfono que ya tenía registrado.</div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => resolveConflict(true)}
+                disabled={saving}
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] flex items-center justify-center"></div>
+                <div>
+                  <div className="font-bold text-[#0B1929] text-sm">Actualizar todo con los datos nuevos</div>
+                  <div className="text-xs text-[#6B7A8D] mt-1">Sobrescribe su nombre y teléfono globalmente usando la información que acabas de escribir.</div>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end mt-6 pt-4 border-t border-[#E2E8F0]">
+              <button onClick={() => { setConflictUser(null); setConflictType(null); }} disabled={saving} className="px-5 py-2.5 text-sm font-bold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC]">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showInviteNutri && (
         <Modal title={<><User size={20} className="text-blue-500"/> Nuevo Nutriólogo</>} onClose={() => setShowInviteNutri(false)}>
           <Field label="Nombre completo">

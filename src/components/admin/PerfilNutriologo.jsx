@@ -20,33 +20,43 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     ubicacion_texto: "",
     mapa_url: "",
     color_primario: "#1A6FD4",
-    logo_url: ""
+    logo_url: "",
+    email: ""
   });
+  
+  const [solicitudes, setSolicitudes] = useState([]);
 
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const rows = await dbGet(`profiles?id=eq.${profileId}`);
-        if (rows.length > 0) {
-          const p = rows[0];
-          setForm({
-            nombre: p.nombre || "",
-            nombre_marca: p.nombre_marca || "",
-            telefono: p.telefono || "",
-            especialidad: p.especialidad || "",
-            ubicacion_texto: p.ubicacion_texto || "",
-            mapa_url: p.mapa_url || "",
-            color_primario: p.color_primario || "#1A6FD4",
-            logo_url: p.logo_url || ""
-          });
+  const loadProfile = async () => {
+    try {
+      const rows = await dbGet(`profiles?id=eq.${profileId}`);
+      if (rows.length > 0) {
+        const p = rows[0];
+        setForm({
+          nombre: p.nombre || "",
+          nombre_marca: p.nombre_marca || "",
+          telefono: p.telefono || "",
+          especialidad: p.especialidad || "",
+          ubicacion_texto: p.ubicacion_texto || "",
+          mapa_url: p.mapa_url || "",
+          color_primario: p.color_primario || "#1A6FD4",
+          logo_url: p.logo_url || "",
+          email: p.email || ""
+        });
+        
+        if (p.email) {
+          const reqs = await dbGet(`solicitudes_entrenamiento?to_email=eq.${p.email}&estado=eq.pendiente`);
+          setSolicitudes(reqs);
         }
-      } catch (error) {
-        console.error("Error cargando perfil", error);
       }
-      setLoading(false);
-    };
+    } catch (error) {
+      console.error("Error cargando perfil", error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     loadProfile();
   }, [profileId]);
 
@@ -86,10 +96,52 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     setMsg("");
     setErr("");
     try {
-      await dbPatch(`profiles?id=eq.${profileId}`, form);
+      await dbPatch(`profiles?id=eq.${profileId}`, {
+        nombre: form.nombre,
+        nombre_marca: form.nombre_marca,
+        telefono: form.telefono,
+        especialidad: form.especialidad,
+        ubicacion_texto: form.ubicacion_texto,
+        mapa_url: form.mapa_url,
+        color_primario: form.color_primario,
+        logo_url: form.logo_url
+      });
       setMsg("Perfil actualizado correctamente. Los cambios se reflejarán en la Landing Page.");
     } catch (error) {
       setErr("Error guardando perfil: " + error.message);
+    }
+    setSaving(false);
+  };
+
+  const handleAcceptRequest = async (req) => {
+    setSaving(true);
+    setErr("");
+    try {
+      await dbPost("clientes", {
+        nombre: form.nombre || "Colega",
+        objetivo: "Entrenamiento entre colegas",
+        email: form.email,
+        telefono: form.telefono,
+        nutriologo_id: req.from_nutriologo_id,
+        auth_id: profileId,
+        activo: true
+      });
+      await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, { estado: 'aceptada' });
+      setMsg(`✅ Eres ahora paciente de ${req.from_nutriologo_nombre}`);
+      loadProfile();
+    } catch (e) {
+      setErr("Error al aceptar solicitud: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const handleRejectRequest = async (req) => {
+    setSaving(true);
+    try {
+      await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, { estado: 'rechazada' });
+      loadProfile();
+    } catch (e) {
+      setErr("Error al rechazar: " + e.message);
     }
     setSaving(false);
   };
@@ -136,6 +188,42 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         {err && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
             <AlertCircle size={18} className="text-red-500 flex-shrink-0" /> <span>{err}</span>
+          </div>
+        )}
+
+        {/* BUZÓN DE SOLICITUDES DE ENTRENAMIENTO */}
+        {solicitudes.length > 0 && (
+          <div className="mb-8 p-5 bg-blue-50 border border-blue-200 rounded-2xl">
+            <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-3">
+              <User size={18} className="text-blue-600" /> Solicitudes de Paciente
+            </h3>
+            <div className="flex flex-col gap-3">
+              {solicitudes.map(req => (
+                <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-[#0B1929]">
+                      <strong>{req.from_nutriologo_nombre}</strong> desea agregarte como paciente para asignarte planes de entrenamiento y dieta.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                    <button 
+                      onClick={() => handleRejectRequest(req)}
+                      disabled={saving}
+                      className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-gray-50 flex-1 sm:flex-none"
+                    >
+                      Rechazar
+                    </button>
+                    <button 
+                      onClick={() => handleAcceptRequest(req)}
+                      disabled={saving}
+                      className="px-4 py-2 text-sm font-bold bg-[#1A6FD4] text-white rounded-lg hover:bg-[#155ab0] flex-1 sm:flex-none"
+                    >
+                      Aceptar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
