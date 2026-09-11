@@ -171,14 +171,14 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
                 </div>
               </button>
 
-              {/* ── Expanded content: imagen + info lado a lado (igual que Figma) ── */}
+              {/* ── Expanded content: diseño vertical optimizado para móviles ── */}
               {isExpanded && (
                 <div className="px-5 pb-5 border-t border-[#F0F4FA]">
 
-                  {/* Opciones de comida */}
-                  <div className="flex gap-4 mt-4">
-                    {/* Imagen si existe, placeholder si no */}
-                    <div className="w-32 h-24 rounded-lg bg-[#F0F4FA] flex-shrink-0 overflow-hidden">
+                  {/* Opciones de comida en disposición vertical */}
+                  <div className="flex flex-col gap-4 mt-4">
+                    {/* Imagen a lo ancho */}
+                    <div className="w-full h-40 sm:h-48 rounded-xl bg-[#F0F4FA] overflow-hidden">
                       {meal.imagen_url ? (
                         <img
                           src={meal.imagen_url}
@@ -187,41 +187,27 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Apple size={28} className="text-[#CBD5E1]" />
+                          <Apple size={40} className="text-[#CBD5E1]" />
                         </div>
                       )}
                     </div>
 
-                    <div className="flex flex-col justify-center gap-2 min-w-0">
-                      <p className="text-base font-semibold text-[#0B1929] leading-snug">{label}</p>
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-lg font-bold text-[#0B1929]">{label}</p>
 
-                      {/* Opción 1 y 2 como texto pequeño */}
+                      {/* Opción 1 (Descripción completa sin line-clamp) */}
                       {meal.opcion1 && (
-                        <p className="text-xs text-[#6B7A8D] leading-relaxed line-clamp-2">
+                        <p className="text-sm text-[#6B7A8D] leading-relaxed">
                           {meal.opcion1}
                         </p>
                       )}
+                      
+                      {/* Alternativa */}
                       {meal.opcion2 && (
-                        <p className="text-xs text-[#9BA8B7] leading-relaxed line-clamp-1">
-                          Alt: {meal.opcion2}
+                        <p className="text-sm text-[#9BA8B7] leading-relaxed mt-1">
+                          <span className="font-semibold">Alt:</span> {meal.opcion2}
                         </p>
                       )}
-
-                      {/* Badges de kcal + saludable */}
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {meal.calorias > 0 && (
-                          <div className="flex items-center gap-1 bg-[#E8F1FB] px-2 py-1 rounded">
-                            <Flame size={11} className="text-[var(--brand-primary)]" />
-                            <span className="text-xs font-mono font-bold text-[var(--brand-primary)]">
-                              {meal.calorias} kcal
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1 bg-[#F0FDF4] px-2 py-1 rounded">
-                          <Apple size={11} className="text-green-500" />
-                          <span className="text-xs font-mono text-green-600">Saludable</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
