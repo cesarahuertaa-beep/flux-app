@@ -174,25 +174,32 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                 Nivel de Suscripción Actual
               </h2>
 
-              <div className="relative pt-8 pb-4">
+              <div className="relative pt-6 pb-6 mt-4">
                 {/* Barra de progreso */}
-                <div className="absolute top-1/2 left-0 w-full h-3 bg-gray-100 rounded-full -translate-y-1/2 overflow-hidden">
+                <div className="absolute top-[60px] left-0 w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-[#1A6FD4] to-blue-400 transition-all duration-1000"
                     style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
                   />
                 </div>
 
-                {/* Puntos (Tiers) */}
-                <div className="absolute top-1/2 left-0 w-full flex justify-between -translate-y-1/2 px-1">
+                {/* Markers */}
+                <div className="relative flex justify-between px-2">
                   {[1, 21, 51].map((pts, i) => (
-                    <div key={i} className="flex flex-col items-center">
+                    <div key={i} className="flex flex-col items-center w-20">
+                      {/* Textos ARRIBA */}
+                      <div className="mb-2 text-center h-12 flex flex-col justify-end">
+                        <span className="block text-xs font-bold text-[#0B1929]">Nivel {i+1}</span>
+                        <span className="block text-[10px] text-[#6B7A8D]">{pts === 51 ? '+50' : `${pts}`} pac.</span>
+                      </div>
+                      
+                      {/* El Punto */}
                       <div className={`w-5 h-5 rounded-full border-4 shadow-sm flex items-center justify-center z-10 transition-colors
                         ${activeCount >= pts ? 'bg-[#1A6FD4] border-white' : 'bg-gray-200 border-white'}
                       `}/>
-                      <div className="mt-6 text-center">
-                        <span className="block text-xs font-bold text-[#0B1929]">Nivel {i+1}</span>
-                        <span className="block text-[10px] text-[#6B7A8D]">{pts === 51 ? '+50' : `${pts}`} pac.</span>
+                      
+                      {/* Precio ABAJO */}
+                      <div className="mt-2 text-center">
                         <span className="block text-xs font-bold text-emerald-600">${i===0?50:i===1?45:40}</span>
                       </div>
                     </div>
