@@ -45,6 +45,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [showRutinaModal, setShowRutinaModal] = useState(false);
   const [editRutina, setEditRutina] = useState(null);
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
+  const [activeAltSlot, setActiveAltSlot] = useState(null);
 
   const ORDINALES = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
 
@@ -423,11 +424,37 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>); await loadData(); };
   const addEj = (ej) => {
-    if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
-    setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { _dndId: Math.random().toString(36).slice(2,9), biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10 }] }));
+    if (activeAltSlot === null) {
+      if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
+      setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
+        _dndId: Math.random().toString(36).slice(2,9), 
+        biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, 
+        gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", alternativas:[] 
+      }] }));
+    } else {
+      setRutinaForm(p => {
+        const es = [...p.ejercicios];
+        const main = es[activeAltSlot];
+        if ((main.alternativas || []).length >= 2) return p;
+        if ((main.alternativas || []).find(a => a.biblioteca_id === ej.id)) return p;
+        const newAlt = {
+          biblioteca_id: ej.id, nombre: ej.nombre, gif_url: ej.gif_url||"",
+          reps_sugeridas: main.reps_sugeridas || 10, peso_sugerido: main.peso_sugerido || "", unidad: main.unidad || "kg"
+        };
+        es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
+        return { ...p, ejercicios: es };
+      });
+      setActiveAltSlot(null);
+    }
   };
-  const updEj = (i,f,v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
+
+  const updEj = (i, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
+  
+  const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad === "lb" ? "kg" : "lb"}; return { ...p, ejercicios:es }; });
+  const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad === "lb" ? "kg" : "lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
+  const updAlt = (i, altIdx, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], [f]:v}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
+  const remAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], alternativas: es[i].alternativas.filter((_,x)=>x!==altIdx)}; return { ...p, ejercicios:es }; });
 
   // ── Handlers de Drag & Drop ──
   const sensors = useSensors(
@@ -887,10 +914,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
               {rutinaForm.ejercicios.length > 0 && (
                 <div className="mt-3">
-                    <div className="hidden sm:grid grid-cols-[24px_40px_1fr_80px_80px_32px] gap-1.5 mb-1.5 items-center">
+                    <div className="hidden sm:grid grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-1.5 mb-1.5 items-center">
                       <span/><span/><span className="text-[11px] text-[#6B7A8D] font-semibold">EJERCICIO</span>
                       <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">SERIES</span>
                       <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">REPS</span>
+                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">PESO</span>
                       <span/>
                     </div>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
@@ -898,27 +926,85 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                         {rutinaForm.ejercicios.map((e, i) => (
                           <SortableItem key={e._dndId} id={e._dndId}>
                             {({ dragHandle, isDragging }) => (
-                              <div className={`grid grid-cols-[24px_40px_1fr_32px] sm:grid-cols-[24px_40px_1fr_80px_80px_32px] gap-2 sm:gap-1.5 mb-2 sm:mb-1.5 items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded-lg sm:rounded-none border sm:border-none ${isDragging ? 'bg-white shadow-sm border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
-                                <div className="flex items-center justify-center">{dragHandle}</div>
-                                <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
-                                  {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
-                                </div>
-                                <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} • {e.tipo_movimiento}</span></div>
-                                
-                                <div className="col-span-4 sm:col-span-2 sm:col-start-4 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[80px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                  <div className="flex items-center gap-2 sm:block">
-                                    <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">SERIES</span>
-                                    <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                              <div className={`mb-2 sm:mb-1.5 p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded-lg sm:rounded-none border sm:border-none ${isDragging ? 'bg-white shadow-sm border-[#E2E8F0] z-10' : 'border-[#E2E8F0]'}`}>
+                                {/* MAIN EXERCISE */}
+                                <div className={`grid grid-cols-[24px_40px_1fr_32px] sm:grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-2 sm:gap-1.5 items-center`}>
+                                  <div className="flex items-center justify-center">{dragHandle}</div>
+                                  <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
+                                    {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
                                   </div>
-                                  <div className="flex items-center gap-2 sm:block">
-                                    <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
-                                    <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                  <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} • {e.tipo_movimiento}</span></div>
+                                  
+                                  <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                    <div className="flex items-center gap-2 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">SERIES</span>
+                                      <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
+                                      <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
+                                      <div className="relative w-full">
+                                        <input type="number" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.peso_sugerido||""} onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                        <button onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{e.unidad || 'KG'}</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                            
+                                  <div className="col-start-4 row-start-1 sm:col-start-7 sm:row-start-1 flex items-center justify-end gap-1 self-start sm:self-auto mt-0.5 sm:mt-0">
+                                    {(e.alternativas || []).length < 2 && (
+                                      <button onClick={() => setActiveAltSlot(activeAltSlot === i ? null : i)} className={`p-1.5 rounded-md flex items-center justify-center transition-colors border-none ${activeAltSlot === i ? 'bg-blue-50 text-[var(--brand-primary)]' : 'bg-gray-100 text-[#6B7A8D] hover:bg-gray-200'}`} title="Añadir alternativa">
+                                        <Plus className="w-[14px] h-[14px]" />
+                                      </button>
+                                    )}
+                                    <button onClick={() => remEj(i)} className="bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none">
+                                      <Trash2 className="w-[14px] h-[14px]" />
+                                    </button>
                                   </div>
                                 </div>
-
-                                <button onClick={() => remEj(i)} className="col-start-4 row-start-1 sm:col-start-6 sm:row-start-1 bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none self-start sm:self-auto mt-0.5 sm:mt-0">
-                                  <Trash2 className="w-[14px] h-[14px]" />
-                                </button>
+                            
+                                {/* ACTIVE ALT SLOT INDICATOR */}
+                                {activeAltSlot === i && (
+                                  <div className="mt-2 ml-[72px] p-3 border-2 border-dashed border-[var(--brand-primary)] opacity-75 rounded-xl bg-blue-50 flex flex-col items-center justify-center gap-1">
+                                    <span className="text-xs font-semibold text-[#0B1929]">Selecciona un ejercicio del catálogo arriba</span>
+                                    <span className="text-[10px] text-[#6B7A8D]">Se agregará como alternativa a {e.nombre}</span>
+                                  </div>
+                                )}
+                            
+                                {/* ALTERNATIVES */}
+                                {(e.alternativas || []).map((alt, altIdx) => (
+                                  <div key={`alt-${altIdx}`} className="mt-1.5 ml-[24px] sm:ml-[72px] grid grid-cols-[30px_1fr_32px] sm:grid-cols-[30px_1fr_65px_80px_70px] gap-2 sm:gap-1.5 items-center p-2 sm:p-0 bg-white sm:bg-transparent rounded-lg sm:rounded-none border sm:border-none border-[#E2E8F0] opacity-90">
+                                    <div className="w-7 h-7 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
+                                      {alt.gif_url ? <img src={alt.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[9px] font-bold">ALT</span>
+                                      <span className="text-[12px] font-medium leading-tight truncate">{alt.nombre}</span>
+                                    </div>
+                                    
+                                    <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
+                                      <div className="flex items-center gap-2 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
+                                        <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.reps_sugeridas} onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)} placeholder="10" />
+                                      </div>
+                                      <div className="flex items-center gap-2 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
+                                        <div className="relative w-full">
+                                          <input type="number" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                          <button onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{alt.unidad || 'KG'}</button>
+                                        </div>
+                                      </div>
+                                    </div>
+                            
+                                    <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-start sm:self-auto mt-0.5 sm:mt-0">
+                                      <button onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-md p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none">
+                                        <X className="w-[14px] h-[14px]" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </SortableItem>

@@ -14,7 +14,7 @@ import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } 
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
-    await dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo', records);
+    await dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id', records);
   } else {
     const items = Array.isArray(records) ? records : [records];
     for (const item of items) await enqueue(item);
@@ -62,17 +62,19 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
         if (allIds.length) {
           const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
-          const pm = {};
-          ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
-          
-          try {
-            const pending = await getAll();
-            pending
-              .filter(p => p.cliente_id === cliente.id)
-              .forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
-          } catch { /* if IndexedDB fails, just use Supabase data */ }
-          
-          setProgreso(pm);
+          if (ps && Array.isArray(ps)) {
+            const pm = {};
+            ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+            
+            try {
+              const pending = await getAll();
+              pending
+                .filter(p => p.cliente_id === cliente.id)
+                .forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+            } catch { /* if IndexedDB fails, just use Supabase data */ }
+            
+            setProgreso(pm);
+          }
         }
       } catch (e) { 
         console.error(e); 
@@ -81,8 +83,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     })();
   }, [cliente.id]);
 
-  const handleProgressChange = async (ejId, wi, si, tipo, val) => {
-    const key = `${ejId}-${wi}-${si}-${tipo}`;
+  const handleProgressChange = async (ejId, wi, si, tipo, val, variante_id = "original") => {
+    const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
     try {
       await offlineAwareUpsert({ 
@@ -91,7 +93,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         semana: parseInt(wi), 
         serie: parseInt(si), 
         tipo, 
-        valor: val, 
+        valor: val,
+        variante_id,
         updated_at: new Date().toISOString() 
       });
     } catch(e) {

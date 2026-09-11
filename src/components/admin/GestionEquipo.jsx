@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from "lucide-react";
-import { authInvite, dbGet, dbPatch, getProfileId } from "../../lib/supabase";
+import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
 // Permite que un nutriólogo invite y gestione a su personal administrativo.

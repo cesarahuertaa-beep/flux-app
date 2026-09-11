@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { GRUPOS, TIPOS } from "../../styles/theme";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
-import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);

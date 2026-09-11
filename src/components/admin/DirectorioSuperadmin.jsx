@@ -73,6 +73,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [showEditNutri, setShowEditNutri] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
   
+  const [conflictUser, setConflictUser] = useState(null);
+  const [conflictType, setConflictType] = useState(null);
+  
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   

@@ -85,7 +85,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       if (allIds.length) {
         const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})`);
         const pm = {};
-        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
+        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
         setProgreso(pm);
       } else {
         setProgreso({});
@@ -111,7 +111,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       if (allIds.length) {
         const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})`);
         const pm = {};
-        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}`] = p.valor; });
+        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
         setProgreso(pm);
       } else {
         setProgreso({});
@@ -390,26 +390,71 @@ export function ProgresoCliente({ selected, setMsg }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {r.ejercicios.map((ej,eji)=>Array.from({length:ej.num_series||4},(_,si)=>(
-                          <tr key={`${ej.id}-${si}`} style={{background:eji%2===0?C.card:C.surfaceAlt}}>
-                            {si===0&&<td rowSpan={ej.num_series||4} style={{padding:"8px 12px",border:`1px solid ${C.border}`,fontWeight:600,verticalAlign:"middle"}}>
-                              {ej.nombre}<div style={{fontSize:10,color:C.muted,fontWeight:400,marginTop:2}}>{ej.grupo_muscular}</div>
-                            </td>}
-                            <td style={{padding:"6px 8px",border:`1px solid ${C.border}`,textAlign:"center",color:C.accent,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{si+1}</td>
-                            {semanas.map((_,wi)=>{
-                              const pVal=progreso[`${ej.id}-${wi}-${si}-peso`]||"";
-                              const rVal=progreso[`${ej.id}-${wi}-${si}-reps`]||"";
-                              return (<Fragment key={`w${wi}`}>
-                                <td key={`p${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:pVal?`${C.accentDeep}40`:"transparent"}}>
-                                  <span style={{fontSize:11,color:pVal?C.accent:C.dim,fontWeight:pVal?700:400}}>{pVal||"—"}</span>
-                                </td>
-                                <td key={`r${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:rVal?`${C.accentDeep}25`:"transparent"}}>
-                                  <span style={{fontSize:11,color:rVal?C.accentMid:C.dim,fontWeight:rVal?700:400}}>{rVal||"—"}</span>
-                                </td>
-                              </Fragment>);
-                            })}
-                          </tr>
-                        )))}
+                        {r.ejercicios.map((ej, eji) => {
+                          const variantsWithData = new Set(["original"]);
+                          for (const key in progreso) {
+                            if (key.startsWith(`${ej.id}-`)) {
+                              const parts = key.split("-");
+                              if (parts.length >= 5) variantsWithData.add(parts.slice(4).join("-"));
+                            }
+                          }
+                          const activeVariants = Array.from(variantsWithData).sort();
+
+                          return activeVariants.map((vid, vidIdx) => {
+                            const isOriginal = vid === "original";
+                            const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_", ""));
+                            const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
+                            
+                            // Combine background styles so alternative tables are subtly highlighted
+                            const rowBg = eji % 2 === 0 ? C.card : C.surfaceAlt;
+                            const highlight = !isOriginal ? `${C.accentDeep}15` : rowBg;
+
+                            return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
+                              <tr key={`${ej.id}-${vid}-${si}`} style={{background: highlight}}>
+                                {si === 0 && (
+                                  <td rowSpan={exObj.num_series || ej.num_series || 4} style={{padding:"8px 12px",border:`1px solid ${C.border}`,fontWeight:600,verticalAlign:"middle"}}>
+                                    <div style={{display:"flex", alignItems:"center", gap: 6}}>
+                                      <span>{exObj.nombre}</span>
+                                      {!isOriginal && <span style={{fontSize:9, background: C.accent, color: C.card, padding: "2px 4px", borderRadius: 4, fontWeight: "bold"}}>ALT</span>}
+                                    </div>
+                                    <div style={{fontSize:10,color:C.muted,fontWeight:400,marginTop:2}}>{exObj.grupo_muscular || ej.grupo_muscular}</div>
+                                  </td>
+                                )}
+                                <td style={{padding:"6px 8px",border:`1px solid ${C.border}`,textAlign:"center",color:C.accent,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{si+1}</td>
+                                {semanas.map((_, wi) => {
+                                  const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
+                                  const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
+                                  
+                                  let emptyText = "—";
+                                  let emptyColor = C.dim;
+                                  let emptyWeight = 400;
+                                  
+                                  if (!pVal && !rVal) {
+                                    const otherVariantHasData = activeVariants.some(otherVid => 
+                                      otherVid !== vid && (progreso[`${ej.id}-${wi}-${si}-peso-${otherVid}`] || progreso[`${ej.id}-${wi}-${si}-reps-${otherVid}`])
+                                    );
+                                    if (otherVariantHasData) {
+                                      emptyText = isOriginal ? "ALT" : "ORG";
+                                      emptyColor = C.accentMid;
+                                      emptyWeight = 700;
+                                    }
+                                  }
+
+                                  return (
+                                    <Fragment key={`w${wi}`}>
+                                      <td key={`p${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:pVal?`${C.accentDeep}40`:"transparent"}}>
+                                        <span style={{fontSize:11,color:pVal?C.accent:emptyColor,fontWeight:pVal?700:emptyWeight}}>{pVal||emptyText}</span>
+                                      </td>
+                                      <td key={`r${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:rVal?`${C.accentDeep}25`:"transparent"}}>
+                                        <span style={{fontSize:11,color:rVal?C.accentMid:emptyColor,fontWeight:rVal?700:emptyWeight}}>{rVal||emptyText}</span>
+                                      </td>
+                                    </Fragment>
+                                  );
+                                })}
+                              </tr>
+                            ));
+                          });
+                        })}
                       </tbody>
                     </table>
                   </div>
