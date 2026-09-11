@@ -118,7 +118,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     if (tab === "programar" && !selected) {
       setTab("clientes");
     }
-  }, [tab, selected]);
+    if (tab === "membresia" && isSuperadmin) {
+      setTab("pagos");
+    }
+  }, [tab, selected, isSuperadmin]);
 
   useEffect(() => {
     if (!isSuperadmin) return;
@@ -303,7 +306,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           ] : []),
           { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
           { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
-          { id: "membresia",  label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> },
+          ...(!isSuperadmin ? [
+            { id: "membresia",  label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> }
+          ] : []),
           ...(isSuperadmin ? [
             { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
             { id: "pagos", label: "Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
