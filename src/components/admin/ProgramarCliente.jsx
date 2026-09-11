@@ -387,7 +387,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         
         for (let i=0; i<rutinaForm.ejercicios.length; i++) {
           const e = rutinaForm.ejercicios[i];
-          const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
+          const data = { 
+            rutina_id:rid, 
+            biblioteca_id:e.biblioteca_id||null, 
+            nombre:e.nombre, 
+            gif_url:e.gif_url||"", 
+            grupo_muscular:e.grupo_muscular||"", 
+            tipo_movimiento:e.tipo_movimiento||"", 
+            num_series:+e.num_series||4, 
+            reps_sugeridas:+e.reps_sugeridas||10,
+            peso_sugerido:e.peso_sugerido||null,
+            unidad:e.unidad||"kg",
+            alternativas:e.alternativas||[],
+            orden:i 
+          };
           if (e.id) await dbPatch(`ejercicios?id=eq.${e.id}`, data);
           else await dbPost("ejercicios", data);
         }
@@ -407,7 +420,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           const rid = r[0].id;
           for (let i=0; i<rutinaForm.ejercicios.length; i++) {
             const e = rutinaForm.ejercicios[i];
-            const data = { rutina_id:rid, biblioteca_id:e.biblioteca_id||null, nombre:e.nombre, gif_url:e.gif_url||"", grupo_muscular:e.grupo_muscular||"", tipo_movimiento:e.tipo_movimiento||"", num_series:+e.num_series||4, reps_sugeridas:+e.reps_sugeridas||10, orden:i };
+            const data = { 
+            rutina_id:rid, 
+            biblioteca_id:e.biblioteca_id||null, 
+            nombre:e.nombre, 
+            gif_url:e.gif_url||"", 
+            grupo_muscular:e.grupo_muscular||"", 
+            tipo_movimiento:e.tipo_movimiento||"", 
+            num_series:+e.num_series||4, 
+            reps_sugeridas:+e.reps_sugeridas||10,
+            peso_sugerido:e.peso_sugerido||null,
+            unidad:e.unidad||"kg",
+            alternativas:e.alternativas||[],
+            orden:i 
+          };
             await dbPost("ejercicios", data);
           }
         }
