@@ -58,13 +58,22 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
           fechaInicioCobro = createdAt;
         }
       } else if (deactivatedAt && deactivatedAt > lastCutoff) {
-        // Cliente desactivado recientemente (en este ciclo). 
+        // Regla de 20 días: si el paciente estuvo menos de 20 días activo en este ciclo → mes completo.
+        // Si estuvo 20 días o más → proporcional al día de baja.
         const start = createdAt > lastCutoff ? createdAt : lastCutoff;
         const diffTime = Math.abs(deactivatedAt - start);
-        diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diasCobrar > 30) diasCobrar = 30;
-        fechaInicioCobro = start;
-        fechaFinCobro = deactivatedAt;
+        const diasActivo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diasActivo < 20) {
+          // Mes forzoso: cobra 30 días completos aunque el paciente se fue antes
+          diasCobrar = 30;
+          fechaFinCobro = nextCutoff; // Periodo hasta el corte completo
+        } else {
+          // Proporcional: solo los días que estuvo activo
+          diasCobrar = Math.min(diasActivo, 30);
+          fechaInicioCobro = start;
+          fechaFinCobro = deactivatedAt;
+        }
       }
       
       const periodoStr = `${fechaInicioCobro.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})} al ${fechaFinCobro.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})}`;
