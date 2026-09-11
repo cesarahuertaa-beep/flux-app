@@ -110,28 +110,61 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                 <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorte}</span>
               </div>
               
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                    <div>
-                      <p className="font-bold text-[#0B1929]">Cupos Mensuales Activos</p>
-                      <p className="text-sm text-[#6B7A8D]">{activeCount} pacientes en tarifa Nivel {currentTier} (${currentRate})</p>
-                    </div>
-                    <p className="font-bold text-lg">${totalAmount.toFixed(2)}</p>
-                  </div>
+              {/* Tabla de Pacientes */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-[#E2E8F0]">
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Alta</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días facturados</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Costo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {clientes.filter(c => c.activo).length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes activos en este ciclo.</td>
+                      </tr>
+                    ) : (
+                      clientes.filter(c => c.activo).map((c, i) => {
+                        // Mock cálculos de días (en la versión final esto se calculará en base a fecha_corte y c.created_at)
+                        const dias = 30; // Simulando mes completo por defecto
+                        const costoPaciente = (currentRate / 30) * dias; 
+                        
+                        return (
+                          <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
+                            <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
+                              {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
+                            </td>
+                            <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
+                              {dias} <span className="text-gray-400 font-normal">/ 30</span>
+                            </td>
+                            <td className="py-3 px-6 font-bold text-[#1A6FD4] text-right">${costoPaciente.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                    <div>
-                      <p className="font-bold text-[#0B1929] flex items-center gap-1">
-                        Ajuste de altas recientes <Info size={14} className="text-gray-400"/>
-                      </p>
-                      <p className="text-sm text-[#6B7A8D]">Días proporcionales de nuevos pacientes</p>
-                    </div>
-                    <p className="font-bold text-lg text-gray-400">$0.00</p>
+              {/* Total Summary */}
+              <div className="p-6 bg-gray-50/50 border-t border-[#E2E8F0]">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-bold text-[#6B7A8D]">Subtotal por volumen ({activeCount} pac. a ${currentRate})</p>
+                    <p className="font-bold text-[#0B1929]">${totalAmount.toFixed(2)}</p>
                   </div>
-
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+                    <p className="text-sm font-bold text-[#6B7A8D] flex items-center gap-1">
+                      Ajuste por mes forzoso pendiente <Info size={14} className="text-gray-400"/>
+                    </p>
+                    <p className="font-bold text-gray-400">$0.00</p>
+                  </div>
                   <div className="flex justify-between items-center pt-2">
-                    <p className="text-xl font-extrabold text-[#0B1929]">Total Estimado</p>
+                    <p className="text-xl font-extrabold text-[#0B1929]">Total a Pagar</p>
                     <p className="text-2xl font-black text-[#1A6FD4]">${totalAmount.toFixed(2)} MXN</p>
                   </div>
                 </div>
