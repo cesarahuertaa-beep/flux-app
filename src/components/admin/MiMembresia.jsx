@@ -23,7 +23,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
   }, [profileId]);
 
   // Cálculos de fechas y periodos
-  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText } = useMemo(() => {
+  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff } = useMemo(() => {
     const today = new Date();
     const diaCorte = perfil?.dia_corte || 1; // Si no hay en DB, usa día 1
 
@@ -93,21 +93,59 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       currentRate: rate, 
       nextTierThreshold: threshold, 
       totalAmount: total, 
-      fechaCorteText: strCorte 
+      fechaCorteText: strCorte,
+      nextCutoff
     };
   }, [clientes, perfil]);
 
-  // Fechas mock (luego vendrán de Supabase)
-  const fechaCorte = "15 de Noviembre";
+  // Estado del componente
   const status = "active"; // active, pending, review
 
   const handleUploadClick = () => {
-    // Aquí integraremos storageUpload de supabase después
-    setMsg("✓ Funcionalidad de subida pendiente de integración con base de datos.");
+    document.getElementById("comprobanteUpload").click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setMsg("Subiendo comprobante...");
+
+    try {
+      // 1. Subir a Storage
+      const ext = file.name.split('.').pop();
+      const path = `${profileId}_${Date.now()}.${ext}`;
+      const url = await storageUpload('comprobantes', path, file);
+
+      // 2. Insertar en DB
+      await dbPost('recibos_pago', {
+        nutriologo_id: profileId,
+        monto: totalAmount,
+        fecha_corte_mes: nextCutoff.toISOString().split('T')[0],
+        comprobante_url: url,
+        estado: 'pendiente'
+      });
+
+      setMsg("✓ Comprobante subido y en revisión.");
+    } catch (error) {
+      console.error(error);
+      setMsg("❌ Error al subir: " + error.message);
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // Limpiar input
+    }
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
+      <input 
+        type="file" 
+        id="comprobanteUpload" 
+        accept="image/*,.pdf" 
+        style={{ display: "none" }} 
+        onChange={handleFileChange} 
+      />
       
       {/* Banner de Estado */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -271,12 +309,12 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
               </div>
 
               <div className="mt-6">
-                <button 
+                <button disabled={uploading} 
                   onClick={handleUploadClick}
                   className="w-full bg-[#1A6FD4] hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   <Upload size={18} />
-                  Subir Comprobante
+                  {uploading ? 'Subiendo...' : 'Subir Comprobante'}
                 </button>
                 <p className="text-xs text-center text-[#6B7A8D] mt-3 flex items-center justify-center gap-1">
                   <AlertCircle size={12}/> Validado manualmente en menos de 2h
