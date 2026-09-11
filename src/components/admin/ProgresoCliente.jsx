@@ -1,23 +1,25 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
-import { C } from "../../styles/theme";
-import { Btn, Modal, Field } from "../ui";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
+import { 
+  Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
+  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X
+} from "lucide-react";
 
 const METRIC_GROUPS = [
-  { label:"Básicas", icon:"⚖️", fields:[
+  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
     { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
     { key:"estatura",  label:"Estatura (cm)", type:"number" },
     { key:"imc",       label:"IMC",           type:"number", step:"0.01", readOnly:true },
   ]},
-  { label:"Composición corporal", icon:"🔬", fields:[
+  { label:"Composición corporal", icon:<Microscope className="w-4 h-4" />, fields:[
     { key:"grasa_pct",   label:"Grasa (%)",   type:"number", step:"0.1" },
     { key:"musculo_pct", label:"Músculo (%)", type:"number", step:"0.1" },
   ]},
-  { label:"Circunferencias (cm)", icon:"📏", fields:[
+  { label:"Circunferencias (cm)", icon:<Ruler className="w-4 h-4" />, fields:[
     { key:"cintura", label:"Cintura",  type:"number", step:"0.1" },
     { key:"cadera",  label:"Cadera",   type:"number", step:"0.1" },
     { key:"icc",     label:"ICC",      type:"number", step:"0.001", readOnly:true },
@@ -25,7 +27,7 @@ const METRIC_GROUPS = [
     { key:"brazo",   label:"Brazo",    type:"number", step:"0.1" },
     { key:"muslo",   label:"Muslo",    type:"number", step:"0.1" },
   ]},
-  { label:"Clínicos", icon:"🩺", fields:[
+  { label:"Clínicos", icon:<Stethoscope className="w-4 h-4" />, fields:[
     { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
     { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
   ]},
@@ -40,8 +42,6 @@ const emptyForm = () => ({
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
-
-
 
 export function ProgresoCliente({ selected, setMsg }) {
   const [metricas,     setMetricas]     = useState([]);
@@ -221,106 +221,109 @@ export function ProgresoCliente({ selected, setMsg }) {
     return d === 0 ? null : d;
   };
 
-
-
   const DISPLAY_KEYS = [
-    { key:"peso",            label:"Peso",      unit:"kg",    icon:"⚖️" },
-    { key:"imc",             label:"IMC",        unit:"",      icon:"📐" },
-    { key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:"🔴" },
-    { key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:"💪" },
-    { key:"cintura",         label:"Cintura",    unit:"cm",    icon:"📏" },
-    { key:"cadera",          label:"Cadera",     unit:"cm",    icon:"📏" },
-    { key:"icc",             label:"ICC",         unit:"",      icon:"⚖️" },
-    { key:"pecho",           label:"Pecho",      unit:"cm",    icon:"📏" },
-    { key:"brazo",           label:"Brazo",      unit:"cm",    icon:"📏" },
-    { key:"muslo",           label:"Muslo",      unit:"cm",    icon:"📏" },
-    { key:"glucosa",         label:"Glucosa",    unit:"mg/dL", icon:"🩺" },
-    { key:"presion_arterial",label:"Presión",    unit:"",       icon:"❤️" },
+    { key:"peso",            label:"Peso",      unit:"kg",    icon:<Scale className="w-3.5 h-3.5" /> },
+    { key:"imc",             label:"IMC",        unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"cintura",         label:"Cintura",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"cadera",          label:"Cadera",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"icc",             label:"ICC",         unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
+    { key:"pecho",           label:"Pecho",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"brazo",           label:"Brazo",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"muslo",           label:"Muslo",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"glucosa",         label:"Glucosa",    unit:"mg/dL", icon:<Stethoscope className="w-3.5 h-3.5" /> },
+    { key:"presion_arterial",label:"Presión",    unit:"",       icon:<Heart className="w-3.5 h-3.5" /> },
   ];
 
-  if (loading) return <div style={{color:C.muted,textAlign:"center",padding:40}}>Cargando…</div>;
+  if (loading) return <div className="text-[#6B7A8D] text-center p-10">Cargando…</div>;
 
   return (
-    <div style={{paddingBottom: 100}}>
+    <div className="pb-24">
       {/* Sub-nav */}
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {[["evaluaciones","📊","Evaluaciones"],["rutinas","🏋️","Rutinas del cliente"]].map(([k,ic,lb])=>(
-          <button key={k} onClick={()=>setSub(k)} style={{
-            padding:"8px 20px",borderRadius:20,
-            background:sub===k?C.gradBtn:C.card,
-            color:sub===k?"#000":C.muted,
-            fontWeight:sub===k?700:400,fontSize:13,
-            border:`1px solid ${sub===k?C.accent:C.border}`,cursor:"pointer"
-          }}>{ic} {lb}</button>
-        ))}
+      <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex gap-1 mb-5">
+        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ? "bg-white shadow-sm text-[#1A6FD4] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+          <BarChart2 className="w-4 h-4" /> Evaluaciones
+        </button>
+        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ? "bg-white shadow-sm text-[#1A6FD4] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+          <Dumbbell className="w-4 h-4" /> Rutinas del cliente
+        </button>
       </div>
 
       {/* ── EVALUACIONES ── */}
       {sub==="evaluaciones"&&(
         <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-            <span style={{fontWeight:600}}>Evaluaciones corporales <span style={{color:C.muted,fontWeight:400}}>({metricas.length})</span></span>
-            <div style={{display:"flex",gap:8}}>
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
+            <div className="flex gap-2">
               {metricas.length > 0 && (
-                <Btn small outline onClick={() => generateProgresoPDF(selected, metricas, brand)}>📄 PDF</Btn>
+                <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                  <FileText className="w-4 h-4" /> PDF
+                </button>
               )}
-              <Btn small grad onClick={()=>{setForm(emptyForm());setShowModal(true);}}>+ Nueva evaluación</Btn>
+              <button onClick={()=>{setForm(emptyForm());setShowModal(true);}} className="bg-[#1A6FD4] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+                <Plus className="w-4 h-4" /> Nueva evaluación
+              </button>
             </div>
           </div>
           {metricas.length===0?(
-            <div style={{textAlign:"center",padding:"60px 0",color:C.muted}}>
-              <div style={{fontSize:48,marginBottom:12}}>📊</div>
-              <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:6}}>Sin evaluaciones aún</div>
-              <div style={{fontSize:13}}>Registra la primera evaluación corporal del cliente.</div>
+            <div className="text-center py-16 text-[#6B7A8D]">
+              <div className="flex justify-center mb-3 text-[#E2E8F0]"><BarChart2 className="w-12 h-12" /></div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones aún</div>
+              <div className="text-[13px]">Registra la primera evaluación corporal del cliente.</div>
             </div>
           ):metricas.map((m,idx)=>{
             const prev = metricas[idx+1];
             return (
-              <div key={m.id} style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                  <div>
-                    <span style={{fontWeight:700,color:C.accent,fontSize:15}}>📅 {fmtDate(m.fecha)}</span>
-                    {idx===0&&<span style={{marginLeft:8,background:C.accentDeep+"50",color:C.accent,fontSize:11,padding:"2px 10px",borderRadius:20,fontWeight:600}}>Más reciente</span>}
+              <div key={m.id} className="bg-white rounded-[14px] border border-[#E2E8F0] p-4 mb-3 shadow-sm">
+                <div className="flex justify-between items-center mb-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-[#1A6FD4] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
+                    {idx===0&&<span className="bg-[#1A6FD4]/10 text-[#1A6FD4] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
                   </div>
-                  <div style={{display:"flex",gap:6}}>
-                    <Btn small outline color={C.accentMid} onClick={()=>startEdit(m)}>✏️ Editar</Btn>
-                    <Btn small danger onClick={()=>deleteMetrica(m.id)}>Borrar</Btn>
+                  <div className="flex gap-1.5">
+                    <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1">
+                      <Edit2 className="w-3.5 h-3.5" /> Editar
+                    </button>
+                    <button onClick={()=>deleteMetrica(m.id)} className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1">
+                      <Trash2 className="w-3.5 h-3.5" /> Borrar
+                    </button>
                   </div>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:10,marginBottom:m.notas?12:0}}>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
                   {DISPLAY_KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
                     const d = prev ? delta(m,prev,f.key) : null;
                     return (
-                      <div key={f.key} style={{background:C.bg,borderRadius:10,padding:"10px 12px",border:`1px solid ${C.border}`,textAlign:"center"}}>
-                        <div style={{fontSize:11,color:C.muted,marginBottom:4}}>{f.icon} {f.label}</div>
-                        <div style={{fontSize:18,fontWeight:800,color:C.text,fontFamily:"'Rajdhani',sans-serif"}}>
-                          {m[f.key]}{f.unit&&<span style={{fontSize:11,fontWeight:400,color:C.muted}}> {f.unit}</span>}
+                      <div key={f.key} className="bg-gray-50 rounded-[10px] p-2.5 border border-[#E2E8F0] text-center">
+                        <div className="text-[11px] text-[#6B7A8D] mb-1 flex items-center justify-center gap-1">{f.icon} {f.label}</div>
+                        <div className="text-lg font-bold text-[#0B1929] font-['Rajdhani']">
+                          {m[f.key]}{f.unit&&<span className="text-[11px] font-normal text-[#6B7A8D]"> {f.unit}</span>}
                         </div>
                         {d!==null&&(
-                          <div style={{fontSize:11,color:d<0?"#4ade80":"#f87171",marginTop:2,fontWeight:600}}>
-                            {d>0?"↑":"↓"} {Math.abs(d).toFixed(1)}{f.unit}
+                          <div className={`text-[11px] mt-0.5 font-bold flex items-center justify-center gap-0.5 ${d<0?"text-green-500":"text-red-500"}`}>
+                            {d>0?<ArrowUp className="w-3 h-3" />:<ArrowDown className="w-3 h-3" />} {Math.abs(d).toFixed(1)}{f.unit}
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-                {m.notas&&<div style={{fontSize:12,color:C.muted,background:C.bg,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,marginTop:10}}>📝 {m.notas}</div>}
+                {m.notas&&<div className="text-xs text-[#6B7A8D] bg-gray-50 p-2.5 rounded-lg border border-[#E2E8F0] mt-2.5 flex items-start gap-1.5">
+                  <FileText className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> {m.notas}
+                </div>}
                 {/* Fotos de progreso */}
                 {parseFotos(m.fotos).length>0&&(
-                  <div style={{marginTop:12}}>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos ({parseFotos(m.fotos).length})</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div className="mt-3">
+                    <div className="text-[11px] text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1">
+                      <Camera className="w-3.5 h-3.5" /> Fotos ({parseFotos(m.fotos).length})
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
                       {parseFotos(m.fotos).map((url,fi)=>(
-                        <div key={fi} style={{position:"relative",width:80,height:80}}>
+                        <div key={fi} className="relative w-20 h-20">
                           <img src={url} onClick={()=>setLightbox(url)}
-                            style={{width:80,height:80,objectFit:"cover",borderRadius:10,cursor:"zoom-in",border:`2px solid ${C.border}`}}
+                            className="w-20 h-20 object-cover rounded-[10px] cursor-zoom-in border-2 border-[#E2E8F0]"
                             alt={`foto ${fi+1}`}/>
-                          <button onClick={()=>deleteFoto(m,url)} style={{
-                            position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",
-                            borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",
-                            textAlign:"center",cursor:"pointer",border:"none",fontWeight:700
-                          }}>×</button>
+                          <button onClick={()=>deleteFoto(m,url)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
                         </div>
                       ))}
                     </div>
@@ -337,55 +340,54 @@ export function ProgresoCliente({ selected, setMsg }) {
         <div>
           {/* Cycle selector */}
           {ciclos.length > 0 && (
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:8}}>Ciclo</div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div className="mb-4">
+              <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
+              <div className="flex gap-1.5 flex-wrap">
                 {ciclos.map(c => (
-                  <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} style={{
-                    padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: cicloSel?.id===c.id ? 700 : 500,
-                    background: cicloSel?.id===c.id ? (c.activo ? C.gradBtn : "rgba(100,116,139,0.3)") : "transparent",
-                    color: cicloSel?.id===c.id ? (c.activo ? "#000" : C.text) : C.muted,
-                    border: `1px solid`,
-                    borderColor: cicloSel?.id===c.id ? (c.activo ? C.accent : "#64748b") : C.border,
-                    cursor: "pointer", transition: "all 0.2s ease"
-                  }}>
+                  <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    cicloSel?.id===c.id 
+                      ? (c.activo ? "bg-[#1A6FD4] text-white border-[#1A6FD4] font-bold shadow-md" : "bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
+                      : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                  }`}>
                     {c.nombre.split("|")[0]}
-                    {c.activo && <span style={{marginLeft:5,display:"inline-block",width:6,height:6,borderRadius:"50%",background:"#4ade80",verticalAlign:"middle"}}/>}
+                    {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ? "bg-white" : "bg-green-400"}`}/>}
                   </button>
                 ))}
               </div>
             </div>
           )}
           {rutinas.length===0?(
-            <div style={{textAlign:"center",padding:"60px 0",color:C.muted}}>
-              <div style={{fontSize:48,marginBottom:12}}>🏋️</div>
-              <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:6}}>Sin rutinas asignadas</div>
+            <div className="text-center py-16 text-[#6B7A8D]">
+              <div className="flex justify-center mb-3 text-[#E2E8F0]"><Dumbbell className="w-12 h-12" /></div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin rutinas asignadas</div>
             </div>
           ):rutinas.map(r=>{
             const semanas = getSemanasConFecha(r);
             const tieneData = r.ejercicios.some(ej=>semanas.some((_,wi)=>Array.from({length:ej.num_series||4},(_,si)=>progreso[`${ej.id}-${wi}-${si}-peso`]||progreso[`${ej.id}-${wi}-${si}-reps`]).some(Boolean)));
             return (
-              <div key={r.id} style={{marginBottom:24}}>
-                <div style={{fontWeight:700,fontSize:15,marginBottom:10,color:C.accent,display:"flex",alignItems:"center",gap:8}}>
-                  🏋️ {r.nombre}
-                  {!tieneData&&<span style={{fontSize:11,color:C.muted,fontWeight:400}}>Sin registros aún</span>}
+              <div key={r.id} className="mb-6">
+                <div className="font-bold text-[15px] mb-2.5 text-[#1A6FD4] flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4" /> {r.nombre}
+                  {!tieneData&&<span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
                 </div>
                 {tieneData&&(
-                  <div style={{overflowX:"auto",borderRadius:12,border:`1px solid ${C.border}`}}>
-                    <table style={{borderCollapse:"collapse",fontSize:11,minWidth:"100%",background:C.card}}>
+                  <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] shadow-sm">
+                    <table className="border-collapse text-[11px] min-w-full bg-white">
                       <thead>
                         <tr>
-                          <th style={{background:C.faint,color:C.text,padding:"8px 12px",border:`1px solid ${C.border}`,textAlign:"left",minWidth:120}}>Ejercicio</th>
-                          <th style={{background:C.faint,color:C.text,padding:"8px 8px",border:`1px solid ${C.border}`,textAlign:"center",minWidth:40}}>Serie</th>
+                          <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left min-w-[120px]">Ejercicio</th>
+                          <th className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center min-w-[40px]">Serie</th>
                           {semanas.map((s,i)=>(
-                            <th key={i} colSpan={2} style={{background:C.faint,color:C.accent,padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10,whiteSpace:"nowrap"}}>{s.label}</th>
+                            <th key={i} colSpan={2} className="bg-gray-50 text-[#1A6FD4] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] whitespace-nowrap">{s.label}</th>
                           ))}
                         </tr>
                         <tr>
-                          <th colSpan={2} style={{background:C.surfaceAlt,border:`1px solid ${C.border}`}}/>
+                          <th colSpan={2} className="bg-gray-50/50 border border-[#E2E8F0]"/>
                           {semanas.map((_,i)=>(
-                            <Fragment key={`h${i}`}><th key={`p${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Peso</th>
-                              <th key={`r${i}`} style={{background:C.surfaceAlt,color:C.muted,padding:"4px 6px",border:`1px solid ${C.border}`,textAlign:"center",fontSize:10}}>Reps</th></Fragment>
+                            <Fragment key={`h${i}`}>
+                              <th key={`p${i}`} className="bg-gray-50/50 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px]">Peso</th>
+                              <th key={`r${i}`} className="bg-gray-50/50 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px]">Reps</th>
+                            </Fragment>
                           ))}
                         </tr>
                       </thead>
@@ -405,29 +407,28 @@ export function ProgresoCliente({ selected, setMsg }) {
                             const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_", ""));
                             const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
                             
-                            // Combine background styles so alternative tables are subtly highlighted
-                            const rowBg = eji % 2 === 0 ? C.card : C.surfaceAlt;
-                            const highlight = !isOriginal ? `${C.accentDeep}15` : rowBg;
+                            const rowBg = eji % 2 === 0 ? "bg-white" : "bg-gray-50/30";
+                            const highlight = !isOriginal ? "bg-[#1A6FD4]/5" : rowBg;
 
                             return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
-                              <tr key={`${ej.id}-${vid}-${si}`} style={{background: highlight}}>
+                              <tr key={`${ej.id}-${vid}-${si}`} className={highlight}>
                                 {si === 0 && (
-                                  <td rowSpan={exObj.num_series || ej.num_series || 4} style={{padding:"8px 12px",border:`1px solid ${C.border}`,fontWeight:600,verticalAlign:"middle"}}>
-                                    <div style={{display:"flex", alignItems:"center", gap: 6}}>
-                                      <span>{exObj.nombre}</span>
-                                      {!isOriginal && <span style={{fontSize:9, background: C.accent, color: C.card, padding: "2px 4px", borderRadius: 4, fontWeight: "bold"}}>ALT</span>}
+                                  <td rowSpan={exObj.num_series || ej.num_series || 4} className="px-3 py-2 border border-[#E2E8F0] font-bold align-middle">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[#0B1929]">{exObj.nombre}</span>
+                                      {!isOriginal && <span className="text-[9px] bg-[#1A6FD4] text-white px-1 py-0.5 rounded font-bold">ALT</span>}
                                     </div>
-                                    <div style={{fontSize:10,color:C.muted,fontWeight:400,marginTop:2}}>{exObj.grupo_muscular || ej.grupo_muscular}</div>
+                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5">{exObj.grupo_muscular || ej.grupo_muscular}</div>
                                   </td>
                                 )}
-                                <td style={{padding:"6px 8px",border:`1px solid ${C.border}`,textAlign:"center",color:C.accent,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{si+1}</td>
+                                <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[#1A6FD4] font-bold font-['Rajdhani']">{si+1}</td>
                                 {semanas.map((_, wi) => {
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
                                   
                                   let emptyText = "—";
-                                  let emptyColor = C.dim;
-                                  let emptyWeight = 400;
+                                  let emptyColorClass = "text-[#CBD5E1]";
+                                  let emptyWeightClass = "font-normal";
                                   
                                   if (!pVal && !rVal) {
                                     const otherVariantHasData = activeVariants.some(otherVid => 
@@ -435,18 +436,18 @@ export function ProgresoCliente({ selected, setMsg }) {
                                     );
                                     if (otherVariantHasData) {
                                       emptyText = isOriginal ? "ALT" : "ORG";
-                                      emptyColor = C.accentMid;
-                                      emptyWeight = 700;
+                                      emptyColorClass = "text-[#6B7A8D]";
+                                      emptyWeightClass = "font-bold";
                                     }
                                   }
 
                                   return (
                                     <Fragment key={`w${wi}`}>
-                                      <td key={`p${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:pVal?`${C.accentDeep}40`:"transparent"}}>
-                                        <span style={{fontSize:11,color:pVal?C.accent:emptyColor,fontWeight:pVal?700:emptyWeight}}>{pVal||emptyText}</span>
+                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ? "bg-[#1A6FD4]/10" : ""}`}>
+                                        <span className={`text-[11px] ${pVal ? "text-[#1A6FD4] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
                                       </td>
-                                      <td key={`r${wi}`} style={{padding:"6px 4px",border:`1px solid ${C.border}`,textAlign:"center",background:rVal?`${C.accentDeep}25`:"transparent"}}>
-                                        <span style={{fontSize:11,color:rVal?C.accentMid:emptyColor,fontWeight:rVal?700:emptyWeight}}>{rVal||emptyText}</span>
+                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ? "bg-[#1A6FD4]/5" : ""}`}>
+                                        <span className={`text-[11px] ${rVal ? "text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
                                       </td>
                                     </Fragment>
                                   );
@@ -467,93 +468,98 @@ export function ProgresoCliente({ selected, setMsg }) {
 
       {/* ── MODAL NUEVA EVALUACIÓN ── */}
       {showModal&&(
-        <Modal title={editingId ? "Editar evaluación" : "Nueva evaluación corporal"} onClose={closeModal} wide>
-          <Field label="Fecha de evaluación">
-            <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)}/>
-          </Field>
-          {METRIC_GROUPS.map(group=>(
-            <div key={group.label} style={{marginBottom:18}}>
-              <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>
-                {group.icon} {group.label}
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
-                {group.fields.map(f=>(
-                  <Field key={f.key} label={f.label}>
-                    <input
-                      type={f.type} step={f.step||"any"}
-                      value={form[f.key]}
-                      readOnly={!!f.readOnly}
-                      placeholder={f.readOnly?"Auto":(f.placeholder||"")}
-                      style={f.readOnly?{opacity:0.6,cursor:"not-allowed"}:{}}
-                      onChange={e=>!f.readOnly&&updForm(f.key,e.target.value)}
-                    />
-                  </Field>
-                ))}
-              </div>
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluación" : "Nueva evaluación corporal"}</h2>
+              <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929]"><X className="w-6 h-6" /></button>
             </div>
-          ))}
-          <Field label="Notas">
-            <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…"/>
-          </Field>
-
-          {/* Fotos existentes cuando se edita */}
-          {editingId && existingFotos.length > 0 && (
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 Fotos actuales</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {existingFotos.map((url,i) => (
-                  <div key={i} style={{position:"relative",width:72,height:72}}>
-                    <img src={url} onClick={()=>setLightbox(url)} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:`2px solid ${C.border}`,cursor:"zoom-in"}} alt=""/>
-                    <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",textAlign:"center",cursor:"pointer",border:"none",fontWeight:700}}>×</button>
-                  </div>
-                ))}
-              </div>
+            
+            <div className="flex flex-col gap-1.5 mb-6">
+              <label className="text-sm font-bold text-[#0B1929]">Fecha de evaluación</label>
+              <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20" />
             </div>
-          )}
 
-          {/* Foto upload */}
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📸 {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
-            <label style={{display:"inline-flex",alignItems:"center",gap:8,background:C.card,border:`1px dashed ${C.accent}`,borderRadius:10,padding:"10px 16px",cursor:"pointer",fontSize:13,color:C.accent,fontWeight:600}}>
-              + Agregar fotos
-              <input type="file" accept="image/*" multiple onChange={handleFotos} style={{display:"none"}}/>
-            </label>
-            {previewUrls.length>0&&(
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}>
-                {previewUrls.map((url,i)=>(
-                  <div key={i} style={{position:"relative",width:72,height:72}}>
-                    <img src={url} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:`2px solid ${C.accent}`}} alt=""/>
-                    <button onClick={()=>removePendingFoto(i)} style={{
-                      position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",
-                      borderRadius:"50%",width:18,height:18,fontSize:11,lineHeight:"18px",
-                      textAlign:"center",cursor:"pointer",border:"none",fontWeight:700
-                    }}>×</button>
-                  </div>
-                ))}
+            {METRIC_GROUPS.map(group=>(
+              <div key={group.label} className="mb-6">
+                <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
+                  {group.icon} {group.label}
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+                  {group.fields.map(f=>(
+                    <div key={f.key} className="flex flex-col gap-1.5">
+                      <label className="text-sm font-bold text-[#0B1929]">{f.label}</label>
+                      <input
+                        type={f.type} step={f.step||"any"}
+                        value={form[f.key]}
+                        readOnly={!!f.readOnly}
+                        placeholder={f.readOnly?"Auto":(f.placeholder||"")}
+                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20 ${f.readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                        onChange={e=>!f.readOnly&&updForm(f.key,e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            
+            <div className="flex flex-col gap-1.5 mb-6">
+              <label className="text-sm font-bold text-[#0B1929]">Notas</label>
+              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]/20 min-h-[100px]" />
+            </div>
+
+            {/* Fotos existentes cuando se edita */}
+            {editingId && existingFotos.length > 0 && (
+              <div className="mb-4">
+                <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> Fotos actuales</div>
+                <div className="flex gap-2 flex-wrap">
+                  {existingFotos.map((url,i) => (
+                    <div key={i} className="relative w-20 h-20">
+                      <img src={url} onClick={()=>setLightbox(url)} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#E2E8F0] cursor-zoom-in" alt=""/>
+                      <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
 
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <Btn outline color={C.muted} onClick={closeModal}>Cancelar</Btn>
-            <Btn grad onClick={saveMetrica} disabled={saving}>{saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}</Btn>
+            {/* Foto upload */}
+            <div className="mb-6">
+              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
+              <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[#1A6FD4] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[#1A6FD4] font-bold hover:bg-[#1A6FD4]/5 transition-colors">
+                <Plus className="w-4 h-4" /> Agregar fotos
+                <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
+              </label>
+              {previewUrls.length>0&&(
+                <div className="flex gap-2 flex-wrap mt-3">
+                  {previewUrls.map((url,i)=>(
+                    <div key={i} className="relative w-20 h-20">
+                      <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#1A6FD4]" alt=""/>
+                      <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
+              <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button onClick={saveMetrica} disabled={saving} className="bg-[#1A6FD4] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
+              </button>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
+      
       {/* Lightbox */}
       {lightbox&&createPortal(
-        <div onClick={()=>setLightbox(null)} style={{
-          position:"fixed",top:0,left:0,width:"100%",height:"100%",
-          background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",
-          justifyContent:"center",zIndex:9999,cursor:"zoom-out"
-        }}>
-          <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,objectFit:"contain",boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} alt=""/>
-          <div style={{position:"absolute",top:20,right:24,color:"#fff",fontSize:28,cursor:"pointer",fontWeight:700}} onClick={()=>setLightbox(null)}>✕</div>
+        <div onClick={()=>setLightbox(null)} className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out">
+          <img src={lightbox} className="max-w-[90vw] max-h-[90vh] rounded-[14px] object-contain shadow-2xl" alt=""/>
+          <div className="absolute top-5 right-6 text-white text-3xl cursor-pointer font-bold" onClick={()=>setLightbox(null)}>✕</div>
         </div>,
         document.body
       )}
-
-        {/* ── Se removió el FAB para PDF y se movió a la cabecera ── */}
 
     </div>
   );
