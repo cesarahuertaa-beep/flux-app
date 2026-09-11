@@ -1,26 +1,101 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from "lucide-react";
 
 export default function MiMembresia({ clientes, profileId, setMsg }) {
-  // Lógica dinámica de pacientes
-  const activeCount = clientes.filter(c => c.activo).length;
-  
-  let currentTier = 1;
-  let currentRate = 50;
-  let nextTierThreshold = 21;
+  const [perfil, setPerfil] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  if (activeCount >= 21 && activeCount <= 50) {
-    currentTier = 2;
-    currentRate = 45;
-    nextTierThreshold = 51;
-  } else if (activeCount > 50) {
-    currentTier = 3;
-    currentRate = 40;
-    nextTierThreshold = null; // Max tier
-  }
+  useEffect(() => {
+    async function loadData() {
+      if (!profileId) return;
+      try {
+        const data = await dbGet(`profiles?id=eq.${profileId}`);
+        if (data && data.length > 0) setPerfil(data[0]);
+      } catch (e) {
+        console.error("Error cargando perfil:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [profileId]);
 
-  // Cálculos base 
-  const totalAmount = activeCount * currentRate;
+  // Cálculos de fechas y periodos
+  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText } = useMemo(() => {
+    const today = new Date();
+    const diaCorte = perfil?.dia_corte || 1; // Si no hay en DB, usa día 1
+
+    let nextCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
+    if (today.getDate() > diaCorte) {
+      nextCutoff = new Date(today.getFullYear(), today.getMonth() + 1, diaCorte);
+    }
+    const lastCutoff = new Date(nextCutoff.getFullYear(), nextCutoff.getMonth() - 1, diaCorte);
+    
+    // Contadores
+    let activePatientsCount = 0;
+    
+    // Generar desglose
+    const dataList = clientes.map(c => {
+      const isActivo = c.activo;
+      const createdAt = new Date(c.created_at || today);
+      const deactivatedAt = c.deactivated_at ? new Date(c.deactivated_at) : null;
+      
+      let diasCobrar = 0;
+      
+      if (isActivo) {
+        activePatientsCount++;
+        if (createdAt < lastCutoff) {
+          diasCobrar = 30; // Cliente de ciclos anteriores
+        } else {
+          // Cliente nuevo en este ciclo, cobramos los días hasta el corte
+          const diffTime = Math.abs(nextCutoff - createdAt);
+          diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diasCobrar > 30) diasCobrar = 30;
+        }
+      } else if (deactivatedAt && deactivatedAt > lastCutoff) {
+        // Cliente desactivado recientemente (en este ciclo). 
+        // Lógica del mes forzoso: cobramos los días proporcionales de su mes forzoso pendiente.
+        // Simplificado para V1: Calculamos cuántos días estuvo activo este mes antes de la baja.
+        const start = createdAt > lastCutoff ? createdAt : lastCutoff;
+        const diffTime = Math.abs(deactivatedAt - start);
+        diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diasCobrar > 30) diasCobrar = 30;
+      }
+      
+      return { ...c, diasCobrar };
+    }).filter(c => c.diasCobrar > 0);
+
+    // Calcular tarifa
+    let tier = 1;
+    let rate = 50;
+    let threshold = 21;
+    if (activePatientsCount >= 21 && activePatientsCount <= 50) {
+      tier = 2; rate = 45; threshold = 51;
+    } else if (activePatientsCount > 50) {
+      tier = 3; rate = 40; threshold = null;
+    }
+
+    // Calcular costos
+    let total = 0;
+    dataList.forEach(c => {
+      c.costoPaciente = (rate / 30) * c.diasCobrar;
+      total += c.costoPaciente;
+    });
+
+    const strCorte = nextCutoff.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' });
+
+    return { 
+      desglose: dataList, 
+      activeCount: activePatientsCount, 
+      currentTier: tier, 
+      currentRate: rate, 
+      nextTierThreshold: threshold, 
+      totalAmount: total, 
+      fechaCorteText: strCorte 
+    };
+  }, [clientes, perfil]);
 
   // Fechas mock (luego vendrán de Supabase)
   const fechaCorte = "15 de Noviembre";
@@ -107,7 +182,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                   <FileText size={20} className="text-[#1A6FD4]"/>
                   Desglose para Próximo Corte
                 </h2>
-                <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorte}</span>
+                <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorteText}</span>
               </div>
               
               {/* Tabla de Pacientes */}
@@ -122,29 +197,23 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {clientes.filter(c => c.activo).length === 0 ? (
+                    {desglose.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes activos en este ciclo.</td>
+                        <td colSpan="4" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</td>
                       </tr>
                     ) : (
-                      clientes.filter(c => c.activo).map((c, i) => {
-                        // Mock cálculos de días (en la versión final esto se calculará en base a fecha_corte y c.created_at)
-                        const dias = 30; // Simulando mes completo por defecto
-                        const costoPaciente = (currentRate / 30) * dias; 
-                        
-                        return (
-                          <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
-                            <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
-                              {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
-                            </td>
-                            <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
-                              {dias} <span className="text-gray-400 font-normal">/ 30</span>
-                            </td>
-                            <td className="py-3 px-6 font-bold text-[#1A6FD4] text-right">${costoPaciente.toFixed(2)}</td>
-                          </tr>
-                        );
-                      })
+                      desglose.map((c, i) => (
+                        <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
+                          <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
+                            {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
+                          </td>
+                          <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
+                            {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
+                          </td>
+                          <td className="py-3 px-6 font-bold text-[#1A6FD4] text-right">${c.costoPaciente.toFixed(2)}</td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>

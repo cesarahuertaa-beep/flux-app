@@ -231,9 +231,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   const toggleActivo = async (c) => {
     try {
-      await dbPatch(`clientes?id=eq.${c.id}`, { activo:!c.activo });
+      const payload = { activo: !c.activo };
+      if (c.activo) {
+        payload.deactivated_at = new Date().toISOString();
+      } else {
+        payload.deactivated_at = null; // Limpiar si se vuelve a activar
+      }
+      await dbPatch(`clientes?id=eq.${c.id}`, payload);
       await loadClientes();
-      setMsg(`✅ Cliente ${!c.activo ? "activado" : "desactivado"}`);
+      setMsg(`✓ Cliente ${!c.activo ? "activado" : "desactivado"}`);
     } catch(e) { setMsg("❌ Error: "+e.message); }
   };
 
