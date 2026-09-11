@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
-  Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard 
+  Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
@@ -12,6 +12,7 @@ import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import GestorTienda from "../components/admin/GestorTienda";
 import MiMembresia from "../components/admin/MiMembresia";
+import ControlPagos from "../components/admin/ControlPagos";
 import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
@@ -304,7 +305,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           { id: "membresia",  label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
-            { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> }
+            { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+            { id: "pagos", label: "Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
           ] : [])
         ];
 
@@ -529,6 +531,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {tab === "equipo" && role !== "administrativo" && role !== "staff" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
       {tab === "membresia" && <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>}
+      {tab === "pagos" && isSuperadmin && <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>}
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
       {conflictClient && (
