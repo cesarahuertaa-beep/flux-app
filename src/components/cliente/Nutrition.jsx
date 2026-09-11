@@ -177,20 +177,16 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
 
                   {/* Opciones de comida en disposición vertical */}
                   <div className="flex flex-col gap-4 mt-4">
-                    {/* Imagen a lo ancho */}
-                    <div className="w-full h-40 sm:h-48 rounded-xl bg-[#F0F4FA] overflow-hidden">
-                      {meal.imagen_url ? (
+                    {/* Imagen a lo ancho (solo si existe) */}
+                    {(meal.foto_url || meal.imagen_url) && (
+                      <div className="w-full h-40 sm:h-48 rounded-xl bg-[#F0F4FA] overflow-hidden shrink-0">
                         <img
-                          src={meal.imagen_url}
+                          src={meal.foto_url || meal.imagen_url}
                           alt={label}
                           className="w-full h-full object-cover"
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Apple size={40} className="text-[#CBD5E1]" />
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-1.5">
                       <p className="text-lg font-bold text-[#0B1929]">{label}</p>
