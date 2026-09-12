@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { dbGet, dbPatch } from "../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar } from "lucide-react";
+import { dbGet, dbPatch, dbPost } from "../../lib/supabase";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send } from "lucide-react";
 
 export default function ControlPagos({ setMsg }) {
   const [recibos, setRecibos] = useState([]);
@@ -10,19 +10,30 @@ export default function ControlPagos({ setMsg }) {
   const [filtroEstado, setFiltroEstado] = useState("pendiente");
   const [filtroMes, setFiltroMes] = useState("todos");
   const [expandedColab, setExpandedColab] = useState(null);
+  const [nominasEstado, setNominasEstado] = useState({}); // "Nombre|YYYY-MM" -> { transferido_por_admin, confirmado_por_colaborador }
 
   const COMISION_PCT = 0.35;
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [dataRecibos, profiles] = await Promise.all([
+      const [dataRecibos, profiles, dataNominas] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),
-        dbGet("profiles?role=eq.nutriologo&select=id,nombre,creado_por_nombre")
+        dbGet("profiles?role=eq.nutriologo&select=id,nombre,creado_por_nombre"),
+        dbGet("nomina_colaboradores")
       ]);
       const map = {};
       profiles.forEach(p => { map[p.id] = { nombre: p.nombre, creado_por: p.creado_por_nombre || null }; });
+      
+      const mapNominas = {};
+      if(dataNominas && dataNominas.length > 0) {
+        dataNominas.forEach(n => {
+          mapNominas[`${n.colaborador_nombre}|${n.mes_facturacion}`] = n;
+        });
+      }
+
       setNutriologos(map);
+      setNominasEstado(mapNominas);
       setRecibos(dataRecibos);
     } catch (e) {
       console.error(e);
@@ -102,6 +113,34 @@ export default function ControlPagos({ setMsg }) {
     if (s === "aprobado") return <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><CheckCircle2 size={12}/> Aprobado</span>;
     if (s === "rechazado") return <span className="px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><XCircle size={12}/> Rechazado</span>;
     return null;
+  };
+
+  const handleMarcarTransferido = async (colaboradorNombre, monto) => {
+    if (filtroMes === 'todos') {
+      setMsg("⚠️ Selecciona un mes específico arriba para poder transferir.");
+      return;
+    }
+    try {
+      setMsg("Guardando...");
+      // Primero checar si existe la fila
+      const key = `${colaboradorNombre}|${filtroMes}`;
+      const existing = nominasEstado[key];
+      
+      if (existing) {
+        await dbPatch(`nomina_colaboradores?id=eq.${existing.id}`, { transferido_por_admin: true, monto });
+      } else {
+        await dbPost("nomina_colaboradores", {
+          colaborador_nombre: colaboradorNombre,
+          mes_facturacion: filtroMes,
+          monto: monto,
+          transferido_por_admin: true
+        });
+      }
+      setMsg("✓ Marcado como transferido");
+      loadData();
+    } catch (e) {
+      setMsg("❌ Error: " + e.message);
+    }
   };
 
   return (
@@ -213,22 +252,35 @@ export default function ControlPagos({ setMsg }) {
           </div>
 
           <div className="divide-y divide-gray-100">
-            {comisiones.map((c, i) => (
+            {comisiones.map((c, i) => {
+              const nom = nominasEstado[`${c.nombre}|${filtroMes}`];
+              const isTransferido = nom?.transferido_por_admin;
+              const isConfirmado = nom?.confirmado_por_colaborador;
+
+              return (
               <div key={i}>
-                <button
-                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/60 transition-colors text-left"
-                  onClick={() => setExpandedColab(expandedColab === c.nombre ? null : c.nombre)}
-                >
-                  <div className="flex items-center gap-3">
+                <div className="w-full flex flex-col md:flex-row md:items-center justify-between px-6 py-4 hover:bg-gray-50/60 transition-colors">
+                  
+                  {/* Info izquierda (Clickable) */}
+                  <button 
+                    onClick={() => setExpandedColab(expandedColab === c.nombre ? null : c.nombre)}
+                    className="flex items-center gap-3 text-left flex-1"
+                  >
                     <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
                       <span className="text-indigo-600 font-bold text-sm">{c.nombre.charAt(0).toUpperCase()}</span>
                     </div>
                     <div>
-                      <p className="font-bold text-[#0B1929]">{c.nombre}</p>
+                      <p className="font-bold text-[#0B1929] flex items-center gap-2">
+                        {c.nombre}
+                        {isConfirmado && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] uppercase tracking-wider font-bold">FIRMADO</span>}
+                      </p>
                       <p className="text-xs text-[#6B7A8D]">{c.nutriologos.length} nutriólogo{c.nutriologos.length !== 1 ? 's' : ''} · {c.recibosCount} recibo{c.recibosCount !== 1 ? 's' : ''}</p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-6">
+                    {expandedColab === c.nombre ? <ChevronDown size={18} className="text-[#6B7A8D] shrink-0 ml-2" /> : <ChevronRight size={18} className="text-[#6B7A8D] shrink-0 ml-2" />}
+                  </button>
+
+                  {/* Acciones derecha */}
+                  <div className="flex items-center justify-end gap-6 mt-4 md:mt-0 pl-12 md:pl-0">
                     <div className="text-right hidden sm:block">
                       <p className="text-xs text-[#6B7A8D]">Total generado</p>
                       <p className="font-semibold text-[#0B1929] text-sm">${c.totalGenerado.toFixed(2)}</p>
@@ -237,12 +289,34 @@ export default function ControlPagos({ setMsg }) {
                       <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Tu pago (35%)</p>
                       <p className="font-black text-indigo-600 text-lg">${c.comision.toFixed(2)}</p>
                     </div>
-                    {expandedColab === c.nombre ? <ChevronDown size={18} className="text-[#6B7A8D] shrink-0" /> : <ChevronRight size={18} className="text-[#6B7A8D] shrink-0" />}
+                    
+                    {filtroMes !== 'todos' && (
+                      <div className="border-l border-gray-200 pl-4">
+                        {isConfirmado ? (
+                           <div className="flex flex-col items-center text-green-600">
+                             <CheckCircle2 size={20} />
+                             <span className="text-[10px] font-bold mt-1">PAGADO</span>
+                           </div>
+                        ) : isTransferido ? (
+                           <div className="flex flex-col items-center text-amber-500">
+                             <Clock size={20} />
+                             <span className="text-[10px] font-bold mt-1 text-center leading-tight">ESPERANDO<br/>FIRMA</span>
+                           </div>
+                        ) : (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleMarcarTransferido(c.nombre, c.comision); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors"
+                          >
+                            <Send size={14} /> Transferir
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </button>
+                </div>
 
                 {expandedColab === c.nombre && (
-                  <div className="px-6 pb-4 bg-indigo-50/40">
+                  <div className="px-6 pb-4 bg-indigo-50/40 border-t border-indigo-100/50 pt-3">
                     <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-2">Nutriólogos a su cargo:</p>
                     <div className="flex flex-wrap gap-2">
                       {c.nutriologos.map((n, j) => (
@@ -252,7 +326,7 @@ export default function ControlPagos({ setMsg }) {
                   </div>
                 )}
               </div>
-            ))}
+            )})}
           </div>
 
           <div className="px-6 py-4 bg-gray-50 border-t border-[#E2E8F0] flex justify-between items-center">

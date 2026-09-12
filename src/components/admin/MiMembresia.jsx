@@ -34,7 +34,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
   // Cálculos de fechas y periodos
   const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff } = useMemo(() => {
     const today = new Date();
-    const diaCorte = perfil?.dia_corte || 1; // Si no hay en DB, usa día 1
+    const diaCorte = 10; // Fijo global
 
     let nextCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
     if (today.getDate() > diaCorte) {

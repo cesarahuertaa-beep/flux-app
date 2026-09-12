@@ -13,6 +13,7 @@ import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import GestorTienda from "../components/admin/GestorTienda";
 import MiMembresia from "../components/admin/MiMembresia";
 import ControlPagos from "../components/admin/ControlPagos";
+import MisComisiones from "../components/admin/MisComisiones";
 import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
@@ -312,6 +313,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           ...(isSuperadmin ? [
             { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
             { id: "pagos", label: "Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
+          ] : []),
+          ...((role === "staff" || role === "administrativo") ? [
+            { id: "comisiones", label: "Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
           ] : [])
         ];
 
@@ -537,6 +541,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
       {tab === "membresia" && <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>}
       {tab === "pagos" && isSuperadmin && <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>}
+      {tab === "comisiones" && (role === "staff" || role === "administrativo") && <SubComponentWrapper title="Mis Comisiones"><MisComisiones myId={myId} setMsg={setMsg} /></SubComponentWrapper>}
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
       {conflictClient && (
