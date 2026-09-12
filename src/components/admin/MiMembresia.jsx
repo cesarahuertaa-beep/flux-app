@@ -4,6 +4,7 @@ import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Inf
 
 export default function MiMembresia({ clientes, profileId, setMsg }) {
   const [perfil, setPerfil] = useState(null);
+  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -11,8 +12,16 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
     async function loadData() {
       if (!profileId) return;
       try {
-        const data = await dbGet(`profiles?id=eq.${profileId}`);
+        const [data, cfg] = await Promise.all([
+          dbGet(`profiles?id=eq.${profileId}`),
+          dbGet("configuracion_plataforma?id=eq.1")
+        ]);
         if (data && data.length > 0) setPerfil(data[0]);
+        if (cfg && cfg.length > 0) setConfigPago({
+          clabe: cfg[0].clabe || "",
+          banco: cfg[0].banco || "",
+          beneficiario: cfg[0].beneficiario || ""
+        });
       } catch (e) {
         console.error("Error cargando perfil:", e);
       } finally {
@@ -310,22 +319,27 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
               <h2 className="text-lg font-bold text-[#0B1929] mb-4">Datos de Transferencia</h2>
               
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-4">
-                <div>
-                  <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Banco</p>
-                  <p className="font-bold text-[#0B1929]">BBVA</p>
-                </div>
-                
-                <div>
-                  <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">CLABE Interbancaria</p>
-                  <p className="font-bold text-[#0B1929] tracking-widest">0123 4567 8901 2345 67</p>
-                </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Banco</p>
+                    <p className="font-bold text-[#0B1929]">{configPago.banco || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">CLABE Interbancaria</p>
+                    <p className="font-bold text-[#0B1929] tracking-widest font-mono">
+                      {configPago.clabe 
+                        ? configPago.clabe.replace(/(.{4})/g, '$1 ').trim()
+                        : <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>
+                      }
+                    </p>
+                  </div>
 
-                <div>
-                  <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</p>
-                  <p className="font-bold text-[#0B1929]">Flux Technologies</p>
-                </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</p>
+                    <p className="font-bold text-[#0B1929]">{configPago.beneficiario || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
+                  </div>
 
-                <div className="pt-3 border-t border-gray-200">
+                  <div className="pt-3 border-t border-gray-200">
                   <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
                   <p className="font-black text-lg text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
                     FLX-{profileId ? profileId.substring(0,6).toUpperCase() : 'USER12'}

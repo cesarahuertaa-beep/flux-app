@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { dbGet, dbPatch, storageUpload } from "../../lib/supabase";
+import { dbGet, dbPatch, dbPost, storageUpload } from "../../lib/supabase";
 import { Capacitor } from "@capacitor/core";
-import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, ShoppingBag, RefreshCw } from "lucide-react";
+import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, ShoppingBag, RefreshCw, CreditCard } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
@@ -23,11 +23,15 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     logo_url: "",
     email: ""
   });
+
+  // Config de cobro (solo superadmin)
+  const isSuperadmin = role === "superadmin";
+  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
+  const [savingConfig, setSavingConfig] = useState(false);
   
   const [solicitudes, setSolicitudes] = useState([]);
 
   const fileInputRef = useRef(null);
-
   const loadProfile = async () => {
     try {
       const rows = await dbGet(`profiles?id=eq.${profileId}`);
@@ -50,6 +54,18 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           setSolicitudes(reqs);
         }
       }
+
+      // Si es superadmin, cargar config de pago
+      if (role === "superadmin") {
+        const cfg = await dbGet("configuracion_plataforma?id=eq.1");
+        if (cfg && cfg.length > 0) {
+          setConfigPago({
+            clabe: cfg[0].clabe || "",
+            banco: cfg[0].banco || "",
+            beneficiario: cfg[0].beneficiario || ""
+          });
+        }
+      }
     } catch (error) {
       console.error("Error cargando perfil", error);
     }
@@ -59,6 +75,24 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   useEffect(() => {
     loadProfile();
   }, [profileId]);
+
+  const handleSaveConfig = async () => {
+    setSavingConfig(true);
+    setErr("");
+    setMsg("");
+    try {
+      await dbPatch("configuracion_plataforma?id=eq.1", {
+        clabe: configPago.clabe,
+        banco: configPago.banco,
+        beneficiario: configPago.beneficiario,
+        updated_at: new Date().toISOString()
+      });
+      setMsg("Datos de cobro actualizados correctamente.");
+    } catch (error) {
+      setErr("Error guardando config: " + error.message);
+    }
+    setSavingConfig(false);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -345,6 +379,55 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             <LogOut size={18} /> Salir
           </button>
         </div>
+
+        {/* Sección de datos de cobro — solo Superadmin */}
+        {isSuperadmin && (
+          <div className="mt-10 border-t border-[#E2E8F0] pt-8">
+            <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-1">
+              <CreditCard size={18} className="text-[#1A6FD4]" /> Datos de Cobro (SPEI)
+            </h3>
+            <p className="text-xs text-[#6B7A8D] mb-5">Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo para que sepan a dónde hacer su transferencia.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Banco</label>
+                <input
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  placeholder="Ej. BBVA, BANAMEX..."
+                  value={configPago.banco}
+                  onChange={e => setConfigPago(p => ({ ...p, banco: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">CLABE Interbancaria (18 dígitos)</label>
+                <input
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  placeholder="000000000000000000"
+                  maxLength={18}
+                  value={configPago.clabe}
+                  onChange={e => setConfigPago(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))}
+                />
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Beneficiario (nombre de cuenta)</label>
+                <input
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  placeholder="Ej. Flux Technologies SA de CV"
+                  value={configPago.beneficiario}
+                  onChange={e => setConfigPago(p => ({ ...p, beneficiario: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveConfig}
+              disabled={savingConfig}
+              className="mt-4 w-full md:w-auto px-6 py-3 bg-[#1A6FD4] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
+            >
+              <Save size={16} /> {savingConfig ? "Guardando..." : "Guardar datos de cobro"}
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
