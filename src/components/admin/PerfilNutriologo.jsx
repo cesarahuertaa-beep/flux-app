@@ -334,14 +334,14 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           )}
         </div>
 
-        {(multiRoles?.filter(r => r.role !== 'client') || []).length > 1 && (
+        {(multiRoles || []).length > 1 && (
           <div className="mt-8 border-t border-[#E2E8F0] pt-8">
             <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
               <RefreshCw size={16} className="text-[#6B7A8D]" />
               Cambiar Perfil (Sesión Múltiple)
             </h3>
             <div className="flex flex-col gap-2">
-              {multiRoles.filter(r => r.role !== 'client').map((r, i) => {
+              {multiRoles.map((r, i) => {
                 const isActive = (role === "admin" ? "admin" : role) === (r.role === "admin" ? "admin" : r.role);
                 return (
                   <button
