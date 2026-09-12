@@ -14,6 +14,7 @@ import GestorTienda from "../components/admin/GestorTienda";
 import MiMembresia from "../components/admin/MiMembresia";
 import ControlPagos from "../components/admin/ControlPagos";
 import MisComisiones from "../components/admin/MisComisiones";
+import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
 import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
@@ -63,6 +64,59 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const myId = profileId || getProfileId();
 
   const [myShadowClient, setMyShadowClient] = useState(null);
+  const [bloqueado, setBloqueado] = useState(false);
+  const [diasGracia, setDiasGracia] = useState(false); // true = días 11-12, mostrar alerta
+
+  // ── VERIFICACIÓN DE MORA (solo para nutriólogos) ──
+  useEffect(() => {
+    if (role !== "nutriologo") return;
+
+    const checkPago = async () => {
+      try {
+        const today = new Date();
+        const diaHoy = today.getDate();
+        const DIA_CORTE = 10;
+        const DIA_BLOQUEO = 13; // día 13 = 48h después del corte
+
+        // Solo verificar si pasó el día de corte
+        if (diaHoy <= DIA_CORTE) return;
+
+        // El período de facturación actual: año-mes del mes actual (si diaHoy <= 10) o mismo mes
+        // Como ya pasamos el día 10, el periodo que deben pagar es el mes actual
+        const mesActual = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+        // Buscar un recibo aprobado para este nutriólogo en el período actual
+        const recibos = await dbGet(
+          `recibos_pago?nutriologo_id=eq.${myId}&estado=eq.aprobado&fecha_corte_mes=gte.${mesActual}-01&fecha_corte_mes=lte.${mesActual}-31`
+        );
+
+        const tieneRecibo = recibos && recibos.length > 0;
+
+        if (tieneRecibo) {
+          // Tiene pago: asegurar que esté desbloqueado
+          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
+          setBloqueado(false);
+          setDiasGracia(false);
+          return;
+        }
+
+        if (diaHoy >= DIA_BLOQUEO) {
+          // Bloquear
+          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
+          setBloqueado(true);
+          setDiasGracia(false);
+        } else {
+          // Días 11-12: alerta pero sin bloqueo
+          setDiasGracia(true);
+          setBloqueado(false);
+        }
+      } catch (e) {
+        console.error("Error verificando pago:", e);
+      }
+    };
+
+    checkPago();
+  }, [myId, role]);
 
   const clientesFilter = (isSuperadmin || role === "staff")
     ? "clientes?order=created_at.asc"
@@ -318,6 +372,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           ] : [])
         ];
 
+  if (bloqueado) {
+    return <BloqueadoNutriologo onLogout={onLogout} />;
+  }
+
   return (
     <AppLayout
       nav={SIDEBAR_ITEMS}
@@ -326,6 +384,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       brand={brand}
       onLogout={onLogout}
     >
+      {diasGracia && (
+        <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
+          ⚠️ Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.
+        </div>
+      )}
       {/* Toast Notification (z-[110] para que siempre esté arriba) */}
       {msg && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-top-4">

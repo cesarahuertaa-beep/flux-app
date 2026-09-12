@@ -91,9 +91,15 @@ export default function ControlPagos({ setMsg }) {
       .sort((a, b) => b.comision - a.comision);
   }, [filtrados, nutriologos]);
 
-  const updateEstado = async (id, nuevoEstado) => {
+  const updateEstado = async (id, nuevoEstado, nutriologoId) => {
     try {
       await dbPatch(`recibos_pago?id=eq.${id}`, { estado: nuevoEstado });
+      
+      // Si se aprueba, desbloquear al nutriólogo automáticamente
+      if (nuevoEstado === "aprobado" && nutriologoId) {
+        await dbPatch(`profiles?id=eq.${nutriologoId}`, { bloqueado: false });
+      }
+
       setMsg("✓ Recibo " + nuevoEstado);
       loadData();
     } catch (e) {
@@ -225,8 +231,8 @@ export default function ControlPagos({ setMsg }) {
                           <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
                           {r.estado === "pendiente" && (
                             <>
-                              <button onClick={() => updateEstado(r.id, "aprobado")} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                              <button onClick={() => updateEstado(r.id, "rechazado")} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                              <button onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                              <button onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
                             </>
                           )}
                         </div>

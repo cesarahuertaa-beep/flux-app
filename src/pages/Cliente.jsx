@@ -10,6 +10,7 @@ import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
 import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
+import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -41,9 +42,19 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [loading, setLoading] = useState(true);
   const [cicloActivo, setCicloActivo] = useState(null);
   const [syncStatus, setSyncStatus] = useState("synced");
+  const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
 
   const loadData = async () => {
     try {
+      if (cliente?.nutriologo_id) {
+        const nutriProfile = await dbGet(`profiles?id=eq.${cliente.nutriologo_id}&select=bloqueado`);
+        if (nutriProfile && nutriProfile[0]?.bloqueado) {
+          setNutriologoBloqueado(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
       const ciclo = cs.length ? cs[0] : null;
       setCicloActivo(ciclo);
@@ -154,6 +165,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     const wk = Math.floor(diffDays / 7) + 1;
     return isNaN(wk) ? 1 : Math.max(1, wk);
   })();
+
+  if (nutriologoBloqueado) {
+    return <BloqueadoPaciente onLogout={onLogout} />;
+  }
 
   return (
     <AppLayout 
