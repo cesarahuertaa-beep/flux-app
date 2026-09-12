@@ -197,34 +197,39 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                 Nivel de Suscripción Actual
               </h2>
 
-              <div className="relative pt-6 pb-6 mt-4">
-                {/* Barra de progreso */}
-                <div className="absolute top-[60px] left-0 w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#1A6FD4] to-blue-400 transition-all duration-1000"
-                    style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
-                  />
+              {/* Termómetro: textos arriba, barra en el medio, precios abajo */}
+              <div className="mt-4 px-2">
+                {/* Fila de etiquetas superiores */}
+                <div className="flex justify-between mb-2">
+                  {[{label: 'Nivel 1', sub: '1 pac.'}, {label: 'Nivel 2', sub: '21 pac.'}, {label: 'Nivel 3', sub: '+50 pac.'}].map((t, i) => (
+                    <div key={i} className="text-center w-20">
+                      <span className="block text-xs font-bold text-[#0B1929]">{t.label}</span>
+                      <span className="block text-[10px] text-[#6B7A8D]">{t.sub}</span>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Markers */}
-                <div className="relative flex justify-between px-2">
-                  {[1, 21, 51].map((pts, i) => (
-                    <div key={i} className="flex flex-col items-center w-20">
-                      {/* Textos ARRIBA */}
-                      <div className="mb-2 text-center h-12 flex flex-col justify-end">
-                        <span className="block text-xs font-bold text-[#0B1929]">Nivel {i+1}</span>
-                        <span className="block text-[10px] text-[#6B7A8D]">{pts === 51 ? '+50' : `${pts}`} pac.</span>
-                      </div>
-                      
-                      {/* El Punto */}
-                      <div className={`w-5 h-5 rounded-full border-4 shadow-sm flex items-center justify-center z-10 transition-colors
-                        ${activeCount >= pts ? 'bg-[#1A6FD4] border-white' : 'bg-gray-200 border-white'}
-                      `}/>
-                      
-                      {/* Precio ABAJO */}
-                      <div className="mt-2 text-center">
-                        <span className="block text-xs font-bold text-emerald-600">${i===0?50:i===1?45:40}</span>
-                      </div>
+                {/* Barra con puntos superpuestos */}
+                <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-2">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#1A6FD4] to-blue-400 rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
+                  />
+                  {/* Puntos */}
+                  {[0, 0.39, 1].map((pct, i) => (
+                    <div
+                      key={i}
+                      className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 shadow-sm z-10 transition-colors ${activeCount >= [1,21,51][i] ? 'bg-[#1A6FD4] border-white' : 'bg-gray-200 border-white'}`}
+                      style={{ left: `calc(${pct * 100}% - 10px)` }}
+                    />
+                  ))}
+                </div>
+
+                {/* Fila de precios inferiores */}
+                <div className="flex justify-between mt-3">
+                  {['$50 /pac', '$45 /pac', '$40 /pac'].map((p, i) => (
+                    <div key={i} className="text-center w-20">
+                      <span className="block text-xs font-bold text-emerald-600">{p}</span>
                     </div>
                   ))}
                 </div>

@@ -380,52 +380,62 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           </button>
         </div>
 
-        {/* Sección de datos de cobro — solo Superadmin */}
-        {isSuperadmin && (
+        {/* Sección de datos de cobro — visible para todos pero editable solo por Superadmin */}
+        {(isSuperadmin || isTeam) && (
           <div className="mt-10 border-t border-[#E2E8F0] pt-8">
             <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-1">
               <CreditCard size={18} className="text-[#1A6FD4]" /> Datos de Cobro (SPEI)
             </h3>
-            <p className="text-xs text-[#6B7A8D] mb-5">Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo para que sepan a dónde hacer su transferencia.</p>
+            <p className="text-xs text-[#6B7A8D] mb-5">
+              {isSuperadmin
+                ? 'Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo para que sepan a dónde hacer su transferencia.'
+                : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos mensuales. Solo el Superadmin puede modificarlos.'
+              }
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Banco</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="Ej. BBVA, BANAMEX..."
                   value={configPago.banco}
-                  onChange={e => setConfigPago(p => ({ ...p, banco: e.target.value }))}
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, banco: e.target.value }))}
+                  readOnly={!isSuperadmin}
                 />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">CLABE Interbancaria (18 dígitos)</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="000000000000000000"
                   maxLength={18}
                   value={configPago.clabe}
-                  onChange={e => setConfigPago(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))}
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))}
+                  readOnly={!isSuperadmin}
                 />
               </div>
               <div className="md:col-span-3">
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Beneficiario (nombre de cuenta)</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1A6FD4]"
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="Ej. Flux Technologies SA de CV"
                   value={configPago.beneficiario}
-                  onChange={e => setConfigPago(p => ({ ...p, beneficiario: e.target.value }))}
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, beneficiario: e.target.value }))}
+                  readOnly={!isSuperadmin}
                 />
               </div>
             </div>
 
-            <button
-              onClick={handleSaveConfig}
-              disabled={savingConfig}
-              className="mt-4 w-full md:w-auto px-6 py-3 bg-[#1A6FD4] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              <Save size={16} /> {savingConfig ? "Guardando..." : "Guardar datos de cobro"}
-            </button>
+            {isSuperadmin && (
+              <button
+                onClick={handleSaveConfig}
+                disabled={savingConfig}
+                className="mt-4 w-full md:w-auto px-6 py-3 bg-[#1A6FD4] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                <Save size={16} /> {savingConfig ? "Guardando..." : "Guardar datos de cobro"}
+              </button>
+            )}
           </div>
         )}
 
