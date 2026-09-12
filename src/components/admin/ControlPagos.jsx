@@ -1,21 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { dbGet, dbPatch } from "../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight } from "lucide-react";
 
 export default function ControlPagos({ setMsg }) {
   const [recibos, setRecibos] = useState([]);
-  const [nutriologos, setNutriologos] = useState({});
+  const [nutriologos, setNutriologos] = useState({}); // id -> { nombre, creado_por }
   const [loading, setLoading] = useState(true);
   const [modalImg, setModalImg] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("pendiente");
+  const [expandedColab, setExpandedColab] = useState(null);
+
+  const COMISION_PCT = 0.35;
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const dataRecibos = await dbGet("recibos_pago?order=created_at.desc");
-      const profiles = await dbGet("profiles?role=eq.nutriologo&select=id,nombre");
+      const [dataRecibos, profiles] = await Promise.all([
+        dbGet("recibos_pago?order=created_at.desc"),
+        dbGet("profiles?role=eq.nutriologo&select=id,nombre,creado_por_nombre")
+      ]);
       const map = {};
-      profiles.forEach(p => { map[p.id] = p.nombre; });
+      profiles.forEach(p => { map[p.id] = { nombre: p.nombre, creado_por: p.creado_por_nombre || null }; });
       setNutriologos(map);
       setRecibos(dataRecibos);
     } catch (e) {
@@ -26,6 +31,29 @@ export default function ControlPagos({ setMsg }) {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  // Comisiones agrupadas por colaborador
+  const comisiones = useMemo(() => {
+    const map = {};
+    recibos.forEach(r => {
+      const nutri = nutriologos[r.nutriologo_id];
+      if (!nutri || !nutri.creado_por) return;
+      const colab = nutri.creado_por;
+      if (!map[colab]) map[colab] = { totalGenerado: 0, nutriologos: new Set(), recibosCount: 0 };
+      map[colab].totalGenerado += Number(r.monto) || 0;
+      map[colab].nutriologos.add(nutri.nombre || "Desconocido");
+      map[colab].recibosCount++;
+    });
+    return Object.entries(map)
+      .map(([nombre, data]) => ({
+        nombre,
+        totalGenerado: data.totalGenerado,
+        comision: data.totalGenerado * COMISION_PCT,
+        nutriologos: [...data.nutriologos],
+        recibosCount: data.recibosCount
+      }))
+      .sort((a, b) => b.comision - a.comision);
+  }, [recibos, nutriologos]);
 
   const updateEstado = async (id, nuevoEstado) => {
     try {
@@ -94,7 +122,10 @@ export default function ControlPagos({ setMsg }) {
                         <span className="block text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
                       </td>
                       <td className="py-3 px-6 font-semibold text-[#0B1929]">
-                        {nutriologos[r.nutriologo_id] || "Desconocido"}
+                        {nutriologos[r.nutriologo_id]?.nombre || "Desconocido"}
+                        {nutriologos[r.nutriologo_id]?.creado_por && (
+                          <span className="block text-[11px] text-[#6B7A8D] font-normal">Inv. por: {nutriologos[r.nutriologo_id].creado_por}</span>
+                        )}
                       </td>
                       <td className="py-3 px-6 text-sm text-center text-[#6B7A8D]">
                         {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}
@@ -124,6 +155,69 @@ export default function ControlPagos({ setMsg }) {
           </div>
         )}
       </div>
+
+      {/* ── COMISIONES POR COLABORADOR ── */}
+      {!loading && comisiones.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+          <div className="p-6 border-b border-[#E2E8F0] flex items-center gap-3">
+            <UserCheck className="text-indigo-500" size={22} />
+            <div>
+              <h3 className="text-lg font-bold text-[#0B1929]">Comisiones de Colaboradores</h3>
+              <p className="text-[#6B7A8D] text-sm mt-0.5">35% del total generado por los nutriólogos que cada colaborador invitó · <strong>Acumulado histórico</strong></p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {comisiones.map((c, i) => (
+              <div key={i}>
+                <button
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/60 transition-colors text-left"
+                  onClick={() => setExpandedColab(expandedColab === c.nombre ? null : c.nombre)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                      <span className="text-indigo-600 font-bold text-sm">{c.nombre.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#0B1929]">{c.nombre}</p>
+                      <p className="text-xs text-[#6B7A8D]">{c.nutriologos.length} nutriólogo{c.nutriologos.length !== 1 ? 's' : ''} · {c.recibosCount} recibo{c.recibosCount !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-xs text-[#6B7A8D]">Total generado</p>
+                      <p className="font-semibold text-[#0B1929] text-sm">${c.totalGenerado.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Tu pago (35%)</p>
+                      <p className="font-black text-indigo-600 text-lg">${c.comision.toFixed(2)}</p>
+                    </div>
+                    {expandedColab === c.nombre ? <ChevronDown size={18} className="text-[#6B7A8D] shrink-0" /> : <ChevronRight size={18} className="text-[#6B7A8D] shrink-0" />}
+                  </div>
+                </button>
+
+                {expandedColab === c.nombre && (
+                  <div className="px-6 pb-4 bg-indigo-50/40">
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-2">Nutriólogos a su cargo:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {c.nutriologos.map((n, j) => (
+                        <span key={j} className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-semibold text-indigo-700">{n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 border-t border-[#E2E8F0] flex justify-between items-center">
+            <span className="text-sm font-bold text-[#6B7A8D] uppercase tracking-wider">Total nómina de colaboradores</span>
+            <span className="text-xl font-black text-[#0B1929]">
+              ${comisiones.reduce((acc, c) => acc + c.comision, 0).toFixed(2)} MXN
+            </span>
+          </div>
+        </div>
+      )}
 
       {modalImg && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/60 backdrop-blur-sm flex items-center justify-center p-4">
