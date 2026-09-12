@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { dbGet, dbPatch } from "../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar } from "lucide-react";
 
 export default function ControlPagos({ setMsg }) {
   const [recibos, setRecibos] = useState([]);
@@ -8,6 +8,7 @@ export default function ControlPagos({ setMsg }) {
   const [loading, setLoading] = useState(true);
   const [modalImg, setModalImg] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("pendiente");
+  const [filtroMes, setFiltroMes] = useState("todos");
   const [expandedColab, setExpandedColab] = useState(null);
 
   const COMISION_PCT = 0.35;
@@ -32,10 +33,34 @@ export default function ControlPagos({ setMsg }) {
 
   useEffect(() => { loadData(); }, []);
 
-  // Comisiones agrupadas por colaborador
+  const mesesDisponibles = useMemo(() => {
+    const setMeses = new Set();
+    recibos.forEach(r => {
+      if (r.fecha_corte_mes) {
+        setMeses.add(r.fecha_corte_mes.substring(0, 7)); // YYYY-MM
+      }
+    });
+    return Array.from(setMeses).sort().reverse();
+  }, [recibos]);
+
+  useEffect(() => {
+    if (mesesDisponibles.length > 0 && filtroMes === "todos") {
+      setFiltroMes(mesesDisponibles[0]); // Seleccionar el mes más reciente por defecto
+    }
+  }, [mesesDisponibles, filtroMes]);
+
+  const filtrados = useMemo(() => {
+    return recibos.filter(r => {
+      const matchEstado = filtroEstado === "todos" ? true : r.estado === filtroEstado;
+      const matchMes = filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
+      return matchEstado && matchMes;
+    });
+  }, [recibos, filtroEstado, filtroMes]);
+
+  // Comisiones agrupadas por colaborador basadas en los recibos filtrados
   const comisiones = useMemo(() => {
     const map = {};
-    recibos.forEach(r => {
+    filtrados.forEach(r => {
       const nutri = nutriologos[r.nutriologo_id];
       if (!nutri || !nutri.creado_por) return;
       const colab = nutri.creado_por;
@@ -53,7 +78,7 @@ export default function ControlPagos({ setMsg }) {
         recibosCount: data.recibosCount
       }))
       .sort((a, b) => b.comision - a.comision);
-  }, [recibos, nutriologos]);
+  }, [filtrados, nutriologos]);
 
   const updateEstado = async (id, nuevoEstado) => {
     try {
@@ -65,7 +90,12 @@ export default function ControlPagos({ setMsg }) {
     }
   };
 
-  const filtrados = recibos.filter(r => filtroEstado === "todos" ? true : r.estado === filtroEstado);
+  const formatMes = (yyyyMm) => {
+    if (yyyyMm === 'todos') return 'Todos los meses';
+    const [y, m] = yyyyMm.split('-');
+    const date = new Date(y, m - 1);
+    return date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  };
 
   const StatusBadge = ({ s }) => {
     if (s === "pendiente") return <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><Clock size={12}/> Pendiente</span>;
@@ -84,12 +114,27 @@ export default function ControlPagos({ setMsg }) {
           </h2>
           <p className="text-[#6B7A8D] mt-1 text-sm">Revisa y valida las transferencias mensuales de los nutriólogos.</p>
         </div>
-        <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
-          {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
-            <button key={st} onClick={() => setFiltroEstado(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstado === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>
-              {st}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+          <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
+            <Calendar size={16} className="text-[#6B7A8D]" />
+            <select
+              value={filtroMes}
+              onChange={e => setFiltroMes(e.target.value)}
+              className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize"
+            >
+              <option value="todos">Todos los meses</option>
+              {mesesDisponibles.map(m => (
+                <option key={m} value={m}>{formatMes(m)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
+            {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
+              <button key={st} onClick={() => setFiltroEstado(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstado === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>
+                {st}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -163,7 +208,7 @@ export default function ControlPagos({ setMsg }) {
             <UserCheck className="text-indigo-500" size={22} />
             <div>
               <h3 className="text-lg font-bold text-[#0B1929]">Comisiones de Colaboradores</h3>
-              <p className="text-[#6B7A8D] text-sm mt-0.5">35% del total generado por los nutriólogos que cada colaborador invitó · <strong>Acumulado histórico</strong></p>
+              <p className="text-[#6B7A8D] text-sm mt-0.5">35% del total generado por los nutriólogos que cada colaborador invitó · <strong>{filtroMes === 'todos' ? 'Acumulado histórico' : <span className="capitalize">{formatMes(filtroMes)}</span>}</strong></p>
             </div>
           </div>
 
