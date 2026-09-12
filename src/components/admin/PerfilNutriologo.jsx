@@ -334,14 +334,21 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           )}
         </div>
 
-        {(multiRoles || []).length > 1 && (
-          <div className="mt-8 border-t border-[#E2E8F0] pt-8">
-            <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
-              <RefreshCw size={16} className="text-[#6B7A8D]" />
-              Cambiar Perfil (Sesión Múltiple)
-            </h3>
-            <div className="flex flex-col gap-2">
-              {multiRoles.map((r, i) => {
+        {(() => {
+          const rolesToShow = (role === "nutriologo" || role === "superadmin")
+            ? (multiRoles || []).filter(r => r.role !== 'client')
+            : (multiRoles || []);
+
+          if (rolesToShow.length <= 1) return null;
+
+          return (
+            <div className="mt-8 border-t border-[#E2E8F0] pt-8">
+              <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
+                <RefreshCw size={16} className="text-[#6B7A8D]" />
+                Cambiar Perfil (Sesión Múltiple)
+              </h3>
+              <div className="flex flex-col gap-2">
+                {rolesToShow.map((r, i) => {
                 const isActive = (role === "admin" ? "admin" : role) === (r.role === "admin" ? "admin" : r.role);
                 return (
                   <button
@@ -363,8 +370,9 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                 );
               })}
             </div>
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4">
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#0B1929] text-white hover:bg-[#1A2D45] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50">
