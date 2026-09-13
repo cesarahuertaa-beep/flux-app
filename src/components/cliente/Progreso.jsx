@@ -118,7 +118,7 @@ export default function Progreso({ cliente }) {
       // 2. Calcular progreso muscular
       const [rutinas, progs] = await Promise.all([
         dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ejercicios(id,grupo_muscular)`),
-        dbGet(`progreso?cliente_id=eq.${cliente.id}`)
+        dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`)
       ]);
 
       const ejMap = {};

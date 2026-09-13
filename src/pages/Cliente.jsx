@@ -80,7 +80,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})`);
+        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
         if (ps && Array.isArray(ps)) {
           const pm = {};
           ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });

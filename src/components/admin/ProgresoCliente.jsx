@@ -83,7 +83,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       setRutinas(rsFull);
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})`);
+        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
         const pm = {};
         ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
         setProgreso(pm);
@@ -109,7 +109,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       setRutinas(rsFull);
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})`);
+        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
         const pm = {};
         ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
         setProgreso(pm);
@@ -365,7 +365,7 @@ export function ProgresoCliente({ selected, setMsg }) {
             </div>
           ):rutinas.map(r=>{
             const semanas = getSemanasConFecha(r);
-            const tieneData = r.ejercicios.some(ej=>semanas.some((_,wi)=>Array.from({length:ej.num_series||4},(_,si)=>progreso[`${ej.id}-${wi}-${si}-peso`]||progreso[`${ej.id}-${wi}-${si}-reps`]).some(Boolean)));
+            const tieneData = r.ejercicios.some(ej => Object.keys(progreso).some(key => key.startsWith(`${ej.id}-`)));
             return (
               <div key={r.id} className="mb-6">
                 <div className="font-bold text-[15px] mb-2.5 text-[var(--brand-primary)] flex items-center gap-2">
