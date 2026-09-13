@@ -178,14 +178,14 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
                   {/* Layout responsive: imagen izquierda en desktop, arriba en móvil */}
                   <div className={`flex mt-4 gap-4 ${(meal.foto_url || meal.imagen_url) ? 'flex-col md:flex-row' : 'flex-col'}`}>
 
-                    {/* Imagen — izquierda en desktop, arriba en móvil */}
+                    {/* Imagen — izquierda en desktop (cuadrado fijo), arriba en móvil (banner contenido) */}
                     {(meal.foto_url || meal.imagen_url) && (
-                      <div className="md:w-48 md:shrink-0 w-full">
-                        <div className="w-full md:h-full h-36 rounded-xl bg-[#F0F4FA] overflow-hidden">
+                      <div className="md:w-40 md:h-40 md:shrink-0 w-full">
+                        <div className="w-full md:w-40 md:h-40 h-36 rounded-xl bg-[#F0F4FA] overflow-hidden">
                           <img
                             src={meal.foto_url || meal.imagen_url}
                             alt={label}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full md:object-cover object-contain"
                           />
                         </div>
                       </div>

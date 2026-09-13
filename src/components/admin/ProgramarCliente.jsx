@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import {
   DndContext,
   closestCenter,
@@ -54,6 +56,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
   const [historialDias, setHistorialDias] = useState([]);
+
+  // ── Crop de foto de comida ──
+  const [cropModal, setCropModal] = useState(null); // { objectUrl, mealIndex }
+  const [crop, setCrop] = useState();
+  const [completedCrop, setCompletedCrop] = useState(null);
+  const imgCropRef = useRef(null);
   
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre || "Desconocido";
 
@@ -340,20 +348,63 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
   
-  const uploadFotoComida = async (i, e) => {
+  // Abre el modal de recorte en lugar de subir directo
+  const handleFileSelect = (i, e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setCropModal({ objectUrl, mealIndex: i });
+    setCrop(undefined);
+    setCompletedCrop(null);
+    // Reset el input para que se pueda volver a seleccionar el mismo archivo
+    e.target.value = "";
+  };
+
+  // Cuando la imagen carga en el cropper, centrar el recorte cuadrado automáticamente
+  const onCropImageLoad = (e) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    const centeredCrop = centerCrop(
+      makeAspectCrop({ unit: "%", width: 80 }, 1, naturalWidth, naturalHeight),
+      naturalWidth,
+      naturalHeight
+    );
+    setCrop(centeredCrop);
+  };
+
+  // Confirmar recorte: canvas → blob → upload
+  const confirmCrop = async () => {
+    if (!imgCropRef.current || !completedCrop) return;
+    const img = imgCropRef.current;
+    const canvas = document.createElement("canvas");
+    const OUTPUT = 600;
+    canvas.width = OUTPUT;
+    canvas.height = OUTPUT;
+    const ctx = canvas.getContext("2d");
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
+    ctx.drawImage(
+      img,
+      completedCrop.x * scaleX,
+      completedCrop.y * scaleY,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY,
+      0, 0, OUTPUT, OUTPUT
+    );
+    const idx = cropModal.mealIndex;
+    const objectUrl = cropModal.objectUrl;
+    setCropModal(null);
     setSaving(true);
     setMsg(<div className="flex items-center gap-1.5 text-blue-500">Subiendo foto...</div>);
     try {
-      const ext = file.name.split('.').pop();
-      const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-      const url = await storageUpload('comidas', path, file);
-      updComida(i, 'foto_url', url);
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+      const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const url = await storageUpload("comidas", path, blob);
+      updComida(idx, "foto_url", url);
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto subida</div>);
-    } catch(err) {
+    } catch (err) {
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
     }
+    URL.revokeObjectURL(objectUrl);
     setSaving(false);
   };
 
@@ -896,7 +947,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[#1A6FD4] rounded-xl text-[#1A6FD4] text-xs font-bold cursor-pointer hover:bg-blue-50 transition-colors w-full sm:w-auto">
                                 <ImageIcon className="w-4 h-4" />
                                 <span>{c.foto_url ? "Cambiar foto" : "Subir foto"}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadFotoComida(i, e)} disabled={saving} />
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
                               </label>
                               {c.foto_url && (
                                 <button onClick={() => updComida(i, "foto_url", "")} className="text-red-400 hover:text-red-600 p-2">
@@ -1087,6 +1138,62 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       )}
 
       {/* ── Se removió el FAB para PDF y se integró en la cabecera ── */}
+
+      {/* ── Modal de recorte de foto ── */}
+      {cropModal && (
+        <div className="fixed inset-0 z-[200] bg-[#0B1929]/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center px-5 py-4 border-b border-[#E2E8F0]">
+              <div>
+                <h3 className="text-base font-bold text-[#0B1929]">Recortar foto de referencia</h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra el cuadro para elegir qué parte verá el paciente</p>
+              </div>
+              <button onClick={() => { URL.revokeObjectURL(cropModal.objectUrl); setCropModal(null); }} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cropper */}
+            <div className="p-5 flex justify-center bg-[#F0F4FA]">
+              <ReactCrop
+                crop={crop}
+                onChange={(c) => setCrop(c)}
+                onComplete={(c) => setCompletedCrop(c)}
+                aspect={1}
+                minWidth={60}
+                circularCrop={false}
+              >
+                <img
+                  ref={imgCropRef}
+                  src={cropModal.objectUrl}
+                  alt="Recortar"
+                  onLoad={onCropImageLoad}
+                  className="max-h-[50vh] max-w-full object-contain rounded-lg"
+                />
+              </ReactCrop>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-[#E2E8F0] flex justify-end gap-3">
+              <button
+                onClick={() => { URL.revokeObjectURL(cropModal.objectUrl); setCropModal(null); }}
+                className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium text-sm transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmCrop}
+                disabled={!completedCrop || saving}
+                className="px-5 py-2 rounded-xl bg-[#1A6FD4] text-white font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-40 flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Confirmar recorte
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
