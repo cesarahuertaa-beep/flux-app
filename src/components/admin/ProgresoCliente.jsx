@@ -226,6 +226,8 @@ export function ProgresoCliente({ selected, setMsg }) {
     { key:"imc",             label:"IMC",        unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"agua_pct",        label:"Agua",       unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"masa_osea",       label:"Masa Ósea",  unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"cintura",         label:"Cintura",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"cadera",          label:"Cadera",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"icc",             label:"ICC",         unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
