@@ -304,18 +304,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbDel(`comidas?id=in.(${toDelete.join(",")})`);
         }
 
-        for (let i=0; i<diaForm.comidas.length; i++) {
-          const c = diaForm.comidas[i];
-          const data = { ...c, dia_id:diaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
-          delete data.id;
-          delete data._dndId;
-          
-          if (c.id) {
-            await dbPatch(`comidas?id=eq.${c.id}`, data);
-          } else {
-            await dbPost("comidas", data);
-          }
-        }
+        const promises = diaForm.comidas.map((c, i) => {
+          const data = { 
+            dia_id: diaId, hora: c.hora||"", nombre: c.nombre||"", 
+            opcion1: c.opcion1||"", opcion2: c.opcion2||"", 
+            calorias: +c.calorias||null, proteina: +c.proteina||null, carbohidratos: +c.carbohidratos||null, grasas: +c.grasas||null,
+            foto_url: c.foto_url||"", orden: i 
+          };
+          if (c.id) return dbPatch(`comidas?id=eq.${c.id}`, data);
+          return dbPost("comidas", data);
+        });
+        await Promise.all(promises);
       } else { 
         // Creación masiva (Múltiples días) o normal
         const dSeleccionados = diaForm.diasSeleccionados || [];
@@ -453,8 +452,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
         }
         
-        for (let i=0; i<rutinaForm.ejercicios.length; i++) {
-          const e = rutinaForm.ejercicios[i];
+        const promises = rutinaForm.ejercicios.map((e, i) => {
           const data = { 
             rutina_id:rid, 
             biblioteca_id:e.biblioteca_id||null, 
@@ -469,9 +467,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             alternativas:e.alternativas||[],
             orden:i 
           };
-          if (e.id) await dbPatch(`ejercicios?id=eq.${e.id}`, data);
-          else await dbPost("ejercicios", data);
-        }
+          if (e.id) return dbPatch(`ejercicios?id=eq.${e.id}`, data);
+          return dbPost("ejercicios", data);
+        });
+        await Promise.all(promises);
       } else {
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
         for (let idx=0; idx<diasToCreate.length; idx++) {

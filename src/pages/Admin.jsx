@@ -126,20 +126,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const loadClientes = useCallback(async () => {
     setLoading(true);
     try { 
-      const r = await dbGet(clientesFilter); 
+      // Peticiones en paralelo
+      const [r, allNutris, me] = await Promise.all([
+        dbGet(clientesFilter),
+        dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`),
+        dbGet(`profiles?id=eq.${myId}&select=email`)
+      ]);
       
-      // Obtener emails de todos los nutriólogos para ocultar TODOS los clones de la lista global
-      const allNutris = await dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`);
       const nutriEmails = new Set(allNutris.map(n => n.email));
 
-      const me = await dbGet(`profiles?id=eq.${myId}&select=email`);
       if (me.length > 0) {
         const myEmail = me[0].email;
         const clone = r.find(c => c.email === myEmail);
         if (clone) setMyShadowClient(clone);
       }
       
-      // Excluir a cualquier cliente cuyo email coincida con un Nutriólogo/Superadmin
       setClientes(r.filter(c => !nutriEmails.has(c.email)));
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
@@ -152,21 +153,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useEffect(() => { 
     loadClientes(); 
     loadBiblioteca(); 
-
-    const onFocus = () => {
-      if (document.visibilityState === 'visible') {
-        loadClientes();
-        loadBiblioteca();
-      }
-    };
-    
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("visibilitychange", onFocus);
-    
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("visibilitychange", onFocus);
-    };
   }, [loadClientes, loadBiblioteca]);
 
   useEffect(() => {
@@ -598,12 +584,37 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      {tab === "programar" && <SubComponentWrapper title="Asignador de Dietas y Rutinas"><ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} /></SubComponentWrapper>}
-      {tab === "equipo" && role !== "administrativo" && role !== "staff" && <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>}
-      {tab === "agenda" && <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>}
-      {tab === "membresia" && <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>}
-      {tab === "pagos" && isSuperadmin && <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>}
-      {tab === "comisiones" && (role === "staff" || role === "administrativo") && <SubComponentWrapper title="Mis Comisiones"><MisComisiones myId={myId} setMsg={setMsg} /></SubComponentWrapper>}
+      <div className={tab === "programar" ? "block" : "hidden"}>
+        <SubComponentWrapper title="Asignador de Dietas y Rutinas">
+          <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
+        </SubComponentWrapper>
+      </div>
+
+      {(role !== "administrativo" && role !== "staff") && (
+        <div className={tab === "equipo" ? "block" : "hidden"}>
+          <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>
+        </div>
+      )}
+
+      <div className={tab === "agenda" ? "block" : "hidden"}>
+        <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>
+      </div>
+
+      <div className={tab === "membresia" ? "block" : "hidden"}>
+        <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>
+      </div>
+
+      {isSuperadmin && (
+        <div className={tab === "pagos" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>
+        </div>
+      )}
+
+      {(role === "staff" || role === "administrativo") && (
+        <div className={tab === "comisiones" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Mis Comisiones"><MisComisiones myId={myId} setMsg={setMsg} /></SubComponentWrapper>
+        </div>
+      )}
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
       {conflictClient && (
