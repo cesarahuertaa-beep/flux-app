@@ -175,20 +175,24 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
               {isExpanded && (
                 <div className="px-5 pb-5 border-t border-[#F0F4FA]">
 
-                  {/* Opciones de comida en disposición vertical */}
-                  <div className="flex flex-col gap-4 mt-4">
-                    {/* Imagen a lo ancho (solo si existe) */}
+                  {/* Layout responsive: imagen izquierda en desktop, arriba en móvil */}
+                  <div className={`flex mt-4 gap-4 ${(meal.foto_url || meal.imagen_url) ? 'flex-col md:flex-row' : 'flex-col'}`}>
+
+                    {/* Imagen — izquierda en desktop, arriba en móvil */}
                     {(meal.foto_url || meal.imagen_url) && (
-                      <div className="w-full h-40 sm:h-48 rounded-xl bg-[#F0F4FA] overflow-hidden shrink-0">
-                        <img
-                          src={meal.foto_url || meal.imagen_url}
-                          alt={label}
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="md:w-48 md:shrink-0 w-full">
+                        <div className="w-full md:h-full h-36 rounded-xl bg-[#F0F4FA] overflow-hidden">
+                          <img
+                            src={meal.foto_url || meal.imagen_url}
+                            alt={label}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                       </div>
                     )}
 
-                    <div className="flex flex-col gap-1.5">
+                    {/* Contenido: nombre, opciones, alternativa */}
+                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                       <p className="text-lg font-bold text-[#0B1929]">{label}</p>
 
                       {/* Opción 1 (Descripción completa sin line-clamp) */}
