@@ -398,8 +398,10 @@ export function ProgresoCliente({ selected, setMsg }) {
                           const variantsWithData = new Set(["original"]);
                           for (const key in progreso) {
                             if (key.startsWith(`${ej.id}-`)) {
-                              const parts = key.split("-");
-                              if (parts.length >= 5) variantsWithData.add(parts.slice(4).join("-"));
+                              const match = key.match(/-(?:peso|reps)-(.+)$/);
+                              if (match && match[1]) {
+                                variantsWithData.add(match[1]);
+                              }
                             }
                           }
                           const activeVariants = Array.from(variantsWithData).sort();
