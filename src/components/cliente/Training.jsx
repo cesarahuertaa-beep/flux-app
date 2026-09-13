@@ -125,11 +125,20 @@ export default function Training({
     return unit === 'lb' ? (p * 0.453592).toFixed(1) : p.toString();
   };
 
-  const getDiff = (curr, prev) => {
-    const c = parseFloat(curr), p = parseFloat(prev);
-    if (!curr || isNaN(c) || !prev || isNaN(p)) return null;
-    const d = c - p;
-    return { d, up: d > 0, same: d === 0 };
+  // ── 1RM Estimado (Fórmula Epley) ──────────────────────────────
+  const calcular1RM = (peso, reps) => {
+    const p = parseFloat(peso), r = parseFloat(reps);
+    if (!p || !r || p <= 0 || r <= 0) return null;
+    if (r === 1) return p;
+    return p * (1 + r / 30);
+  };
+
+  // Retorna el Δ% entre semana actual y anterior, o null si faltan datos
+  const calcularAvance = (pesoActual, repsActual, pesoPrev, repsPrev) => {
+    const e1RM_actual = calcular1RM(pesoActual, repsActual);
+    const e1RM_prev   = calcular1RM(pesoPrev, repsPrev);
+    if (!e1RM_actual || !e1RM_prev) return null;
+    return ((e1RM_actual - e1RM_prev) / e1RM_prev) * 100;
   };
 
   return (
@@ -366,8 +375,9 @@ export default function Training({
                       
                       const displayKgVal  = parseDisplayWeight(kgVal, prefUnit);
                       const displayPrevKg = parseDisplayWeight(prevKg, prefUnit);
-                      
-                      const kgDiff  = getDiff(displayKgVal, displayPrevKg);
+
+                      // Avance por 1RM estimado: comparar (peso+reps actuales) vs (peso+reps prev)
+                      const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
 
                       return (
                         <div key={si} className="flex gap-2 mb-2 items-center">
@@ -408,18 +418,21 @@ export default function Training({
                           </div>
 
                           <div className="w-12 flex justify-center items-center">
-                            {kgDiff ? (
+                            {avancePct !== null ? (
                               <div className="flex items-center gap-0.5">
-                                {kgDiff.same
+                                {avancePct === 0
                                   ? <Minus size={12} className="text-[#9BA5B0]" />
-                                  : kgDiff.up
+                                  : avancePct > 0
                                     ? <TrendingUp size={12} className="text-emerald-500" />
                                     : <TrendingDown size={12} className="text-red-400" />
                                 }
-                                {!kgDiff.same && (
-                                  <span className={`text-[11px] font-mono font-bold tracking-tight ${kgDiff.up ? "text-emerald-500" : "text-red-400"}`}>
-                                    {kgDiff.up ? "+" : ""}{kgDiff.d.toFixed(1).replace(".0", "")}
+                                {avancePct !== 0 && (
+                                  <span className={`text-[11px] font-mono font-bold tracking-tight ${avancePct > 0 ? "text-emerald-500" : "text-red-400"}`}>
+                                    {avancePct > 0 ? "+" : ""}{avancePct.toFixed(1)}%
                                   </span>
+                                )}
+                                {avancePct === 0 && (
+                                  <span className="text-[11px] font-mono font-bold tracking-tight text-[#9BA5B0]">0%</span>
                                 )}
                               </div>
                             ) : (
