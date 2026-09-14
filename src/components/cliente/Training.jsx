@@ -53,6 +53,7 @@ export default function Training({
   onProgressChange,
   semanaActualCiclo = 1,
   syncStatus = "synced",
+  isLocked = false,
 }) {
   // Semana actual (índice 0-based para leer de progreso)
   const wi = Math.max(0, semanaActualCiclo - 1);
@@ -142,7 +143,12 @@ export default function Training({
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col relative">
+      {isLocked && (
+        <div className="bg-amber-100 text-amber-800 px-4 py-2 text-center text-[11px] md:text-xs font-semibold">
+          Este plan arranca en el futuro. Puedes ver tu rutina, pero aún no puedes registrar progreso.
+        </div>
+      )}
       {/* ── Header ── */}
       <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6">
         <div className="flex items-start justify-between gap-4">
@@ -392,6 +398,7 @@ export default function Training({
                               pattern="[0-9]*"
                               placeholder={prevReps}
                               value={repVal}
+                              disabled={isLocked}
                               onChange={(e) => onProgressChange(ex.id, wi, si, "reps", e.target.value, activeVarId)}
                               className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
                             />
@@ -403,6 +410,7 @@ export default function Training({
                               inputMode="decimal"
                               placeholder={displayPrevKg}
                               value={displayKgVal}
+                              disabled={isLocked}
                               onChange={(e) => {
                                 const dbVal = parseDBWeight(e.target.value, prefUnit);
                                 onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);

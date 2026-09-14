@@ -144,10 +144,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     ] : [])
   ];
 
-  const currentCycleWeek = (() => {
-    // Si hay un ciclo activo, usamos su fecha. Si no, usamos la fecha de creación de la primera rutina (planes legacy)
+  const { currentCycleWeek, isFuture } = (() => {
     const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : null);
-    if (!startStr) return 1;
+    if (!startStr) return { currentCycleWeek: 1, isFuture: false };
     
     let t0;
     if (startStr.includes("T")) {
@@ -158,17 +157,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     }
     
     t0.setHours(0,0,0,0);
-    // AJUSTE: Alinear t0 al Lunes de esa misma semana para que las semanas sean de Lunes a Domingo
-    const day = t0.getDay();
-    const diffToMonday = t0.getDate() - day + (day === 0 ? -6 : 1);
-    t0.setDate(diffToMonday);
     
     const now = new Date();
     now.setHours(0,0,0,0);
     
     const diffDays = Math.floor((now.getTime() - t0.getTime()) / (1000 * 60 * 60 * 24));
-    const wk = Math.floor(diffDays / 7) + 1;
-    return isNaN(wk) ? 1 : Math.max(1, wk);
+    const isFut = diffDays < 0;
+    const wk = isFut ? 1 : Math.floor(diffDays / 7) + 1;
+    return { currentCycleWeek: isNaN(wk) ? 1 : Math.max(1, wk), isFuture: isFut };
   })();
 
   if (nutriologoBloqueado) {
@@ -215,6 +211,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               onProgressChange={handleProgressChange}
               semanaActualCiclo={currentCycleWeek}
               syncStatus={syncStatus}
+              isLocked={isFuture}
             />
           )}
 
