@@ -69,18 +69,23 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   <div class="client-info"><strong style="font-size:16px">${clienteNombre}</strong><br>
   <span style="color:#666;font-size:13px">Objetivo: ${clienteObjetivo}</span>
   <span style="float:right;color:#999;font-size:12px">${fechaHoy}</span></div>
-  ${nutri ? `<div class="macros">
-    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.calorias)}</div><div class="macro-lbl">Calorías (kcal)</div></div>
-    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.proteina)}g</div><div class="macro-lbl">Proteína</div></div>
-    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.carbohidratos)}g</div><div class="macro-lbl">Carbohidratos</div></div>
-    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.grasas)}g</div><div class="macro-lbl">Grasas</div></div>
-  </div>` : ""}
-  ${dias.map(d => `<div class="dia"><div class="dia-title">${escapeHtml(d.dia)}</div>
-  <table><thead><tr><th>Hora</th><th>Comida</th><th>Opción 1</th><th>Opción 2</th><th>Kcal</th><th>P/C/G</th></tr></thead>
+  
+  ${dias.map(d => {
+    const sumKcal = d.comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0);
+    const sumProt = d.comidas.reduce((s, m) => s + (Number(m.proteina) || 0), 0);
+    const sumCarbs = d.comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
+    const sumGrasas = d.comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
+    let macrosHtml = "";
+    if (sumKcal || sumProt || sumCarbs || sumGrasas) {
+      macrosHtml = `<span style="float:right; font-size:12px; color:#555; font-weight:normal;">${sumKcal} kcal &middot; ${sumProt}g P &middot; ${sumCarbs}g C &middot; ${sumGrasas}g G</span>`;
+    }
+    return `<div class="dia"><div class="dia-title">${escapeHtml(d.dia)} ${macrosHtml}</div>
+  <table><thead><tr><th>Hora</th><th>Comida</th><th>Opci&oacute;n 1</th><th>Opci&oacute;n 2</th><th>Kcal</th><th>P/C/G</th></tr></thead>
   <tbody>${d.comidas.map(c => `<tr><td>${escapeHtml(c.hora)}</td><td><strong>${escapeHtml(c.nombre)}</strong></td>
   <td>${escapeHtml(c.opcion1)}</td><td>${escapeHtml(c.opcion2)}</td>
   <td>${escapeHtml(c.calorias||0)}</td><td>${escapeHtml(c.proteina||0)}/${escapeHtml(c.carbohidratos||0)}/${escapeHtml(c.grasas||0)}g</td></tr>`).join("")}
-  </tbody></table></div>`).join("")}
+  </tbody></table></div>`;
+  }).join("")}
   <div class="footer">Plan generado por ${nombre} · Keep Going 💪</div>
   </body></html>`;
 

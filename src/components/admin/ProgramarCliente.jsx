@@ -251,25 +251,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     return false;
   };
 
-  const saveMacros = async () => {
-    if (isReadOnly) return;
-    if (interceptNoPlan()) return;
-    setSaving(true);
-    try {
-      if (nutri) await dbPatch(`nutricion?id=eq.${nutri.id}`, { ...macros, updated_at:new Date().toISOString() });
-      else {
-        const r = await dbPost("nutricion", {
-          cliente_id: selected.id,
-          ciclo_id: cicloSel.id,
-          ...macros
-        });
-        setNutri(r[0]);
-      }
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Macros guardados</div>);
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
-    setSaving(false);
-  };
-
   const openNewDia  = () => { if (interceptNoPlan()) return; setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
   const openEditDia = (d) => { 
     const parts = (d.dia || "").split('|');
@@ -751,31 +732,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         {/* ── NUTRICIÓN ── */}
         {subtab === "nutri" && (
           <div>
-            <div className={`bg-white rounded-2xl border border-[#E2E8F0] p-4 mb-3.5 ${isReadOnly ? 'opacity-75' : ''}`}>
-              <div className="flex justify-between items-center mb-3.5">
-                <div className="font-semibold text-[var(--brand-primary)]">Macros diarios</div>
+            
+            <div className="flex justify-between items-center mb-2.5">
+              <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
+              <div className="flex items-center gap-2">
                 {dias.length > 0 && (
                   <button
                     onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] text-xs font-semibold shadow-sm transition-colors"
                   >
-                    <Download className="w-3.5 h-3.5" /> Descargar PDF
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Descargar PDF</span>
+                    <span className="sm:hidden">PDF</span>
                   </button>
                 )}
+                {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewDia}><Plus className="w-3.5 h-3.5" /> Día</button>}
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                {[["calorias", "Calorías (kcal)"], ["proteina", "Proteína (g)"], ["carbohidratos", "Carbohidratos (g)"], ["grasas", "Grasas (g)"]].map(([k, lb]) => (
-                  <div key={k} className="mb-3">
-                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">{lb}</label>
-                    <input type="number" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] disabled:opacity-50" value={macros[k]} onChange={e => setMacros(p => ({ ...p, [k]: e.target.value }))} placeholder="0" disabled={isReadOnly} />
-                  </div>
-                ))}
-              </div>
-              {!isReadOnly && <button className="text-xs px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveMacros} disabled={saving}>{saving ? "Guardando…" : "Guardar macros"}</button>}
-            </div>
-            <div className="flex justify-between items-center mb-2.5">
-              <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
-              {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewDia}><Plus className="w-3.5 h-3.5" /> Día</button>}
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
@@ -796,7 +768,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                   )}
                                   <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                                 </div>
-                                <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{d.comidas.length} comidas</span>
+                                <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
+                                  <span>{d.comidas.length} comidas</span>
+                                  {(() => {
+                                    const sumKcal = d.comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0);
+                                    const sumProt = d.comidas.reduce((s, m) => s + (Number(m.proteina) || 0), 0);
+                                    const sumCarbs = d.comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
+                                    const sumGrasas = d.comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
+                                    if (sumKcal || sumProt || sumCarbs || sumGrasas) {
+                                      return (
+                                        <span className="text-[10px] font-mono bg-[#E8F1FB] text-[var(--brand-primary)] px-1.5 py-0.5 rounded-md font-bold">
+                                          🔥{sumKcal} <span className="text-[9px] opacity-70">kcal</span> · 🍗{sumProt}g · 🍞{sumCarbs}g · 🥑{sumGrasas}g
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
                               </div>
                             </div>
                             {!isReadOnly && (
