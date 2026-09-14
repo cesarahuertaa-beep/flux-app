@@ -176,6 +176,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return { currentCycleWeek: isNaN(wk) ? 1 : Math.max(1, wk), isFuture: isFut };
   })();
 
+  const cycleDuration = rutinas.length > 0 ? Math.max(...rutinas.map(r => parseInt(r.semanas) || 4)) : 4;
+  const isFinished = !isFuture && currentCycleWeek > cycleDuration;
+
   if (nutriologoBloqueado) {
     return <BloqueadoPaciente onLogout={onLogout} />;
   }
@@ -206,23 +209,39 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
       ) : (
         <>
-          {tab === "nutricion" && (
-            <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} />
-          )}
+          {isFinished && (tab === "nutricion" || tab === "deporte") ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
+              <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center shadow-sm mb-4">
+                <span className="text-2xl">🏆</span>
+              </div>
+              <h3 className="text-[#0B1929] font-bold text-xl mb-2" style={{ fontFamily: "DM Sans" }}>
+                ¡Felicidades, terminaste!
+              </h3>
+              <p className="text-[#6B7A8D] text-sm max-w-[280px]">
+                Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan.
+              </p>
+            </div>
+          ) : (
+            <>
+              {tab === "nutricion" && (
+                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} />
+              )}
 
-          {tab === "deporte" && (
-            <Training 
-              rutinas={rutinas} 
-              progreso={progreso}
-              progresoSemanaAnterior={progreso}
-              clienteNombre={cliente.nombre}
-              onSaveExercise={async () => {}}
-              onProgressChange={handleProgressChange}
-              semanaActualCiclo={currentCycleWeek}
-              syncStatus={syncStatus}
-              isLocked={isFuture}
-              ultimoPeso={ultimoPeso}
-            />
+              {tab === "deporte" && (
+                <Training 
+                  rutinas={rutinas} 
+                  progreso={progreso}
+                  progresoSemanaAnterior={progreso}
+                  clienteNombre={cliente.nombre}
+                  onSaveExercise={async () => {}}
+                  onProgressChange={handleProgressChange}
+                  semanaActualCiclo={currentCycleWeek}
+                  syncStatus={syncStatus}
+                  isLocked={isFuture}
+                  ultimoPeso={ultimoPeso}
+                />
+              )}
+            </>
           )}
 
           {tab === "progreso" && (
