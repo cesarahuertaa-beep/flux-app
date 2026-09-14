@@ -6,7 +6,7 @@ import { version } from "../../package.json";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
-  CheckCircle, Leaf, Zap, Shield, Users, User, X, Menu,
+  CheckCircle, Leaf, Zap, Shield, Users, User, X, Menu, MessageCircle,
 } from "lucide-react";
 
 const MOCK_SUPPLEMENTS = [
