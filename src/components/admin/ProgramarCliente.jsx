@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
+import { RefreshCw, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
@@ -623,13 +623,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   return (
     <div className="pb-[100px]">
       {/* ── Cabecera cliente ── */}
-      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
-        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-xl px-4 py-2 flex flex-col">
+      <div className="flex items-stretch mb-5 w-max group">
+        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-l-xl px-4 py-2 flex flex-col justify-center">
           <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>
           <span className="text-xs text-[#6B7A8D] leading-tight mt-0.5">{selected.email}</span>
         </div>
-        <button className="text-xs px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setSelected(null)}>
-          Cambiar
+        <button 
+          title="Cambiar paciente"
+          className="px-3 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
+          onClick={() => setSelected(null)}
+        >
+          <RefreshCw className="w-4 h-4" />
         </button>
       </div>
 
