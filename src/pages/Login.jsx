@@ -243,13 +243,20 @@ export default function Login({ onLogin }) {
                 <Lock size={18} />
               </div>
               <input
-                type="password"
+                type={showPass ? "text" : "password"}
                 value={pass}
                 onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && submit()}
                 placeholder="••••••••"
-                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm"
               />
+              <button 
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
@@ -308,13 +315,20 @@ export default function Login({ onLogin }) {
                 <Lock size={18} />
               </div>
               <input
-                type="password"
+                type={showPass ? "text" : "password"}
                 value={pass}
                 onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && signUpSubmit()}
                 placeholder="••••••••"
-                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
+                className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm"
               />
+              <button 
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
