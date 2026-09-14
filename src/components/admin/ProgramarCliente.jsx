@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
@@ -30,7 +30,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   // ── Ciclos ──
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSel, setCicloSel] = useState(null); // ciclo seleccionado para ver/editar
+  const [cicloSel, setCicloSel] = useState(null);
+  const [showPastCycles, setShowPastCycles] = useState(false);
+  useEffect(() => { if (cicloSel && !cicloSel.activo) setShowPastCycles(true); }, [cicloSel]); // ciclo seleccionado para ver/editar
 
   // ── Datos del ciclo seleccionado ──
   const [nutri, setNutri] = useState(null);
@@ -640,27 +642,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Selector de Ciclos ── */}
       {ciclos.length > 0 && (
         <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">Planes del Paciente</span>
-            <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
-              <Plus className="w-3.5 h-3.5" /> Siguiente Plan
+            <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
+              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Siguiente Plan</span>
             </button>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {ciclos.map(c => (
+            {/* Ciclos Activos */}
+            {ciclos.filter(c => c.activo).map(c => (
               <div key={c.id} className="flex items-stretch flex-shrink-0 group">
                 <button 
-                  onClick={() => setCicloSel(c)}
-                  className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
+                  onClick={() => { setCicloSel(c); setShowPastCycles(false); }}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-[13px] transition-colors border ${
                     cicloSel?.id === c.id 
                       ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold" 
-                      : c.activo 
-                        ? "bg-blue-50/50 border-blue-200 text-[var(--brand-primary)] hover:bg-blue-50 font-medium" 
-                        : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium"
+                      : "bg-[#0B1929]/5 border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[#0B1929]/10 font-medium" 
                   } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
                 >
                   {c.nombre.split("|")[0]}
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ? "bg-white" : "bg-green-400"}`}/>
                 </button>
                 {cicloSel?.id === c.id && (
                   <button
@@ -673,6 +675,43 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 )}
               </div>
             ))}
+
+            {/* Ciclos Pasados (Acordeón) */}
+            {ciclos.filter(c => !c.activo).length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowPastCycles(p => !p)}
+                  className="flex items-center justify-center px-3 py-2 border border-[#E2E8F0] rounded-xl text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+                  title="Ver planes anteriores"
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ? "rotate-180" : ""}`} />
+                </button>
+
+                {showPastCycles && ciclos.filter(c => !c.activo).map(c => (
+                  <div key={c.id} className="flex items-stretch flex-shrink-0 group animate-in fade-in slide-in-from-left-2">
+                    <button 
+                      onClick={() => setCicloSel(c)}
+                      className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
+                        cicloSel?.id === c.id 
+                          ? "bg-[#6B7A8D] text-white border-[#6B7A8D] font-bold" 
+                          : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                      } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
+                    >
+                      {c.nombre.split("|")[0]}
+                    </button>
+                    {cicloSel?.id === c.id && (
+                      <button
+                        onClick={(e) => eliminarCiclo(c, e)}
+                        title="Eliminar este plan"
+                        className="flex items-center justify-center px-3 bg-[#6B7A8D] text-white/80 hover:text-white border-y border-r border-[#6B7A8D] rounded-r-xl transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         {cicloSel && !cicloSel.activo && (
           <div className="mt-3 text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 px-3 py-2 rounded-lg flex items-center gap-2">
