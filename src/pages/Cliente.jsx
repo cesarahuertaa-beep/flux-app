@@ -11,7 +11,7 @@ import UserProfile from "../components/UserProfile";
 import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -212,7 +212,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           {isFinished && (tab === "nutricion" || tab === "deporte") ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
               <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center shadow-sm mb-4">
-                <span className="text-2xl">🏆</span>
+                <Trophy size={32} className="text-[#10B981]" />
               </div>
               <h3 className="text-[#0B1929] font-bold text-xl mb-2" style={{ fontFamily: "DM Sans" }}>
                 ¡Felicidades, terminaste!
