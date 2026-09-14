@@ -300,26 +300,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   };
 
   const activarModoAtleta = async () => {
-    try {
-      const profiles = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`);
-      if (!profiles.length) { setMsg("❌ No se encontró tu perfil"); return; }
-      const { nombre, email } = profiles[0];
-
-      const existing = await dbGet(`clientes?nutriologo_id=eq.${myId}&email=ilike.${encodeURIComponent(email)}&limit=1`);
-      let clienteRecord;
-      if (existing.length) {
-        clienteRecord = existing[0];
-      } else {
-        const created = await dbPost("clientes", {
-          nombre, email,
-          objetivo: "Mi entrenamiento personal",
-          nutriologo_id: myId,
-          activo: true,
-        });
-        clienteRecord = Array.isArray(created) ? created[0] : created;
-      }
-      onModoAtleta(clienteRecord);
-    } catch(e) { setMsg("❌ " + e.message); }
+    if (myShadowClient) {
+      onModoAtleta(myShadowClient);
+      return;
+    }
   };
 
   const activeCount = clientes.filter(c=>c.activo).length;
