@@ -43,6 +43,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [cicloActivo, setCicloActivo] = useState(null);
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
+  const [ultimoPeso, setUltimoPeso] = useState(null);
 
   const loadData = async () => {
     try {
@@ -58,6 +59,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
       const ciclo = cs.length ? cs[0] : null;
       setCicloActivo(ciclo);
+
+      try {
+        const met = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`);
+        if (met && met.length > 0 && met[0].peso) {
+          setUltimoPeso(parseFloat(met[0].peso));
+        }
+      } catch(e) {}
+
 
       const cicloFilter = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
 
@@ -212,6 +221,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               semanaActualCiclo={currentCycleWeek}
               syncStatus={syncStatus}
               isLocked={isFuture}
+              ultimoPeso={ultimoPeso}
             />
           )}
 
