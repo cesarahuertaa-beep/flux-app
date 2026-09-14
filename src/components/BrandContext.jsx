@@ -17,7 +17,7 @@ export function BrandProvider({ children, session }) {
 
   useEffect(() => {
     // Sin sesión o superadmin/admin → siempre FLUX
-    if (!session || session.role === "superadmin" || session.role === "admin") {
+    if (!session || session.role === "superadmin") {
       setBrand(FLUX_DEFAULT);
       return;
     }
@@ -26,7 +26,7 @@ export function BrandProvider({ children, session }) {
       try {
         let profileIdToFetch = null;
 
-        if (session.role === "client" && session.data?.nutriologo_id) {
+        if (session.role === "cliente" && session.data?.nutriologo_id) {
           // Cliente ve la marca de su nutriólogo
           profileIdToFetch = session.data.nutriologo_id;
         } else if (session.role === "nutriologo") {

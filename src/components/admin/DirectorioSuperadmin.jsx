@@ -239,7 +239,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           email: formClient.email,
           typedData: { ...formClient }
         });
-        setConflictType("client");
+        setConflictType("cliente");
         setShowNewClient(false);
         setSaving(false);
         return;

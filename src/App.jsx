@@ -13,7 +13,7 @@ import { AppUpdater } from "./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
-  if (s.role === "client" && s.data?.id) localStorage.setItem("flux_client_id", s.data.id);
+  if (s.role === "cliente" && s.data?.id) localStorage.setItem("flux_client_id", s.data.id);
   else localStorage.removeItem("flux_client_id");
   
   if (s.multiRoles) {
@@ -59,10 +59,10 @@ export default function App() {
 
       if (token && savedRole) {
         try {
-          if (savedRole === "client" && savedClientId) {
+          if (savedRole === "cliente" && savedClientId) {
             const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
             if (rows.length) {
-              setSession({ role: "client", data: rows[0], token, profileId, multiRoles: savedMultiRoles });
+              setSession({ role: "cliente", data: rows[0], token, profileId, multiRoles: savedMultiRoles });
             } else {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
@@ -77,11 +77,11 @@ export default function App() {
               }
             }
 
-            if (role && ["admin", "superadmin", "nutriologo", "administrativo", "staff"].includes(role)) {
+            if (role && ["superadmin", "nutriologo", "administrativo", "staff"].includes(role)) {
               if (["nutriologo", "administrativo", "staff"].includes(role) && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
-                setSession({ role: role === "admin" ? "admin" : role, token, profileId, multiRoles: savedMultiRoles });
+                setSession({ role, token, profileId, multiRoles: savedMultiRoles });
               }
             } else {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
@@ -144,7 +144,7 @@ export default function App() {
   const handleBackToAdmin = () => setAtletaData(null);
 
   const MainApp = () => {
-    if (session.role === "client" && !session.data?.nutriologo_id && !atletaData) {
+    if (session.role === "cliente" && !session.data?.nutriologo_id && !atletaData) {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
       const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform() || isStandalone;
       return <Navigate to={isAppMode ? "/login" : "/"} replace />;
@@ -152,14 +152,14 @@ export default function App() {
 
     if (atletaData) return (
       <ClienteView
-        session={{ role:"client", data:atletaData, token:session.token, profileId: session.profileId, adminRole: session.role }}
+        session={{ role:"cliente", data:atletaData, token:session.token, profileId: session.profileId, adminRole: session.role }}
         onLogout={handleLogout}
         isAtletaMode={true}
         onBackToAdmin={handleBackToAdmin}
         onChangeRole={null}
       />
     );
-    if (session.role==="admin" || session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo" || session.role==="staff")
+    if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo" || session.role==="staff")
       return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
     return <ClienteView session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };

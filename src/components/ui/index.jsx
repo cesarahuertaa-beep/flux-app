@@ -80,7 +80,7 @@ export const Header = ({ role, nombre, objetivo, onLogout, extra, onMenuClick })
     </div>
     <div style={{ display:"flex",alignItems:"center",gap:12 }}>
       {extra}
-      {role==="admin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(46,92,184,0.12)",border:"1px solid rgba(46,92,184,0.25)",color:"var(--brand-accent,#2e5cb8)",fontFamily:"'Inter',sans-serif" }}>⚡ ADMIN</div>}
+      
       {role==="superadmin"&&<div style={{ fontSize:11,fontWeight:700,letterSpacing:"1px",padding:"4px 12px",borderRadius:20,background:"rgba(124,142,245,0.12)",border:"1px solid rgba(124,142,245,0.25)",color:"#7c8ef5",fontFamily:"'Inter',sans-serif" }}>❆ SUPERADMIN</div>}
       {nombre&&<div style={{ textAlign:"right" }}><div style={{ fontSize:13,fontWeight:600,color:C.text }}>{nombre}</div>{objetivo&&<div style={{ fontSize:11,color:C.muted }}>{objetivo}</div>}</div>}
     </div>
@@ -116,7 +116,7 @@ export const Sidebar = ({ isOpen, onClose, tabs, active, onChange, onLogout, rol
             <div style={{ textAlign: "right" }}>
               {nombre && <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{nombre}</div>}
               {role === "superadmin" && <div style={{ fontSize: 10, color: "#7c8ef5", fontWeight: 700, letterSpacing: "0.5px" }}>❆ SUPERADMIN</div>}
-              {role === "admin" && <div style={{ fontSize: 10, color: "var(--brand-accent,#2e5cb8)", fontWeight: 700, letterSpacing: "0.5px" }}>⚡ ADMIN</div>}
+              
             </div>
           )}
         </div>

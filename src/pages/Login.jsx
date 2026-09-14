@@ -66,12 +66,12 @@ export default function Login({ onLogin }) {
         }
       }
 
-      if (adminRole && ["admin", "superadmin", "nutriologo", "administrativo", "staff"].includes(adminRole)) {
+      if (adminRole && ["superadmin", "nutriologo", "administrativo", "staff"].includes(adminRole)) {
         if (["nutriologo", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
            // Suspended admin account (ignore or we could error, but we skip to allow client login if any)
         } else {
            availableRoles.push({
-             role: adminRole === "admin" ? "admin" : adminRole,
+             role: adminRole,
              data: profiles[0]
            });
         }
@@ -87,7 +87,7 @@ export default function Login({ onLogin }) {
           }
         }
         availableRoles.push({
-          role: "client",
+          role: "cliente",
           data: clientData
         });
       }
@@ -102,7 +102,7 @@ export default function Login({ onLogin }) {
         onLogin({ role: availableRoles[0].role, data: availableRoles[0].data, token: data.access_token, profileId: data.user.id });
       } else {
         // Auto-seleccionar el rol principal (administrativo sobre cliente) por defecto
-        const sorted = availableRoles.sort((a, b) => a.role === 'client' ? 1 : -1);
+        const sorted = availableRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
         onLogin({ 
           role: sorted[0].role, 
           data: sorted[0].data, 

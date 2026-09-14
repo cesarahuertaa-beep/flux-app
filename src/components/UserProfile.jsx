@@ -14,7 +14,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
-  const isCliente = session?.role === "client";
+  const isCliente = session?.role === "cliente";
 
   const handleSave = async () => {
     setLoading(true); setMsg(""); setErr("");
@@ -149,7 +149,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
               </h3>
               <div className="flex flex-col gap-2">
                 {multiRoles.map((r, i) => {
-                  const isActive = (session.role === "admin" ? "admin" : session.role) === (r.role === "admin" ? "admin" : r.role);
+                  const isActive = session.role === r.role;
                   return (
                     <button
                       key={i}
@@ -159,7 +159,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
                     >
                       <div className="text-left">
                         <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                          {r.role === "client" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
+                          {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
                         </p>
                         <p className="text-xs text-[#6B7A8D]">
                           {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
