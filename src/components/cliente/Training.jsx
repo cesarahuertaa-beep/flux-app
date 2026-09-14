@@ -200,15 +200,74 @@ export default function Training({
                     border: "1px solid #E2E8F0",
                     borderRadius: 8,
                   }}
+                  formatter={(value, name) => [`${value} kg`, name]}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="peso"
-                  stroke="var(--brand-primary)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--brand-primary)", r: 4 }}
-                  name="Peso (kg)"
-                />
+                {numSeries > 0 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_0"
+                    stroke="#0ea5e9"
+                    strokeWidth={2}
+                    dot={{ fill: "#0ea5e9", r: 3 }}
+                    name="Serie 1"
+                    connectNulls={false}
+                  />
+                )}
+                {numSeries > 1 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_1"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 3 }}
+                    name="Serie 2"
+                    connectNulls={false}
+                  />
+                )}
+                {numSeries > 2 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_2"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={{ fill: "#f59e0b", r: 3 }}
+                    name="Serie 3"
+                    connectNulls={false}
+                  />
+                )}
+                {numSeries > 3 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_3"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={{ fill: "#8b5cf6", r: 3 }}
+                    name="Serie 4"
+                    connectNulls={false}
+                  />
+                )}
+                {numSeries > 4 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_4"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={{ fill: "#ef4444", r: 3 }}
+                    name="Serie 5"
+                    connectNulls={false}
+                  />
+                )}
+                {numSeries > 5 && (
+                  <Line
+                    type="monotone"
+                    dataKey="serie_5"
+                    stroke="#14b8a6"
+                    strokeWidth={2}
+                    dot={{ fill: "#14b8a6", r: 3 }}
+                    name="Serie 6"
+                    connectNulls={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
