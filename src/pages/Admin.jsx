@@ -544,7 +544,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <SubComponentWrapper 
           title="Mi Plan"
           action={
-            myShadowClient && !isSuperadmin ? (
+            myShadowClient ? (
               <button
                 onClick={activarModoAtleta}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
