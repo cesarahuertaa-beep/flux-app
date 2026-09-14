@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
 import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from "lucide-react";
 
 export default function MiMembresia({ clientes, profileId, setMsg }) {
@@ -7,6 +8,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
   const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const brand = useBrand();
 
   useEffect(() => {
     async function loadData() {
@@ -193,7 +195,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
             {/* Termómetro de Nivel */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
               <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2 mb-6">
-                <BarChart3 size={20} className="text-[#1A6FD4]"/>
+                <BarChart3 size={20} className="text-[var(--brand-primary)]"/>
                 Nivel de Suscripción Actual
               </h2>
 
@@ -212,14 +214,14 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                 {/* Barra con puntos superpuestos */}
                 <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-2">
                   <div
-                    className="h-full bg-gradient-to-r from-[#1A6FD4] to-blue-400 rounded-full transition-all duration-1000"
+                    className="h-full bg-[var(--brand-primary)] rounded-full transition-all duration-1000"
                     style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
                   />
                   {/* Puntos */}
                   {[0, 0.39, 1].map((pct, i) => (
                     <div
                       key={i}
-                      className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 shadow-sm z-10 transition-colors ${activeCount >= [1,21,51][i] ? 'bg-[#1A6FD4] border-white' : 'bg-gray-200 border-white'}`}
+                      className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 shadow-sm z-10 transition-colors ${activeCount >= [1,21,51][i] ? 'bg-[var(--brand-primary)] border-white' : 'bg-gray-200 border-white'}`}
                       style={{ left: `calc(${pct * 100}% - 10px)` }}
                     />
                   ))}
@@ -238,9 +240,9 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
               <div className="mt-12 bg-blue-50/50 rounded-xl p-4 border border-blue-100">
                 <p className="text-sm text-[#0B1929]">
                   Actualmente tienes <strong>{activeCount} pacientes activos</strong>. 
-                  Tu tarifa actual es de <strong className="text-[#1A6FD4]">${currentRate}.00 MXN</strong> por paciente.
+                  Tu tarifa actual es de <strong className="text-[var(--brand-primary)]">${currentRate}.00 MXN</strong> por paciente.
                   {nextTierThreshold && (
-                    <span className="block text-blue-600 mt-1">
+                    <span className="block text-[var(--brand-primary)] mt-1">
                       ¡Agrega {nextTierThreshold - activeCount} pacientes más para desbloquear la tarifa de ${currentTier === 1 ? 45 : 40}!
                     </span>
                   )}
@@ -252,7 +254,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
             <div className="bg-white p-0 rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
               <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
                 <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
-                  <FileText size={20} className="text-[#1A6FD4]"/>
+                  <FileText size={20} className="text-[var(--brand-primary)]"/>
                   Desglose para Próximo Corte
                 </h2>
                 <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorteText}</span>
@@ -288,7 +290,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                           <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
                             {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
                           </td>
-                          <td className="py-3 px-6 font-bold text-[#1A6FD4] text-right">${c.costoPaciente.toFixed(2)}</td>
+                          <td className="py-3 px-6 font-bold text-[var(--brand-primary)] text-right">${c.costoPaciente.toFixed(2)}</td>
                         </tr>
                       ))
                     )}
@@ -311,7 +313,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
                   </div>
                   <div className="flex justify-between items-center pt-2">
                     <p className="text-xl font-extrabold text-[#0B1929]">Total a Pagar</p>
-                    <p className="text-2xl font-black text-[#1A6FD4]">${totalAmount.toFixed(2)} MXN</p>
+                    <p className="text-2xl font-black text-[var(--brand-primary)]">${totalAmount.toFixed(2)} MXN</p>
                   </div>
                 </div>
               </div>
@@ -355,7 +357,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
               <div className="mt-6">
                 <button disabled={uploading} 
                   onClick={handleUploadClick}
-                  className="w-full bg-[#1A6FD4] hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                  className="w-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   <Upload size={18} />
                   {uploading ? 'Subiendo...' : 'Subir Comprobante'}

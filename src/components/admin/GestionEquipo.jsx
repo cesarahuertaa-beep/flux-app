@@ -279,7 +279,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               <button 
                 onClick={() => resolveConflict(false)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]\/5 transition-colors flex items-start gap-3"
               >
                 <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center">
                   <div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div>
@@ -293,9 +293,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               <button 
                 onClick={() => resolveConflict(true)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]\/5 transition-colors flex items-start gap-3"
               >
-                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] group-hover:border-[#3B82F6] flex items-center justify-center">
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] group-hover:border-[var(--brand-primary)] flex items-center justify-center">
                 </div>
                 <div>
                   <div className="font-bold text-[#0B1929] text-sm">Actualizar todo con los datos nuevos</div>

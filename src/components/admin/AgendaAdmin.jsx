@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
 import {
   Clock,
   Clock3,
@@ -25,7 +26,7 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
   let base = "inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
   let size = small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
   
-  let variant = "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"; // default
+  let variant = "bg-[var(--brand-primary)] text-white hover:opacity-90 shadow-sm"; // default
   if (outline) {
     if (color === "#ef4444" || danger) {
       variant = "border border-red-200 text-red-600 hover:bg-red-50 bg-white";
@@ -35,7 +36,7 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
   } else if (danger) {
     variant = "bg-red-600 text-white hover:bg-red-700 shadow-sm";
   } else if (grad) {
-    variant = "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-sm";
+    variant = "bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90";
   }
 
   return (
@@ -82,7 +83,7 @@ const fmtFechaHora = (iso) => {
 const ESTADO_COLOR = {
   pendiente:  { bg: "bg-yellow-50",  border: "border-yellow-200",  text: "text-yellow-700", bar: "bg-yellow-400", label: "Pendiente", Icon: Clock },
   confirmada: { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700", bar: "bg-green-400", label: "Confirmada", Icon: CheckCircle2 },
-  completada: { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700", bar: "bg-blue-400", label: "Completada", Icon: CheckCircle2 },
+  completada: { bg: "bg-slate-50",    border: "border-slate-200",    text: "text-[var(--brand-primary)]", bar: "bg-[var(--brand-primary)]", label: "Completada", Icon: CheckCircle2 },
   rechazada:  { bg: "bg-red-50",     border: "border-red-200",     text: "text-red-700", bar: "bg-red-400", label: "Rechazada", Icon: XCircle },
   cancelada:  { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700", bar: "bg-slate-400", label: "Cancelada", Icon: Ban },
 };
@@ -98,6 +99,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
+  const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
   const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio: "09:00", hora_fin: "17:00" });
 
@@ -241,7 +243,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           {[["citas", "Citas"], ["horarios", "Horarios"]].map(([k, lb]) => (
             <button key={k} onClick={() => setSubTab(k)} className={`
               px-4 py-1.5 rounded-lg text-sm font-semibold transition-all
-              ${subTab === k ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
+              ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm border border-slate-200" : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
             `}>
               {lb}
             </button>
@@ -251,7 +253,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
       {loading ? (
         <div className="text-center py-16 text-[#6B7A8D]">
-          <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-blue-600 animate-spin mx-auto mb-4" />
+          <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-[var(--brand-primary)] animate-spin mx-auto mb-4" />
           Cargando agenda…
         </div>
       ) : subTab === "citas" ? (
@@ -268,7 +270,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             ].map(([k, lb, Icon]) => (
               <button key={k} onClick={() => setFiltro(k)} className={`
                 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border
-                ${filtro === k ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-[#6B7A8D] hover:bg-slate-50"}
+                ${filtro === k ? "bg-slate-50 border-slate-200 text-[var(--brand-primary)]" : "bg-white border-slate-200 text-[#6B7A8D] hover:bg-slate-50"}
               `}>
                 <Icon className="w-4 h-4" />
                 {lb}
@@ -344,7 +346,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
                         )}
                         {cita.estado === "confirmada" && (
                           <>
-                            <button onClick={() => marcarCompletada(cita)} disabled={saving} className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                            <button onClick={() => marcarCompletada(cita)} disabled={saving} className="text-[11px] font-bold bg-slate-50 text-[var(--brand-primary)] border border-slate-200 hover:bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
                               <CheckCircle2 size={12} /> Completada
                             </button>
                             <button onClick={() => cancelar(cita)} disabled={saving} className="text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
@@ -412,7 +414,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           </div>
           <Field label="Motivo del rechazo">
             <textarea
-              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-y"
+              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white resize-y"
               value={motivoRechazo}
               onChange={e => setMotivoRechazo(e.target.value)}
               placeholder="Ej. El horario ya fue ocupado..."
@@ -433,7 +435,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
         <Modal title="Agregar disponibilidad" onClose={() => setShowHorario(false)}>
           <Field label="Día de la semana">
             <select 
-              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
               value={horarioForm.dia_semana} 
               onChange={e => setHorarioForm(p => ({ ...p, dia_semana: +e.target.value }))}
             >
@@ -443,7 +445,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           <div className="grid grid-cols-2 gap-3 mt-1">
             <Field label="Hora inicio">
               <select 
-                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
                 value={horarioForm.hora_inicio} 
                 onChange={e => setHorarioForm(p => ({ ...p, hora_inicio: e.target.value }))}
               >
@@ -452,7 +454,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             </Field>
             <Field label="Hora fin">
               <select 
-                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
                 value={horarioForm.hora_fin} 
                 onChange={e => setHorarioForm(p => ({ ...p, hora_fin: e.target.value }))}
               >
