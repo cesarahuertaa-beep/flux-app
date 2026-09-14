@@ -56,8 +56,8 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         }
       }
 
-      // Si es superadmin, cargar config de pago
-      if (role === "superadmin") {
+      // Si es superadmin o staff, cargar config de pago
+      if (role === "superadmin" || role === "administrativo" || role === "staff") {
         const cfg = await dbGet("configuracion_plataforma?id=eq.1");
         if (cfg && cfg.length > 0) {
           setConfigPago({
