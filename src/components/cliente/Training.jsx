@@ -91,16 +91,38 @@ export default function Training({
     return { obj: (ex.alternativas || [])[altIdx] || ex, variantId };
   };
 
-  const primerExObj = ejercicios[0] ? getVariantObj(ejercicios[0]).obj : null;
+    const targetExIndex = expandedEx !== null ? expandedEx : 0;
+  const targetEx = ejercicios[targetExIndex];
+  const targetExObj = targetEx ? getVariantObj(targetEx).obj : null;
   const totalSemanas = rutinaActiva?.semanas || 4;
-  const graficaData = primerExObj
+  const numSeries = targetExObj ? parseInt(targetExObj.num_series) || 4 : 4;
+
+  const calcular1RMForGraph = (peso, reps) => {
+    const p = parseFloat(peso), r = parseFloat(reps);
+    if (!p || !r || p <= 0 || r <= 0) return null;
+    if (r === 1) return p;
+    return p * (1 + r / 30);
+  };
+
+  const graficaData = targetExObj
     ? Array.from({ length: totalSemanas }, (_, w) => {
-        let maxPeso = 0;
-        for (let s = 0; s < 6; s++) {
-          const p = parseFloat(progreso[`${ejercicios[0].id}-${w}-${s}-peso-${activeVariant[ejercicios[0].id] || 'original'}`]);
-          if (!isNaN(p) && p > maxPeso) maxPeso = p;
+        const dataPoint = { week: `Sem ${w + 1}` };
+        let hasData = false;
+        for (let s = 0; s < numSeries; s++) {
+          const variantId = activeVariant[targetEx.id] || 'original';
+          const p = parseFloat(progreso[`${targetEx.id}-${w}-${s}-peso-${variantId}`]);
+          const rVal = progreso[`${targetEx.id}-${w}-${s}-reps-${variantId}`];
+          const r = rVal === "Falta" ? 0 : parseFloat(rVal);
+          
+          if (!isNaN(p) && !isNaN(r) && p > 0 && r > 0) {
+            const e1rm = calcular1RMForGraph(p, r);
+            if (e1rm) {
+              dataPoint[`serie_${s}`] = Math.round(e1rm * 10) / 10;
+              hasData = true;
+            }
+          }
         }
-        return maxPeso > 0 ? { week: `Sem ${w + 1}`, peso: maxPeso } : null;
+        return hasData ? dataPoint : null;
       }).filter(Boolean)
     : [];
 
