@@ -644,9 +644,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">Planes del Paciente</span>
-            <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
-              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Siguiente Plan</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {ciclos.filter(c => !c.activo).length > 0 && (
+                <button
+                  onClick={() => setShowPastCycles(p => !p)}
+                  className="flex items-center justify-center p-2 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+                  title="Ver planes anteriores"
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ? "rotate-180" : ""}`} />
+                </button>
+              )}
+              <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
+                <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Siguiente Plan</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -679,13 +690,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             {/* Ciclos Pasados (Acordeón) */}
             {ciclos.filter(c => !c.activo).length > 0 && (
               <>
-                <button
-                  onClick={() => setShowPastCycles(p => !p)}
-                  className="flex items-center justify-center px-3 py-2 border border-[#E2E8F0] rounded-xl text-[#6B7A8D] hover:bg-gray-50 transition-colors"
-                  title="Ver planes anteriores"
-                >
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ? "rotate-180" : ""}`} />
-                </button>
 
                 {showPastCycles && ciclos.filter(c => !c.activo).map(c => (
                   <div key={c.id} className="flex items-stretch flex-shrink-0 group animate-in fade-in slide-in-from-left-2">
