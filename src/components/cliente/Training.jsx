@@ -104,7 +104,7 @@ export default function Training({
     return p * (1 + r / 30);
   };
 
-  const graficaData = targetExObj
+    let graficaDataRaw = targetExObj
     ? Array.from({ length: totalSemanas }, (_, w) => {
         const dataPoint = { week: `Sem ${w + 1}` };
         let hasData = false;
@@ -122,9 +122,12 @@ export default function Training({
             }
           }
         }
-        return hasData ? dataPoint : null;
-      }).filter(Boolean)
+        return { dataPoint, hasData };
+      })
     : [];
+
+  const lastDataIndex = graficaDataRaw.reduce((lastIdx, item, idx) => item.hasData ? idx : lastIdx, -1);
+  const graficaData = lastDataIndex === -1 ? [] : graficaDataRaw.slice(0, lastDataIndex + 1).map(i => i.dataPoint);
 
   const getPrevVal = (exId, variantId, exObj, si, tipo) => {
     if (wi === 0) {
