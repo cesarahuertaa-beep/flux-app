@@ -217,9 +217,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre || "Cliente";
   const clienteTelefono = (id) => clientes.find(c => c.id === id)?.telefono;
 
-  const citasFiltradas = filtro === "todos"
-    ? citas
-    : citas.filter(c => c.estado === filtro);
+  const citasFiltradas = citas;
 
   const pendientesCount = citas.filter(c => c.estado === "pendiente").length;
 
@@ -259,33 +257,11 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
-          {/* Filtros */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {[
-              ["pendiente", "Pendientes", Clock], 
-              ["confirmada", "Confirmadas", CheckCircle2], 
-              ["completada", "Completadas", CheckCircle2], 
-              ["rechazada", "Rechazadas", XCircle], 
-              ["todos", "Todas", ClipboardList]
-            ].map(([k, lb, Icon]) => (
-              <button key={k} onClick={() => setFiltro(k)} className={`
-                inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border
-                ${filtro === k ? "bg-slate-50 border-slate-200 text-[var(--brand-primary)]" : "bg-white border-slate-200 text-[#6B7A8D] hover:bg-slate-50"}
-              `}>
-                <Icon className="w-4 h-4" />
-                {lb}
-                {k === "pendiente" && pendientesCount > 0 && (
-                  <span className="ml-1 bg-yellow-400 text-yellow-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
-                    {pendientesCount}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          
 
           {citasFiltradas.length === 0 ? (
             <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
-              <div className="text-[15px] font-semibold text-[#6B7A8D]">Sin citas {filtro !== "todos" ? `en estado "${filtro}"` : ""}</div>
+              <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay citas agendadas</div>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
