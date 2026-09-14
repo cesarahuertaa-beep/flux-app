@@ -1,3 +1,4 @@
+import { useBrand } from "../BrandContext";
 import { useState, useEffect, useCallback } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from "lucide-react";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
@@ -152,7 +153,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
         <div>
           <h2 className="font-['Rajdhani'] font-bold text-2xl text-[#0B1929] tracking-[0.5px] flex items-center gap-2">
-            <Users className="w-6 h-6 text-[#3B82F6]" /> {isSuperadmin ? "Staff Corporativo" : "Equipo Administrativo"}
+            <Users className="w-6 h-6 text-[var(--brand-primary)]" /> {isSuperadmin ? "Staff Corporativo" : "Equipo Administrativo"}
           </h2>
           <div className="text-sm text-[#6B7A8D] mt-0.5">
             {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
@@ -160,14 +161,14 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
         </div>
         <button 
           onClick={() => setShowInvite(true)}
-          className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+          className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
         >
           + Invitar colaborador
         </button>
       </div>
 
       {/* Explicación */}
-      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
+      <div className="bg-[#F8FAFC] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         {isSuperadmin 
           ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa." 
@@ -179,7 +180,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       {/* Lista */}
       {loading ? (
         <div className="text-center py-16 text-[#6B7A8D] flex flex-col items-center">
-          <Loader2 className="w-9 h-9 text-[#3B82F6] animate-spin mb-3.5" />
+          <Loader2 className="w-9 h-9 text-[var(--brand-primary)] animate-spin mb-3.5" />
           Cargando equipo…
         </div>
       ) : equipo.length === 0 ? (
@@ -190,7 +191,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           <div className="mt-5">
             <button 
               onClick={() => setShowInvite(true)}
-              className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+              className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
             >
               + Invitar primer colaborador
             </button>
@@ -222,7 +223,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   )}
                 </div>
                 <div className="mt-1.5">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${p.activo !== false ? 'bg-[#EFF6FF] text-[#3B82F6]' : 'bg-[#FEF2F2] text-[#EF4444]'}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${p.activo !== false ? 'bg-[#F8FAFC] text-[var(--brand-primary)]' : 'bg-[#FEF2F2] text-[#EF4444]'}`}>
                     {p.activo !== false ? <Circle className="w-3 h-3 fill-current" /> : <CircleDashed className="w-3 h-3" />}
                     {p.activo !== false ? "Activo" : "Suspendido"}
                   </span>
@@ -281,8 +282,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 disabled={saving}
                 className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]\/5 transition-colors flex items-start gap-3"
               >
-                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div>
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[var(--brand-primary)] flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-[var(--brand-primary)] rounded-full"></div>
                 </div>
                 <div>
                   <div className="font-bold text-[#0B1929] text-sm">Usar sus datos actuales</div>
@@ -323,7 +324,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
-                <Folder className="w-5 h-5 text-[#3B82F6]" /> Invitar colaborador
+                <Folder className="w-5 h-5 text-[var(--brand-primary)]" /> Invitar colaborador
               </h3>
               <button onClick={() => setShowInvite(false)} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors">
                 <XCircle className="w-6 h-6" />
@@ -337,7 +338,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   value={form.nombre}
                   onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
                   placeholder="Ej. Sofía López"
-                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
               <div>
@@ -347,7 +348,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   value={form.email}
                   onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                   placeholder="sofia@clinica.com"
-                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
               <div>
@@ -357,12 +358,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   value={form.telefono}
                   onChange={e => setForm(p => ({ ...p, telefono: e.target.value }))}
                   placeholder="Ej. +525512345678"
-                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
 
-              <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs text-[#6B7A8D] leading-relaxed mt-2 flex gap-2">
-                <Mail className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
+              <div className="bg-[#F8FAFC] border border-[#BFDBFE] rounded-lg p-3 text-xs text-[#6B7A8D] leading-relaxed mt-2 flex gap-2">
+                <Mail className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
                 <span>
                   El colaborador recibirá un email de invitación para crear su contraseña.
                   {isSuperadmin ? (
@@ -389,7 +390,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 <button 
                   onClick={invite} 
                   disabled={saving}
-                  className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {saving ? "Enviando invitación…" : "Invitar colaborador"}
@@ -406,7 +407,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 truncate">
-                <Edit2 className="w-5 h-5 text-[#3B82F6]" /> Editar colaborador
+                <Edit2 className="w-5 h-5 text-[var(--brand-primary)]" /> Editar colaborador
               </h3>
               <button onClick={() => setEditUser(null)} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors shrink-0">
                 <XCircle className="w-6 h-6" />
@@ -421,7 +422,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 <input
                   value={editForm.nombre}
                   onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
               <div>
@@ -431,7 +432,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   value={editForm.telefono}
                   onChange={e => setEditForm(p => ({ ...p, telefono: e.target.value }))}
                   placeholder="Ej. +525512345678"
-                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
               <div className="flex gap-2 justify-end mt-2">
@@ -444,7 +445,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 <button 
                   onClick={saveEdit} 
                   disabled={saving}
-                  className="bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {saving ? "Guardando…" : "Guardar cambios"}
