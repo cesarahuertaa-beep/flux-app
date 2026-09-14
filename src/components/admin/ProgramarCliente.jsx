@@ -630,7 +630,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         </div>
         <button 
           title="Cambiar paciente"
-          className="px-3 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
+          className="px-3 bg-[#0B1929]/5 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
           onClick={() => setSelected(null)}
         >
           <RefreshCw className="w-4 h-4" />
