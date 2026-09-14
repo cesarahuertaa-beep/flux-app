@@ -772,20 +772,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                 </div>
                                 <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
                                   <span>{d.comidas.length} comidas</span>
-                                  {(() => {
-                                    const sumKcal = d.comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0);
-                                    const sumProt = d.comidas.reduce((s, m) => s + (Number(m.proteina) || 0), 0);
-                                    const sumCarbs = d.comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
-                                    const sumGrasas = d.comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
-                                    if (sumKcal || sumProt || sumCarbs || sumGrasas) {
-                                      return (
-                                        <span className="text-[10px] font-mono bg-[#E8F1FB] text-[var(--brand-primary)] px-1.5 py-0.5 rounded-md font-bold">
-                                          🔥{sumKcal} <span className="text-[9px] opacity-70">kcal</span> · 🍗{sumProt}g · 🍞{sumCarbs}g · 🥑{sumGrasas}g
-                                        </span>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
                                 </div>
                               </div>
                             </div>
