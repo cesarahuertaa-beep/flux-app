@@ -11,7 +11,8 @@ export default function Login({ onLogin }) {
   const [confirmPass, setConfirmPass] = useState("");
   const [err, setErr]             = useState("");
   const [info, setInfo]           = useState("");
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [fadeSplash, setFadeSplash] = useState(false);
