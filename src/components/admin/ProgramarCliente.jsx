@@ -23,7 +23,7 @@ import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase
 import { useBrand } from "../BrandContext";
 import { ProgresoCliente } from "./ProgresoCliente";
 
-export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca }) {
+export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState("nutri");
   const [searchProg, setSearchProg] = useState("");
@@ -606,19 +606,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   return (
     <div className="pb-[100px]">
       {/* ── Cabecera cliente ── */}
-      <div className="flex items-stretch mb-5 w-max group">
-        <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-l-xl px-4 py-2 flex flex-col justify-center">
-          <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>
-          <span className="text-xs text-[#6B7A8D] leading-tight mt-0.5">{selected.email}</span>
+      {!isMiPlan && (
+        <div className="flex items-stretch mb-5 w-max group">
+          <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-l-xl px-4 py-2 flex flex-col justify-center">
+            <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>
+            <span className="text-xs text-[#6B7A8D] leading-tight mt-0.5">{selected.email}</span>
+          </div>
+          <button 
+            title="Cambiar paciente"
+            className="px-3 bg-[#0B1929]/5 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
+            onClick={() => setSelected(null)}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
-        <button 
-          title="Cambiar paciente"
-          className="px-3 bg-[#0B1929]/5 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
-          onClick={() => setSelected(null)}
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
+      )}
 
       {/* ── Selector de Ciclos ── */}
       {ciclos.length > 0 && (

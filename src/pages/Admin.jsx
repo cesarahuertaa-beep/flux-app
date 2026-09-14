@@ -556,7 +556,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
         >
           {myShadowClient ? (
-            <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} />
+            <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white rounded-2xl m-4 md:m-8 shadow-sm border border-[#E2E8F0]">
               <Activity className="w-16 h-16 text-[#9BA5B0] mb-4" />
