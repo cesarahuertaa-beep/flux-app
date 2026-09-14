@@ -75,18 +75,10 @@ function Navbar({ session, onLogout }) {
           {hasAppAccess && (
             <>
               <div className="w-px h-5 bg-[#E2E5EA] ml-2" />
-              <a
-                href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`}
-                download
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
-              >
+              <a href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`} download className="hidden items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
                 <Monitor size={14} strokeWidth={1.5} /> Windows (v{version})
               </a>
-              <a
-                href="/FLUX.apk"
-                download
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors"
-              >
+              <a href="/FLUX.apk" download className="hidden items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-medium transition-colors">
                 <Smartphone size={14} strokeWidth={1.5} /> Android (v{version})
               </a>
               <Link to="/app" className="flex items-center gap-1.5 px-4 py-2 bg-[#1A6FD4] text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-200">
@@ -153,19 +145,11 @@ function Hero() {
         </div>
         {/* Botones de descarga de la App */}
         <div className="flex flex-wrap items-center gap-3 mt-6">
-          <p className="text-xs text-[#9BA5B0] w-full font-medium uppercase tracking-widest">Descarga la app:</p>
-          <a
-            href="/FLUX.apk"
-            download
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1A6FD4]/10 border border-[#1A6FD4]/20 text-[#1A6FD4] text-sm font-semibold hover:bg-[#1A6FD4]/20 transition-all"
-          >
+          <p className="hidden text-xs text-[#9BA5B0] w-full font-medium uppercase tracking-widest">Descarga la app:</p>
+          <a href="/FLUX.apk" download className="hidden items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1A6FD4]/10 border border-[#1A6FD4]/20 text-[#1A6FD4] text-sm font-semibold hover:bg-[#1A6FD4]/20 transition-all">
             <Smartphone size={16} /> Android (v{version})
           </a>
-          <a
-            href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`}
-            download
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 border border-[#E2E5EA] text-[#0B1929] text-sm font-semibold hover:bg-gray-200 transition-all"
-          >
+          <a href={`https://github.com/cesarahuertaa-beep/flux-app/releases/download/v${version}/FLUX.Setup.${version}.exe`} download className="hidden items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 border border-[#E2E5EA] text-[#0B1929] text-sm font-semibold hover:bg-gray-200 transition-all">
             <Monitor size={16} /> Windows (v{version})
           </a>
         </div>
@@ -232,6 +216,12 @@ function SupplementsSection({ supplements }) {
             <p className="text-[#6B7A8D] mt-2 text-sm">Formulados con tu nutriólogo. Respaldados por ciencia.</p>
           </div>
         </div>
+        {safeSupplements.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-[#F7F9FC] rounded-3xl border border-[#E2E5EA] text-center w-full">
+            <h3 className="text-2xl font-bold text-[#0B1929] mb-2">Próximamente</h3>
+            <p className="text-[#6B7A8D] max-w-md">Nuestra tienda de suplementos FLUX está en construcción. ¡Mantente atento a las novedades!</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {safeSupplements.map((s) => {
             const inCart = cart.includes(s.id);
@@ -274,6 +264,7 @@ function SupplementsSection({ supplements }) {
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );
@@ -293,6 +284,12 @@ function ApparelSection({ apparel }) {
             <p className="text-[#6B7A8D] mt-2 text-sm">Diseñado para rendir. Hecho para durar.</p>
           </div>
         </div>
+        {safeApparel.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-[#E2E5EA] text-center w-full">
+            <h3 className="text-2xl font-bold text-[#0B1929] mb-2">Próximamente</h3>
+            <p className="text-[#6B7A8D] max-w-md">La nueva colección de ropa deportiva FLUX está por llegar. ¡Prepárate para entrenar con estilo!</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {safeApparel.map((a) => {
             const inCart = cart.includes(a.id);
@@ -327,6 +324,7 @@ function ApparelSection({ apparel }) {
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );
@@ -534,8 +532,8 @@ export default function Landing({ session, onLogout }) {
     loadData();
   }, []);
 
-  const activeSupplements = dbSupplements.length > 0 ? dbSupplements : MOCK_SUPPLEMENTS;
-  const activeApparel = dbApparel.length > 0 ? dbApparel : MOCK_APPAREL;
+  const activeSupplements = dbSupplements;
+  const activeApparel = dbApparel;
   const activeNutritionists = dbNutritionists.length > 0 ? dbNutritionists : MOCK_NUTRITIONISTS;
   const activeMapPins = dbMapPins.length > 0 ? dbMapPins : MOCK_MAPPINS;
 
