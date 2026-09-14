@@ -8,6 +8,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const { setBrandColor } = useBrand();
   
   const [loading, setLoading] = useState(true);
+  const brand = useBrand();
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -195,7 +196,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-10 h-10 border-4 border-[#1A6FD4]/30 border-t-[#1A6FD4] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[var(--brand-primary)]/30 border-t-[var(--brand-primary)] rounded-full animate-spin" />
       </div>
     );
   }
@@ -227,13 +228,13 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
         {/* BUZÓN DE SOLICITUDES DE ENTRENAMIENTO */}
         {solicitudes.length > 0 && (
-          <div className="mb-8 p-5 bg-blue-50 border border-blue-200 rounded-2xl">
+          <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
             <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-3">
-              <User size={18} className="text-blue-600" /> Solicitudes de Paciente
+              <User size={18} className="text-[var(--brand-primary)]" /> Solicitudes de Paciente
             </h3>
             <div className="flex flex-col gap-3">
               {solicitudes.map(req => (
-                <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div>
                     <p className="text-sm text-[#0B1929]">
                       <strong>{req.from_nutriologo_nombre}</strong> desea agregarte como paciente para asignarte planes de entrenamiento y dieta.
@@ -250,7 +251,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                     <button 
                       onClick={() => handleAcceptRequest(req)}
                       disabled={saving}
-                      className="px-4 py-2 text-sm font-bold bg-[#1A6FD4] text-white rounded-lg hover:bg-[#155ab0] flex-1 sm:flex-none"
+                      className="px-4 py-2 text-sm font-bold bg-[var(--brand-primary)] text-white rounded-lg hover:opacity-90 flex-1 sm:flex-none"
                     >
                       Aceptar
                     </button>
@@ -267,7 +268,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               {form.logo_url ? (
                 <img src={form.logo_url} alt="Logo" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[#1A6FD4] transition-colors">
+                <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[var(--brand-primary)] transition-colors">
                   <ImageIcon size={32} />
                 </div>
               )}
@@ -292,43 +293,43 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
         <div className={`grid grid-cols-1 ${!isTeam ? 'md:grid-cols-2' : ''} gap-6`}>
           <div className="space-y-4">
-            <h3 className="font-bold text-[#0B1929] flex items-center gap-2"><User size={18} className="text-[#1A6FD4]"/> {isTeam ? "Mis Datos" : "Identidad"}</h3>
+            <h3 className="font-bold text-[#0B1929] flex items-center gap-2"><User size={18} className="text-[var(--brand-primary)]"/> {isTeam ? "Mis Datos" : "Identidad"}</h3>
             
             <div>
               <label className="block text-xs font-bold text-[#6B7A8D] mb-2">Nombre Personal</label>
-              <input type="text" name="nombre" value={form.nombre} onChange={handleChange} placeholder="Ej. Dr. Miguel Sánchez" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              <input type="text" name="nombre" value={form.nombre} onChange={handleChange} placeholder="Ej. Dr. Miguel Sánchez" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
             </div>
 
             {!isTeam && (
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] mb-2">Nombre de Marca (App)</label>
-                <input type="text" name="nombre_marca" value={form.nombre_marca} onChange={handleChange} placeholder="Ej. NutriFit Pro" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+                <input type="text" name="nombre_marca" value={form.nombre_marca} onChange={handleChange} placeholder="Ej. NutriFit Pro" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
             )}
 
             <div>
               <label className="block text-xs font-bold text-[#6B7A8D] mb-2 flex items-center gap-1.5"><Phone size={14}/> WhatsApp (Contacto)</label>
-              <input type="tel" name="telefono" value={form.telefono} onChange={handleChange} placeholder="10 dígitos" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              <input type="tel" name="telefono" value={form.telefono} onChange={handleChange} placeholder="10 dígitos" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
             </div>
           </div>
 
           {!isTeam && (
             <div className="space-y-4">
-              <h3 className="font-bold text-[#0B1929] flex items-center gap-2"><Building2 size={18} className="text-[#1A6FD4]"/> Directorio Público</h3>
+              <h3 className="font-bold text-[#0B1929] flex items-center gap-2"><Building2 size={18} className="text-[var(--brand-primary)]"/> Directorio Público</h3>
               
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] mb-2">Especialidad</label>
-                <input type="text" name="especialidad" value={form.especialidad} onChange={handleChange} placeholder="Ej. Nutrición Deportiva | Vegana" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+                <input type="text" name="especialidad" value={form.especialidad} onChange={handleChange} placeholder="Ej. Nutrición Deportiva | Vegana" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] mb-2 flex items-center gap-1.5"><MapPin size={14}/> Ubicación (Texto Corto)</label>
-                <input type="text" name="ubicacion_texto" value={form.ubicacion_texto} onChange={handleChange} placeholder="Ej. CDMX - Polanco" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+                <input type="text" name="ubicacion_texto" value={form.ubicacion_texto} onChange={handleChange} placeholder="Ej. CDMX - Polanco" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] mb-2 flex items-center gap-1.5"><LinkIcon size={14}/> Enlace de Google Maps</label>
-                <input type="url" name="mapa_url" value={form.mapa_url} onChange={handleChange} placeholder="https://maps.app.goo.gl/..." className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[#1A6FD4] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+                <input type="url" name="mapa_url" value={form.mapa_url} onChange={handleChange} placeholder="https://maps.app.goo.gl/..." className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
             </div>
           )}
@@ -392,7 +393,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         {(isSuperadmin || isTeam) && (
           <div className="mt-10 border-t border-[#E2E8F0] pt-8">
             <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-1">
-              <CreditCard size={18} className="text-[#1A6FD4]" /> Datos de Cobro (SPEI)
+              <CreditCard size={18} className="text-[var(--brand-primary)]" /> Datos de Cobro (SPEI)
             </h3>
             <p className="text-xs text-[#6B7A8D] mb-5">
               {isSuperadmin
@@ -405,7 +406,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Banco</label>
                 <input
-                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="Ej. BBVA, BANAMEX..."
                   value={configPago.banco}
                   onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, banco: e.target.value }))}
@@ -415,7 +416,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">CLABE Interbancaria (18 dígitos)</label>
                 <input
-                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="000000000000000000"
                   maxLength={18}
                   value={configPago.clabe}
@@ -426,7 +427,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               <div className="md:col-span-3">
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Beneficiario (nombre de cuenta)</label>
                 <input
-                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[#1A6FD4]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`}
                   placeholder="Ej. Flux Technologies SA de CV"
                   value={configPago.beneficiario}
                   onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, beneficiario: e.target.value }))}
@@ -439,7 +440,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               <button
                 onClick={handleSaveConfig}
                 disabled={savingConfig}
-                className="mt-4 w-full md:w-auto px-6 py-3 bg-[#1A6FD4] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
+                className="mt-4 w-full md:w-auto px-6 py-3 bg-[var(--brand-primary)] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
               >
                 <Save size={16} /> {savingConfig ? "Guardando..." : "Guardar datos de cobro"}
               </button>
