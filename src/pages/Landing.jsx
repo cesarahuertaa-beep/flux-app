@@ -383,19 +383,33 @@ function NutritionistsSection({ nutritionists }) {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs font-medium text-[#6B7A8D] bg-[#F0F4FB] p-2.5 rounded-xl">
-                <div className="flex items-center gap-1">
-                  <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating || 5.0}
-                </div>
+                {n.reviewCount > 0 ? (
+                  <div className="flex items-center gap-1">
+                    <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating.toFixed(1)} ({n.reviewCount} reseñas)
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 italic text-xs text-[#9BA5B0]">
+                    Sin calificaciones
+                  </div>
+                )}
               </div>
-              {n.mapa_url ? (
-                <a href={n.mapa_url} target="_blank" rel="noopener noreferrer" className="w-full mt-4 bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center">
-                  Ver ubicación en Google Maps
-                </a>
-              ) : (
-                <button className="w-full mt-4 bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all">
-                  Contacto (Próximamente)
-                </button>
-              )}
+              <div className="flex flex-col gap-2 mt-4">
+                {n.mapa_url && (
+                  <a href={n.mapa_url} target="_blank" rel="noopener noreferrer" className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center">
+                    Ver en mapa
+                  </a>
+                )}
+                {n.telefono && (
+                  <a href={`https://wa.me/${n.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/20 h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                    <MessageCircle size={16} /> WhatsApp
+                  </a>
+                )}
+                {!n.telefono && n.email && (
+                  <a href={`mailto:${n.email}`} className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                    <Mail size={16} /> Enviar correo
+                  </a>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -503,19 +517,30 @@ export default function Landing({ session, onLogout }) {
       } catch (e) { console.error('Error cargando productos', e); }
 
       try {
-        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url');
+        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
+        const allRatings = await dbGet('citas_ratings?select=nutriologo_id,puntuacion') || [];
+        
+        const ratingsMap = {};
+        allRatings.forEach(r => {
+          if (!ratingsMap[r.nutriologo_id]) ratingsMap[r.nutriologo_id] = { sum: 0, count: 0 };
+          ratingsMap[r.nutriologo_id].sum += r.puntuacion;
+          ratingsMap[r.nutriologo_id].count += 1;
+        });
         if (Array.isArray(nutris) && nutris.length > 0) {
           const formattedNutris = nutris.map(n => ({
             id: n.id,
             name: n.nombre_marca || n.nombre || 'Especialista',
             specialty: n.especialidad || 'Nutrición Integral',
             location: n.ubicacion_texto || 'Consulta Online',
-            rating: n.rating || 5.0,
+            rating: ratingsMap[n.id] ? (ratingsMap[n.id].sum / ratingsMap[n.id].count) : 0,
+            reviewCount: ratingsMap[n.id] ? ratingsMap[n.id].count : 0,
             patients: 0,
             available: true,
             img: n.logo_url || 'photo-1559839734-2b71ea197ec2',
             verified: n.verificado || false,
-            mapa_url: n.mapa_url || ''
+            mapa_url: n.mapa_url || '',
+            telefono: n.telefono || '',
+            email: n.email || ''
           }));
           setDbNutritionists(formattedNutris);
 
