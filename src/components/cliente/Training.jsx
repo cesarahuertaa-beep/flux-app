@@ -406,7 +406,10 @@ export default function Training({
                   {/* Fila superior: Miniatura GIF + Alternativas */}
                   <div className="flex items-start gap-4 mb-5">
                     {/* Miniatura Activa */}
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#0B1929] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center">
+                      <button
+                        onClick={() => setPreviewEx(activeObj)}
+                        className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#0B1929] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0 border-none"
+                      >
                       {activeObj.gif_url ? (
                         <img src={activeObj.gif_url} alt={activeObj.nombre} className="w-full h-full object-contain" />
                       ) : (
@@ -417,7 +420,7 @@ export default function Training({
                           <span className="text-[8px] font-mono text-white tracking-widest uppercase">GIF</span>
                         </div>
                       )}
-                    </div>
+                      </button>
 
                     {/* Alternativas Clickables */}
                     <div className="flex-1 min-w-0 flex gap-3 overflow-x-auto pb-2 scroll-hide">
