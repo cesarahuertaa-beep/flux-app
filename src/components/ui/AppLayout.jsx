@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { Capacitor } from "@capacitor/core";
@@ -18,6 +18,24 @@ import { Capacitor } from "@capacitor/core";
 export function AppLayout({ children, nav, active, setActive, session }) {
   const [collapsed, setCollapsed] = useState(false);
   const brand = useBrand();
+
+  const navRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    if (navRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
+  }, [nav]);
 
   const userName = session?.data?.nombre || session?.nombre || "Usuario";
   const subtitle  = session?.role === "cliente" ? "Vista Atleta" : "Panel Admin";
@@ -144,8 +162,30 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           BOTTOM NAV BAR — sólo visible en mobile (< md)
           Fija en la parte inferior de la pantalla.
       ══════════════════════════════════════════════ */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] flex items-stretch overflow-x-auto scroll-hide shadow-[0_-2px_10px_rgba(0,0,0,0.02)]"
-           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {/* Left Indicator */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none transition-opacity duration-300 z-10" 
+          style={{ 
+            background: "linear-gradient(to right, var(--brand-primary), transparent)", 
+            opacity: canScrollLeft ? 0.15 : 0 
+          }} 
+        />
+        
+        {/* Right Indicator */}
+        <div 
+          className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none transition-opacity duration-300 z-10" 
+          style={{ 
+            background: "linear-gradient(to left, var(--brand-primary), transparent)", 
+            opacity: canScrollRight ? 0.15 : 0 
+          }} 
+        />
+
+        <nav 
+          ref={navRef}
+          onScroll={checkScroll}
+          className="flex items-stretch overflow-x-auto scroll-hide w-full relative z-20"
+        >
         {nav.map(({ id, label, icon }, index) => {
           const isActive = active === id;
           const isMid = index === Math.ceil(nav.length / 2);
@@ -200,6 +240,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           );
         })}
       </nav>
+      </div>
 
     </div>
   );
