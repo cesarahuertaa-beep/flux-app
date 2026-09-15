@@ -165,19 +165,19 @@ export function AppLayout({ children, nav, active, setActive, session }) {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {/* Left Indicator */}
         <div 
-          className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none transition-opacity duration-300 z-10" 
+          className="absolute left-0 top-0 bottom-0 w-10 pointer-events-none transition-opacity duration-300 z-10" 
           style={{ 
             background: "linear-gradient(to right, var(--brand-primary), transparent)", 
-            opacity: canScrollLeft ? 0.15 : 0 
+            opacity: canScrollLeft ? 0.35 : 0 
           }} 
         />
         
         {/* Right Indicator */}
         <div 
-          className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none transition-opacity duration-300 z-10" 
+          className="absolute right-0 top-0 bottom-0 w-10 pointer-events-none transition-opacity duration-300 z-10" 
           style={{ 
             background: "linear-gradient(to left, var(--brand-primary), transparent)", 
-            opacity: canScrollRight ? 0.15 : 0 
+            opacity: canScrollRight ? 0.35 : 0 
           }} 
         />
 
