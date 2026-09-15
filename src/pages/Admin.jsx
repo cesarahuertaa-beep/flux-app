@@ -600,9 +600,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <SubComponentWrapper title="Aprobaciones"><Aprobaciones setMsg={setMsg} /></SubComponentWrapper>
       </div>
 
-      <div className={tab === "membresia" ? "block" : "hidden"}>
-        <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>
-      </div>
+      {!isCivil && (
+        <div className={tab === "membresia" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>
+        </div>
+      )}
 
       {isSuperadmin && (
         <div className={tab === "pagos" ? "block" : "hidden"}>
@@ -742,7 +744,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {tab === "perfil" && (
+      {!isCivil && tab === "perfil" && (
         <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
       )}
 
