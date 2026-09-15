@@ -12,6 +12,8 @@ import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
+import { MembresiaB2C } from "../components/cliente/MembresiaB2C";
+import { ProgresoCliente } from "../components/admin/ProgresoCliente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -207,7 +209,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       session={session}
       onLogout={onLogout}
     >
-      {isAtletaMode && (
+      {(isAtletaMode || atletaModeCivil) && (
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
             <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
@@ -215,7 +217,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </span>
             <span className="text-[#047857] text-xs md:text-sm hidden sm:block">{isCivil ? "Modo de ejecución de rutina." : "Previsualiza tu app exactamente como lo verían tus pacientes."}</span>
           </div>
-          <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
+          <button onClick={isAtletaMode ? onBackToAdmin : () => setAtletaModeCivil(false)} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
             {isCivil ? "Volver al Editor" : "Volver al Panel"}
           </button>
         </div>
@@ -254,11 +256,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               )}
               
               {tab === "membresia" && isCivil && (
-                 <div className="flex flex-col items-center justify-center h-full p-8 text-center text-[#6B7A8D]">
-                    <ShoppingBag size={48} className="mb-4 text-[#CBD5E1]" />
-                    <h2 className="text-xl font-bold text-[#0B1929] mb-2">Tu Membresía Civil</h2>
-                    <p>Aquí podrás gestionar tu suscripción y beneficios.</p>
-                 </div>
+                 <MembresiaB2C cliente={cliente} />
               )}
 
               {tab === "nutricion" && (!atletaModeCivil) && (
@@ -283,7 +281,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           )}
 
           {tab === "progreso" && (
-            <Progreso cliente={cliente} />
+            isCivil 
+              ? <ProgresoCliente selected={cliente} setMsg={() => {}} /> 
+              : <Progreso cliente={cliente} />
           )}
 
           {tab === "citas" && (

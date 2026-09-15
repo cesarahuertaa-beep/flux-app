@@ -726,7 +726,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         {[
           { k: "nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb: "Nutrición" },
           { k: "deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb: "Rutinas" },
-          { k: "progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb: "Progreso" }
+          ...(isMiPlan ? [] : [{ k: "progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb: "Progreso" }])
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
