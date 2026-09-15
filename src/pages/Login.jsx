@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from "lucide-react";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost } from "../lib/supabase";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from "../lib/supabase";
 
 export default function Login({ onLogin }) {
   const [mode, setMode]           = useState("login");
@@ -101,7 +101,7 @@ export default function Login({ onLogin }) {
           try {
             // Usuario verificó su email pero no tiene tabla clientes (Civil nuevo)
             const nombreMeta = data.user?.user_metadata?.nombre || email.trim().split("@")[0];
-            const newClient = await dbPost("clientes", {
+            const newClient = await dbPostMinimal("clientes", {
                nombre: nombreMeta,
                email: email.trim(),
                auth_id: data.user.id,
@@ -205,7 +205,7 @@ export default function Login({ onLogin }) {
         }
       
       try {
-          await dbPost("clientes", { 
+          await dbPostMinimal("clientes", { 
             nombre: nombre.trim(), 
             email: email.trim(), 
             auth_id: userId, 
