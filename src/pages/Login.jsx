@@ -169,9 +169,16 @@ export default function Login({ onLogin }) {
     try {
       const data = await authSignUp(email.trim(), pass, nombre);
       const userId = data?.user?.id || data?.id;
-      if (!userId) {
-        throw new Error("No se pudo crear el usuario en Auth. " + JSON.stringify(data));
-      }
+        
+        if (!data.session) {
+          setErr("DEPURACIÓN: La sesión es NULA. Confirmación de email está encendida en Supabase.");
+          setLoading(false);
+          return;
+        }
+
+        if (!userId) {
+          throw new Error("No se pudo crear el usuario en Auth. " + JSON.stringify(data));
+        }
       
       await dbPost("clientes", { 
         nombre: nombre.trim(), 
