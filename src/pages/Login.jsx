@@ -125,7 +125,7 @@ export default function Login({ onLogin }) {
           }
         } else {
           setAuthToken(null); setProfileId(null);
-          setErr("No se encontró tu cuenta activa.");
+          setErr("ERR_DIAG_1: No se encontro tu cuenta activa.");
           setLoading(false); return;
         }
       }
@@ -139,7 +139,7 @@ export default function Login({ onLogin }) {
 
       if (multiRoles.length === 0) {
         setAuthToken(null); setProfileId(null);
-        setErr("No se encontró tu cuenta activa.");
+        setErr("ERR_DIAG_2: No se encontro tu cuenta activa.");
         setLoading(false); return;
       }
 
@@ -156,7 +156,7 @@ export default function Login({ onLogin }) {
           multiRoles: sorted 
         });
       }
-} catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
+} catch(e) { setAuthToken(null); setProfileId(null); setErr("ERR_CATCH: " + e.message); setLoading(false); }
   };
 
   
@@ -222,7 +222,7 @@ export default function Login({ onLogin }) {
           setMode("login");
         }
     } catch(e) {
-      setErr(e.message);
+      setErr("ERR_CATCH: " + e.message);
       setLoading(false);
     }
   };
@@ -234,7 +234,7 @@ export default function Login({ onLogin }) {
       await authResetPassword(email.trim());
       setInfo("Revisa tu email para restablecer tu contraseña.");
       setMode("login");
-    } catch(e) { setErr(e.message); }
+    } catch(e) { setErr("ERR_CATCH: " + e.message); }
     setLoading(false);
   };
 
@@ -246,7 +246,7 @@ export default function Login({ onLogin }) {
       await authUpdatePassword(accessToken, newPass);
       setInfo("Contraseña establecida. Ya puedes entrar.");
       setMode("login");
-    } catch(e) { setErr(e.message); }
+    } catch(e) { setErr("ERR_CATCH: " + e.message); }
     setLoading(false);
   };
 
