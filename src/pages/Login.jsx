@@ -168,14 +168,15 @@ export default function Login({ onLogin }) {
     setLoading(true); setErr(""); setInfo("");
     try {
       const data = await authSignUp(email.trim(), pass, nombre);
-      if (!data.user) {
-        throw new Error("No se pudo crear el usuario en Auth.");
+      const userId = data?.user?.id || data?.id;
+      if (!userId) {
+        throw new Error("No se pudo crear el usuario en Auth. " + JSON.stringify(data));
       }
       
       await dbPost("clientes", { 
         nombre: nombre.trim(), 
         email: email.trim(), 
-        auth_id: data.user.id, 
+        auth_id: userId, 
         activo: true, 
         nutriologo_id: null 
       });
