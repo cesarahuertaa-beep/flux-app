@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { dbUpsert } from "../lib/supabase";
-import { User, Mail, Save, AlertCircle, CheckCircle2, LogOut, ShoppingBag, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { dbPatch } from "../lib/supabase";
+import { User, Mail, LogOut, ShoppingBag, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
@@ -10,42 +10,47 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   const [objetivo, setObjetivo] = useState(user?.objetivo || "");
   const [telefono, setTelefono] = useState(user?.telefono || "");
   
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
   const isCliente = session?.role === "cliente";
+  const isFirstRender = useRef(true);
 
-  const handleSave = async () => {
-    setLoading(true); setMsg(""); setErr("");
-    try {
-      if (isCliente) {
-        await dbUpsert("clientes", {
-          id: user.id,
-          nombre,
-          objetivo,
-          telefono
-        });
-      } else {
-        await dbUpsert("profiles", {
-          id: user.id,
-          nombre
-        });
-      }
-      setMsg("Perfil actualizado correctamente");
-      // Actualizar sesión localmente para que se refleje inmediatamente
-      if (user) {
-        user.nombre = nombre;
-        if (isCliente) {
-          user.objetivo = objetivo;
-          user.telefono = telefono;
-        }
-      }
-    } catch (e) {
-      setErr("Error al guardar: " + e.message);
+  // Auto-guardado silencioso (1 segundo después de dejar de escribir)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-    setLoading(false);
-  };
+    
+    const timeoutId = setTimeout(async () => {
+      setIsSaving(true);
+      setSaveSuccess(false);
+      try {
+        if (isCliente) {
+          await dbPatch(`clientes?id=eq.${user.id}`, { nombre, objetivo, telefono });
+        } else {
+          await dbPatch(`profiles?id=eq.${user.id}`, { nombre });
+        }
+        
+        // Actualizar sesión localmente
+        if (user) {
+          user.nombre = nombre;
+          if (isCliente) {
+            user.objetivo = objetivo;
+            user.telefono = telefono;
+          }
+        }
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      } catch (e) {
+        console.error("Error al autoguardar:", e);
+      }
+      setIsSaving(false);
+    }, 1000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [nombre, objetivo, telefono, user, isCliente]);
 
   const handleStore = () => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
@@ -59,25 +64,21 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
 
   return (
     <div className="p-6 max-w-md mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
-      <div className="mb-6 text-center md:text-left">
-        <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
-        <p className="text-[#6B7A8D] mt-1">Actualiza tu información personal</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
+          <p className="text-[#6B7A8D] mt-1">Actualiza tu información personal</p>
+        </div>
+        
+        {/* Indicador silencioso de guardado */}
+        <div className="h-6 flex items-center justify-end min-w-[24px]">
+          {isSaving && <Loader2 size={18} className="text-[#6B7A8D] animate-spin" />}
+          {saveSuccess && !isSaving && <CheckCircle2 size={18} className="text-green-500" />}
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2E8F0]">
         
-        {msg && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" /> <span className="truncate">{msg}</span>
-          </div>
-        )}
-        
-        {err && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <AlertCircle size={18} className="text-red-500 flex-shrink-0" /> <span className="line-clamp-2">{err}</span>
-          </div>
-        )}
-
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#E2E8F0]">
           <div className="w-16 h-16 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center shadow-md flex-shrink-0">
             <User size={28} />
@@ -133,14 +134,6 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
             </>
           )}
 
-          <button 
-            onClick={handleSave}
-            disabled={loading}
-            className={`w-full mt-4 py-3.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--brand-primary)] hover:opacity-90'}`}
-          >
-            {loading ? "Guardando..." : <><Save size={18} /> Guardar Cambios</>}
-          </button>
-
           {multiRoles && multiRoles.length > 1 && (
             <div className="mt-8 border-t border-[#E2E8F0] pt-6 mb-2">
               <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
@@ -173,21 +166,23 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
             </div>
           )}
 
-          <button 
-            onClick={handleStore}
-            className="w-full mt-2 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
-          >
-            <ShoppingBag size={18} /> Ir a la tienda FLUX
-          </button>
-
-          {onLogout && (
+          <div className="pt-4 border-t border-transparent space-y-2 mt-4">
             <button 
-              onClick={onLogout}
-              className="w-full mt-2 py-3.5 rounded-xl font-bold text-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2 transition-all border border-red-100"
+              onClick={handleStore}
+              className="w-full py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
             >
-              <LogOut size={18} /> Cerrar Sesión
+              <ShoppingBag size={18} /> Ir a la tienda FLUX
             </button>
-          )}
+
+            {onLogout && (
+              <button 
+                onClick={onLogout}
+                className="w-full py-3.5 rounded-xl font-bold text-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2 transition-all border border-red-100"
+              >
+                <LogOut size={18} /> Cerrar Sesión
+              </button>
+            )}
+          </div>
         </div>
 
       </div>
