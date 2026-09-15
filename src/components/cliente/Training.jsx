@@ -100,6 +100,7 @@ export default function Training({
   const [expandedEx,      setExpandedEx]      = useState(0); // Primer ejercicio abierto por defecto
   const [showProgress,    setShowProgress]    = useState(false);
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
+  const [previewEx, setPreviewEx] = useState(null);
   const [unitPrefs,       setUnitPrefs]       = useState({}); // { [exId_variantId]: 'kg' | 'lb' }
   const [focusedInput,    setFocusedInput]    = useState(null); // { exId, wi, si }
 
