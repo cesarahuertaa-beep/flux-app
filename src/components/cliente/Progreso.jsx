@@ -197,6 +197,39 @@ export default function Progreso({ cliente }) {
     { key: "cintura", label: "CINTURA", unit: "cm" },
   ].filter(k => current[k.key] != null && current[k.key] !== ""); // Solo mostrar los que tienen datos
 
+  const getBodyData = (groups) => {
+    const data = [];
+    
+    // We have 6 colors. Let's map RANKS (9 levels) to 1-6 frequencies.
+    // 0 = none
+    const getFrequency = (val) => {
+      if (!val || val <= 0) return 0;
+      // Use the same getRank logic to get the rank object
+      const r = [...RANKS].reverse().find(r => val >= r.min) || RANKS[0];
+      const rankIdx = RANKS.indexOf(r);
+      // Map 0-8 to 1-6 safely
+      let freq = Math.ceil((rankIdx / 8) * 6);
+      if (freq < 1) freq = 1;
+      if (freq > 6) freq = 6;
+      return freq; // 1 to 6 mapped to array index 0 to 5
+    };
+
+    if (groups.pecho) data.push({ name: 'Pecho', muscles: ['chest'], frequency: getFrequency(groups.pecho) });
+    if (groups.hombro) data.push({ name: 'Hombros', muscles: ['front-deltoids', 'back-deltoids'], frequency: getFrequency(groups.hombro) });
+    if (groups.abdomen) data.push({ name: 'Abdomen', muscles: ['abs', 'obliques'], frequency: getFrequency(groups.abdomen) });
+    if (groups.espalda) data.push({ name: 'Espalda', muscles: ['upper-back', 'lower-back', 'trapezius'], frequency: getFrequency(groups.espalda) });
+    if (groups.brazo) data.push({ name: 'Brazos', muscles: ['biceps', 'triceps', 'forearm'], frequency: getFrequency(groups.brazo) });
+    if (groups.pierna) data.push({ name: 'Piernas', muscles: ['quadriceps', 'hamstring', 'calves', 'gluteal', 'adductor', 'abductors'], frequency: getFrequency(groups.pierna) });
+
+    const hasMax = data.some(d => d.frequency === 6);
+    if (!hasMax && data.length > 0) {
+      data.push({ name: 'Anchor', muscles: ['head'], frequency: 6 }); 
+    }
+    
+    return data;
+  };
+
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#F7F9FC]">
       <div className="px-6 md:px-8 pt-6 md:pt-8 pb-12 max-w-5xl mx-auto space-y-8">
