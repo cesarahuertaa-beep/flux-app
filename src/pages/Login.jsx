@@ -98,11 +98,24 @@ export default function Login({ onLogin }) {
         setLoading(false); return;
       }
 
-      if (availableRoles.length === 1) {
-        onLogin({ role: availableRoles[0].role, data: availableRoles[0].data, token: data.access_token, profileId: data.user.id });
+      
+      let multiRoles = availableRoles.map(r => ({ role: r.role, data: r.data }));
+      const hasPro = multiRoles.some(r => ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(r.role));
+      if (hasPro) {
+        multiRoles = multiRoles.filter(r => r.role !== 'cliente');
+      }
+
+      if (multiRoles.length === 0) {
+        setAuthToken(null); setProfileId(null);
+        setErr("No se encontró tu cuenta activa.");
+        setLoading(false); return;
+      }
+
+      const sorted = multiRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
+
+      if (sorted.length === 1) {
+        onLogin({ role: sorted[0].role, data: sorted[0].data, token: data.access_token, profileId: data.user.id });
       } else {
-        // Auto-seleccionar el rol principal (administrativo sobre cliente) por defecto
-        const sorted = availableRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
         onLogin({ 
           role: sorted[0].role, 
           data: sorted[0].data, 
@@ -111,7 +124,7 @@ export default function Login({ onLogin }) {
           multiRoles: sorted 
         });
       }
-    } catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
+} catch(e) { setAuthToken(null); setProfileId(null); setErr(e.message); setLoading(false); }
   };
 
   const signUpSubmit = async () => {

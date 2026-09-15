@@ -10,6 +10,7 @@ import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
+import Aprobaciones from "../components/admin/Aprobaciones";
 import GestorTienda from "../components/admin/GestorTienda";
 import MiMembresia from "../components/admin/MiMembresia";
 import ControlPagos from "../components/admin/ControlPagos";
