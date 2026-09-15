@@ -135,7 +135,7 @@ export default function Progreso({ cliente }) {
         byEj[p.ejercicio_id][p.semana][p.serie][p.tipo] = p.valor;
       });
 
-      const muscleAdvances = { pecho: [], espalda: [], pierna: [], brazo: [], hombro: [], abdomen: [] };
+      const muscleAdvances = {}; EXACT_GROUPS.forEach(g => muscleAdvances[g] = []);
 
       for (const ejId in byEj) {
         const g = normalizeGroup(ejMap[ejId]);
@@ -200,26 +200,35 @@ export default function Progreso({ cliente }) {
   const getBodyData = (groups) => {
     const data = [];
     
-    // We have 6 colors. Let's map RANKS (9 levels) to 1-6 frequencies.
-    // 0 = none
     const getFrequency = (val) => {
       if (!val || val <= 0) return 0;
-      // Use the same getRank logic to get the rank object
       const r = [...RANKS].reverse().find(r => val >= r.min) || RANKS[0];
       const rankIdx = RANKS.indexOf(r);
-      // Map 0-8 to 1-6 safely
       let freq = Math.ceil((rankIdx / 8) * 6);
       if (freq < 1) freq = 1;
       if (freq > 6) freq = 6;
-      return freq; // 1 to 6 mapped to array index 0 to 5
+      return freq;
     };
 
     if (groups.pecho) data.push({ name: 'Pecho', muscles: ['chest'], frequency: getFrequency(groups.pecho) });
-    if (groups.hombro) data.push({ name: 'Hombros', muscles: ['front-deltoids', 'back-deltoids'], frequency: getFrequency(groups.hombro) });
-    if (groups.abdomen) data.push({ name: 'Abdomen', muscles: ['abs', 'obliques'], frequency: getFrequency(groups.abdomen) });
-    if (groups.espalda) data.push({ name: 'Espalda', muscles: ['upper-back', 'lower-back', 'trapezius'], frequency: getFrequency(groups.espalda) });
-    if (groups.brazo) data.push({ name: 'Brazos', muscles: ['biceps', 'triceps', 'forearm'], frequency: getFrequency(groups.brazo) });
-    if (groups.pierna) data.push({ name: 'Piernas', muscles: ['quadriceps', 'hamstring', 'calves', 'gluteal', 'adductor', 'abductors'], frequency: getFrequency(groups.pierna) });
+    if (groups.abdomen) data.push({ name: 'Abdomen', muscles: ['abs'], frequency: getFrequency(groups.abdomen) });
+    if (groups.oblicuos) data.push({ name: 'Oblicuos', muscles: ['obliques'], frequency: getFrequency(groups.oblicuos) });
+    if (groups.deltoide_anterior) data.push({ name: 'Deltoide Ant.', muscles: ['front-deltoids'], frequency: getFrequency(groups.deltoide_anterior) });
+    if (groups.deltoide_posterior) data.push({ name: 'Deltoide Post.', muscles: ['back-deltoids'], frequency: getFrequency(groups.deltoide_posterior) });
+    if (groups.trapecio) data.push({ name: 'Trapecio', muscles: ['trapezius'], frequency: getFrequency(groups.trapecio) });
+    if (groups.dorsal) data.push({ name: 'Dorsal', muscles: ['upper-back'], frequency: getFrequency(groups.dorsal) });
+    if (groups.lumbar) data.push({ name: 'Lumbar', muscles: ['lower-back'], frequency: getFrequency(groups.lumbar) });
+    if (groups.biceps) data.push({ name: 'Bíceps', muscles: ['biceps'], frequency: getFrequency(groups.biceps) });
+    if (groups.triceps) data.push({ name: 'Tríceps', muscles: ['triceps'], frequency: getFrequency(groups.triceps) });
+    if (groups.antebrazo) data.push({ name: 'Antebrazo', muscles: ['forearm'], frequency: getFrequency(groups.antebrazo) });
+    if (groups.gluteo) data.push({ name: 'Glúteo', muscles: ['gluteal'], frequency: getFrequency(groups.gluteo) });
+    if (groups.cuadriceps) data.push({ name: 'Cuádriceps', muscles: ['quadriceps'], frequency: getFrequency(groups.cuadriceps) });
+    if (groups.isquiotibial) data.push({ name: 'Isquiotibial', muscles: ['hamstring'], frequency: getFrequency(groups.isquiotibial) });
+    if (groups.pantorrilla) data.push({ name: 'Pantorrilla', muscles: ['calves'], frequency: getFrequency(groups.pantorrilla) });
+    if (groups.aductor) data.push({ name: 'Aductor', muscles: ['adductor'], frequency: getFrequency(groups.aductor) });
+    if (groups.abductor) data.push({ name: 'Abductor', muscles: ['abductors'], frequency: getFrequency(groups.abductor) });
+    if (groups.soleo) data.push({ name: 'Sóleo', muscles: ['left-soleus', 'right-soleus'], frequency: getFrequency(groups.soleo) });
+    if (groups.cuello) data.push({ name: 'Cuello', muscles: ['neck'], frequency: getFrequency(groups.cuello) });
 
     const hasMax = data.some(d => d.frequency === 6);
     if (!hasMax && data.length > 0) {
@@ -359,7 +368,7 @@ export default function Progreso({ cliente }) {
                     <div key={g} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.3)]" style={{ background: rank.color }} />
-                        <span className="text-sm font-semibold text-white capitalize">{g}</span>
+                        <span className="text-sm font-semibold text-white capitalize">{g.replace(/_/g, " ")}</span>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
