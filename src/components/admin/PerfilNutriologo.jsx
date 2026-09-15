@@ -10,6 +10,8 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const [loading, setLoading] = useState(true);
   const brand = useBrand();
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
