@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { enqueue, getAll } from "../lib/offlineQueue";
@@ -12,8 +12,6 @@ import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { MembresiaB2C } from "../components/cliente/MembresiaB2C";
-import { ProgresoCliente } from "../components/admin/ProgresoCliente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
@@ -160,10 +158,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const SIDEBAR_ITEMS = isCivil ? [
     { id: "programar", label: "Mi Plan", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso", icon: <Camera size={18} strokeWidth={1.5} /> },
-    { id: "membresia", label: "Membresía", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+    { id: "membresia", label: "Membres├¡a", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
     { id: "perfil", label: "Mi Perfil", icon: <User size={18} strokeWidth={1.5} /> }
   ] : [
-    { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+    { id: "nutricion",label: "Nutrici├│n",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
     ...(cliente?.objetivo !== "Mi entrenamiento personal" ? [
@@ -209,21 +207,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       session={session}
       onLogout={onLogout}
     >
-      {(isAtletaMode || atletaModeCivil) && (
+      {isAtletaMode && (
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
             <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
-              {isCivil ? <><Dumbbell size={16} /> Entrenando</> : <><Dumbbell size={16} /> Estás en Modo Atleta</>}
+              {isCivil ? <><Dumbbell size={16} /> Entrenando</> : <><Dumbbell size={16} /> Est├ís en Modo Atleta</>}
             </span>
-            <span className="text-[#047857] text-xs md:text-sm hidden sm:block">{isCivil ? "Modo de ejecución de rutina." : "Previsualiza tu app exactamente como lo verían tus pacientes."}</span>
+            <span className="text-[#047857] text-xs md:text-sm hidden sm:block">{isCivil ? "Modo de ejecuci├│n de rutina." : "Previsualiza tu app exactamente como lo ver├¡an tus pacientes."}</span>
           </div>
-          <button onClick={isAtletaMode ? onBackToAdmin : () => setAtletaModeCivil(false)} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
+          <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
             {isCivil ? "Volver al Editor" : "Volver al Panel"}
           </button>
         </div>
       )}
       {loading ? (
-        <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
+        <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando informaci├│n...</div>
       ) : (
         <>
           {isFinished && (tab === "nutricion" || tab === "deporte") ? (
@@ -232,10 +230,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                 <Trophy size={32} className="text-[#10B981]" />
               </div>
               <h3 className="text-[#0B1929] font-bold text-xl mb-2" style={{ fontFamily: "DM Sans" }}>
-                ¡Felicidades, terminaste!
+                ┬íFelicidades, terminaste!
               </h3>
               <p className="text-[#6B7A8D] text-sm max-w-[280px]">
-                Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan.
+                Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutri├│logo para agendar tu pr├│xima evaluaci├│n y recibir tu nuevo plan.
               </p>
             </div>
           ) : (
@@ -256,7 +254,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               )}
               
               {tab === "membresia" && isCivil && (
-                 <MembresiaB2C cliente={cliente} />
+                 <div className="flex flex-col items-center justify-center h-full p-8 text-center text-[#6B7A8D]">
+                    <ShoppingBag size={48} className="mb-4 text-[#CBD5E1]" />
+                    <h2 className="text-xl font-bold text-[#0B1929] mb-2">Tu Membres├¡a Civil</h2>
+                    <p>Aqu├¡ podr├ís gestionar tu suscripci├│n y beneficios.</p>
+                 </div>
               )}
 
               {tab === "nutricion" && (!atletaModeCivil) && (
@@ -281,9 +283,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           )}
 
           {tab === "progreso" && (
-            isCivil 
-              ? <ProgresoCliente selected={cliente} setMsg={() => {}} /> 
-              : <Progreso cliente={cliente} />
+            <Progreso cliente={cliente} />
           )}
 
           {tab === "citas" && (

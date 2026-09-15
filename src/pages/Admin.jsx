@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-, UserCheck} from "lucide-react";
+, UserCheck, Dumbbell, BarChart2, User} from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
+import { ProgresoCliente } from "../components/admin/ProgresoCliente";
+import MiMembresiaCivil from "../components/admin/MiMembresiaCivil";
 import { GestionEquipo } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import UserProfile from "../components/UserProfile";
@@ -36,7 +38,8 @@ const SubComponentWrapper = ({ children, title, action }) => (
   </div>
 );
 
-export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles }) {
+export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles, clienteData }) {
+  const isCivil = role === "civil";
   const brand = useBrand();
   const { setBrandColor } = brand;
   
@@ -313,7 +316,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-  const SIDEBAR_ITEMS = role === "staff"
+  const SIDEBAR_ITEMS = isCivil ? [
+    { id: "mi_plan",   label: "Mi Plan",    icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id: "progreso",  label: "Progreso",   icon: <BarChart2 size={18} strokeWidth={1.5} /> },
+    { id: "membresia", label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> },
+    { id: "perfil",    label: "Mi Perfil",  icon: <User size={18} strokeWidth={1.5} /> },
+  ]
+  : role === "staff"
     ? [
         { id: "clientes",   label: "Directorio", icon: <Users size={18} strokeWidth={1.5} /> },
         { id: "aprobaciones", label: "Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
@@ -357,7 +366,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       brand={brand}
       onLogout={onLogout}
     >
-      {diasGracia && (
+      {diasGracia && !isCivil && (
         <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
           ⚠️ Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.
         </div>
@@ -374,7 +383,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {tab === "clientes" && (isSuperadmin || role === "staff") ? (
+      {!isCivil && tab === "clientes" && (isSuperadmin || role === "staff") ? (
         <DirectorioSuperadmin 
           myId={myId} 
           clientes={clientes} 

@@ -144,13 +144,17 @@ export default function Login({ onLogin }) {
       }
 
       const sorted = multiRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
+      const firstRole = sorted[0];
+      // Un "civil" es un cliente sin nutriólogo asignado
+      const isCivilUser = firstRole.role === 'cliente' && !firstRole.data?.nutriologo_id;
+      const finalRole = isCivilUser ? 'civil' : firstRole.role;
 
       if (sorted.length === 1) {
-        onLogin({ role: sorted[0].role, data: sorted[0].data, token: data.access_token, profileId: data.user.id });
+        onLogin({ role: finalRole, data: firstRole.data, token: data.access_token, profileId: data.user.id });
       } else {
         onLogin({ 
-          role: sorted[0].role, 
-          data: sorted[0].data, 
+          role: finalRole, 
+          data: firstRole.data, 
           token: data.access_token, 
           profileId: data.user.id,
           multiRoles: sorted 

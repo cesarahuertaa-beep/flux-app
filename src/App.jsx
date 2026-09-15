@@ -13,8 +13,12 @@ import { AppUpdater } from "./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
-  if (s.role === "cliente" && s.data?.id) localStorage.setItem("flux_client_id", s.data.id);
-  else localStorage.removeItem("flux_client_id");
+  // "civil" y "cliente" ambos guardan su ID de cliente en flux_client_id
+  if ((s.role === "cliente" || s.role === "civil") && s.data?.id) {
+    localStorage.setItem("flux_client_id", s.data.id);
+  } else {
+    localStorage.removeItem("flux_client_id");
+  }
   
   if (s.multiRoles) {
     localStorage.setItem("flux_multi_roles", JSON.stringify(s.multiRoles));
@@ -59,10 +63,13 @@ export default function App() {
 
       if (token && savedRole) {
         try {
-          if (savedRole === "cliente" && savedClientId) {
+          if ((savedRole === "cliente" || savedRole === "civil") && savedClientId) {
             const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
             if (rows.length) {
-              setSession({ role: "cliente", data: rows[0], token, profileId, multiRoles: savedMultiRoles });
+              // Preservar el rol "civil" si no tiene nutriólogo, "cliente" si sí tiene
+              const restoredRole = savedRole === "civil" ? "civil" : 
+                                   (rows[0].nutriologo_id ? "cliente" : "civil");
+              setSession({ role: restoredRole, data: rows[0], token, profileId, multiRoles: savedMultiRoles });
             } else {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
@@ -157,6 +164,8 @@ export default function App() {
     );
     if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
       return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
+    if (session.role === "civil")
+      return <Admin role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={null} multiRoles={null} clienteData={session.data} />;
     return <ClienteView session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };
 
