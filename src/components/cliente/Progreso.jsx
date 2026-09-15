@@ -342,21 +342,25 @@ export default function Progreso({ cliente }) {
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 relative z-10">
-            <div className="flex flex-row justify-center drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-              <div className="flex gap-4">
-                <Model 
-                  data={getBodyData(groupAvg)} 
-                  style={{ width: '12rem', padding: '1rem' }} 
-                  highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
-                  type="anterior"
-                />
-                <Model 
-                  data={getBodyData(groupAvg)} 
-                  style={{ width: '12rem', padding: '1rem' }} 
-                  highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
-                  type="posterior"
-                />
-              </div>
+            <div className="flex flex-row justify-center drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] w-full">
+              <div className="flex justify-center gap-2 md:gap-4 w-full max-w-[400px] mx-auto">
+                  <div className="w-1/2 flex justify-center">
+                    <Model 
+                      data={getBodyData(groupAvg)} 
+                      style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
+                      highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
+                      type="anterior"
+                    />
+                  </div>
+                  <div className="w-1/2 flex justify-center">
+                    <Model 
+                      data={getBodyData(groupAvg)} 
+                      style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
+                      highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
+                      type="posterior"
+                    />
+                  </div>
+                </div>
             </div>
 
             <div className="bg-[#152336] border border-[#1E2D3D] rounded-2xl p-5 w-full md:w-64">
