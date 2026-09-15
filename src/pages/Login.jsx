@@ -133,8 +133,8 @@ export default function Login({ onLogin }) {
 
   
   const submitProRequest = async () => {
-    if (!nombre || !email || !cedula) {
-      setErr("Nombre, Email y Cédula son obligatorios");
+    if (!nombre || !email || (signupType === 'nutriologo' && !cedula)) {
+      setErr("Por favor llena los campos obligatorios");
       return;
     }
     setLoading(true); setErr(""); setInfo("");
@@ -419,12 +419,14 @@ export default function Login({ onLogin }) {
               <input value={mapaUrl} onChange={e => setMapaUrl(e.target.value)} placeholder="Enlace de Maps" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
+          {signupType === 'nutriologo' && (
           <div className="mb-6">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Número de Cédula Profesional</div>
             <div className="relative">
               <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu número de cédula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
+          )}
           <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
             {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}
           </button>
