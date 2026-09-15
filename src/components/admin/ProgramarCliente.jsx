@@ -1070,7 +1070,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                   <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center">
                                     {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
                                   </div>
-                                  <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular} • {e.tipo_movimiento}</span></div>
+                                  <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular}</span></div>
                                   
                                   <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
                                     <div className="flex items-center gap-2 sm:block">

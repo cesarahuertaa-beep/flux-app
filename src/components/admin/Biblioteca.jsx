@@ -99,7 +99,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         
         {(filtroGrupo !== "Todos" || busqueda) && (
           <button
-            onClick={() => { setBusqueda(""); setFiltroGrupo("Todos"); setFiltroTipo("Todos"); }}
+            onClick={() => { setBusqueda(""); setFiltroGrupo("Todos"); }}
             className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
           >
             <X size={14} /> Limpiar
@@ -280,9 +280,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor:`${groupColors[preview.grupo_muscular] || "#38bdf8"}20`, color: groupColors[preview.grupo_muscular] || "#38bdf8" }}>
                 {preview.grupo_muscular}
               </span>
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-600">
-                {preview.tipo_movimiento}
-              </span>
+              
             </div>
             <button
               onClick={() => setPreview(null)}
