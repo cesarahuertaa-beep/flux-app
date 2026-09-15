@@ -79,7 +79,7 @@ export default function Aprobaciones({ setMsg }) {
                   <p className="text-sm text-[#6B7A8D]">{s.email}</p>
                 </div>
                 <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-full bg-blue-50 text-blue-600 uppercase">
-                  {s.tipo === 'nutriologo' ? 'Nutriólogo' : 'Estudiante'}
+                  {s.tipo === 'nutriologo' ? 'Nutriólogo' : 'Estudiante de Nutrición'}
                 </span>
               </div>
               

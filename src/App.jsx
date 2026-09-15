@@ -77,8 +77,8 @@ export default function App() {
               }
             }
 
-            if (role && ["superadmin", "nutriologo", "administrativo", "staff"].includes(role)) {
-              if (["nutriologo", "administrativo", "staff"].includes(role) && profiles[0].activo === false) {
+            if (role && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(role)) {
+              if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(role) && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
                 setSession({ role, token, profileId, multiRoles: savedMultiRoles });
@@ -144,11 +144,7 @@ export default function App() {
   const handleBackToAdmin = () => setAtletaData(null);
 
   const MainApp = () => {
-    if (session.role === "cliente" && !session.data?.nutriologo_id && !atletaData) {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
-      const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform() || isStandalone;
-      return <Navigate to={isAppMode ? "/login" : "/"} replace />;
-    }
+    
 
     if (atletaData) return (
       <ClienteView
@@ -159,7 +155,7 @@ export default function App() {
         onChangeRole={null}
       />
     );
-    if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="administrativo" || session.role==="staff")
+    if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
       return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
     return <ClienteView session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };
