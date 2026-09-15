@@ -68,8 +68,8 @@ export default function Login({ onLogin }) {
         }
       }
 
-      if (adminRole && ["superadmin", "nutriologo", "administrativo", "staff"].includes(adminRole)) {
-        if (["nutriologo", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
+      if (adminRole && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole)) {
+        if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
            // Suspended admin account (ignore or we could error, but we skip to allow client login if any)
         } else {
            availableRoles.push({

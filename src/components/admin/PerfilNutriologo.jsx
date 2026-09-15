@@ -336,7 +336,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </div>
 
         {(() => {
-          const rolesToShow = (role === "nutriologo" || role === "superadmin")
+          const rolesToShow = (role === "nutriologo" || role === "nutriologo_estudiante" || role === "superadmin")
             ? (multiRoles || []).filter(r => r.role !== 'cliente')
             : (multiRoles || []);
 
@@ -360,7 +360,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                   >
                     <div className="text-left">
                       <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                        {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
+                        {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : (r.role === "nutriologo_estudiante" ? "Estudiante" : "Staff Administrativo"))}
                       </p>
                       <p className="text-xs text-[#6B7A8D]">
                         {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}

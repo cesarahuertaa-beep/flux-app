@@ -159,7 +159,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
                     >
                       <div className="text-left">
                         <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                          {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : "Staff Administrativo")}
+                          {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : (r.role === "nutriologo_estudiante" ? "Estudiante" : "Staff Administrativo"))}
                         </p>
                         <p className="text-xs text-[#6B7A8D]">
                           {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}

@@ -29,7 +29,7 @@ export function BrandProvider({ children, session }) {
         if (session.role === "cliente" && session.data?.nutriologo_id) {
           // Cliente ve la marca de su nutriólogo
           profileIdToFetch = session.data.nutriologo_id;
-        } else if (session.role === "nutriologo") {
+        } else if (session.role === "nutriologo" || session.role === "nutriologo_estudiante") {
           // Nutriólogo ve su propia marca
           profileIdToFetch = session.profileId || getProfileId();
         }

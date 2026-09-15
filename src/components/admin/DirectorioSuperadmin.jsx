@@ -218,7 +218,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         const profile = existingProfiles[0];
 
         // Consentimiento si es colega o rol superior (solo para cuando lo invitan como paciente)
-        if (profile && ["nutriologo", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
           await dbPost("solicitudes_entrenamiento", {
             from_nutriologo_id: myId,
             from_nutriologo_nombre: myName || 'Superadmin',

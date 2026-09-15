@@ -70,7 +70,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   // ── VERIFICACIÓN DE MORA (solo para nutriólogos) ──
   useEffect(() => {
-    if (role !== "nutriologo") return;
+    if (role !== "nutriologo" && role !== "nutriologo_estudiante") return;
 
     const checkPago = async () => {
       try {
@@ -188,7 +188,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         const profile = existingProfiles[0];
         
         // Bloqueo / Consentimiento: Si es un colega o rol superior
-        if (profile && ["nutriologo", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
           const me = await dbGet(`profiles?id=eq.${myId}`);
           const myName = me[0]?.nombre || 'Nutriólogo';
           
