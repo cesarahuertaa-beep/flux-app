@@ -37,21 +37,22 @@ const normalizeGroup = (g) => {
 };
 
 const RANKS = [
-  { name: "Iniciando", min: -Infinity, color: "#334155" }, 
-  { name: "Bronce", min: 0.1, color: "#CD7F32" }, 
-  { name: "Hierro", min: 2, color: "#94A3B8" }, 
-  { name: "Plata", min: 4, color: "#CBD5E1" }, 
-  { name: "Oro", min: 6, color: "#FBBF24" }, 
-  { name: "Platino", min: 8, color: "#F43F5E" }, 
-  { name: "Diamante", min: 10, color: "#3B82F6" }, 
-  { name: "Esmeralda", min: 15, color: "#10B981" }, 
-  { name: "Campeón", min: 20, color: "#8B5CF6" }, 
+  { name: "Clase G", min: 0, color: "#64748B", level: 1 }, 
+  { name: "Clase F", min: 100, color: "#9BA5B0", level: 1 }, 
+  { name: "Clase E", min: 300, color: "#10B981", level: 2 }, 
+  { name: "Clase D", min: 600, color: "#10B981", level: 2 }, 
+  { name: "Clase C", min: 1000, color: "#3B82F6", level: 3 }, 
+  { name: "Clase B", min: 1500, color: "#3B82F6", level: 3 }, 
+  { name: "Clase A", min: 2100, color: "#8B5CF6", level: 4 }, 
+  { name: "Clase S", min: 2800, color: "#F59E0B", level: 5 }, 
+  { name: "Clase SS", min: 3600, color: "#F59E0B", level: 5 },
+  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 }
 ];
 
-const getRank = (pct) => {
-  if (pct == null) return RANKS[0];
-  return [...RANKS].reverse().find(r => pct >= r.min) || RANKS[0];
+const getRank = (xp) => {
+  return [...RANKS].reverse().find(r => xp >= r.min) || RANKS[0];
 };
+
 
 // ── SVGs de Figuras ──
 const SilhouetteSVG = () => (
@@ -135,37 +136,58 @@ export default function Progreso({ cliente }) {
         byEj[p.ejercicio_id][p.semana][p.serie][p.tipo] = p.valor;
       });
 
-      const muscleAdvances = {}; EXACT_GROUPS.forEach(g => muscleAdvances[g] = []);
+            const muscleXP = {}; EXACT_GROUPS.forEach(g => muscleXP[g] = 0);
 
+      const allWeeks = new Set();
       for (const ejId in byEj) {
-        const g = normalizeGroup(ejMap[ejId]);
-        if (!muscleAdvances[g]) continue;
-        
-        const semanas = Object.keys(byEj[ejId]).map(Number).sort((a,b)=>a-b);
-        let e1RM_first = null;
-        let e1RM_last = null;
-        
-        for (const sem of semanas) {
-          const s1 = byEj[ejId][sem][1]; // serie 1
-          if (s1 && s1.peso && s1.reps) {
-            if (!e1RM_first) e1RM_first = calcular1RM(s1.peso, s1.reps);
-            e1RM_last = calcular1RM(s1.peso, s1.reps);
-          }
-        }
-        
-        if (e1RM_first && e1RM_last && e1RM_first > 0) {
-          const pct = ((e1RM_last - e1RM_first) / e1RM_first) * 100;
-          muscleAdvances[g].push(pct);
-        }
+         Object.keys(byEj[ejId]).forEach(w => allWeeks.add(Number(w)));
+      }
+      const sortedWeeks = Array.from(allWeeks).sort((a,b)=>a-b);
+      const minWeek = sortedWeeks[0] || 1;
+      const maxWeek = sortedWeeks[sortedWeeks.length - 1] || 1;
+
+      const muscleStarted = {}; EXACT_GROUPS.forEach(g => muscleStarted[g] = false);
+      const last1RM = {}; 
+
+      for (let w = minWeek; w <= maxWeek; w++) {
+         const musclesTrainedThisWeek = new Set();
+         
+         for (const ejId in byEj) {
+            const g = normalizeGroup(ejMap[ejId]);
+            if (!muscleXP.hasOwnProperty(g)) continue;
+
+            const weekData = byEj[ejId][w];
+            if (weekData) {
+               muscleStarted[g] = true;
+               musclesTrainedThisWeek.add(g);
+               
+               const s1 = weekData[1]; // serie 1
+               if (s1 && s1.peso && s1.reps) {
+                  const current1RM = calcular1RM(s1.peso, s1.reps);
+                  if (current1RM) {
+                     if (last1RM[ejId]) {
+                        const pctGrowth = ((current1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
+                        muscleXP[g] += Math.round(pctGrowth);
+                     }
+                     last1RM[ejId] = current1RM;
+                  }
+               }
+            }
+         }
+
+         // Puntos por consistencia
+         for (const g of EXACT_GROUPS) {
+            if (!muscleStarted[g]) continue;
+            if (musclesTrainedThisWeek.has(g)) {
+               muscleXP[g] += 10;
+            } else {
+               muscleXP[g] -= 15;
+            }
+            if (muscleXP[g] < 0) muscleXP[g] = 0;
+         }
       }
 
-      const avg = {};
-      for (const g in muscleAdvances) {
-        if (muscleAdvances[g].length > 0) {
-          avg[g] = muscleAdvances[g].reduce((a,b)=>a+b, 0) / muscleAdvances[g].length;
-        }
-      }
-      setGroupAvg(avg);
+      setGroupAvg(muscleXP);
 
     } catch (e) {
       console.error(e);
@@ -202,12 +224,8 @@ export default function Progreso({ cliente }) {
     
     const getFrequency = (val) => {
       if (!val || val <= 0) return 0;
-      const r = [...RANKS].reverse().find(r => val >= r.min) || RANKS[0];
-      const rankIdx = RANKS.indexOf(r);
-      let freq = Math.ceil((rankIdx / 8) * 6);
-      if (freq < 1) freq = 1;
-      if (freq > 6) freq = 6;
-      return freq;
+      const r = getRank(val);
+      return r.level;
     };
 
     if (groups.pecho) data.push({ name: 'Pecho', muscles: ['chest'], frequency: getFrequency(groups.pecho) });
@@ -376,7 +394,7 @@ export default function Progreso({ cliente }) {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
-                        <p className="text-[10px] text-[#6B7A8D]">+{pct.toFixed(1)}%</p>
+                        <p className="text-[10px] text-[#6B7A8D]">{pct} XP</p>
                       </div>
                     </div>
                   );
