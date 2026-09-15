@@ -187,8 +187,9 @@ export const authSignUp = async (email, password, nombre) => {
   if (!r.ok) throw new Error(d.msg || d.error_description || "Error registrando cuenta");
   
   if (d.session) {
-    if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
-  }
+      if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
+      if (d.session.access_token) setAuthToken(d.session.access_token);
+    }
   return d;
 };
 
