@@ -10,7 +10,9 @@ export default function Login({ onLogin }) {
   const [newPass, setNewPass]     = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [signupType, setSignupType] = useState("civil");
-  const [docUrl, setDocUrl] = useState("");
+  const [nombreMarca, setNombreMarca] = useState("");
+  const [mapaUrl, setMapaUrl] = useState("");
+  const [cedula, setCedula] = useState("");
   const [err, setErr]             = useState("");
   const [info, setInfo]           = useState("");
   const [loading, setLoading] = useState(false);
@@ -131,8 +133,8 @@ export default function Login({ onLogin }) {
 
   
   const submitProRequest = async () => {
-    if (!nombre || !email || !docUrl) {
-      setErr("Todos los campos son obligatorios");
+    if (!nombre || !email || !cedula) {
+      setErr("Nombre, Email y Cédula son obligatorios");
       return;
     }
     setLoading(true); setErr(""); setInfo("");
@@ -141,7 +143,9 @@ export default function Login({ onLogin }) {
         nombre: nombre.trim(),
         email: email.trim(),
         tipo: signupType,
-        documentacion_url: docUrl.trim(),
+        cedula: cedula.trim(),
+        nombre_marca: nombreMarca.trim(),
+        mapa_url: mapaUrl.trim(),
         estado: 'pendiente'
       });
       setInfo("Solicitud enviada con éxito. Nuestro equipo la revisará pronto.");
@@ -225,7 +229,7 @@ export default function Login({ onLogin }) {
               {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
             </div>
           )}
-          {(mode === "login" || mode === "signup") && (
+          {(mode === "login" || mode.startsWith("signup")) && (
             <div className="flex bg-[#F0F4FA] rounded-full p-1 mx-auto w-fit mt-2">
               <button
                 onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
@@ -234,8 +238,8 @@ export default function Login({ onLogin }) {
                 Iniciar Sesión
               </button>
               <button
-                onClick={() => { setMode("signup"); setErr(""); setInfo(""); }}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode === "signup" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+                onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
+                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode.startsWith("signup") ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
               >
                 Crear Cuenta
               </button>
@@ -403,12 +407,23 @@ export default function Login({ onLogin }) {
               <input value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" type="email" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
-          <div className="mb-6">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">URL de Cédula o Credencial</div>
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nombre de Consultorio/Marca</div>
             <div className="relative">
-              <input value={docUrl} onChange={e => setDocUrl(e.target.value)} placeholder="Link a tu documento / Drive / Foto" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
+              <input value={nombreMarca} onChange={e => setNombreMarca(e.target.value)} placeholder="Ej. NutriFit" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
-            <p className="text-[10px] text-[#6B7A8D] mt-2 leading-tight">Por ahora, pega un enlace donde podamos ver tu comprobante (ej. Google Drive público, Dropbox, o tu número de cédula).</p>
+          </div>
+          <div className="mb-4">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Ubicación (Google Maps) (Opcional)</div>
+            <div className="relative">
+              <input value={mapaUrl} onChange={e => setMapaUrl(e.target.value)} placeholder="Enlace de Maps" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
+            </div>
+          </div>
+          <div className="mb-6">
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Número de Cédula Profesional</div>
+            <div className="relative">
+              <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu número de cédula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
+            </div>
           </div>
           <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
             {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}

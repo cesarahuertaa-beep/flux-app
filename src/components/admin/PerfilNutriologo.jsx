@@ -19,6 +19,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     telefono: "",
     especialidad: "",
     ubicacion_texto: "",
+    cedula: "",
     mapa_url: "",
     color_primario: "#1A6FD4",
     logo_url: "",
@@ -41,6 +42,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         setForm({
           nombre: p.nombre || "",
           nombre_marca: p.nombre_marca || "",
+          cedula: p.cedula || "",
           telefono: p.telefono || "",
           especialidad: p.especialidad || "",
           ubicacion_texto: p.ubicacion_texto || "",
@@ -134,6 +136,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       await dbPatch(`profiles?id=eq.${profileId}`, {
         nombre: form.nombre,
         nombre_marca: form.nombre_marca,
+        cedula: form.cedula,
         telefono: form.telefono,
         especialidad: form.especialidad,
         ubicacion_texto: form.ubicacion_texto,
@@ -302,6 +305,9 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
             {!isTeam && (
               <div>
+                <label className="block text-xs font-bold text-[#6B7A8D] mb-2">Número de Cédula</label>
+                <input type="text" name="cedula" value={form.cedula} onChange={handleChange} placeholder="Ej. 1234567" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors mb-4" />
+                
                 <label className="block text-xs font-bold text-[#6B7A8D] mb-2">Nombre de Marca (App)</label>
                 <input type="text" name="nombre_marca" value={form.nombre_marca} onChange={handleChange} placeholder="Ej. NutriFit Pro" className="w-full bg-[#F7F9FC] border border-[#E2E5EA] focus:border-[var(--brand-primary)] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
