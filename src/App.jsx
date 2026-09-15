@@ -88,7 +88,7 @@ export default function App() {
               if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(role) && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
-                setSession({ role, token, profileId, multiRoles: savedMultiRoles });
+                setSession({ role, data: profiles[0], token, profileId, multiRoles: savedMultiRoles });
               }
             } else {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
@@ -163,9 +163,9 @@ export default function App() {
       />
     );
     if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
-      return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
+      return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} session={session} />;
     if (session.role === "civil")
-      return <Admin role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={null} multiRoles={null} clienteData={session.data} />;
+      return <Admin role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={null} multiRoles={null} clienteData={session.data} session={session} />;
     return <ClienteView session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };
 

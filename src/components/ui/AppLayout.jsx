@@ -38,7 +38,9 @@ export function AppLayout({ children, nav, active, setActive, session }) {
   }, [nav]);
 
   const userName = session?.data?.nombre || session?.nombre || "Usuario";
-  const subtitle  = session?.role === "cliente" ? "Vista Atleta" : "Panel Admin";
+  const subtitle = session?.role === "civil" ? "Civil Premium" 
+                 : session?.role === "cliente" ? "Vista Atleta" 
+                 : "Panel Admin";
 
   return (
     <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height: "100dvh", width: "100vw" }}>

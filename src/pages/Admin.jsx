@@ -38,7 +38,7 @@ const SubComponentWrapper = ({ children, title, action }) => (
   </div>
 );
 
-export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles, clienteData }) {
+export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles, clienteData, session }) {
   const isCivil = role === "civil";
   const brand = useBrand();
   const { setBrandColor } = brand;

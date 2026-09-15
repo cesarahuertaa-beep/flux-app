@@ -63,23 +63,9 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       setMsg("✓ Comprobante subido. Lo revisaremos en menos de 24 horas.");
     } catch (error) {
       console.error(error);
-      // Fallback: si la tabla no existe aún, al menos guardar en recibos_pago genérico
-      try {
-        const today = new Date();
-        const nextCutoff = new Date(today.getFullYear(), today.getMonth() + 1, 10)
-          .toISOString().split('T')[0];
-        const ext = file.name.split('.').pop();
-        const path = `civil_${clienteData.id}_${Date.now()}.${ext}`;
-        const url = await storageUpload('comprobantes', path, file);
-        await dbPost('recibos_pago', {
-          nutriologo_id: clienteData.id,
-          monto: TARIFA,
-          fecha_corte_mes: nextCutoff,
-          comprobante_url: url,
-          estado: 'pendiente'
-        });
-        setMsg("✓ Comprobante subido. Lo revisaremos en menos de 24 horas.");
-      } catch (e2) {
+      if (error.message?.includes('relation "recibos_pago_civil" does not exist')) {
+        setMsg("❌ Error: La base de datos aún no está configurada para recibir pagos civiles. Contacta a soporte.");
+      } else {
         setMsg("❌ Error al subir: " + error.message);
       }
     } finally {
