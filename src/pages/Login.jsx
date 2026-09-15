@@ -97,9 +97,37 @@ export default function Login({ onLogin }) {
       }
 
       if (availableRoles.length === 0) {
-        setAuthToken(null); setProfileId(null);
-        setErr("No se encontró tu cuenta activa.");
-        setLoading(false); return;
+        if (profiles.length === 0) {
+          try {
+            // Usuario verificó su email pero no tiene tabla clientes (Civil nuevo)
+            const nombreMeta = data.user?.user_metadata?.nombre || email.trim().split("@")[0];
+            const newClient = await dbPost("clientes", {
+               nombre: nombreMeta,
+               email: email.trim(),
+               auth_id: data.user.id,
+               activo: true,
+               nutriologo_id: null
+            });
+            
+            // Re-evaluar si se insertó bien
+            const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}&activo=eq.true`);
+            if (checkAgain.length > 0) {
+                availableRoles.push({ role: 'cliente', data: checkAgain[0] });
+            } else {
+                setAuthToken(null); setProfileId(null);
+                setErr("No se pudo crear tu perfil de cliente. Contacta soporte.");
+                setLoading(false); return;
+            }
+          } catch (postErr) {
+            setAuthToken(null); setProfileId(null);
+            setErr("Error creando perfil: " + postErr.message);
+            setLoading(false); return;
+          }
+        } else {
+          setAuthToken(null); setProfileId(null);
+          setErr("No se encontró tu cuenta activa.");
+          setLoading(false); return;
+        }
       }
 
       
