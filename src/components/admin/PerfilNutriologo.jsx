@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { dbGet, dbPatch, dbPost, storageUpload } from "../../lib/supabase";
 import { Capacitor } from "@capacitor/core";
-import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, ShoppingBag, RefreshCw, CreditCard } from "lucide-react";
+import { User, Image as ImageIcon, MapPin, Link as LinkIcon, Phone, Save, LogOut, CheckCircle2, AlertCircle, Building2, ShoppingBag, RefreshCw, CreditCard, Loader2, XCircle } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
@@ -30,6 +30,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const isSuperadmin = role === "superadmin";
   const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
   const [savingConfig, setSavingConfig] = useState(false);
+  const [configSuccess, setConfigSuccess] = useState(false);
+  const [configError, setConfigError] = useState(false);
+  const isFirstRender = useRef(true);
+  const isFirstRenderConfig = useRef(true);
   
   const [solicitudes, setSolicitudes] = useState([]);
 
@@ -78,6 +82,75 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   useEffect(() => {
     loadProfile();
   }, [profileId]);
+
+  
+  // Auto-save para el perfil
+  useEffect(() => {
+    if (loading) return; // No auto-guardar mientras carga
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      setSaving(true);
+      setSaveSuccess(false);
+      setSaveError(false);
+      try {
+        const res = await dbPatch(`profiles?id=eq.${profileId}`, {
+          nombre: form.nombre,
+          nombre_marca: form.nombre_marca,
+          cedula: form.cedula,
+          telefono: form.telefono,
+          especialidad: form.especialidad,
+          ubicacion_texto: form.ubicacion_texto,
+          mapa_url: form.mapa_url,
+          color_primario: form.color_primario,
+          logo_url: form.logo_url
+        });
+        if (Array.isArray(res) && res.length === 0) {
+          throw new Error("RLS error");
+        }
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      } catch (error) {
+        setSaveError(true);
+      }
+      setSaving(false);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [form.nombre, form.nombre_marca, form.cedula, form.telefono, form.especialidad, form.ubicacion_texto, form.mapa_url, form.color_primario, form.logo_url, profileId, loading]);
+
+  // Auto-save para config de cobro
+  useEffect(() => {
+    if (!isSuperadmin || loading) return;
+    if (isFirstRenderConfig.current) {
+      isFirstRenderConfig.current = false;
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      setSavingConfig(true);
+      setConfigSuccess(false);
+      setConfigError(false);
+      try {
+        const res = await dbPatch("configuracion_plataforma?id=eq.1", {
+          clabe: configPago.clabe,
+          banco: configPago.banco,
+          beneficiario: configPago.beneficiario,
+          updated_at: new Date().toISOString()
+        });
+        if (Array.isArray(res) && res.length === 0) {
+          throw new Error("RLS error");
+        }
+        setConfigSuccess(true);
+        setTimeout(() => setConfigSuccess(false), 2000);
+      } catch (error) {
+        setConfigError(true);
+      }
+      setSavingConfig(false);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [configPago.clabe, configPago.banco, configPago.beneficiario, isSuperadmin, loading]);
+
 
   const handleSaveConfig = async () => {
     setSavingConfig(true);
@@ -206,28 +279,25 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
   return (
     <div className="p-6 max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-          {isTeam ? "Configuración de Cuenta" : "Configuración de Profesional"}
-        </h1>
-        <p className="text-[#6B7A8D] mt-1">
-          {isTeam ? "Actualiza tu información de contacto personal." : "Completa estos datos para aparecer correctamente en el Directorio Público."}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+            {isTeam ? "Configuración de Cuenta" : "Configuración de Profesional"}
+          </h1>
+          <p className="text-[#6B7A8D] mt-1">
+            {isTeam ? "Actualiza tu información de contacto personal." : "Completa estos datos para aparecer correctamente en el Directorio Público."}
+          </p>
+        </div>
+        <div className="h-6 flex items-center justify-end min-w-[24px]">
+          {saving && <Loader2 size={18} className="text-[#6B7A8D] animate-spin" />}
+          {saveSuccess && !saving && <CheckCircle2 size={18} className="text-green-500" />}
+          {saveError && !saving && <XCircle size={18} className="text-red-500" title="Error al guardar" />}
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl p-8 shadow-sm border border-[#E2E8F0]">
         
-        {msg && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" /> <span>{msg}</span>
-          </div>
-        )}
         
-        {err && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <AlertCircle size={18} className="text-red-500 flex-shrink-0" /> <span>{err}</span>
-          </div>
-        )}
 
         {/* BUZÓN DE SOLICITUDES DE ENTRENAMIENTO */}
         {solicitudes.length > 0 && (
@@ -386,9 +456,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         })()}
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4">
-          <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#0B1929] text-white hover:bg-[#1A2D45] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50">
-            {saving ? "Guardando..." : <><Save size={18} /> {isTeam ? "Guardar Cambios" : "Guardar Perfil Público"}</>}
-          </button>
+          
           
           <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <ShoppingBag size={18} /> Ir a la tienda FLUX
@@ -402,9 +470,16 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         {/* Sección de datos de cobro — visible para todos pero editable solo por Superadmin */}
         {(isSuperadmin || isTeam) && (
           <div className="mt-10 border-t border-[#E2E8F0] pt-8">
-            <h3 className="font-bold text-[#0B1929] flex items-center gap-2 mb-1">
-              <CreditCard size={18} className="text-[var(--brand-primary)]" /> Datos de Cobro (SPEI)
-            </h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-[#0B1929] flex items-center gap-2">
+                <CreditCard size={18} className="text-[var(--brand-primary)]" /> Datos de Cobro (SPEI)
+              </h3>
+              <div className="h-6 flex items-center justify-end min-w-[24px]">
+                {savingConfig && <Loader2 size={16} className="text-[#6B7A8D] animate-spin" />}
+                {configSuccess && !savingConfig && <CheckCircle2 size={16} className="text-green-500" />}
+                {configError && !savingConfig && <XCircle size={16} className="text-red-500" title="Error al guardar config" />}
+              </div>
+            </div>
             <p className="text-xs text-[#6B7A8D] mb-5">
               {isSuperadmin
                 ? 'Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo para que sepan a dónde hacer su transferencia.'
@@ -446,15 +521,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               </div>
             </div>
 
-            {isSuperadmin && (
-              <button
-                onClick={handleSaveConfig}
-                disabled={savingConfig}
-                className="mt-4 w-full md:w-auto px-6 py-3 bg-[var(--brand-primary)] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
-              >
-                <Save size={16} /> {savingConfig ? "Guardando..." : "Guardar datos de cobro"}
-              </button>
-            )}
+            
           </div>
         )}
 
