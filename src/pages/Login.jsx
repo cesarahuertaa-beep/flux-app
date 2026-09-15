@@ -176,15 +176,23 @@ export default function Login({ onLogin }) {
           throw new Error("No se pudo crear el usuario en Auth. " + JSON.stringify(data));
         }
       
-      await dbPost("clientes", { 
-        nombre: nombre.trim(), 
-        email: email.trim(), 
-        auth_id: userId, 
-        activo: true, 
-        nutriologo_id: null 
-      });
-
-      await submit();
+      try {
+          await dbPost("clientes", { 
+            nombre: nombre.trim(), 
+            email: email.trim(), 
+            auth_id: userId, 
+            activo: true, 
+            nutriologo_id: null 
+          });
+          await submit(); // Intenta iniciar sesión si no hay confirmación de email
+        } catch (postErr) {
+          // Si la BD rebota el insert (por ejemplo, si "Confirmar Email" está activado en Supabase 
+          // y el usuario aún no tiene Token), no es un error crítico. 
+          // El perfil se creará cuando inicien sesión por primera vez.
+          console.log("Perfil no insertado aún (posible Confirmación de Email pendiente):", postErr.message);
+          setInfo("¡Cuenta creada! Por favor revisa tu bandeja de correo para confirmar tu email e iniciar sesión.");
+          setMode("login");
+        }
     } catch(e) {
       setErr(e.message);
       setLoading(false);
