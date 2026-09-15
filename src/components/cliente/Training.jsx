@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-// ── Cronómetro inline (exactamente como Figma: tarjeta oscura dentro del scroll) ──
 function TimerCard({ brandColor }) {
   const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(false);
@@ -41,80 +40,6 @@ function TimerCard({ brandColor }) {
           <RotateCcw size={14} />
         </button>
       </div>
-    
-      {/* Modal preview */}
-      {previewEx && (
-        <div 
-          onClick={() => setPreviewEx(null)} 
-          className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[200] flex items-center justify-center p-5"
-        >
-          <div 
-            className="animate-in bg-white rounded-2xl p-6 max-w-[440px] w-full text-center border border-[#E2E8F0] shadow-2xl relative"
-            onClick={e => e.stopPropagation()}
-          >
-            <button onClick={() => setPreviewEx(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
-            {previewEx.gif_url ? (
-              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#0B1929] object-contain max-h-[300px]" />
-            ) : (
-              <div className="w-full h-[200px] bg-[#F0F4FA] rounded-xl mb-4 flex items-center justify-center">
-                <Dumbbell size={48} className="text-[#CBD5E1]" />
-              </div>
-            )}
-            <div className="font-bold text-[18px] text-[#0B1929] mb-2 font-['Space_Grotesk',sans-serif]">
-              {previewEx.nombre}
-            </div>
-            <div className="flex gap-1.5 justify-center mb-4">
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
-                {previewEx.grupo_muscular}
-              </span>
-            </div>
-            <button
-              onClick={() => setPreviewEx(null)}
-              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-[13px] font-semibold transition-colors border border-gray-200"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-
-        
-      {/* Modal preview */}
-      {previewEx && (
-        <div 
-          onClick={() => setPreviewEx(null)} 
-          className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[200] flex items-center justify-center p-5"
-        >
-          <div 
-            className="animate-in bg-white rounded-2xl p-6 max-w-[440px] w-full text-center border border-[#E2E8F0] shadow-2xl relative"
-            onClick={e => e.stopPropagation()}
-          >
-            <button onClick={() => setPreviewEx(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
-            {previewEx.gif_url ? (
-              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#0B1929] object-contain max-h-[300px]" />
-            ) : (
-              <div className="w-full h-[200px] bg-[#F0F4FA] rounded-xl mb-4 flex items-center justify-center">
-                <Dumbbell size={48} className="text-[#CBD5E1]" />
-              </div>
-            )}
-            <div className="font-bold text-[18px] text-[#0B1929] mb-2 font-['Space_Grotesk',sans-serif]">
-              {previewEx.nombre}
-            </div>
-            <div className="flex gap-1.5 justify-center mb-4">
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
-                {previewEx.grupo_muscular}
-              </span>
-            </div>
-            <button
-              onClick={() => setPreviewEx(null)}
-              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-[13px] font-semibold transition-colors border border-gray-200"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
@@ -656,6 +581,42 @@ export default function Training({
           );
         })}
       </div>
+    
+      {/* Modal preview */}
+      {previewEx && (
+        <div 
+          onClick={() => setPreviewEx(null)} 
+          className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[200] flex items-center justify-center p-5"
+        >
+          <div 
+            className="animate-in bg-white rounded-2xl p-6 max-w-[440px] w-full text-center border border-[#E2E8F0] shadow-2xl relative"
+            onClick={e => e.stopPropagation()}
+          >
+            <button onClick={() => setPreviewEx(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
+            {previewEx.gif_url ? (
+              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#0B1929] object-contain max-h-[300px]" />
+            ) : (
+              <div className="w-full h-[200px] bg-[#F0F4FA] rounded-xl mb-4 flex items-center justify-center">
+                <Dumbbell size={48} className="text-[#CBD5E1]" />
+              </div>
+            )}
+            <div className="font-bold text-[18px] text-[#0B1929] mb-2 font-['Space_Grotesk',sans-serif]">
+              {previewEx.nombre}
+            </div>
+            <div className="flex gap-1.5 justify-center mb-4">
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
+                {previewEx.grupo_muscular}
+              </span>
+            </div>
+            <button
+              onClick={() => setPreviewEx(null)}
+              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-[13px] font-semibold transition-colors border border-gray-200"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
