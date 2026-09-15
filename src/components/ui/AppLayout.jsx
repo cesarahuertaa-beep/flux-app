@@ -144,7 +144,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           BOTTOM NAV BAR — sólo visible en mobile (< md)
           Fija en la parte inferior de la pantalla.
       ══════════════════════════════════════════════ */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] flex items-stretch"
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] flex items-stretch overflow-x-auto scroll-hide shadow-[0_-2px_10px_rgba(0,0,0,0.02)]"
            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {nav.map(({ id, label, icon }, index) => {
           const isActive = active === id;
@@ -156,7 +156,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               {isMid && (
                 <button
                   onClick={() => setActive("perfil")}
-                  className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
+                  className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
                 >
                   <span className="block h-0.5 w-5 rounded-full mb-1 transition-all" style={{ background: isPerfilActive ? "var(--brand-primary)" : "transparent" }} />
                   <span className={`transition-transform ${isPerfilActive ? "scale-110" : "scale-100"}`}>
@@ -182,9 +182,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                     setActive(id);
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${
-                  isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"
-                }`}
+                className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
               >
                 {/* Indicador activo encima del ícono */}
                 <span
