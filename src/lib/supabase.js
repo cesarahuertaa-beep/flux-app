@@ -220,3 +220,5 @@ export const authUpdatePassword = async (token, password) => {
   });
   if (!r.ok) throw new Error("Error al actualizar contraseña");
 };
+
+export const dbPostMinimal = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers: { Prefer: "return=minimal" } });
