@@ -11,7 +11,8 @@ import UserProfile from "../components/UserProfile";
 import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { UtensilsCrossed, Dumbbell, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
+import { ProgramarCliente } from "../components/admin/ProgramarCliente";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -44,6 +45,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
   const [ultimoPeso, setUltimoPeso] = useState(null);
+  const isCivil = cliente?.nutriologo_id === null;
+  const [atletaModeCivil, setAtletaModeCivil] = useState(false);
+  const [biblioteca, setBiblioteca] = useState([]);
 
   const loadData = async () => {
     try {
@@ -54,6 +58,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           setLoading(false);
           return;
         }
+      }
+
+      if (isCivil) {
+        try {
+          const bib = await dbGet("biblioteca_ejercicios?order=nombre.asc");
+          setBiblioteca(bib);
+        } catch(e) {}
       }
 
       const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
@@ -144,7 +155,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     }
   };
 
-  const SIDEBAR_ITEMS = [
+  const SIDEBAR_ITEMS = isCivil ? [
+    { id: "programar", label: "Mi Plan", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id: "progreso", label: "Progreso", icon: <Camera size={18} strokeWidth={1.5} /> },
+    { id: "membresia", label: "Membresía", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+    { id: "perfil", label: "Mi Perfil", icon: <User size={18} strokeWidth={1.5} /> }
+  ] : [
     { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
@@ -152,7 +168,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
     ] : [])
   ];
-
   const { currentCycleWeek, isFuture } = (() => {
     const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : null);
     if (!startStr) return { currentCycleWeek: 1, isFuture: false };
@@ -196,12 +211,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
             <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
-              <Dumbbell size={16} /> Estás en Modo Atleta
+              {isCivil ? <><Dumbbell size={16} /> Entrenando</> : <><Dumbbell size={16} /> Estás en Modo Atleta</>}
             </span>
-            <span className="text-[#047857] text-xs md:text-sm hidden sm:block">Previsualiza tu app exactamente como lo verían tus pacientes.</span>
+            <span className="text-[#047857] text-xs md:text-sm hidden sm:block">{isCivil ? "Modo de ejecución de rutina." : "Previsualiza tu app exactamente como lo verían tus pacientes."}</span>
           </div>
           <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
-            Volver al Panel
+            {isCivil ? "Volver al Editor" : "Volver al Panel"}
           </button>
         </div>
       )}
@@ -223,11 +238,34 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </div>
           ) : (
             <>
-              {tab === "nutricion" && (
+              
+              {tab === "programar" && isCivil && (
+                 <div className={atletaModeCivil ? "hidden" : "block"} style={{ minHeight: '80vh' }}>
+                    <ProgramarCliente 
+                       clientes={[cliente]} 
+                       selected={cliente} 
+                       isMiPlan={true} 
+                       biblioteca={biblioteca} 
+                       onModoAtleta={() => setAtletaModeCivil(true)} 
+                       setMsg={() => {}} 
+                       setSelected={() => {}} 
+                    />
+                 </div>
+              )}
+              
+              {tab === "membresia" && isCivil && (
+                 <div className="flex flex-col items-center justify-center h-full p-8 text-center text-[#6B7A8D]">
+                    <ShoppingBag size={48} className="mb-4 text-[#CBD5E1]" />
+                    <h2 className="text-xl font-bold text-[#0B1929] mb-2">Tu Membresía Civil</h2>
+                    <p>Aquí podrás gestionar tu suscripción y beneficios.</p>
+                 </div>
+              )}
+
+              {tab === "nutricion" && (!atletaModeCivil) && (
                 <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} />
               )}
 
-              {tab === "deporte" && (
+              {(tab === "deporte" || atletaModeCivil) && (
                 <Training 
                   rutinas={rutinas} 
                   progreso={progreso}

@@ -23,7 +23,7 @@ import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase
 import { useBrand } from "../BrandContext";
 import { ProgresoCliente } from "./ProgresoCliente";
 
-export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan }) {
+export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState("nutri");
   const [searchProg, setSearchProg] = useState("");
@@ -606,7 +606,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   return (
     <div className="pb-[100px]">
       {/* ── Cabecera cliente ── */}
-      {!isMiPlan && (
+      
+        {/* Cabecera Civil Premium / Mi Plan */}
+        {isMiPlan && onModoAtleta && (
+          <div className="flex justify-end mb-4">
+            <button 
+              onClick={onModoAtleta}
+              className="bg-[#10B981] text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:opacity-90 flex items-center gap-2 transition-all"
+            >
+              <Dumbbell size={18} /> Entrenar (Modo Atleta)
+            </button>
+          </div>
+        )}
+        
+        {!isMiPlan && (
         <div className="flex items-stretch mb-5 w-max group">
           <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-l-xl px-4 py-2 flex flex-col justify-center">
             <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>

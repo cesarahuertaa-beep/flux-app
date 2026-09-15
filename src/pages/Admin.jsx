@@ -525,7 +525,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {/* Legacy Dark Mode Sub-Components */}
-      {tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={isSuperadmin || role === "staff"}/></SubComponentWrapper>}
+      {(role === "superadmin" || role === "staff") && tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/></SubComponentWrapper>}
       
       {tab === "mi_entrenamiento" && (
         <SubComponentWrapper 
