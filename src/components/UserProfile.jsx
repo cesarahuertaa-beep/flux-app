@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { dbPatch } from "../lib/supabase";
-import { User, Mail, LogOut, ShoppingBag, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
+import { User, Mail, LogOut, ShoppingBag, RefreshCw, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
@@ -12,6 +12,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   
   const isCliente = session?.role === "cliente";
   const isFirstRender = useRef(true);
@@ -26,11 +27,17 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     const timeoutId = setTimeout(async () => {
       setIsSaving(true);
       setSaveSuccess(false);
+      setSaveError(false);
       try {
+        let res;
         if (isCliente) {
-          await dbPatch(`clientes?id=eq.${user.id}`, { nombre, objetivo, telefono });
+          res = await dbPatch(`clientes?id=eq.${user.id}`, { nombre, objetivo, telefono });
         } else {
-          await dbPatch(`profiles?id=eq.${user.id}`, { nombre });
+          res = await dbPatch(`profiles?id=eq.${user.id}`, { nombre });
+        }
+        
+        if (Array.isArray(res) && res.length === 0) {
+          throw new Error("No se pudo guardar en la base de datos (Posible bloqueo de RLS en Supabase).");
         }
         
         // Actualizar sesión localmente
@@ -45,6 +52,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         setTimeout(() => setSaveSuccess(false), 2000);
       } catch (e) {
         console.error("Error al autoguardar:", e);
+        setSaveError(true);
       }
       setIsSaving(false);
     }, 1000);
@@ -74,6 +82,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         <div className="h-6 flex items-center justify-end min-w-[24px]">
           {isSaving && <Loader2 size={18} className="text-[#6B7A8D] animate-spin" />}
           {saveSuccess && !isSaving && <CheckCircle2 size={18} className="text-green-500" />}
+          {saveError && !isSaving && <XCircle size={18} className="text-red-500" title="Error de permisos al guardar" />}
         </div>
       </div>
 
