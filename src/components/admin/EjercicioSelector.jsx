@@ -1,19 +1,17 @@
 import { useState } from "react";
-import { C, GRUPOS, TIPOS } from "../../styles/theme";
+import { C, GRUPOS } from "../../styles/theme";
 import { Tag } from "../ui";
 
 export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState("Todos");
-  const [filtroTipo, setFiltroTipo] = useState("Todos");
-
+  
   const filtrados = biblioteca.filter(e => {
     const yaEsta = selected.find(s => s.biblioteca_id===e.id);
     if (yaEsta) return false;
     const matchG = filtroGrupo==="Todos" || e.grupo_muscular===filtroGrupo;
-    const matchT = filtroTipo==="Todos" || e.tipo_movimiento===filtroTipo;
-    const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
-    return matchG && matchT && matchB;
+        const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return matchG && matchB;
   });
 
   return (
@@ -24,9 +22,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
         <select value={filtroGrupo} onChange={e=>setFiltroGrupo(e.target.value)} style={{fontSize:12,padding:"6px 8px"}}>
           <option>Todos</option>{GRUPOS.map(g=><option key={g}>{g}</option>)}
         </select>
-        <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{fontSize:12,padding:"6px 8px"}}>
-          <option>Todos</option>{TIPOS.map(t=><option key={t}>{t}</option>)}
-        </select>
+        
       </div>
       {biblioteca.length===0
         ?<div style={{color:C.muted,fontSize:12,textAlign:"center",padding:10}}>La biblioteca está vacía. Agrega ejercicios primero.</div>

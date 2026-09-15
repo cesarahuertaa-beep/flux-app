@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import Model from "react-body-highlighter";
 import { dbGet } from "../../lib/supabase";
 import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useBrand } from "../BrandContext";
@@ -53,95 +54,25 @@ const getRank = (pct) => {
 };
 
 // ── SVGs de Figuras ──
-
-
-, useEffect, useCallback } from "react";
-import { dbGet } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { useBrand } from "../BrandContext";
-
-// ── Helpers ──
-const fmtDate = (d) => {
-  if (!d) return "";
-  const date = new Date(d + "T12:00:00");
-  return date.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
-};
-
-const delta = (curr, prev, key) => {
-  if (curr[key] == null || prev[key] == null || curr[key] === "" || prev[key] === "") return null;
-  const d = parseFloat(curr[key]) - parseFloat(prev[key]);
-  return d === 0 ? 0 : d;
-};
-
-const calcular1RM = (peso, reps) => {
-  const p = parseFloat(peso), r = parseFloat(reps);
-  if (!p || !r || p <= 0 || r <= 0) return null;
-  if (r === 1) return p;
-  return p * (1 + r / 30);
-};
-
-const normalizeGroup = (g) => {
-  if (!g) return "otro";
-  const str = g.toLowerCase();
-  if (str.includes("pecho") || str.includes("pectoral")) return "pecho";
-  if (str.includes("espalda") || str.includes("dorsal")) return "espalda";
-  if (str.includes("pierna") || str.includes("glúteo") || str.includes("cuádriceps") || str.includes("isquio") || str.includes("pantorrilla")) return "pierna";
-  if (str.includes("brazo") || str.includes("bíceps") || str.includes("tríceps") || str.includes("antebrazo")) return "brazo";
-  if (str.includes("hombro") || str.includes("deltoide")) return "hombro";
-  if (str.includes("abdomen") || str.includes("core")) return "abdomen";
-  return "otro";
-};
-
-const RANKS = [
-  { name: "Iniciando", min: -Infinity, color: "#334155" }, 
-  { name: "Bronce", min: 0.1, color: "#CD7F32" }, 
-  { name: "Hierro", min: 2, color: "#94A3B8" }, 
-  { name: "Plata", min: 4, color: "#CBD5E1" }, 
-  { name: "Oro", min: 6, color: "#FBBF24" }, 
-  { name: "Platino", min: 8, color: "#F43F5E" }, 
-  { name: "Diamante", min: 10, color: "#3B82F6" }, 
-  { name: "Esmeralda", min: 15, color: "#10B981" }, 
-  { name: "Campeón", min: 20, color: "#8B5CF6" }, 
-];
-
-const getRank = (pct) => {
-  if (pct == null) return RANKS[0];
-  return [...RANKS].reverse().find(r => pct >= r.min) || RANKS[0];
-};
-
-// ── SVGs de Figuras ──
-
+const SilhouetteSVG = () => (
+  <svg viewBox="0 0 100 220" className="w-full h-full drop-shadow-md">
+    <circle cx="50" cy="25" r="14" fill="#E2E8F0" />
+    <path d="M30,45 Q50,40 70,45 L75,80 Q50,85 25,80 Z" fill="#F1F5F9" />
+    <path d="M35,80 Q50,83 65,80 L60,115 Q50,120 40,115 Z" fill="#E2E8F0" />
+    <path d="M25,45 Q15,60 20,100 L28,95 Q25,60 30,45 Z" fill="#CBD5E1" />
+    <path d="M75,45 Q85,60 80,100 L72,95 Q75,60 70,45 Z" fill="#CBD5E1" />
+    <path d="M40,115 L40,200 L48,200 L48,130 L52,130 L52,200 L60,200 L60,115 Z" fill="#CBD5E1" />
+    {/* Glowing Dots */}
+    <circle cx="50" cy="25" r="3" fill="#3B82F6" />
+    <circle cx="50" cy="60" r="3" fill="#3B82F6" />
+    <circle cx="50" cy="100" r="3" fill="#10B981" />
+    <circle cx="44" cy="160" r="3" fill="#8B5CF6" />
+    <circle cx="56" cy="160" r="3" fill="#8B5CF6" />
+  </svg>
+);
 
 const MuscularSVG = ({ groups }) => {
   const getColor = (g) => getRank(groups[g]).color;
-  
-  const getBodyData = (groups) => {
-    const data = [];
-    
-    // Función auxiliar para obtener el índice del rango (0 a 5)
-    const getFrequency = (val) => {
-      if (!val) return 0;
-      const idx = RANKS.findIndex(r => val <= r.max);
-      return idx === -1 ? 5 : idx;
-    };
-
-    if (groups.pecho) data.push({ name: 'Pecho', muscles: ['chest'], frequency: getFrequency(groups.pecho) });
-    if (groups.hombro) data.push({ name: 'Hombros', muscles: ['front-deltoids', 'back-deltoids'], frequency: getFrequency(groups.hombro) });
-    if (groups.abdomen) data.push({ name: 'Abdomen', muscles: ['abs', 'obliques'], frequency: getFrequency(groups.abdomen) });
-    if (groups.espalda) data.push({ name: 'Espalda', muscles: ['upper-back', 'lower-back', 'trapezius'], frequency: getFrequency(groups.espalda) });
-    if (groups.brazo) data.push({ name: 'Brazos', muscles: ['biceps', 'triceps', 'forearm'], frequency: getFrequency(groups.brazo) });
-    if (groups.pierna) data.push({ name: 'Piernas', muscles: ['quadriceps', 'hamstrings', 'calves', 'gluteal', 'adductor', 'abductors'], frequency: getFrequency(groups.pierna) });
-
-    // Truco: Para forzar que el componente respete nuestra escala exacta de colores (0 a 5),
-    // inyectamos un músculo invisible o irrelevante con frecuencia máxima (5) si nadie la tiene.
-    const hasMax = data.some(d => d.frequency === 5);
-    if (!hasMax && data.length > 0) {
-      data.push({ name: 'Anchor', muscles: ['head'], frequency: 5 }); 
-    }
-    
-    return data;
-  };
-
   return (
     <svg viewBox="0 0 100 160" className="w-full h-full drop-shadow-xl">
       <circle cx="50" cy="15" r="9" fill="#1E293B" />

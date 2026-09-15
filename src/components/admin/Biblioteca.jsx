@@ -1,17 +1,16 @@
 import { useState } from "react";
-import { GRUPOS, TIPOS } from "../../styles/theme";
+import { GRUPOS } from "../../styles/theme";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
   const [editEj, setEditEj]       = useState(null);
-  const [form, setForm]           = useState({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" });
+  const [form, setForm]           = useState({ nombre:"", grupo_muscular:"Pecho", gif_url:"" });
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
   const [filtroGrupo, setFiltroGrupo] = useState("Todos");
-  const [filtroTipo, setFiltroTipo]   = useState("Todos");
-  const [busqueda, setBusqueda]   = useState("");
+    const [busqueda, setBusqueda]   = useState("");
   const [preview, setPreview]     = useState(null);
 
   const uploadGif = async (file) => {
@@ -26,8 +25,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     setUploading(false);
   };
 
-  const openNew  = () => { setEditEj(null); setForm({ nombre:"", grupo_muscular:"Pecho", tipo_movimiento:"Empuje", gif_url:"" }); setShowModal(true); };
-  const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, tipo_movimiento:e.tipo_movimiento, gif_url:e.gif_url||"" }); setShowModal(true); };
+  const openNew  = () => { setEditEj(null); setForm({ nombre:"", grupo_muscular:"Pecho", gif_url:"" }); setShowModal(true); };
+  const openEdit = (e) => { setEditEj(e); setForm({ nombre:e.nombre, grupo_muscular:e.grupo_muscular, gif_url:e.gif_url||"" }); setShowModal(true); };
 
   const save = async () => {
     if (!form.nombre) { setMsg(<div className='flex gap-2 items-center'><AlertCircle className='w-4 h-4 text-yellow-500'/> Escribe el nombre</div>); return; }
@@ -48,9 +47,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   const filtrados = biblioteca.filter(e => {
     const matchG = filtroGrupo==="Todos" || e.grupo_muscular===filtroGrupo;
-    const matchT = filtroTipo==="Todos"  || e.tipo_movimiento===filtroTipo;
-    const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
-    return matchG && matchT && matchB;
+        const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return matchG && matchB;
   });
 
   // Group accent colors by muscle group
@@ -98,15 +96,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           <option>Todos</option>
           {GRUPOS.map(g => <option key={g}>{g}</option>)}
         </select>
-        <select
-          value={filtroTipo}
-          onChange={e => setFiltroTipo(e.target.value)}
-          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif] min-w-[140px]"
-        >
-          <option>Todos</option>
-          {TIPOS.map(t => <option key={t}>{t}</option>)}
-        </select>
-        {(filtroGrupo !== "Todos" || filtroTipo !== "Todos" || busqueda) && (
+        
+        {(filtroGrupo !== "Todos" || busqueda) && (
           <button
             onClick={() => { setBusqueda(""); setFiltroGrupo("Todos"); setFiltroTipo("Todos"); }}
             className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
@@ -175,9 +166,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                     <span className="px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ backgroundColor:`${accentColor}20`, color:accentColor }}>
                       {e.grupo_muscular}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-600">
-                      {e.tipo_movimiento}
-                    </span>
+                    
                   </div>
                   {isSuperadmin && (
                     <div className="flex gap-1.5 mt-1">
@@ -220,12 +209,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                     {GRUPOS.map(g => <option key={g}>{g}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Tipo de movimiento</label>
-                  <select value={form.tipo_movimiento} onChange={e => setForm(p => ({...p,tipo_movimiento:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
-                    {TIPOS.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
+                
               </div>
               
               <div>

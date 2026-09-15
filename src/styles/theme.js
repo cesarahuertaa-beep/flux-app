@@ -1,5 +1,24 @@
-export const GRUPOS = ["Pecho","Espalda","Piernas","Hombros","Bíceps","Tríceps","Core","Cardio"];
-export const TIPOS  = ["Empuje","Jale","Sentadilla","Bisagra","Cargada","Aislamiento"];
+export const GRUPOS = [
+  "pecho",
+  "abdomen",
+  "oblicuos",
+  "deltoide_anterior",
+  "deltoide_posterior",
+  "trapecio",
+  "dorsal",
+  "lumbar",
+  "biceps",
+  "triceps",
+  "antebrazo",
+  "gluteo",
+  "cuadriceps",
+  "isquiotibial",
+  "pantorrilla",
+  "aductor",
+  "abductor",
+  "soleo",
+  "cuello"
+];
 
 // Legacy constants mapping to new CSS variables to avoid breaking existing imports 
 // while we migrate to pure Tailwind classes.
