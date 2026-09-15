@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-} from "lucide-react";
+, UserCheck} from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
@@ -585,6 +585,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       <div className={tab === "agenda" ? "block" : "hidden"}>
         <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>
+      </div>
+
+      <div className={tab === "aprobaciones" && (isSuperadmin || role === "staff") ? "block" : "hidden"}>
+        <SubComponentWrapper title="Aprobaciones"><Aprobaciones setMsg={setMsg} /></SubComponentWrapper>
       </div>
 
       <div className={tab === "membresia" ? "block" : "hidden"}>
