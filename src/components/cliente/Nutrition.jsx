@@ -80,7 +80,10 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
             <div className="bg-[#E8F1FB] rounded-xl px-4 py-2 flex-shrink-0 flex items-center gap-4">
               <div className="text-center sm:text-left">
                 <p className="text-[10px] text-[#6B7A8D] font-mono font-semibold uppercase tracking-wider">Total Día</p>
-                <p className="text-xl sm:text-2xl font-bold text-[var(--brand-primary)] font-mono leading-none mt-1">{totalKcal} <span className="text-xs text-[var(--brand-primary)]/70 font-sans tracking-normal hidden sm:inline">kcal</span></p>
+                <p className="flex items-center justify-center sm:justify-start gap-1 text-xl sm:text-2xl font-bold text-[var(--brand-primary)] font-mono leading-none mt-1">
+                    <Flame size={20} className="text-[var(--brand-primary)]" />
+                    {totalKcal} <span className="text-xs text-[var(--brand-primary)]/70 font-sans tracking-normal hidden sm:inline">kcal</span>
+                  </p>
               </div>
             </div>
           </div>
