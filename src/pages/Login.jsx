@@ -97,7 +97,7 @@ export default function Login({ onLogin }) {
       }
 
       if (availableRoles.length === 0) {
-        if (profiles.length === 0) {
+        if (profiles.length === 0 || !["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(profiles[0].role)) {
           try {
             // Usuario verificó su email pero no tiene tabla clientes (Civil nuevo)
             const nombreMeta = data.user?.user_metadata?.nombre || email.trim().split("@")[0];
@@ -125,7 +125,7 @@ export default function Login({ onLogin }) {
           }
         } else {
           setAuthToken(null); setProfileId(null);
-          setErr("ERR_DIAG_1: No se encontro tu cuenta activa.");
+          setErr("ERR_DIAG_1: Perfil intruso detectado: " + JSON.stringify(profiles[0]));
           setLoading(false); return;
         }
       }
