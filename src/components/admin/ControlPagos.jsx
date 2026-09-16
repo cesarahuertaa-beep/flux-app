@@ -136,6 +136,24 @@ export default function ControlPagos({ setMsg }) {
           deactivated_at: null,
           plan_tipo: 'premium'
         });
+      } else if (nuevoEstado === "rechazado" && clienteId) {
+        // Re-evaluar si tiene derecho a ser premium por algún otro recibo anterior
+        const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteId}&order=created_at.desc`);
+        const lastAprobado = recibos?.find(r => r.estado === 'aprobado');
+        let downgrade = false;
+        if (!lastAprobado) {
+          downgrade = true;
+        } else {
+          const today = new Date();
+          const expirationDate = new Date(lastAprobado.fecha_corte_mes + "T23:59:59");
+          const blockDate = new Date(expirationDate);
+          blockDate.setDate(blockDate.getDate() + 2);
+          if (today > blockDate) downgrade = true;
+        }
+        
+        if (downgrade) {
+          await dbPatch(`clientes?id=eq.${clienteId}`, { plan_tipo: 'estandar' });
+        }
       }
       setMsg("✓ Pago de atleta " + nuevoEstado);
       loadDataCivil();
