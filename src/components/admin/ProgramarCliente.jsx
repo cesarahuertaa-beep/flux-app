@@ -610,10 +610,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         {/* Cabecera Civil Premium / Mi Plan */}
         {isMiPlan && onModoAtleta && (
           <div className="flex justify-end mb-4">
-            <button 
-              onClick={onModoAtleta}
-              className="bg-[#10B981] text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:opacity-90 flex items-center gap-2 transition-all"
-            >
+              <button 
+                onClick={onModoAtleta}
+                className="bg-[var(--brand-primary)] text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:opacity-90 flex items-center gap-2 transition-all"
+              >
               <Dumbbell size={18} /> Entrenar (Modo Atleta)
             </button>
           </div>
@@ -1226,7 +1226,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               <button
                 onClick={confirmCrop}
                 disabled={!completedCrop || saving}
-                className="px-5 py-2 rounded-xl bg-[#1A6FD4] text-white font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-40 flex items-center gap-2"
+                className="px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Confirmar recorte

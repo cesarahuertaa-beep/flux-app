@@ -23,7 +23,7 @@ const offlineAwareUpsert = async (records) => {
   }
 };
 
-export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles }) {
+export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;
   const brand = useBrand();
   
