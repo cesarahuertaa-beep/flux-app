@@ -54,6 +54,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const ORDINALES = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
 
   const isReadOnly = cicloSel && !cicloSel.activo;
+  const isEstandar = selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium';
 
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
@@ -252,8 +253,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const isEstandarLimit = (listLength) => {
-    const client = selected;
-    if (client && !client.nutriologo_id && client.plan_tipo !== 'premium') {
+    if (isEstandar) {
       if (listLength >= 3) {
         setMsg(
           <div className="flex items-center gap-2">
@@ -724,29 +724,43 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             {ciclos.filter(c => !c.activo).length > 0 && (
               <>
 
-                {showPastCycles && ciclos.filter(c => !c.activo).map(c => (
-                  <div key={c.id} className="flex items-stretch flex-shrink-0 group animate-in fade-in slide-in-from-left-2">
-                    <button 
-                      onClick={() => setCicloSel(c)}
-                      className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
-                        cicloSel?.id === c.id 
-                          ? "bg-[#6B7A8D] text-white border-[#6B7A8D] font-bold" 
-                          : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
-                      } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
-                    >
-                      {c.nombre.split("|")[0]}
-                    </button>
-                    {cicloSel?.id === c.id && (
-                      <button
-                        onClick={(e) => eliminarCiclo(c, e)}
-                        title="Eliminar este plan"
-                        className="flex items-center justify-center px-3 bg-[#6B7A8D] text-white/80 hover:text-white border-y border-r border-[#6B7A8D] rounded-r-xl transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                {showPastCycles && isEstandar ? (
+                  <div className="flex items-center px-4 py-2 text-[13px] border border-[#E2E8F0] rounded-xl bg-gray-50/50 relative overflow-hidden group min-w-[200px] cursor-not-allowed">
+                    <div className="absolute inset-0 backdrop-blur-[2px] bg-white/40 z-10 flex flex-col items-center justify-center p-2 text-center">
+                      <span className="font-bold text-[#0B1929] text-xs">Historial Bloqueado</span>
+                      <span className="text-[10px] text-[#6B7A8D] leading-tight">Adquiere Premium</span>
+                    </div>
+                    {/* Falsos botones de fondo */}
+                    <div className="opacity-30 blur-[1px] flex gap-2">
+                      <div className="w-20 h-4 bg-gray-300 rounded"></div>
+                      <div className="w-16 h-4 bg-gray-300 rounded"></div>
+                    </div>
                   </div>
-                ))}
+                ) : showPastCycles && !isEstandar ? (
+                  ciclos.filter(c => !c.activo).map(c => (
+                    <div key={c.id} className="flex items-stretch flex-shrink-0 group animate-in fade-in slide-in-from-left-2">
+                      <button 
+                        onClick={() => setCicloSel(c)}
+                        className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
+                          cicloSel?.id === c.id 
+                            ? "bg-[#6B7A8D] text-white border-[#6B7A8D] font-bold" 
+                            : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                        } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
+                      >
+                        {c.nombre.split("|")[0]}
+                      </button>
+                      {cicloSel?.id === c.id && (
+                        <button
+                          onClick={(e) => eliminarCiclo(c, e)}
+                          title="Eliminar este plan"
+                          className="flex items-center justify-center px-3 bg-[#6B7A8D] text-white/80 hover:text-white border-y border-r border-[#6B7A8D] rounded-r-xl transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                ) : null}
               </>
             )}
           </div>
@@ -961,7 +975,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              {!editDia && historialDias.length > 0 && (
+              {!editDia && historialDias.length > 0 && !isEstandar && (
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
                   <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
                     <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
@@ -1074,7 +1088,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              {!editRutina && historialRutinas.length > 0 && (
+              {!editRutina && historialRutinas.length > 0 && !isEstandar && (
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
                   <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
                     <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
