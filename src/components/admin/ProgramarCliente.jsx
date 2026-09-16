@@ -294,10 +294,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const saveDia = async () => {
-    if (!nutri) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> Guarda los macros primero</div>); return; }
     setSaving(true);
     try {
       let currentNutri = nutri;
+      if (!currentNutri) {
+        const payload = { cliente_id: selected.id, calorias: 0, proteina: 0, carbohidratos: 0, grasas: 0 };
+        if (cicloSel) payload.ciclo_id = cicloSel.id;
+        const res = await dbPost("nutricion", payload);
+        currentNutri = res[0];
+        setNutri(currentNutri);
+      }
 
       if (editDia) { 
         const dayCode = diaForm.diasSeleccionados?.length > 0 ? diaForm.diasSeleccionados[0] : "S/D";
@@ -816,7 +822,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                   <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                                 </div>
                                 <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
-                                  <span>{d.comidas.length} comidas</span>
+                                  <span className="font-medium bg-[#F0F4FA] px-1.5 rounded">{d.comidas.length} comidas</span>
+                                  <span className="opacity-70">&middot;</span>
+                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.calorias)||0), 0)} kcal</span>
+                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.proteina)||0), 0)}g P</span>
+                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.carbohidratos)||0), 0)}g C</span>
+                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.grasas)||0), 0)}g G</span>
                                 </div>
                               </div>
                             </div>
@@ -935,9 +946,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {showDiaModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
-              <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` : "Nuevo día"}</h3>
-              <button onClick={() => setShowDiaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0] gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
+                <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` : "Nuevo día"}</h3>
+                <div className="bg-[#F0F4FA] text-[#0B1929] px-3 py-1.5 rounded-lg text-xs font-semibold flex gap-3">
+                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.calorias) || 0), 0)} Kcal</span>
+                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0)}g P</span>
+                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0)}g C</span>
+                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0)}g G</span>
+                </div>
+              </div>
+              <button onClick={() => setShowDiaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
