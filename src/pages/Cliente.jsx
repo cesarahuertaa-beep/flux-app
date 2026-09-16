@@ -8,7 +8,6 @@ import Nutrition from "../components/cliente/Nutrition";
 import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
-import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
