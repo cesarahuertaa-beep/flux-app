@@ -15,6 +15,34 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
   const TARIFA = 75;
 
+  // Cálculos de fecha de corte
+  const targetCutoff = React.useMemo(() => {
+    const today = new Date();
+    const diaCorte = 10;
+    
+    let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
+    if (today.getDate() < diaCorte) {
+      lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
+    }
+
+    const lastPassedCutoffStr = lastPassedCutoff.toISOString().split('T')[0];
+    let yaPagado = historial.some(r => 
+      r.fecha_corte_mes === lastPassedCutoffStr && 
+      (r.estado === 'aprobado' || r.estado === 'pendiente')
+    );
+
+    const clientCreatedAt = clienteData?.created_at ? new Date(clienteData.created_at) : today;
+    if (clientCreatedAt > lastPassedCutoff) {
+      yaPagado = true; // Si se registró después del corte, no debe el corte pasado
+    }
+
+    if (!yaPagado && today >= lastPassedCutoff) {
+      return lastPassedCutoff; // Paga el vencido
+    } else {
+      return new Date(lastPassedCutoff.getFullYear(), lastPassedCutoff.getMonth() + 1, diaCorte); // Paga el próximo
+    }
+  }, [historial, clienteData]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -55,14 +83,10 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       const path = `civil_${clienteData.id}_${Date.now()}.${ext}`;
       const url = await storageUpload('comprobantes', path, file);
 
-      const today = new Date();
-      const nextCutoff = new Date(today.getFullYear(), today.getMonth() + 1, 10)
-        .toISOString().split('T')[0];
-
       await dbPost('recibos_pago_civil', {
         cliente_id: clienteData.id,
         monto: TARIFA,
-        fecha_corte_mes: nextCutoff,
+        fecha_corte_mes: targetCutoff.toISOString().split('T')[0],
         comprobante_url: url,
         estado: 'pendiente'
       });

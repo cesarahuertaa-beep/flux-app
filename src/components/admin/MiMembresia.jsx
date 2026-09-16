@@ -43,11 +43,36 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
     const today = new Date();
     const diaCorte = 10; // Fijo global
 
-    let nextCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
-    if (today.getDate() > diaCorte) {
-      nextCutoff = new Date(today.getFullYear(), today.getMonth() + 1, diaCorte);
+    // 1. Determinar el último corte que YA PASÓ (o es hoy)
+    let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
+    if (today.getDate() < diaCorte) {
+      lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
     }
-    const lastCutoff = new Date(nextCutoff.getFullYear(), nextCutoff.getMonth() - 1, diaCorte);
+
+    // 2. Revisar si ese último corte ya fue pagado
+    const lastPassedCutoffStr = lastPassedCutoff.toISOString().split('T')[0];
+    let yaPagado = historial.some(r => 
+      r.fecha_corte_mes === lastPassedCutoffStr && 
+      (r.estado === 'aprobado' || r.estado === 'pendiente')
+    );
+
+    // Si el nutriólogo se registró después del último corte, no debe nada de ese corte
+    const nutriCreatedAt = perfil?.created_at ? new Date(perfil.created_at) : today;
+    if (nutriCreatedAt > lastPassedCutoff) {
+      yaPagado = true;
+    }
+
+    // 3. Definir la ventana de facturación actual
+    let nextCutoff, lastCutoff;
+    if (!yaPagado && today >= lastPassedCutoff) {
+      // Estamos cobrando el recibo vencido / del día de hoy
+      nextCutoff = lastPassedCutoff;
+      lastCutoff = new Date(nextCutoff.getFullYear(), nextCutoff.getMonth() - 1, diaCorte);
+    } else {
+      // Ya pagaron el recibo anterior (o son nuevos). El cobro vigente es el próximo.
+      nextCutoff = new Date(lastPassedCutoff.getFullYear(), lastPassedCutoff.getMonth() + 1, diaCorte);
+      lastCutoff = lastPassedCutoff;
+    }
     
     // Contadores
     let activePatientsCount = 0;
