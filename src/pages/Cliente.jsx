@@ -27,10 +27,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const { data: cliente } = session;
   const brand = useBrand();
   
-  const [tab, setTab] = useState(() => {
+  const [tabState, setTab] = useState(() => {
     const saved = localStorage.getItem("flux_cliente_tab");
     return saved ? saved : "perfil";
   });
+  const tab = isEmbedded ? embeddedTab : tabState;
 
   useEffect(() => {
     if (tab) localStorage.setItem("flux_cliente_tab", tab);
@@ -189,15 +190,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return <BloqueadoPaciente onLogout={onLogout} />;
   }
 
-  return (
-    <AppLayout 
-      nav={SIDEBAR_ITEMS}
-      active={tab}
-      setActive={setTab}
-      brand={brand}
-      session={session}
-      onLogout={onLogout}
-    >
+  const innerContent = (
+    <>
       {isAtletaMode && (
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
@@ -272,6 +266,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           )}
         </>
       )}
+        </>
+  );
+
+  if (isEmbedded) return innerContent;
+
+  return (
+    <AppLayout 
+      nav={SIDEBAR_ITEMS}
+      active={tab}
+      setActive={setTab}
+      brand={brand}
+      session={session}
+      onLogout={onLogout}
+    >
+      {innerContent}
     </AppLayout>
   );
 }
