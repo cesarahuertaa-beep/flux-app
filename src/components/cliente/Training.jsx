@@ -54,6 +54,7 @@ export default function Training({
   syncStatus = "synced",
   isLocked = false,
   ultimoPeso = null,
+  isSelfManaged = false,
 }) {
   // Semana actual (índice 0-based para leer de progreso)
   const wi = Math.max(0, semanaActualCiclo - 1);
