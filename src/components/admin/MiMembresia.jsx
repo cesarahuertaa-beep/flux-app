@@ -8,28 +8,33 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
   const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [historial, setHistorial] = useState([]);
   const brand = useBrand();
 
-  useEffect(() => {
-    async function loadData() {
-      if (!profileId) return;
-      try {
-        const [data, cfg] = await Promise.all([
-          dbGet(`profiles?id=eq.${profileId}`),
-          dbGet("configuracion_plataforma?id=eq.1")
-        ]);
-        if (data && data.length > 0) setPerfil(data[0]);
-        if (cfg && cfg.length > 0) setConfigPago({
-          clabe: cfg[0].clabe || "",
-          banco: cfg[0].banco || "",
-          beneficiario: cfg[0].beneficiario || ""
-        });
-      } catch (e) {
-        console.error("Error cargando perfil:", e);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    if (!profileId) return;
+    setLoading(true);
+    try {
+      const [data, cfg, recibos] = await Promise.all([
+        dbGet(`profiles?id=eq.${profileId}`),
+        dbGet("configuracion_plataforma?id=eq.1"),
+        dbGet(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`)
+      ]);
+      if (data && data.length > 0) setPerfil(data[0]);
+      if (cfg && cfg.length > 0) setConfigPago({
+        clabe: cfg[0].clabe || "",
+        banco: cfg[0].banco || "",
+        beneficiario: cfg[0].beneficiario || ""
+      });
+      if (recibos) setHistorial(recibos);
+    } catch (e) {
+      console.error("Error cargando perfil:", e);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, [profileId]);
 
@@ -153,6 +158,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       });
 
       setMsg("✓ Comprobante subido y en revisión.");
+      loadData();
     } catch (error) {
       console.error(error);
       setMsg("❌ Error al subir: " + error.message);
@@ -369,6 +375,54 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
             </div>
           </div>
         </div>
+
+        {/* Historial de Pagos */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+          <h3 className="text-lg font-bold text-[#0B1929] mb-4">Historial de Pagos</h3>
+          {loading ? (
+            <div className="text-sm text-[#6B7A8D]">Cargando historial...</div>
+          ) : historial.length === 0 ? (
+            <div className="text-sm text-[#6B7A8D] bg-slate-50 p-4 rounded-xl text-center border border-slate-100">No hay pagos registrados aún.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
+                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Mes Facturado</th>
+                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
+                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {historial.map(r => (
+                    <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-4 text-sm text-[#0B1929] whitespace-nowrap">
+                        {new Date(r.created_at).toLocaleDateString('es-MX')}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-[#6B7A8D] whitespace-nowrap">
+                        {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : '—'}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap">
+                        ${Number(r.monto).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 flex justify-center">
+                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider ${
+                          r.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700' :
+                          r.estado === 'rechazado' ? 'bg-red-50 text-red-600' :
+                          'bg-amber-50 text-amber-700'
+                        }`}>
+                          {r.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       </div>
   );
 }
