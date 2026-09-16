@@ -76,7 +76,7 @@ export default function Training({
           Rutina en preparación
         </h2>
         <p className="text-sm text-[#6B7A8D]">
-          Tu nutriólogo está diseñando tu plan de entrenamiento.
+          {isSelfManaged ? "Aún no has diseñado tu plan de entrenamiento." : "Tu nutriólogo está diseñando tu plan de entrenamiento."}
         </p>
       </div>
     );

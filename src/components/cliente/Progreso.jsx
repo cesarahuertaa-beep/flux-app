@@ -103,7 +103,7 @@ const MuscularSVG = ({ groups }) => {
   );
 };
 
-export default function Progreso({ cliente }) {
+export default function Progreso({ cliente, isSelfManaged }) {
   const [metricas, setMetricas] = useState([]);
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(true);
@@ -348,7 +348,7 @@ export default function Progreso({ cliente }) {
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
             <Scale className="w-12 h-12 text-[#9BA5B0] mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">Sin métricas de composición</h3>
-            <p className="text-sm text-[#6B7A8D]">Tu nutriólogo aún no ha registrado evaluaciones físicas.</p>
+            <p className="text-sm text-[#6B7A8D]">{isSelfManaged ? "Aún no has registrado ninguna evaluación física." : "Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
           </div>
         )}
 

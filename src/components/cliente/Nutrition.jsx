@@ -6,7 +6,7 @@ import { generateNutriPDF } from "../../utils/pdf";
 const DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const DAY_FULL  = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 }) {
+export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1, isSelfManaged }) {
   const [activeDay, setActiveDay]     = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
   const brand = useBrand();
@@ -17,9 +17,9 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1 
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
           <Apple className="w-8 h-8 text-[#94A3B8]" />
         </div>
-        <h3 className="text-[#0B1929] font-bold text-lg mb-2">Sin plan asignado</h3>
+        <h3 className="text-[#0B1929] font-bold text-lg mb-2">{isSelfManaged ? "Sin plan creado" : "Sin plan asignado"}</h3>
         <p className="text-[#6B7A8D] text-sm max-w-[250px]">
-          Tu nutriólogo aún no ha asignado tu dieta para este ciclo.
+          {isSelfManaged ? "Aún no has creado tu plan de alimentación para este ciclo." : "Tu nutriólogo aún no ha asignado tu dieta para este ciclo."}
         </p>
       </div>
     );
