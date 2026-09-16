@@ -317,7 +317,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   );
 
   const SIDEBAR_ITEMS = isCivil ? [
-    { id: "mi_plan",   label: "Mi Plan",    icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id: "mi_plan",   label: "Mi Plan",    icon: <Activity size={18} strokeWidth={1.5} /> },
     
     { id: "membresia", label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> },
     

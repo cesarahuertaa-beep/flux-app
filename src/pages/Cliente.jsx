@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { enqueue, getAll } from "../lib/offlineQueue";
@@ -12,7 +12,7 @@ import Directorio from "../components/cliente/Directorio";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -156,7 +156,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   };
 
   const SIDEBAR_ITEMS = isCivil ? [
-    { id: "programar", label: "Mi Plan", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id: "programar", label: "Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
     { id: "progreso", label: "Progreso", icon: <Camera size={18} strokeWidth={1.5} /> },
     { id: "membresia", label: "Membresía", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
     { id: "perfil", label: "Mi Perfil", icon: <User size={18} strokeWidth={1.5} /> }
