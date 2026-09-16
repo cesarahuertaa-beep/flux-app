@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle } from "lucide-react";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell } from "lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -458,6 +458,55 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </div>
         )}
       </div>
+
+      {/* ── ATLETAS INDEPENDIENTES ──────────────────────────────────────── */}
+      {(() => {
+        const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
+        if (atletasIndependientes.length === 0) return null;
+        return (
+          <div className="px-6 md:px-8 pb-8">
+            <div className="max-w-5xl mx-auto">
+              <div className="flex items-center gap-3 mb-4 pt-2">
+                <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
+                  <Dumbbell size={18} className="text-[var(--brand-primary)]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#0B1929]">Atletas Independientes</h2>
+                  <p className="text-xs text-[#6B7A8D]">{atletasIndependientes.length} usuario{atletasIndependientes.length !== 1 ? 's' : ''} con plan Premium autodirigido</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#F0F4FA]">
+                  {atletasIndependientes.map(c => (
+                    <div
+                      key={c.id}
+                      className="p-4 hover:bg-[#F8FAFD] transition-colors cursor-default"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[var(--brand-primary)]/10 flex items-center justify-center shrink-0 font-bold text-[var(--brand-primary)] text-sm">
+                          {(c.nombre || c.email || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-[#0B1929] text-sm truncate">{c.nombre || "Sin nombre"}</p>
+                          <p className="text-xs text-[#6B7A8D] truncate">{c.email}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                              {c.activo ? "Activo" : "Inactivo"}
+                            </span>
+                            {c.objetivo && (
+                              <span className="text-[10px] text-[#6B7A8D] truncate max-w-[120px]">{c.objetivo}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modals */}
       {conflictUser && (
