@@ -374,7 +374,7 @@ export default function Login({ onLogin }) {
                 <User size={20} />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#0B1929]">Usuario Civil</p>
+                <p className="text-sm font-bold text-[#0B1929]">Atleta Independiente</p>
                 <p className="text-xs text-[#6B7A8D] mt-0.5">Entrena, sigue tu dieta y vincula a tu nutriólogo.</p>
               </div>
             </button>
