@@ -82,7 +82,7 @@ export default function Login({ onLogin }) {
       }
 
       // 2. Fetch from clientes
-      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}&activo=eq.true`);
+      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}`);
       for (const clientData of clientRows) {
         if (clientData.nutriologo_id) {
           const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
@@ -110,7 +110,7 @@ export default function Login({ onLogin }) {
             });
             
             // Re-evaluar si se insertó bien
-            const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}&activo=eq.true`);
+            const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}`);
             if (checkAgain.length > 0) {
                 availableRoles.push({ role: 'cliente', data: checkAgain[0] });
             } else {
