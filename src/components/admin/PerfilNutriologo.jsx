@@ -7,8 +7,7 @@ import IdentidadEmpresarialCard from "./IdentidadEmpresarialCard";
 import { syncPersonalData } from "../../lib/supabase";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
-  const { setBrandColor } = useBrand();
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [msg, setMsg] = useState("");
@@ -68,8 +67,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             color_primario: b.color_primario || "#1A6FD4",
             logo_url: b.logo_url || ""
           });
-          setBrandColor(b.color_primario || "#1A6FD4");
-        }
+                  }
 
         if (p.email && !isTeam) {
           const reqs = await dbGet(`solicitudes_entrenamiento?to_email=eq.${p.email}&estado=eq.pendiente`);
@@ -108,8 +106,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     try {
       if (bossId) {
         await dbPatch(`profiles?id=eq.${bossId}`, formData);
-        setBrandColor(formData.color_primario);
-      }
+              }
     } catch (e) {
       setErr("Error guardando datos empresariales.");
     }
