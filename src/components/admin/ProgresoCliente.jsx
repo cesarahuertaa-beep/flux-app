@@ -6,7 +6,7 @@ import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
-  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X
+  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2
 } from "lucide-react";
 
 const METRIC_GROUPS = [
@@ -90,7 +90,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       } else {
         setProgreso({});
       }
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
   }, [selected]);
 
@@ -116,7 +116,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       } else {
         setProgreso({});
       }
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
   }, [selected]);
 
@@ -174,14 +174,14 @@ export function ProgresoCliente({ selected, setMsg }) {
 
       if (editingId) {
         await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
-        setMsg("✅ Evaluación actualizada");
+        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
       } else {
         await dbPost("metricas_progreso", data);
-        setMsg("✅ Evaluación guardada");
+        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
       }
       closeModal();
       await load();
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);
   };
 
@@ -212,7 +212,7 @@ export function ProgresoCliente({ selected, setMsg }) {
   const deleteMetrica = async (id) => {
     if (!confirm("¿Eliminar esta evaluación? Esta acción no se puede deshacer.")) return;
     await dbDel(`metricas_progreso?id=eq.${id}`);
-    setMsg("🗑️ Evaluación eliminada"); await load();
+    setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>); await load();
   };
 
   const delta = (curr, prev, key) => {
@@ -560,7 +560,7 @@ export function ProgresoCliente({ selected, setMsg }) {
       {lightbox&&createPortal(
         <div onClick={()=>setLightbox(null)} className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out">
           <img src={lightbox} className="max-w-[90vw] max-h-[90vh] rounded-[14px] object-contain shadow-2xl" alt=""/>
-          <div className="absolute top-5 right-6 text-white text-3xl cursor-pointer font-bold" onClick={()=>setLightbox(null)}>✕</div>
+          <div className="absolute top-5 right-6 text-white text-3xl cursor-pointer font-bold" onClick={()=>setLightbox(null)}><X className="w-8 h-8" /></div>
         </div>,
         document.body
       )}

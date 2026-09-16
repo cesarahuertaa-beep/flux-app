@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-, UserCheck, Dumbbell, BarChart2, User} from "lucide-react";
+, UserCheck, Dumbbell, BarChart2, User, CheckCircle2} from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
@@ -368,7 +368,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     >
       {diasGracia && !isCivil && (
         <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
-          ⚠️ Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.
+          <AlertCircle className="w-4 h-4 shrink-0 text-yellow-600" /> Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.
         </div>
       )}
       {/* Toast Notification (z-[110] para que siempre esté arriba) */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
-import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2 } from "lucide-react";
+import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle } from "lucide-react";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
@@ -60,13 +60,13 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         estado: 'pendiente'
       });
 
-      setMsg("✓ Comprobante subido. Lo revisaremos en menos de 24 horas.");
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Comprobante subido. Lo revisaremos en menos de 24 horas.</div>);
     } catch (error) {
       console.error(error);
       if (error.message?.includes('relation "recibos_pago_civil" does not exist')) {
-        setMsg("❌ Error: La base de datos aún no está configurada para recibir pagos civiles. Contacta a soporte.");
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error: La base de datos aún no está configurada para recibir pagos civiles. Contacta a soporte.</div>);
       } else {
-        setMsg("❌ Error al subir: " + error.message);
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error al subir: {error.message}</div>);
       }
     } finally {
       setUploading(false);

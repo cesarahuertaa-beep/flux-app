@@ -86,7 +86,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         setHistorialDias(hdMapped);
       }
-    } catch(e) { setMsg("❌ Error cargando historial: " + e.message); }
+    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando historial: {e.message}</div>); }
   }, [clientes]);
 
   useEffect(() => { loadHistorial(); }, [loadHistorial]);
@@ -200,7 +200,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if (anteriores.length > 0) {
           // El primero en la lista es el más reciente (orden desc por created_at)
           await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
-          setMsg(`✅ Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`}</div>);
         } else {
           setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
         }
