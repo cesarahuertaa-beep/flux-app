@@ -500,19 +500,23 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {atletasIndependientes.map(c => {
-                          const plan = "premium";
+                          const plan = c.plan_tipo || 'estandar';
                           return (
                             <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all relative overflow-hidden">
-                              <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
+                              <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`}></div>
                               <div className="pl-2 min-w-0">
-                                <h4 className="font-bold text-[#0B1929] text-sm truncate">{c.nombre || "Sin nombre"}</h4>
+                                <div className="flex justify-between items-start mb-2">
+                                  <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2">{c.nombre || "Sin nombre"}</h4>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
+                                    plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                                  }`}>
+                                    {plan}
+                                  </span>
+                                </div>
                                 <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                                     {c.activo ? "Activo" : "Inactivo"}
-                                  </span>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan === 'premium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {plan === 'premium' ? 'Premium' : 'Estándar'}
                                   </span>
                                 </div>
                               </div>

@@ -130,8 +130,13 @@ export default function ControlPagos({ setMsg }) {
   const updateEstadoCivil = async (id, nuevoEstado, clienteId) => {
     try {
       await dbPatch(`recibos_pago_civil?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado === "aprobado" && clienteId)
-        await dbPatch(`clientes?id=eq.${clienteId}`, { activo: true, deactivated_at: null });
+      if (nuevoEstado === "aprobado" && clienteId) {
+        await dbPatch(`clientes?id=eq.${clienteId}`, { 
+          activo: true, 
+          deactivated_at: null,
+          plan_tipo: 'premium'
+        });
+      }
       setMsg("✓ Pago de atleta " + nuevoEstado);
       loadDataCivil();
     } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }

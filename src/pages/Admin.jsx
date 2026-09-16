@@ -87,9 +87,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           const lastValid = recibos?.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
 
           if (!lastValid) {
-            // Si nunca ha pagado, bloquear (cuenta inactiva hasta que pague)
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: false });
-            setBloqueado(true);
+            // Si nunca ha pagado, se queda como estándar
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
+            setBloqueado(false); // NO lo bloqueamos de la app, solo limitamos funciones
             setDiasGracia(false);
             return;
           }
@@ -100,17 +100,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
 
           if (today > blockDate) {
-            // Pasaron los días de gracia
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: false });
-            setBloqueado(true);
+            // Pasaron los días de gracia, vuelve a ser estándar
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
+            setBloqueado(false); // NO se bloquea pantalla completa
             setDiasGracia(false);
           } else if (today > expirationDate && today <= blockDate) {
             // En días de gracia (alerta)
             setDiasGracia(true);
             setBloqueado(false);
           } else {
-            // Suscripción activa y vigente
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, deactivated_at: null });
+            // Suscripción activa y vigente (premium)
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, plan_tipo: 'premium', deactivated_at: null });
             setBloqueado(false);
             setDiasGracia(false);
           }

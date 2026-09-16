@@ -251,7 +251,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     return false;
   };
 
-  const openNewDia  = () => { if (interceptNoPlan()) return; setEditDia(null); setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); setShowDiaModal(true); };
+  const isEstandarLimit = (listLength) => {
+    const client = clientes?.find(c => c.id === selected);
+    if (client && !client.nutriologo_id && client.plan_tipo !== 'premium') {
+      if (listLength >= 3) {
+        setMsg(
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⭐</span>
+            <div>
+              <strong>Límite de Plan Estándar.</strong>
+              <div className="text-xs opacity-90 mt-0.5">Ve a tu Membresía para adquirir Premium y crear días ilimitados.</div>
+            </div>
+          </div>
+        );
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const openNewDia  = () => { 
+    if (interceptNoPlan()) return; 
+    if (isEstandarLimit(dias.length)) return;
+    setEditDia(null); 
+    setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); 
+    setShowDiaModal(true); 
+  };
   const openEditDia = (d) => { 
     const parts = (d.dia || "").split('|');
     const dayTab = parts.length > 1 ? parts[0] : '';
@@ -393,6 +418,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { 
     if (interceptNoPlan()) return; 
+    if (isEstandarLimit(rutinas.length)) return;
     setEditRutina(null); 
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 

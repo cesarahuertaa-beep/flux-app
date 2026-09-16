@@ -125,13 +125,20 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       {/* Banner de Estado */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[#0B1929]">Tu Membresía Premium (Atleta Independiente)</h2>
-          <p className="text-[#6B7A8D] mt-1">Acceso completo al constructor de planes y modo atleta.</p>
+          <h2 className="text-xl font-bold text-[#0B1929]">Tu Membresía (Atleta Independiente)</h2>
+          <p className="text-[#6B7A8D] mt-1">Sube de nivel para quitar las restricciones del constructor.</p>
         </div>
-        <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap">
-          <CheckCircle2 size={18} />
-          Servicio Activo
-        </div>
+        {clienteData?.plan_tipo === 'estandar' ? (
+          <div className="bg-slate-100 text-[#6B7A8D] px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 font-bold whitespace-nowrap">
+            <AlertCircle size={18} />
+            Plan Estándar
+          </div>
+        ) : (
+          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap">
+            <CheckCircle2 size={18} />
+            Premium Activo
+          </div>
+        )}
       </div>
 
       {/* Tarjeta de precio y beneficios */}
