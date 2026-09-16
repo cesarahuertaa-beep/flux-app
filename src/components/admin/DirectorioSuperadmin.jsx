@@ -462,46 +462,71 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       {/* ── ATLETAS INDEPENDIENTES ──────────────────────────────────────── */}
       {(() => {
         const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
-        if (atletasIndependientes.length === 0) return null;
+        const isExpanded = expandedNutri === "__atletas__";
         return (
-          <div className="px-6 md:px-8 pb-8">
-            <div className="max-w-5xl mx-auto">
-              <div className="flex items-center gap-3 mb-4 pt-2">
-                <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
-                  <Dumbbell size={18} className="text-[var(--brand-primary)]" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-[#0B1929]">Atletas Independientes</h2>
-                  <p className="text-xs text-[#6B7A8D]">{atletasIndependientes.length} usuario{atletasIndependientes.length !== 1 ? 's' : ''} con plan Premium autodirigido</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#F0F4FA]">
-                  {atletasIndependientes.map(c => (
-                    <div
-                      key={c.id}
-                      className="p-4 hover:bg-[#F8FAFD] transition-colors cursor-default"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[var(--brand-primary)]/10 flex items-center justify-center shrink-0 font-bold text-[var(--brand-primary)] text-sm">
-                          {(c.nombre || c.email || "?")[0].toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-[#0B1929] text-sm truncate">{c.nombre || "Sin nombre"}</p>
-                          <p className="text-xs text-[#6B7A8D] truncate">{c.email}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                              {c.activo ? "Activo" : "Inactivo"}
-                            </span>
-                            {c.objetivo && (
-                              <span className="text-[10px] text-[#6B7A8D] truncate max-w-[120px]">{c.objetivo}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+          <div className="flex-1 px-6 md:px-8 pb-8">
+            <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
+                {/* Header row — mismo estilo que los nutriólogos */}
+                <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
+                      <Dumbbell className="text-[var(--brand-primary)]" size={22} />
                     </div>
-                  ))}
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-[#0B1929] text-lg">Atletas Independientes</h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">AUTODIRIGIDOS</span>
+                      </div>
+                      <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
+                    <button
+                      onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
+                      className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                    >
+                      <Users size={16} />
+                      <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
+                      {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Expanded list */}
+                {isExpanded && (
+                  <div className="bg-slate-50 border-t border-slate-100 p-5">
+                    {atletasIndependientes.length === 0 ? (
+                      <p className="text-sm text-center text-slate-500 py-4">No hay atletas independientes registrados aún.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {atletasIndependientes.map(c => {
+                          // Por ahora toda cuenta sin nutriologo_id que exista es Premium
+                          // Cuando implementemos estándar usaremos c.plan_tipo o similar
+                          const plan = "premium"; // placeholder para cuando lleguemos al estándar
+                          return (
+                            <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden">
+                              <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
+                              <div className="pl-2">
+                                <h4 className="font-bold text-[#0B1929] text-sm truncate">{c.nombre || "Sin nombre"}</h4>
+                                <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                    {c.activo ? "Activo" : "Inactivo"}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan === 'premium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                    {plan === 'premium' ? 'Premium' : 'Estándar'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
