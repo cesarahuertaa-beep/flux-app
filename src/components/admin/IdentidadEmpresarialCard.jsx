@@ -51,8 +51,8 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
           </div>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
         </div>
-        <div className="flex-1 w-full text-center md:text-left">
-          <h2 className="text-xl font-bold text-[#0B1929]">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
+        <div className="flex-1 min-w-0 w-full text-center md:text-left">
+          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
           <p className="text-[#6B7A8D] text-sm">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
         </div>
         <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
@@ -64,7 +64,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Nombre de la Marca / Consultorio</label>
           <input 

@@ -65,7 +65,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
         </div>
 
         {/* Fields Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-w-0">
           <div>
             <label className="block text-sm font-medium text-[#0B1929] mb-1">Nombre Completo</label>
             <input 

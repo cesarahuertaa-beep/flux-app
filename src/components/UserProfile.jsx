@@ -103,11 +103,11 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
                   onClick={() => onChangeRole && onChangeRole(r)}
                   className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}
                 >
-                  <div className="text-left">
-                    <p className={`font-bold text-sm ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                  <div className="text-left min-w-0 flex-1 pr-4">
+                    <p className={`font-bold text-sm truncate ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
                       {r.role === "cliente" ? "Paciente" : (r.role === "nutriologo" ? "Nutriólogo" : (r.role === "nutriologo_estudiante" ? "Estudiante" : "Staff Administrativo"))}
                     </p>
-                    <p className="text-xs text-[#6B7A8D]">
+                    <p className="text-xs text-[#6B7A8D] truncate">
                       {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
                     </p>
                   </div>
