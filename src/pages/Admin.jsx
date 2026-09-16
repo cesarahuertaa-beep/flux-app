@@ -75,25 +75,59 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   // ── VERIFICACIÓN DE MORA (Nutriólogos y Civiles) ──
   useEffect(() => {
     const checkPago = async () => {
-      // Solo verificamos Nutriólogos o Civiles (que pagan membresía)
       if (role !== "nutriologo" && role !== "nutriologo_estudiante" && role !== "civil") return;
 
       try {
         const today = new Date();
+
+        // ── LOGICA PARA CIVILES (Suscripción rolling de 30 días) ──
+        if (isCivil && clienteData) {
+          // Buscamos su último recibo válido (aprobado o pendiente)
+          const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
+          const lastValid = recibos?.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
+
+          if (!lastValid) {
+            // Si nunca ha pagado, bloquear (cuenta inactiva hasta que pague)
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: false });
+            setBloqueado(true);
+            setDiasGracia(false);
+            return;
+          }
+
+          // Su vencimiento es la fecha_corte_mes del recibo válido
+          const expirationDate = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+          const blockDate = new Date(expirationDate);
+          blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
+
+          if (today > blockDate) {
+            // Pasaron los días de gracia
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: false });
+            setBloqueado(true);
+            setDiasGracia(false);
+          } else if (today > expirationDate && today <= blockDate) {
+            // En días de gracia (alerta)
+            setDiasGracia(true);
+            setBloqueado(false);
+          } else {
+            // Suscripción activa y vigente
+            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, deactivated_at: null });
+            setBloqueado(false);
+            setDiasGracia(false);
+          }
+          return; // Fin lógica civiles
+        }
+
+        // ── LOGICA PARA NUTRIÓLOGOS (Fija los días 10) ──
         const diaCorte = 10;
         const DIA_BLOQUEO = 13;
 
-        // 1. Determinar el último corte que YA PASÓ (o es hoy)
         let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
         if (today.getDate() < diaCorte) {
           lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
         }
         
-        // Si la cuenta es más nueva que el corte pasado, no debe nada todavía.
         let creationDate = today;
-        if (isCivil && clienteData) {
-          creationDate = new Date(clienteData.created_at);
-        } else if (myId) {
+        if (myId) {
           const prof = await dbGet(`profiles?id=eq.${myId}&select=created_at`);
           if (prof && prof.length > 0) creationDate = new Date(prof[0].created_at);
         }
@@ -105,47 +139,25 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         }
 
         const lastPassedCutoffStr = lastPassedCutoff.toISOString().split('T')[0];
-
-        // 2. Buscar si hay recibo para el corte vencido
-        let recibos = [];
-        if (isCivil) {
-          recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&fecha_corte_mes=eq.${lastPassedCutoffStr}`);
-        } else {
-          recibos = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&fecha_corte_mes=eq.${lastPassedCutoffStr}`);
-        }
-
-        // Si tiene un recibo aprobado o pendiente, está a salvo
+        const recibos = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&fecha_corte_mes=eq.${lastPassedCutoffStr}`);
         const pagadoOPendiente = recibos && recibos.some(r => r.estado === 'aprobado' || r.estado === 'pendiente');
 
         if (pagadoOPendiente) {
-          // Desbloquear
-          if (isCivil) {
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, deactivated_at: null });
-          } else {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-          }
+          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
           setBloqueado(false);
           setDiasGracia(false);
           return;
         }
 
-        // 3. Si no ha pagado, verificar si ya pasaron los días de gracia
         const diaHoy = today.getDate();
         if (today >= lastPassedCutoff && diaHoy >= DIA_BLOQUEO) {
-          // Bloquear
-          if (isCivil) {
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: false });
-          } else {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
-          }
+          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
           setBloqueado(true);
           setDiasGracia(false);
         } else if (today >= lastPassedCutoff && diaHoy > diaCorte && diaHoy < DIA_BLOQUEO) {
-          // Días de gracia (11 y 12)
           setDiasGracia(true);
           setBloqueado(false);
         } else {
-          // No ha pasado el corte (estamos antes del día 10 del siguiente mes)
           setBloqueado(false);
           setDiasGracia(false);
         }

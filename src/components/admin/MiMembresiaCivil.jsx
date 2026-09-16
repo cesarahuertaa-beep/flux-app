@@ -15,33 +15,39 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
   const TARIFA = 75;
 
-  // Cálculos de fecha de corte
-  const targetCutoff = React.useMemo(() => {
+  // Cálculos de fecha de vencimiento (Rolling 30 days)
+  const { targetCutoff, expirationDate } = React.useMemo(() => {
     const today = new Date();
-    const diaCorte = 10;
     
-    let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
-    if (today.getDate() < diaCorte) {
-      lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
+    // Buscamos su último recibo válido
+    const lastValid = historial.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
+
+    if (!lastValid) {
+      // Si nunca ha pagado o no hay recibo válido, su "vencimiento" esperado es HOY + 30 días
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      return { targetCutoff: d, expirationDate: null };
     }
 
-    const lastPassedCutoffStr = lastPassedCutoff.toISOString().split('T')[0];
-    let yaPagado = historial.some(r => 
-      r.fecha_corte_mes === lastPassedCutoffStr && 
-      (r.estado === 'aprobado' || r.estado === 'pendiente')
-    );
-
-    const clientCreatedAt = clienteData?.created_at ? new Date(clienteData.created_at) : today;
-    if (clientCreatedAt > lastPassedCutoff) {
-      yaPagado = true; // Si se registró después del corte, no debe el corte pasado
-    }
-
-    if (!yaPagado && today >= lastPassedCutoff) {
-      return lastPassedCutoff; // Paga el vencido
+    // Su membresía vence en la fecha del último recibo válido
+    // (cuando pague de nuevo, cubrirá 30 días a partir de esa fecha, o a partir de hoy si ya venció)
+    const lastExp = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+    
+    // Si ya venció y pasaron los días de gracia, el nuevo ciclo empieza hoy
+    const blockDate = new Date(lastExp);
+    blockDate.setDate(blockDate.getDate() + 2);
+    
+    if (today > blockDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      return { targetCutoff: d, expirationDate: lastExp };
     } else {
-      return new Date(lastPassedCutoff.getFullYear(), lastPassedCutoff.getMonth() + 1, diaCorte); // Paga el próximo
+      // Si está renovando a tiempo, suma 30 días a su fecha original
+      const d = new Date(lastExp);
+      d.setDate(d.getDate() + 30);
+      return { targetCutoff: d, expirationDate: lastExp };
     }
-  }, [historial, clienteData]);
+  }, [historial]);
 
   const loadData = async () => {
     setLoading(true);
@@ -203,24 +209,26 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
         <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
           <Info size={18} className="text-[#6B7A8D]" />
-          Reglas y Fechas de Facturación
+          Reglas de Tu Suscripción
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Ciclo de Cobro</span>
-            <p className="text-sm text-[#0B1929]">Del <strong>10 al 10</strong> de cada mes.</p>
+            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Duración</span>
+            <p className="text-sm text-[#0B1929]"><strong>30 días</strong> a partir de tu pago.</p>
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Límite de Pago</span>
-            <p className="text-sm text-[#0B1929]">Hasta el <strong>día 10</strong> del mes.</p>
+            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Vencimiento Actual</span>
+            <p className="text-sm text-[#0B1929] font-bold text-[var(--brand-primary)]">
+              {expirationDate ? expirationDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long' }) : 'Pendiente de pago'}
+            </p>
           </div>
           <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
             <span className="block text-xs font-bold text-emerald-600 uppercase mb-1">Días de Gracia</span>
-            <p className="text-sm text-[#0B1929]">Días <strong>11 y 12</strong> (cuenta activa).</p>
+            <p className="text-sm text-[#0B1929]"><strong>2 días</strong> tras el vencimiento.</p>
           </div>
           <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
             <span className="block text-xs font-bold text-red-500 uppercase mb-1">Bloqueo</span>
-            <p className="text-sm text-[#0B1929]">Día <strong>13</strong> (si no hay validación).</p>
+            <p className="text-sm text-[#0B1929]">Al <strong>3er día</strong> sin renovar.</p>
           </div>
         </div>
       </div>
@@ -237,8 +245,8 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
-                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Mes Facturado</th>
+                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha de Pago</th>
+                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Válido Hasta</th>
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
                 </tr>
@@ -250,7 +258,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       {new Date(r.created_at).toLocaleDateString('es-MX')}
                     </td>
                     <td className="py-3 px-4 text-sm text-[#6B7A8D] whitespace-nowrap">
-                      {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : '—'}
+                      {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     <td className="py-3 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap">
                       ${Number(r.monto).toFixed(2)}
