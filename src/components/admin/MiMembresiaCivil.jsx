@@ -49,6 +49,22 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     }
   }, [historial]);
 
+  const diasRestantesText = React.useMemo(() => {
+    if (clienteData?.plan_tipo !== 'premium' || !expirationDate) return null;
+    const target = new Date(expirationDate);
+    target.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    
+    if (days > 1) return `Expira en ${days} días`;
+    if (days === 1) return `Expira mañana`;
+    if (days === 0) return `Expira hoy`;
+    if (days < 0) return `En días de gracia (venció hace ${Math.abs(days)} días)`;
+    return null;
+  }, [expirationDate, clienteData?.plan_tipo]);
+
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -139,9 +155,16 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             Plan Estándar
           </div>
         ) : (
-          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap">
-            <CheckCircle2 size={18} />
-            Premium Activo
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap">
+              <CheckCircle2 size={18} />
+              Premium Activo
+            </div>
+            {diasRestantesText && (
+              <span className="text-xs font-semibold text-[#6B7A8D]">
+                {diasRestantesText}
+              </span>
+            )}
           </div>
         )}
       </div>
