@@ -252,7 +252,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const isEstandarLimit = (listLength) => {
-    const client = clientes?.find(c => c.id === selected);
+    const client = selected;
     if (client && !client.nutriologo_id && client.plan_tipo !== 'premium') {
       if (listLength >= 3) {
         setMsg(
