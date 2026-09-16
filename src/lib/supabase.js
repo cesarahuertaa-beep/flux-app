@@ -222,3 +222,16 @@ export const authUpdatePassword = async (token, password) => {
 };
 
 export const dbPostMinimal = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers: { Prefer: "return=minimal" } });
+
+/** Sincroniza datos personales universales en todas las identidades del usuario */
+export const syncPersonalData = async (email, data) => {
+  if (!email) return;
+  try {
+    await Promise.all([
+      dbPatch(`profiles?email=eq.${email}`, data),
+      dbPatch(`clientes?email=eq.${email}`, data)
+    ]);
+  } catch (err) {
+    console.error("Error sincronizando datos personales:", err);
+  }
+};
