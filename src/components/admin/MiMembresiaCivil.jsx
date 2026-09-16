@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
-import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle } from "lucide-react";
+import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from "lucide-react";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
@@ -172,6 +172,32 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             <Upload size={16} />
             {uploading ? "Subiendo..." : "Subir Comprobante de Pago"}
           </button>
+        </div>
+      </div>
+
+      {/* Reglas de Facturación */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+        <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
+          <Info size={18} className="text-[#6B7A8D]" />
+          Reglas y Fechas de Facturación
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Ciclo de Cobro</span>
+            <p className="text-sm text-[#0B1929]">Del <strong>10 al 10</strong> de cada mes.</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Límite de Pago</span>
+            <p className="text-sm text-[#0B1929]">Hasta el <strong>día 10</strong> del mes.</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
+            <span className="block text-xs font-bold text-emerald-600 uppercase mb-1">Días de Gracia</span>
+            <p className="text-sm text-[#0B1929]">Días <strong>11 y 12</strong> (cuenta activa).</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
+            <span className="block text-xs font-bold text-red-500 uppercase mb-1">Bloqueo</span>
+            <p className="text-sm text-[#0B1929]">Día <strong>13</strong> (si no hay validación).</p>
+          </div>
         </div>
       </div>
 
