@@ -128,7 +128,12 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           <h2 className="text-xl font-bold text-[#0B1929]">Tu Membresía (Atleta Independiente)</h2>
           <p className="text-[#6B7A8D] mt-1">Sube de nivel para quitar las restricciones del constructor.</p>
         </div>
-        {clienteData?.plan_tipo === 'estandar' ? (
+        {historial.some(r => r.estado === 'pendiente') ? (
+          <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl border border-amber-200 flex items-center gap-2 font-bold whitespace-nowrap">
+            <AlertCircle size={18} />
+            Pago en Revisión
+          </div>
+        ) : clienteData?.plan_tipo === 'estandar' ? (
           <div className="bg-slate-100 text-[#6B7A8D] px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 font-bold whitespace-nowrap">
             <AlertCircle size={18} />
             Plan Estándar
@@ -203,11 +208,11 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
           <button
             onClick={handleUploadClick}
-            disabled={uploading}
+            disabled={uploading || historial.some(r => r.estado === 'pendiente')}
             className="w-full bg-[var(--brand-primary)] text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Upload size={16} />
-            {uploading ? "Subiendo..." : "Subir Comprobante de Pago"}
+            {uploading ? "Subiendo..." : historial.some(r => r.estado === 'pendiente') ? "Comprobante en Revisión" : "Subir Comprobante de Pago"}
           </button>
         </div>
       </div>

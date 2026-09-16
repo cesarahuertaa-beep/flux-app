@@ -84,7 +84,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         if (isCivil && clienteData) {
           // Buscamos su último recibo válido (aprobado o pendiente)
           const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
-          const lastValid = recibos?.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
+          const lastValid = recibos?.find(r => r.estado === 'aprobado');
 
           if (!lastValid) {
             // Si nunca ha pagado, se queda como estándar
