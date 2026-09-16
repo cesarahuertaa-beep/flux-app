@@ -1,13 +1,3 @@
-
-      {isCivil && (tab === "nutricion" || tab === "entrenamiento" || tab === "progreso_atleta") && clienteData && (
-        <ClienteView 
-          session={{ role:"cliente", data:clienteData, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
-          isAtletaMode={false}
-          isEmbedded={true}
-          embeddedTab={tab === "entrenamiento" ? "deporte" : tab === "progreso_atleta" ? "progreso" : "nutricion"}
-          onLogout={onLogout}
-        />
-      )}
 import { useState, useEffect, useCallback } from "react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
@@ -327,7 +317,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     c.email?.toLowerCase().includes(searchClientes.toLowerCase())
   );
 
-    const SIDEBAR_ITEMS = isCivil ? [
+  const SIDEBAR_ITEMS = isCivil ? [
     { id: "mi_plan",         label: "Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
     { id: "nutricion",       label: "Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id: "entrenamiento",   label: "Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
@@ -551,7 +541,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {tab === "mi_entrenamiento" && (
         <SubComponentWrapper 
           title="Mi Plan"
-          
+          action={
+            myShadowClient ? (
+              <button
+                onClick={activarModoAtleta}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
+              >
+                <Activity size={14} />
+                <span>Modo Atleta</span>
+              </button>
+            ) : null
+          }
         >
           {myShadowClient ? (
             <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
