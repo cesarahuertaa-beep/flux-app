@@ -196,7 +196,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
             <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
-              <Dumbbell size={16} /> {cliente?.nutriologo_id === null ? "Entrenando" : "Estás en Modo Atleta"}
+              <Dumbbell size={16} /> {cliente?.nutriologo_id === null || isAtletaMode ? "Entrenando" : "Estás en Modo Atleta"}
             </span>
             <span className="text-[#047857] text-xs md:text-sm hidden sm:block">
               {cliente?.nutriologo_id === null ? "Modo de ejecución de rutina." : "Previsualiza tu app exactamente como lo verían tus pacientes."}
@@ -227,7 +227,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             <>
               
               {tab === "nutricion" && (
-                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null} />
+                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
               )}
 
               {tab === "deporte" && (
@@ -242,14 +242,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                   syncStatus={syncStatus}
                   isLocked={isFuture}
                   ultimoPeso={ultimoPeso}
-                  isSelfManaged={cliente?.nutriologo_id === null}
+                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode}
                 />
               )}
             </>
           )}
 
           {tab === "progreso" && (
-            <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null} />
+            <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
           )}
 
           {tab === "citas" && (
