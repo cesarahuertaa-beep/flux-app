@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { calculateBodyComposition } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
@@ -6,39 +7,110 @@ import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
-  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2
+  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target
 } from "lucide-react";
 
-const METRIC_GROUPS = [
+const METRIC_GROUPS_MANUAL = [
   { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
     { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
     { key:"estatura",  label:"Estatura (cm)", type:"number" },
-    { key:"imc",       label:"IMC",           type:"number", step:"0.01", readOnly:true },
   ]},
-  { label:"Composición corporal", icon:<Microscope className="w-4 h-4" />, fields:[
-    { key:"grasa_pct",   label:"Grasa (%)",   type:"number", step:"0.1" },
-    { key:"musculo_pct", label:"Músculo (%)", type:"number", step:"0.1" },
+  { label:"Pliegues cutáneos (mm)", icon:<Target className="w-4 h-4" />, fields:[
+    { key:"pliegue_triceps",      label:"Tríceps",      type:"number", step:"0.1" },
+    { key:"pliegue_subescapular", label:"Subescapular", type:"number", step:"0.1" },
+    { key:"pliegue_suprailiaco",  label:"Suprailíaco",  type:"number", step:"0.1" },
+    { key:"pliegue_abdominal",    label:"Abdominal",    type:"number", step:"0.1" },
+    { key:"pliegue_muslo",        label:"Muslo",        type:"number", step:"0.1" },
+    { key:"pliegue_pantorrilla",  label:"Pantorrilla",  type:"number", step:"0.1" },
+    { key:"pliegue_pectoral",     label:"Pectoral",     type:"number", step:"0.1" },
+    { key:"pliegue_biceps",       label:"Bíceps",       type:"number", step:"0.1" },
   ]},
   { label:"Circunferencias (cm)", icon:<Ruler className="w-4 h-4" />, fields:[
-    { key:"cintura", label:"Cintura",  type:"number", step:"0.1" },
-    { key:"cadera",  label:"Cadera",   type:"number", step:"0.1" },
-    { key:"icc",     label:"ICC",      type:"number", step:"0.001", readOnly:true },
-    { key:"pecho",   label:"Pecho",    type:"number", step:"0.1" },
-    { key:"brazo",   label:"Brazo",    type:"number", step:"0.1" },
-    { key:"muslo",   label:"Muslo",    type:"number", step:"0.1" },
+    { key:"cuello",          label:"Cuello",           type:"number", step:"0.1" },
+    { key:"cintura",         label:"Cintura",          type:"number", step:"0.1" },
+    { key:"cadera",          label:"Cadera",           type:"number", step:"0.1" },
+    { key:"brazo_relajado",  label:"Brazo relajado",   type:"number", step:"0.1" },
+    { key:"brazo_contraido", label:"Brazo contraído",  type:"number", step:"0.1" },
+    { key:"muslo",           label:"Muslo",            type:"number", step:"0.1" },
+    { key:"pantorrilla",     label:"Pantorrilla",      type:"number", step:"0.1" },
   ]},
-  { label:"Clínicos", icon:<Stethoscope className="w-4 h-4" />, fields:[
+  { label:"Diámetros óseos (cm) - Rocha", icon:<Activity className="w-4 h-4" />, fields:[
+    { key:"diametro_muneca",  label:"Muñeca (Biestiloideo)",     type:"number", step:"0.1" },
+    { key:"diametro_codo",    label:"Codo (Biepicondíleo)",      type:"number", step:"0.1" },
+    { key:"diametro_rodilla", label:"Rodilla (Bicondíleo)",      type:"number", step:"0.1" },
+  ]},
+  { label:"Outputs Calculados", icon:<BarChart2 className="w-4 h-4" />, fields:[
+    { key:"calc_masa_grasa",    label:"Masa Grasa (kg)",      type:"number", readOnly:true },
+    { key:"calc_masa_muscular", label:"Masa Muscular (kg)",   type:"number", readOnly:true },
+    { key:"calc_masa_osea",     label:"Masa Ósea (kg)",       type:"number", readOnly:true },
+    { key:"calc_masa_residual", label:"Masa Residual (kg)",   type:"number", readOnly:true },
+    { key:"grasa_pct",          label:"% Grasa (Siri)",       type:"number", readOnly:true },
+    { key:"somatotipo_x",       label:"Somatotipo X",         type:"number", readOnly:true },
+    { key:"somatotipo_y",       label:"Somatotipo Y",         type:"number", readOnly:true },
+  ]},
+  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
     { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
     { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
+  ]}
+];
+
+const METRIC_GROUPS_INBODY = [
+  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
+    { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
+    { key:"estatura",  label:"Estatura (cm)", type:"number" },
   ]},
+  { label:"Composición corporal (InBody)", icon:<Microscope className="w-4 h-4" />, fields:[
+    { key:"inbody_smm",          label:"Masa Muscular Esq. (SMM kg)", type:"number", step:"0.1" },
+    { key:"calc_masa_grasa",     label:"Masa Grasa Corporal (kg)",    type:"number", step:"0.1" },
+    { key:"grasa_pct",           label:"% Grasa Corporal",            type:"number", step:"0.1" },
+    { key:"inbody_tbw",          label:"Agua Corporal Total (TBW L)", type:"number", step:"0.1" },
+    { key:"inbody_mineral_oseo", label:"Masa Mineral Ósea (kg)",      type:"number", step:"0.1" },
+    { key:"inbody_proteina",     label:"Proteína (kg)",               type:"number", step:"0.1" },
+  ]},
+  { label:"Índices y metabolismo", icon:<Activity className="w-4 h-4" />, fields:[
+    { key:"imc",                   label:"IMC",                         type:"number", step:"0.1" },
+    { key:"inbody_grasa_visceral", label:"Grasa Visceral (Nivel)",      type:"number", step:"1" },
+    { key:"inbody_bmr",            label:"Tasa Metabólica Basal (kcal)",type:"number", step:"1" },
+    { key:"inbody_score",          label:"Puntaje InBody",              type:"number", step:"1" },
+    { key:"icc",                   label:"Relación Cintura-Cadera",     type:"number", step:"0.01" },
+  ]},
+  { label:"Análisis Segmentado Magra (kg)", icon:<Dumbbell className="w-4 h-4" />, fields:[
+    { key:"inbody_magra_brazo_der",  label:"Brazo Derecho",  type:"number", step:"0.1" },
+    { key:"inbody_magra_brazo_izq",  label:"Brazo Izquierdo",type:"number", step:"0.1" },
+    { key:"inbody_magra_pierna_der", label:"Pierna Derecha", type:"number", step:"0.1" },
+    { key:"inbody_magra_pierna_izq", label:"Pierna Izquierda",type:"number", step:"0.1" },
+    { key:"inbody_magra_tronco",     label:"Tronco",         type:"number", step:"0.1" },
+  ]},
+  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
+    { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
+    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
+  ]}
 ];
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split("T")[0],
-  peso:"", estatura:"", imc:"",
-  grasa_pct:"", musculo_pct:"",
-  cintura:"", cadera:"", icc:"", pecho:"", brazo:"", muslo:"",
-  glucosa:"", presion_arterial:"", notas:"",
+  metodo_evaluacion: "manual",
+  peso: "", estatura: "", imc: "",
+  
+  // Pliegues (mm)
+  pliegue_triceps: "", pliegue_subescapular: "", pliegue_suprailiaco: "", pliegue_abdominal: "", 
+  pliegue_muslo: "", pliegue_pantorrilla: "", pliegue_pectoral: "", pliegue_biceps: "",
+
+  // Circunferencias (cm)
+  cuello: "", cintura: "", cadera: "", pecho: "", brazo_relajado: "", brazo_contraido: "", 
+  muslo: "", pantorrilla: "",
+
+  // Diámetros óseos (cm)
+  diametro_muneca: "", diametro_codo: "", diametro_rodilla: "",
+
+  // InBody
+  inbody_smm: "", inbody_tbw: "", inbody_proteina: "", inbody_mineral_oseo: "",
+  inbody_grasa_visceral: "", inbody_bmr: "", inbody_score: "",
+  inbody_magra_brazo_der: "", inbody_magra_brazo_izq: "", inbody_magra_pierna_der: "",
+  inbody_magra_pierna_izq: "", inbody_magra_tronco: "",
+
+  // Legacy/Calculated
+  grasa_pct: "", musculo_pct: "", icc: "", glucosa: "", presion_arterial: "", notas: "",
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
@@ -154,13 +226,20 @@ export function ProgresoCliente({ selected, setMsg }) {
     try {
       const data = {};
       if (!editingId) data.cliente_id = selected.id;
-      const STRING_KEYS = new Set(["fecha","presion_arterial","notas"]);
+      const STRING_KEYS = new Set(["fecha","presion_arterial","notas","metodo_evaluacion"]);
       Object.entries(form).forEach(([k, v]) => {
         if (v !== "" && v !== null && v !== undefined) {
           if (STRING_KEYS.has(k)) { data[k] = v; }
           else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
         }
       });
+
+      // Aplicar cálculos si es manual
+      if (data.metodo_evaluacion === 'manual') {
+         const edad = selected.edad || (selected.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
+         const calc = calculateBodyComposition(data, selected.sexo, edad);
+         Object.assign(data, calc);
+      }
       // Upload new photos
       const uploadedUrls = [];
       for (const file of pendingFotos) {
@@ -222,6 +301,9 @@ export function ProgresoCliente({ selected, setMsg }) {
     setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>); await load();
   };
 
+  const edadCalc = selected?.edad || (selected?.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
+  const liveCalculations = form.metodo_evaluacion === 'manual' ? calculateBodyComposition(form, selected?.sexo, edadCalc) : {};
+
   const delta = (curr, prev, key) => {
     if (curr[key]==null || prev[key]==null || curr[key]==="" || prev[key]==="") return null;
     const d = parseFloat(curr[key]) - parseFloat(prev[key]);
@@ -229,20 +311,27 @@ export function ProgresoCliente({ selected, setMsg }) {
   };
 
   const DISPLAY_KEYS = [
-    { key:"peso",            label:"Peso",      unit:"kg",    icon:<Scale className="w-3.5 h-3.5" /> },
-    { key:"imc",             label:"IMC",        unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"grasa_pct",       label:"Grasa",      unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
-    { key:"musculo_pct",     label:"Músculo",    unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
-    { key:"agua_pct",        label:"Agua",       unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
-    { key:"masa_osea",       label:"Masa Ósea",  unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
-    { key:"cintura",         label:"Cintura",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"cadera",          label:"Cadera",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"icc",             label:"ICC",         unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
-    { key:"pecho",           label:"Pecho",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"brazo",           label:"Brazo",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"muslo",           label:"Muslo",      unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
-    { key:"glucosa",         label:"Glucosa",    unit:"mg/dL", icon:<Stethoscope className="w-3.5 h-3.5" /> },
-    { key:"presion_arterial",label:"Presión",    unit:"",       icon:<Heart className="w-3.5 h-3.5" /> },
+    { key:"peso",               label:"Peso",      unit:"kg",    icon:<Scale className="w-3.5 h-3.5" /> },
+    { key:"imc",                label:"IMC",       unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"grasa_pct",          label:"Grasa",     unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"musculo_pct",        label:"Músculo",   unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"calc_masa_grasa",    label:"M. Grasa",  unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"calc_masa_muscular", label:"M. Muscular",unit:"kg",   icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"calc_masa_osea",     label:"M. Ósea",   unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"calc_masa_residual", label:"M. Residual",unit:"kg",   icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"inbody_smm",         label:"SMM",       unit:"kg",    icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"inbody_tbw",         label:"TBW",       unit:"L",     icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"inbody_score",       label:"Puntuación",unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
+    { key:"cintura",            label:"Cintura",   unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"cadera",             label:"Cadera",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"icc",                label:"ICC",       unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
+    { key:"pecho",              label:"Pecho",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"brazo_relajado",     label:"Brazo",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"muslo",              label:"Muslo",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
+    { key:"somatotipo_x",       label:"Somato X",  unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
+    { key:"somatotipo_y",       label:"Somato Y",  unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
+    { key:"glucosa",            label:"Glucosa",   unit:"mg/dL", icon:<Stethoscope className="w-3.5 h-3.5" /> },
+    { key:"presion_arterial",   label:"Presión",   unit:"",      icon:<Heart className="w-3.5 h-3.5" /> },
   ];
 
   if (loading) return <div className="text-[#6B7A8D] text-center p-10">Cargando…</div>;
@@ -289,6 +378,9 @@ export function ProgresoCliente({ selected, setMsg }) {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
                     {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                      {m.metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}
+                    </span>
                   </div>
                   <div className="flex gap-1.5">
                     <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1">
@@ -486,12 +578,41 @@ export function ProgresoCliente({ selected, setMsg }) {
               <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929]"><X className="w-6 h-6" /></button>
             </div>
             
-            <div className="flex flex-col gap-1.5 mb-6">
-              <label className="text-sm font-bold text-[#0B1929]">Fecha de evaluación</label>
-              <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20" />
-            </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="flex bg-[#F0F4FA] rounded-xl p-1 inline-flex w-full md:w-auto">
+                  <button 
+                    onClick={() => updForm("metodo_evaluacion", "manual")}
+                    className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "manual" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                  >
+                    MANUAL
+                  </button>
+                  <button 
+                    onClick={() => updForm("metodo_evaluacion", "inbody")}
+                    className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                  >
+                    INBODY
+                  </button>
+                </div>
 
-            {METRIC_GROUPS.map(group=>(
+                <div className="flex flex-col gap-1.5 w-full md:w-auto">
+                  <label className="text-sm font-bold text-[#0B1929] hidden md:block">Fecha</label>
+                  <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20" />
+                </div>
+              </div>
+
+              {metricas.length > 0 && metricas[0].metodo_evaluacion !== form.metodo_evaluacion && !editingId && (
+                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-bold text-yellow-800">Cambio de método detectado</h4>
+                    <p className="text-[13px] text-yellow-700 mt-0.5">
+                      El historial reciente de este paciente está en modo <strong>{metricas[0].metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}</strong>. Se recomienda mantener consistencia para que las gráficas de progreso y comparativas sean exactas.
+                    </p>
+                  </div>
+                </div>
+              )}
+  
+              {(form.metodo_evaluacion === 'inbody' ? METRIC_GROUPS_INBODY : METRIC_GROUPS_MANUAL).map(group=>(
               <div key={group.label} className="mb-6">
                 <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
                   {group.icon} {group.label}
@@ -502,7 +623,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                       <label className="text-sm font-bold text-[#0B1929]">{f.label}</label>
                       <input
                         type={f.type} step={f.step||"any"}
-                        value={form[f.key]}
+                        value={f.readOnly && form.metodo_evaluacion === 'manual' ? (liveCalculations[f.key] || '') : form[f.key]}
                         readOnly={!!f.readOnly}
                         placeholder={f.readOnly?"Auto":(f.placeholder||"")}
                         className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ? "opacity-60 cursor-not-allowed" : ""}`}

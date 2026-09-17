@@ -57,5 +57,5 @@ export const ESTADOS_MEXICO = [
   "Zacatecas"
 ];
   
-export const GRUPOS = [\" "pecho\, \abdomen\, \oblicuos\, \deltoide_anterior\, \deltoide_posterior\, \trapecio\, \dorsal\, \lumbar\, \biceps\, \triceps\, \antebrazo\, \gluteo\, \cuadriceps\, \isquiotibial\, \pantorrilla\, \aductor\, \abductor\, \soleo\, \cuello\];  
-export const TIPOS = [\fuerza\, \hipertrofia\, \resistencia\, \potencia\, \flexibilidad\, \cardio\]; 
+export const GRUPOS = ["pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior", "trapecio", "dorsal", "lumbar", "biceps", "triceps", "antebrazo", "gluteo", "cuadriceps", "isquiotibial", "pantorrilla", "aductor", "abductor", "soleo", "cuello"];
+export const TIPOS = ["fuerza", "hipertrofia", "resistencia", "potencia", "flexibilidad", "cardio"];
