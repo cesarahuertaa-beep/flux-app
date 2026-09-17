@@ -75,10 +75,11 @@ export default function App() {
       if (token && savedRole) {
         // --- OPTIMISTIC RESTORE ---
         let optimisticData = null;
-        if (savedMultiRoles) {
-          const matchingRole = savedMultiRoles.find(r => r.role === savedRole);
-          if (matchingRole) optimisticData = matchingRole.data;
-        }
+          if (savedMultiRoles) {
+            const searchRole = savedRole === "civil" ? "cliente" : savedRole;
+            const matchingRole = savedMultiRoles.find(r => r.role === searchRole);
+            if (matchingRole) optimisticData = matchingRole.data;
+          }
         
         if (optimisticData) {
           setSession({ role: savedRole, data: optimisticData, token, profileId, multiRoles: savedMultiRoles });
