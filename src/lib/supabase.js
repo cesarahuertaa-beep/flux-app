@@ -247,6 +247,25 @@ export const storageDelete = async (bucket, path) => {
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
 };
 
+export const storageListFolder = async (bucket, prefix) => {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/list/${bucket}`, {
+    method:"POST",
+    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":"application/json" },
+    body: JSON.stringify({ prefix })
+  });
+  if (!r.ok) { return []; }
+  return await r.json();
+};
+
+export const storageRemoveMany = async (bucket, prefixes) => {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
+    method:"DELETE",
+    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":"application/json" },
+    body: JSON.stringify({ prefixes })
+  });
+  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+};
+
 // ── Multi-tenancy: Profile del usuario logueado ──
 let _profileId = null;
 export const setProfileId   = (id) => {

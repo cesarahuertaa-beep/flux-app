@@ -363,14 +363,44 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     } catch(e) { setMsg("❌ Error: "+e.message); }
   };
 
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
   const saveEditClient = async () => {
     setSaving(true);
     try {
       await dbPatch(`clientes?id=eq.${editClient.id}`, editClientForm);
-      setMsg("✅ Cliente actualizado");
+      setMsg("✓ Cliente actualizado");
       setEditClient(null);
       loadClientes();
     } catch(e) { setMsg("❌ " + e.message); }
+    setSaving(false);
+  };
+
+  const deleteClient = async () => {
+    if (confirmDeleteText !== "ELIMINAR") return;
+    setSaving(true);
+    try {
+      // Borrar fotos de storage (progress-photos)
+      const { storageListFolder, storageRemoveMany } = await import("../../lib/supabase");
+      const files = await storageListFolder("progress-photos", editClient.id);
+      if (files && files.length > 0) {
+        const paths = files.map(f => `${editClient.id}/${f.name}`);
+        await storageRemoveMany("progress-photos", paths);
+      }
+      
+      // Ejecutar borrado en BD vía RPC usando dbPost
+      await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: editClient.id, p_auth_id: editClient.auth_id });
+      
+      setMsg("✓ Paciente eliminado permanentemente.");
+      setEditClient(null);
+      setShowConfirmDelete(false);
+      setConfirmDeleteText("");
+      if (selected?.id === editClient.id) setSelected(null);
+      loadClientes();
+    } catch(e) {
+      setMsg("❌ Error eliminando: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -816,12 +846,40 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3">
-              <button onClick={() => setEditClient(null)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
-              <button onClick={saveEditClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-                {saving ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
+            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex flex-col gap-3">
+                {showConfirmDelete ? (
+                  <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+                    <p className="text-red-700 text-xs font-bold mb-2">
+                      Esta acción es irreversible. Se borrarán todas las fotos, planes, progreso y cuenta del paciente.
+                      Escribe la palabra <strong>ELIMINAR</strong> para confirmar.
+                    </p>
+                    <input 
+                      value={confirmDeleteText}
+                      onChange={e=>setConfirmDeleteText(e.target.value)}
+                      placeholder="ELIMINAR"
+                      className="w-full bg-white border border-red-200 text-red-900 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-red-500 mb-2"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={()=>setShowConfirmDelete(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7A8D] hover:bg-white transition-colors">Cancelar</button>
+                      <button onClick={deleteClient} disabled={confirmDeleteText !== "ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                        {saving ? "Eliminando..." : "Eliminar Definitivamente"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => setShowConfirmDelete(true)} className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                      <Trash2 size={14} /> Borrar Paciente
+                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditClient(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
+                      <button onClick={saveEditClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
+                        {saving ? "Guardando..." : "Guardar cambios"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
           </div>
         </div>
       )}
