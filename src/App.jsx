@@ -62,9 +62,32 @@ export default function App() {
       }
 
       if (token && savedRole) {
+        // --- OPTIMISTIC RESTORE ---
+        let optimisticData = null;
+        if (savedMultiRoles) {
+          const matchingRole = savedMultiRoles.find(r => r.role === savedRole);
+          if (matchingRole) optimisticData = matchingRole.data;
+        }
+        
+        if (optimisticData) {
+          setSession({ role: savedRole, data: optimisticData, token, profileId, multiRoles: savedMultiRoles });
+          setRestoring(false);
+          // Revalidate in background
+          setTimeout(async () => {
+            try {
+              if (profileId && Array.isArray(savedMultiRoles) && savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role))) {
+                const profiles = await dbGet(`profiles?id=eq.${profileId}`);
+                if (!profiles.length || (profiles[0].activo === false && profiles[0].role !== "superadmin")) {
+                  setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
+                }
+              }
+            } catch(e) {}
+          }, 100);
+          return;
+        }
+
         try {
-          // If the user has admin roles in their multiRoles, ALWAYS restore via profileId
-          // so we land on the correct role (not on a stale civil/cliente view)
+          // Fallback al modo lento si no hay datos optimistas
           const hasAdminRole = Array.isArray(savedMultiRoles) &&
             savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
 
@@ -101,8 +124,14 @@ export default function App() {
           } else {
             clearSessionMeta();
           }
-        } catch {
-          setAuthToken(null); setProfileId(null); clearSessionMeta();
+        } catch (e) {
+          if (e.message === "OFFLINE" && savedMultiRoles) {
+            // offline logic already handled by optimistic restore above if data exists,
+            // but just in case we reach here:
+            clearSessionMeta();
+          } else {
+            clearSessionMeta();
+          }
         }
       } else {
          // No saved role, clean up
