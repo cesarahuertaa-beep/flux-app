@@ -181,29 +181,37 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
-    try { 
-      // Peticiones en paralelo
-      const [r, allNutris, me] = await Promise.all([
-        dbGet(clientesFilter),
-        dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`),
-        dbGet(`profiles?id=eq.${myId}&select=email`)
-      ]);
-      
+    let _allNutris = [];
+    let _me = [];
+    
+    const updateState = (r, allNutris, me) => {
       const nutriEmails = new Set(allNutris.map(n => n.email));
-
       if (me.length > 0) {
         const myEmail = me[0].email;
         const clone = r.find(c => c.email === myEmail);
         if (clone) setMyShadowClient(clone);
       }
-      
       setClientes(r.filter(c => !nutriEmails.has(c.email)));
+    };
+
+    try { 
+      const [r, allNutris, me] = await Promise.all([
+        dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)),
+        dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`),
+        dbGet(`profiles?id=eq.${myId}&select=email`)
+      ]);
+      _allNutris = allNutris;
+      _me = me;
+      updateState(r, allNutris, me);
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
   }, [clientesFilter, myId]);
 
   const loadBiblioteca = useCallback(async () => {
-    try { const r = await dbGet(bibliotecaFilter); setBiblioteca(r); } catch(e) { console.error("Error cargando biblioteca:", e); }
+    try { 
+      const r = await dbGet(bibliotecaFilter, (freshData) => setBiblioteca(freshData)); 
+      setBiblioteca(r); 
+    } catch(e) { console.error("Error cargando biblioteca:", e); }
   }, [bibliotecaFilter]);
 
   useEffect(() => { 

@@ -50,14 +50,22 @@ export const restoreSession = () => {
 
 /** Registrar callback para cuando la sesión expire (401) */
 // ── Caché de Consultas GET ──
+const CACHE_VERSION = "v3"; // Cambiar esto en nuevas versiones para limpiar la caché
 const queryCache = new Map();
 
 const loadCache = () => {
   try {
-    const stored = localStorage.getItem("flux_query_cache");
+    // Limpieza de emergencia de cachés viejos
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith("flux_query_cache_") && key !== `flux_query_cache_${CACHE_VERSION}`) {
+        localStorage.removeItem(key);
+      }
+    });
+    localStorage.removeItem("flux_query_cache"); // limpiar el legado
+
+    const stored = localStorage.getItem(`flux_query_cache_${CACHE_VERSION}`);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Limpiar caché viejo al cargar (>5 min)
       Object.keys(parsed).forEach(k => {
         if (Date.now() - parsed[k].timestamp < 300000) {
           queryCache.set(k, parsed[k]);
@@ -74,9 +82,9 @@ const saveCache = () => {
     for (const [k, v] of queryCache.entries()) {
       obj[k] = v;
     }
-    localStorage.setItem("flux_query_cache", JSON.stringify(obj));
+    localStorage.setItem(`flux_query_cache_${CACHE_VERSION}`, JSON.stringify(obj));
   } catch(e) {
-    if (e.name === 'QuotaExceededError') localStorage.removeItem("flux_query_cache");
+    if (e.name === 'QuotaExceededError') localStorage.removeItem(`flux_query_cache_${CACHE_VERSION}`);
   }
 };
 
@@ -91,82 +99,106 @@ export const invalidateCache = (table) => {
 export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
 
 // ── Función base de petición ──
-const q = async (path, opts={}) => {
+const q = async (path, opts={}, onBackgroundUpdate=null) => {
   const isGet = !opts.method || opts.method === "GET";
   const table = path.split('?')[0];
-  
+  let returnedCache = false;
+
+  const fetchNetwork = async () => {
+    const { headers: extraHeaders, upsert, ...restOpts } = opts;
+    const prefer = upsert ? "resolution=merge-duplicates,return=representation" : "return=representation";
+    let r;
+    try {
+      r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+        headers: {
+          apikey: SUPA_KEY,
+          Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: prefer,
+          ...extraHeaders
+        },
+        ...restOpts
+      });
+    } catch (err) {
+      if (isGet) {
+        const cached = queryCache.get(path);
+        if (cached && !returnedCache) return cached.data;
+      }
+      if (returnedCache) return; // Ya retornamos caché, morimos silenciosamente
+      throw new Error("OFFLINE");
+    }
+
+    // Interceptar 401
+    if (r.status === 401 && _authToken) {
+      if (!_isRefreshing) {
+        _isRefreshing = true;
+        const ok = await refreshSession();
+        _isRefreshing = false;
+        _refreshQueue.forEach(resolve => resolve(ok));
+        _refreshQueue = [];
+        if (ok === "OFFLINE") {
+          if (returnedCache) return;
+          throw new Error("OFFLINE");
+        }
+        if (!ok) {
+          setAuthToken(null); setProfileId(null); saveRefreshToken(null);
+          if (_onSessionExpired) _onSessionExpired();
+          if (returnedCache) return;
+          throw new Error("Sesión expirada — inicia sesión de nuevo");
+        }
+      } else {
+        await new Promise(res => _refreshQueue.push(res));
+      }
+      return fetchNetwork();
+    }
+
+    if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
+    if (!r.ok) { 
+      if (returnedCache) return;
+      const e = await r.text(); throw new Error(e); 
+    }
+    
+    const t = await r.text(); 
+    const data = t ? JSON.parse(t) : [];
+    
+    if (isGet) {
+      const prevCached = queryCache.get(path);
+      const isDifferent = !prevCached || JSON.stringify(prevCached.data) !== JSON.stringify(data);
+      
+      queryCache.set(path, { data, timestamp: Date.now() });
+      saveCache();
+      
+      // Si la data es diferente a la caché que ya mostramos, actualizamos la UI en silencio
+      if (returnedCache && onBackgroundUpdate && isDifferent) {
+        onBackgroundUpdate(data);
+      }
+    }
+    return data;
+  };
+
   if (isGet) {
     const cached = queryCache.get(path);
-    if (cached && (Date.now() - cached.timestamp < 300000)) { // 5 minutos de caché
-      return cached.data;
+    if (cached) {
+      // Si la caché es hiper-reciente (< 15 segundos), usamos caché puro para no saturar la red en clics rápidos
+      if (Date.now() - cached.timestamp < 15000) {
+        return cached.data;
+      }
+      // Si el componente soporta actualización en 2do plano (SWR), devolvemos caché instantáneo y consultamos en silencio
+      if (onBackgroundUpdate) {
+        returnedCache = true;
+        fetchNetwork().catch(() => {}); // Fuego y olvido
+        return cached.data;
+      }
     }
   } else {
-    // Es mutación (POST, PATCH, DELETE), invalidar caché de la tabla
-    invalidateCache(table);
+    invalidateCache(table); // Mutaciones invalidan caché de inmediato
   }
 
-  const { headers: extraHeaders, upsert, ...restOpts } = opts;
-  const prefer = upsert
-    ? "resolution=merge-duplicates,return=representation"
-    : "return=representation";
-  let r;
-  try {
-    r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
-      headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${_authToken || SUPA_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: prefer,
-        ...extraHeaders
-      },
-      ...restOpts
-    });
-  } catch (err) {
-    if (isGet) {
-      const cached = queryCache.get(path);
-      if (cached) return cached.data; // Retornar caché viejo si no hay red
-    }
-    throw new Error("OFFLINE");
-  }
-  // Interceptar 401 — intentar renovar el token antes de cerrar sesión
-  if (r.status === 401 && _authToken) {
-    if (!_isRefreshing) {
-      _isRefreshing = true;
-      const ok = await refreshSession();
-      _isRefreshing = false;
-      _refreshQueue.forEach(resolve => resolve(ok));
-      _refreshQueue = [];
-      if (ok === "OFFLINE") {
-        throw new Error("OFFLINE");
-      }
-      if (!ok) {
-        setAuthToken(null); setProfileId(null); saveRefreshToken(null);
-        if (_onSessionExpired) _onSessionExpired();
-        throw new Error("Sesión expirada — inicia sesión de nuevo");
-      }
-    } else {
-      await new Promise(res => _refreshQueue.push(res));
-    }
-    return q(path, opts);
-  }
-  
-  // Para POST minimal
-  if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
-
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
-  const t = await r.text(); 
-  const data = t ? JSON.parse(t) : [];
-  
-  if (isGet) {
-    queryCache.set(path, { data, timestamp: Date.now() });
-    saveCache();
-  }
-  
-  return data;
+  return fetchNetwork();
 };
 
 // ── Operaciones de base de datos ──
-export const dbGet    = (p)   => q(p);
+export const dbGet    = (p, onBgUpdate) => q(p, {}, onBgUpdate);
 export const dbPost   = (p,b) => q(p, { method:"POST", body:JSON.stringify(b) });
 export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), headers:{Prefer:"return=representation"} });
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
