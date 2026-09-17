@@ -136,6 +136,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
         // Si no tiene pacientes, no debe nada. O si su primer paciente entró después del último corte, tampoco.
         if (!firstClientDate || firstClientDate > lastPassedCutoff) {
+          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
           setBloqueado(false);
           setDiasGracia(false);
           return;
