@@ -136,8 +136,10 @@ export default function App() {
   };
 
   const handleRoleSelect = (roleObj) => {
+    const isCivilUser = roleObj.role === 'cliente' && !roleObj.data?.nutriologo_id;
+    const finalRole = isCivilUser ? 'civil' : roleObj.role;
     const s = {
-      role: roleObj.role,
+      role: finalRole,
       data: roleObj.data,
       token: session.token,
       profileId: session.profileId,
@@ -165,7 +167,7 @@ export default function App() {
     if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
       return <Admin role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} session={session} />;
     if (session.role === "civil")
-      return <Admin role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={null} multiRoles={null} clienteData={session.data} session={session} />;
+      return <Admin role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} clienteData={session.data} session={session} />;
     return <ClienteView session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };
 
