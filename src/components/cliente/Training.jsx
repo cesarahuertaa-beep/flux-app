@@ -1,43 +1,177 @@
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 function TimerCard({ brandColor }) {
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
-  const ref = useRef(null);
+  const [seconds, setSeconds] = useState(90);
+  const [initialSeconds, setInitialSeconds] = useState(90);
+  const [status, setStatus] = useState("IDLE"); // IDLE, RUNNING, ALARMING
+  
+  const timerRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const oscRef = useRef(null);
+
+  const startAlarm = () => {
+    setStatus("ALARMING");
+    if (navigator.vibrate) {
+      const pattern = [];
+      for (let i = 0; i < 20; i++) pattern.push(500, 500);
+      navigator.vibrate(pattern);
+    }
+    
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const ctx = audioCtxRef.current;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      for (let i = 0; i < 20; i++) {
+         gain.gain.setValueAtTime(1, ctx.currentTime + i);
+         gain.gain.setValueAtTime(0, ctx.currentTime + i + 0.5);
+      }
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      oscRef.current = osc;
+    } catch (e) {
+      console.log("Audio not supported");
+    }
+  };
+
+  const stopAlarm = () => {
+    if (navigator.vibrate) navigator.vibrate(0);
+    if (oscRef.current) {
+      try { oscRef.current.stop(); } catch(e){}
+      oscRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    if (running) {
-      ref.current = setInterval(() => setSeconds(s => s + 1), 1000);
+    if (status === "RUNNING") {
+      timerRef.current = setInterval(() => {
+        setSeconds(s => {
+          if (s <= 1) {
+            clearInterval(timerRef.current);
+            startAlarm();
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
     } else {
-      clearInterval(ref.current);
+      clearInterval(timerRef.current);
     }
-    return () => clearInterval(ref.current);
-  }, [running]);
+    return () => clearInterval(timerRef.current);
+  }, [status]);
 
-  const fmt = s =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  useEffect(() => {
+    return () => stopAlarm();
+  }, []);
+
+  const handleAction = () => {
+    if (status === "IDLE") {
+      if (seconds > 0) setStatus("RUNNING");
+    } else if (status === "RUNNING") {
+      setStatus("IDLE");
+      setSeconds(initialSeconds);
+    } else if (status === "ALARMING") {
+      stopAlarm();
+      setSeconds(initialSeconds);
+      setStatus("IDLE");
+    }
+  };
+
+  const changeTime = (type, isUp) => {
+    if (status !== "IDLE") return;
+    setSeconds(prev => {
+      let mins = Math.floor(prev / 60);
+      let secs = prev % 60;
+      if (type === 'min') {
+        mins = isUp ? mins + 1 : Math.max(0, mins - 1);
+      } else {
+        secs = isUp ? secs + 1 : secs - 1;
+        if (secs > 59) { secs = 0; mins++; }
+        if (secs < 0) { secs = 59; mins = Math.max(0, mins - 1); }
+      }
+      const newVal = mins * 60 + secs;
+      setInitialSeconds(newVal);
+      return newVal;
+    });
+  };
+
+  const handleWheel = (e, type) => {
+    changeTime(type, e.deltaY < 0);
+  };
+
+  const handleTouchStart = (e) => {
+    e.currentTarget.dataset.startY = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e, type) => {
+    if (status !== "IDLE") return;
+    const startY = parseFloat(e.currentTarget.dataset.startY);
+    const currentY = e.touches[0].clientY;
+    const diff = startY - currentY;
+    if (Math.abs(diff) > 20) {
+      e.currentTarget.dataset.startY = currentY;
+      changeTime(type, diff > 0);
+    }
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+
+  let btnIcon = <Play size={16} className="ml-0.5" />;
+  let btnClass = "text-white";
+  let btnBg = brandColor || "var(--brand-primary)";
+  
+  if (status === "RUNNING") {
+    btnIcon = <Square size={14} className="fill-current" />;
+  } else if (status === "ALARMING") {
+    btnIcon = <Square size={14} className="fill-current" />;
+    btnClass = "text-white animate-pulse";
+    btnBg = "#ef4444"; // red-500
+  }
 
   return (
     <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3">
       <div>
-        <p className="text-[10px] text-[#6B7A8D] font-mono tracking-widest uppercase">Cronómetro</p>
-        <p className="text-3xl font-mono font-bold text-[#0B1929] mt-1">{fmt(seconds)}</p>
+        <p className={`text-[10px] font-mono tracking-widest uppercase ${status === "ALARMING" ? "text-red-500 font-bold" : "text-[#6B7A8D]"}`}>
+          {status === "ALARMING" ? "¡TIEMPO!" : "Descanso"}
+        </p>
+        <div className={`flex items-center text-3xl font-mono font-bold mt-1 select-none touch-none ${status === "ALARMING" ? "text-red-500" : "text-[#0B1929]"}`}>
+          <div 
+            className={`cursor-ns-resize px-1 rounded transition-colors ${status==="IDLE"?'hover:bg-gray-100':'pointer-events-none'}`}
+            onWheel={(e)=>handleWheel(e, 'min')}
+            onTouchStart={handleTouchStart}
+            onTouchMove={(e)=>handleTouchMove(e, 'min')}
+          >
+            {pad(Math.floor(seconds / 60))}
+          </div>
+          <span className="pb-1 opacity-50">:</span>
+          <div 
+            className={`cursor-ns-resize px-1 rounded transition-colors ${status==="IDLE"?'hover:bg-gray-100':'pointer-events-none'}`}
+            onWheel={(e)=>handleWheel(e, 'sec')}
+            onTouchStart={handleTouchStart}
+            onTouchMove={(e)=>handleTouchMove(e, 'sec')}
+          >
+            {pad(seconds % 60)}
+          </div>
+        </div>
       </div>
       <div className="flex gap-2 ml-auto">
         <button
-          onClick={() => setRunning(r => !r)}
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors shadow-sm"
-          style={{ background: brandColor || "var(--brand-primary)" }}
+          onClick={handleAction}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${btnClass}`}
+          style={{ background: btnBg }}
         >
-          {running ? <Pause size={16} /> : <Play size={16} />}
-        </button>
-        <button
-          onClick={() => { setRunning(false); setSeconds(0); }}
-          className="w-10 h-10 rounded-full bg-[#F0F4FA] flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
-        >
-          <RotateCcw size={14} />
+          {btnIcon}
         </button>
       </div>
     </div>
