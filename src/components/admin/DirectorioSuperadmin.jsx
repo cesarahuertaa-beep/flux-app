@@ -321,6 +321,100 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     return (n.nombre||"").toLowerCase().includes(term) || (n.nombre_marca||"").toLowerCase().includes(term);
   });
 
+  const renderNutri = (n) => {
+    const nClients = clientes.filter(c => c.nutriologo_id === n.id);
+    const isExpanded = expandedNutri === n.id;
+    
+    return (
+      <div key={n.id} className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
+        {/* Nutriologo Row */}
+        <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
+              {n.logo_url ? <img src={n.logo_url} className="w-full h-full object-cover"/> : <User className="text-slate-300" size={24}/>}
+              {n.isSuperadmin && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-white"></div>}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
+                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {n.activo !== false ? "Activo" : "Suspendido"}
+                </span>
+              </div>
+              <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
+                <div className="flex items-center gap-2">
+                  <span>{n.nombre}</span>
+                  {n.telefono && (
+                    <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
+                      <MessageCircle size={12} /> WhatsApp
+                    </a>
+                  )}
+                </div>
+                {n.creado_por_nombre && !n.isSuperadmin && (
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
+            <button 
+              onClick={() => setExpandedNutri(isExpanded ? null : n.id)}
+              className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+            >
+              <Users size={16} />
+              <span>{nClients.length} Pacientes</span>
+              {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+            </button>
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <Btn small outline onClick={() => {
+                setShowEditNutri(n);
+                setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
+              }}>Editar</Btn>
+              {!n.isSuperadmin && (
+                <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
+                  {n.activo !== false ? "Suspender" : "Activar"}
+                </Btn>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Expanded Clients Sub-grid */}
+        {isExpanded && (
+          <div className="bg-slate-50 border-t border-slate-100 p-5">
+            {nClients.length === 0 ? (
+              <p className="text-sm text-center text-slate-500 py-4">No tiene pacientes registrados.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {nClients.map(c => (
+                  <div 
+                    key={c.id} 
+                    onClick={() => { setSelected(c); setTab("programar"); }}
+                    className="bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
+                  >
+                    <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[#1A6FD4]' : 'bg-red-400'}`} />
+                    <div className="pl-2">
+                      <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-blue-600 transition-colors">{c.nombre}</h4>
+                      <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
+                      <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
+                        <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
+                        <span>{c.objetivo || "Sin objetivo definido"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const InputClass = "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
 
   return (
@@ -362,176 +456,81 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <div className="flex items-center justify-center h-40 text-[#6B7A8D]">Cargando directorio...</div>
         ) : (
           <div className="flex flex-col gap-4 max-w-5xl mx-auto">
-            {filteredNutris.map(n => {
-              const nClients = clientes.filter(c => c.nutriologo_id === n.id);
-              const isExpanded = expandedNutri === n.id;
-              
+            {filteredNutris.filter(n => n.isSuperadmin).map(n => renderNutri(n))}
+
+            {(() => {
+              const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
+              const isExpanded = expandedNutri === "__atletas__";
               return (
-                <div key={n.id} className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
-                  {/* Nutriologo Row */}
-                  <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
-                        {n.logo_url ? <img src={n.logo_url} className="w-full h-full object-cover"/> : <User className="text-slate-300" size={24}/>}
-                        {n.isSuperadmin && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-white"></div>}
+                <div key="__atletas__" className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
+                  {/* Header row */}
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
+                        <Dumbbell className="text-[var(--brand-primary)]" size={22} />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
-                          {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {n.activo !== false ? "Activo" : "Suspendido"}
-                          </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h3 className="font-bold text-[#0B1929] text-lg leading-tight">Atletas Independientes</h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 shrink-0">AUTODIRIGIDOS</span>
                         </div>
-                        <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
-                          <div className="flex items-center gap-2">
-                            <span>{n.nombre}</span>
-                            {n.telefono && (
-                              <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
-                                <MessageCircle size={12} /> WhatsApp
-                              </a>
-                            )}
-                          </div>
-                          {n.creado_por_nombre && !n.isSuperadmin && (
-                            <span className="flex items-center gap-1 text-slate-400">
-                              <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
-                      <button 
-                        onClick={() => setExpandedNutri(isExpanded ? null : n.id)}
-                        className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
-                      >
-                        <Users size={16} />
-                        <span>{nClients.length} Pacientes</span>
-                        {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                      </button>
-                      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                        <Btn small outline onClick={() => {
-                          setShowEditNutri(n);
-                          setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
-                        }}>Editar</Btn>
-                        {!n.isSuperadmin && (
-                          <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
-                            {n.activo !== false ? "Suspender" : "Activar"}
-                          </Btn>
-                        )}
-                      </div>
-                    </div>
+
+                    <button
+                      onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
+                      className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                    >
+                      <Users size={16} />
+                      <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
+                      {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                    </button>
                   </div>
 
-                  {/* Expanded Clients Sub-grid */}
+                  {/* Expanded list */}
                   {isExpanded && (
-                    <div className="bg-slate-50 border-t border-slate-100 p-5">
-                      {nClients.length === 0 ? (
-                        <p className="text-sm text-center text-slate-500 py-4">No tiene pacientes registrados.</p>
+                    <div className="bg-slate-50 border-t border-slate-100 p-4">
+                      {atletasIndependientes.length === 0 ? (
+                        <p className="text-sm text-center text-slate-500 py-4">No hay atletas independientes registrados aún.</p>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {nClients.map(c => (
-                            <div 
-                              key={c.id} 
-                              onClick={() => { setSelected(c); setTab("programar"); }}
-                              className="bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
-                            >
-                              <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[#1A6FD4]' : 'bg-red-400'}`} />
-                              <div className="pl-2">
-                                <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-blue-600 transition-colors">{c.nombre}</h4>
-                                <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
-                                <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
-                                  <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
-                                  <span>{c.objetivo || "Sin objetivo definido"}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {atletasIndependientes.map(c => {
+                            const plan = c.plan_tipo || 'estandar';
+                            return (
+                              <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`}></div>
+                                <div className="pl-2 min-w-0">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2">{c.nombre || "Sin nombre"}</h4>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
+                                      plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                      {plan}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                      {c.activo ? "Activo" : "Inactivo"}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               );
-            })}
+            })()}
+
+            {filteredNutris.filter(n => !n.isSuperadmin).map(n => renderNutri(n))}
           </div>
         )}
       </div>
-
-      {/* ── ATLETAS INDEPENDIENTES ──────────────────────────────────────── */}
-      {(() => {
-        const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
-        const isExpanded = expandedNutri === "__atletas__";
-        return (
-          <div className="p-6 md:p-8 pt-0">
-            <div className="flex flex-col gap-4 max-w-5xl mx-auto">
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
-                {/* Header row */}
-                <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
-                      <Dumbbell className="text-[var(--brand-primary)]" size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <h3 className="font-bold text-[#0B1929] text-lg leading-tight">Atletas Independientes</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 shrink-0">AUTODIRIGIDOS</span>
-                      </div>
-                      <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
-                    className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
-                  >
-                    <Users size={16} />
-                    <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
-                    {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                  </button>
-                </div>
-
-                {/* Expanded list */}
-                {isExpanded && (
-                  <div className="bg-slate-50 border-t border-slate-100 p-4">
-                    {atletasIndependientes.length === 0 ? (
-                      <p className="text-sm text-center text-slate-500 py-4">No hay atletas independientes registrados aún.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {atletasIndependientes.map(c => {
-                          const plan = c.plan_tipo || 'estandar';
-                          return (
-                            <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all relative overflow-hidden">
-                              <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`}></div>
-                              <div className="pl-2 min-w-0">
-                                <div className="flex justify-between items-start mb-2">
-                                  <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2">{c.nombre || "Sin nombre"}</h4>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
-                                    plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                                  }`}>
-                                    {plan}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                    {c.activo ? "Activo" : "Inactivo"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
 
       {/* Modals */}
