@@ -233,9 +233,15 @@ export const syncPersonalData = async (email, data) => {
   const dataForProfile = {};
   const dataForCliente = {};
   
-  Object.keys(data).forEach(k => {
-    if (profileFields.includes(k)) dataForProfile[k] = data[k];
-    if (clienteFields.includes(k)) dataForCliente[k] = data[k];
+  // Sanitización profunda de datos: Postgres rechaza "" en columnas de fecha (DATE) o numéricas.
+  const sanitizedData = { ...data };
+  if (sanitizedData.fecha_nacimiento === "") {
+    sanitizedData.fecha_nacimiento = null;
+  }
+  
+  Object.keys(sanitizedData).forEach(k => {
+    if (profileFields.includes(k)) dataForProfile[k] = sanitizedData[k];
+    if (clienteFields.includes(k)) dataForCliente[k] = sanitizedData[k];
   });
 
   const promises = [];
