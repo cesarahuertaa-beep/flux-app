@@ -4,6 +4,7 @@ import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2
 import { useBrand } from "../BrandContext";
 import DatosPersonalesCard from "./DatosPersonalesCard";
 import IdentidadEmpresarialCard from "./IdentidadEmpresarialCard";
+import RoleSwitcher from "../RoleSwitcher";
 import { syncPersonalData } from "../../lib/supabase";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
@@ -169,42 +170,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
       <DatosPersonalesCard form={personalForm} setForm={setPersonalForm} onSave={handleSavePersonal} loading={loading} isSaving={savingPersonal} />
       <IdentidadEmpresarialCard form={businessForm} setForm={setBusinessForm} onSave={handleSaveBusiness} loading={loading} isSaving={savingBusiness} />
-
-      {(() => {
-        const rolesToShow = (role === "nutriologo" || role === "nutriologo_estudiante" || role === "superadmin")
-          ? (multiRoles || []).filter(r => r.role !== 'cliente')
-          : (multiRoles || []);
-
-        if (rolesToShow.length <= 1) return null;
-
-        return (
-          <div className="mt-8 border-t border-[#E2E8F0] pt-8">
-            <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
-              <RefreshCw size={16} className="text-[#6B7A8D]" /> Cambiar Perfil (Sesión Múltiple)
-            </h3>
-            <div className="flex flex-col gap-2">
-                {rolesToShow.map((r, i) => {
-                  const isCivilRole = r.role === 'cliente' && !r.data?.nutriologo_id;
-                  const roleIdentifier = isCivilRole ? 'civil' : r.role;
-                  const isActive = role === roleIdentifier;
-                  return (
-                  <button key={i} disabled={isActive} onClick={() => onChangeRole && onChangeRole(r)} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
-                    <div className="text-left min-w-0 flex-1 pr-4">
-                      <p className={`font-bold text-sm truncate ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                        {r.role === "cliente" ? (r.data?.nutriologo_id ? "Paciente en Consultorio" : "Atleta Independiente") : (r.role === "nutriologo" ? "Nutriólogo" : (r.role === "nutriologo_estudiante" ? "Estudiante" : (r.role === "staff" ? "Staff" : "Administrativo")))}
-                      </p>
-                      <p className={`text-xs mt-0.5 opacity-80 truncate ${isActive ? "text-[var(--brand-primary)]" : "text-[#6B7A8D]"}`}>
-                        {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
-                      </p>
-                    </div>
-                    {isActive && <CheckCircle2 size={18} className="text-[var(--brand-primary)]" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      <RoleSwitcher currentRole={role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <div className="mt-10 flex flex-col sm:flex-row gap-4">
         <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">

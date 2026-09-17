@@ -4,6 +4,7 @@ import { LogOut, ShoppingBag, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import DatosPersonalesCard from "./admin/DatosPersonalesCard";
 import { syncPersonalData } from "../lib/supabase";
+import RoleSwitcher from "./RoleSwitcher";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const user = session?.data || session; // Cliente o Admin
@@ -87,51 +88,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         </div>
       )}
 
-      {multiRoles && multiRoles.length > 1 && (
-        <div className="mt-8 border-t border-[#E2E8F0] pt-6 mb-8">
-          <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
-            <RefreshCw size={16} className="text-[#6B7A8D]" />
-            Cambiar Perfil (Sesión Múltiple)
-          </h3>
-          <div className="flex flex-col gap-2">
-            {multiRoles.map((r, i) => {
-              const isCivilRole = r.role === 'cliente' && !r.data?.nutriologo_id;
-              const roleIdentifier = isCivilRole ? 'civil' : r.role;
-              const isActive = session.role === roleIdentifier;
-              return (
-                <button
-                  key={i}
-                  disabled={isActive}
-                  onClick={() => onChangeRole && onChangeRole(r)}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}
-                >
-                  <div className="text-left min-w-0 flex-1 pr-4">
-                    <p
-                      className={`font-bold text-sm truncate ${
-                        isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"
-                      }`}
-                    >
-                      {r.role === "cliente"
-                        ? (r.data?.nutriologo_id ? "Paciente en Consultorio" : "Atleta Independiente")
-                        : r.role === "nutriologo"
-                        ? "Nutriólogo"
-                        : r.role === "nutriologo_estudiante"
-                        ? "Estudiante"
-                        : r.role === "staff"
-                        ? "Staff"
-                        : "Administrativo"}
-                    </p>
-                    <p className={`text-xs mt-0.5 opacity-80 truncate ${isActive ? "text-[var(--brand-primary)]" : "text-[#6B7A8D]"}`}>
-                      {r.data.nombre_clinica || r.data.nombre || "Panel de Control"}
-                    </p>
-                  </div>
-                  {isActive && <CheckCircle2 size={18} className="text-[var(--brand-primary)]" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <RoleSwitcher currentRole={session.role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <button 
