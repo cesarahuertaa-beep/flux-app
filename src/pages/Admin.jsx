@@ -446,6 +446,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setActive={setTab}
       brand={brand}
       onLogout={onLogout}
+      session={session}
     >
       {diasGracia && !isCivil && (
         <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
