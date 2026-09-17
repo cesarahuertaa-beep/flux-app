@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dbGet, dbPatch, dbPost } from "../../lib/supabase";
 import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell } from "lucide-react";
 
@@ -80,9 +80,14 @@ export default function ControlPagos({ setMsg }) {
     return Array.from(setMeses).sort().reverse();
   }, [recibos]);
 
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
-    if (mesesDisponibles.length > 0 && filtroMes === "todos") setFiltroMes(mesesDisponibles[0]);
-  }, [mesesDisponibles, filtroMes]);
+    if (isInitialLoad.current && mesesDisponibles.length > 0) {
+      setFiltroMes(mesesDisponibles[0]);
+      isInitialLoad.current = false;
+    }
+  }, [mesesDisponibles]);
 
   const filtrados = useMemo(() => recibos.filter(r => {
     const matchEstado = filtroEstado === "todos" ? true : r.estado === filtroEstado;
@@ -213,7 +218,7 @@ export default function ControlPagos({ setMsg }) {
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
         {loading ? <div className="p-8 text-center text-[#6B7A8D]">Cargando recibos...</div> : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="w-full text-left border-collapse min-w-[700px] hidden md:table">
               <thead>
                 <tr className="bg-gray-50 border-b border-[#E2E8F0]">
                   <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
@@ -255,6 +260,51 @@ export default function ControlPagos({ setMsg }) {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden flex flex-col divide-y divide-gray-100">
+              {filtrados.length === 0 ? (
+                <div className="py-8 text-center text-[#6B7A8D]">No hay recibos en esta categoría.</div>
+              ) : filtrados.map((r) => (
+                <div key={r.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <div className="font-semibold text-[#0B1929]">
+                        {nutriologos[r.nutriologo_id]?.nombre || "Desconocido"}
+                      </div>
+                      {nutriologos[r.nutriologo_id]?.creado_por && (
+                        <div className="text-[11px] text-[#6B7A8D] font-normal">
+                          Inv. por: {nutriologos[r.nutriologo_id].creado_por}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="font-bold text-green-600">${Number(r.monto).toFixed(2)}</div>
+                      <StatusBadge s={r.estado} />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                    <div>
+                      <span className="block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                      <span className="block">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block uppercase tracking-wider font-bold text-[10px]">Mes Facturado</span>
+                      <span>{r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+                    <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
+                    {r.estado === "pendiente" && <>
+                      <button onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                      <button onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                    </>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -352,7 +402,7 @@ export default function ControlPagos({ setMsg }) {
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
         {loadingCivil ? <div className="p-8 text-center text-[#6B7A8D]">Cargando pagos de atletas...</div> : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+            <table className="w-full text-left border-collapse min-w-[600px] hidden md:table">
               <thead>
                 <tr className="bg-gray-50 border-b border-[#E2E8F0]">
                   <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
@@ -394,6 +444,51 @@ export default function ControlPagos({ setMsg }) {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden flex flex-col divide-y divide-gray-100">
+              {filtradosCivil.length === 0 ? (
+                <div className="py-8 text-center text-[#6B7A8D]">
+                  {recibosCivil.length === 0 ? "Aún no hay comprobantes de atletas independientes." : "No hay recibos en esta categoría."}
+                </div>
+              ) : filtradosCivil.map((r) => (
+                <div key={r.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <div className="font-semibold text-[#0B1929]">
+                        {clientesCivil[r.cliente_id] || "Atleta Independiente"}
+                      </div>
+                      <div className="text-[11px] text-[var(--brand-primary)] font-normal">
+                        Atleta Independiente Premium
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="font-bold text-green-600">${Number(r.monto).toFixed(2)}</div>
+                      <StatusBadge s={r.estado} />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                    <div>
+                      <span className="block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                      <span className="block">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block uppercase tracking-wider font-bold text-[10px]">Mes Facturado</span>
+                      <span>{r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+                    {r.comprobante_url && <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver comprobante"><Eye size={18} /></button>}
+                    {r.estado === "pendiente" && <>
+                      <button onClick={() => updateEstadoCivil(r.id, "aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                      <button onClick={() => updateEstadoCivil(r.id, "rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                    </>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {!loadingCivil && filtradosCivil.filter(r => r.estado === 'aprobado').length > 0 && (
