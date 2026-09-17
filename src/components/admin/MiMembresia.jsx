@@ -250,7 +250,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 </div>
 
                 {/* Barra con puntos superpuestos */}
-                <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-2">
+                <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-4">
                   <div
                     className="h-full bg-[var(--brand-primary)] rounded-full transition-all duration-1000"
                     style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
@@ -300,7 +300,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               
               {/* Tabla de Pacientes */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse hidden md:table">
                   <thead>
                     <tr className="bg-gray-50 border-b border-[#E2E8F0]">
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
@@ -334,6 +334,29 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     )}
                   </tbody>
                 </table>
+                
+                {/* Mobile View */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {desglose.length === 0 ? (
+                    <div className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</div>
+                  ) : (
+                    desglose.map((c, i) => (
+                      <div key={c.id || i} className="p-4 bg-white space-y-2">
+                        <div className="flex justify-between items-start">
+                          <span className="font-semibold text-[#0B1929]">{c.nombre}</span>
+                          <span className="font-bold text-[var(--brand-primary)]">${c.costoPaciente.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                          <span>Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}</span>
+                          <span>Días: {c.diasCobrar}/30</span>
+                        </div>
+                        <div className="text-xs text-[#6B7A8D] bg-gray-50 p-2 rounded text-center">
+                          {c.periodoStr}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Total Summary */}
@@ -371,7 +394,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   
                   <div>
                     <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">CLABE Interbancaria</p>
-                    <p className="font-bold text-[#0B1929] tracking-widest font-mono">
+                    <p className="font-bold text-[#0B1929] tracking-widest font-mono break-all sm:break-normal">
                       {configPago.clabe 
                         ? configPago.clabe.replace(/(.{4})/g, '$1 ').trim()
                         : <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>
@@ -443,7 +466,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <div className="text-sm text-[#6B7A8D] bg-slate-50 p-4 rounded-xl text-center border border-slate-100">No hay pagos registrados aún.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse hidden md:table">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
@@ -477,6 +500,28 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   ))}
                 </tbody>
               </table>
+              
+              {/* Mobile View */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {historial.map(r => (
+                  <div key={r.id} className="py-4 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <span className="font-bold text-[#0B1929]">${Number(r.monto).toFixed(2)}</span>
+                      <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider ${
+                        r.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700' :
+                        r.estado === 'rechazado' ? 'bg-red-50 text-red-600' :
+                        'bg-amber-50 text-amber-700'
+                      }`}>
+                        {r.estado}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                      <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                      <span>Mes: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : '—'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
