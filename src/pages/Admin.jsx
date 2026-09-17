@@ -366,6 +366,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
+  useEffect(() => {
+    if (editClient) {
+      setEditClientForm({
+        nombre: editClient.nombre || "",
+        telefono: editClient.telefono || "",
+        objetivo: editClient.objetivo || ""
+      });
+    }
+  }, [editClient]);
+
   const saveEditClient = async () => {
     setSaving(true);
     try {
