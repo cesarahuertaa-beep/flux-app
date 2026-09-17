@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+﻿import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { calculateBodyComposition } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
@@ -11,79 +11,79 @@ import {
 } from "lucide-react";
 
 const METRIC_GROUPS_MANUAL = [
-  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
+  { label:"BÃ¡sicas", icon:<Scale className="w-4 h-4" />, fields:[
     { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
     { key:"estatura",  label:"Estatura (cm)", type:"number" },
   ]},
-  { label:"Pliegues cutáneos (mm)", icon:<Target className="w-4 h-4" />, fields:[
-    { key:"pliegue_triceps",      label:"Tríceps",      type:"number", step:"0.1" },
+  { label:"Pliegues cutÃ¡neos (mm)", icon:<Target className="w-4 h-4" />, fields:[
+    { key:"pliegue_triceps",      label:"TrÃ­ceps",      type:"number", step:"0.1" },
     { key:"pliegue_subescapular", label:"Subescapular", type:"number", step:"0.1" },
-    { key:"pliegue_suprailiaco",  label:"Suprailíaco",  type:"number", step:"0.1" },
+    { key:"pliegue_suprailiaco",  label:"SuprailÃ­aco",  type:"number", step:"0.1" },
     { key:"pliegue_abdominal",    label:"Abdominal",    type:"number", step:"0.1" },
     { key:"pliegue_muslo",        label:"Muslo",        type:"number", step:"0.1" },
     { key:"pliegue_pantorrilla",  label:"Pantorrilla",  type:"number", step:"0.1" },
     { key:"pliegue_pectoral",     label:"Pectoral",     type:"number", step:"0.1" },
-    { key:"pliegue_biceps",       label:"Bíceps",       type:"number", step:"0.1" },
+    { key:"pliegue_biceps",       label:"BÃ­ceps",       type:"number", step:"0.1" },
   ]},
   { label:"Circunferencias (cm)", icon:<Ruler className="w-4 h-4" />, fields:[
     { key:"cuello",          label:"Cuello",           type:"number", step:"0.1" },
     { key:"cintura",         label:"Cintura",          type:"number", step:"0.1" },
     { key:"cadera",          label:"Cadera",           type:"number", step:"0.1" },
     { key:"brazo_relajado",  label:"Brazo relajado",   type:"number", step:"0.1" },
-    { key:"brazo_contraido", label:"Brazo contraído",  type:"number", step:"0.1" },
+    { key:"brazo_contraido", label:"Brazo contraÃ­do",  type:"number", step:"0.1" },
     { key:"muslo",           label:"Muslo",            type:"number", step:"0.1" },
     { key:"pantorrilla",     label:"Pantorrilla",      type:"number", step:"0.1" },
   ]},
-  { label:"Diámetros óseos (cm) - Rocha", icon:<Activity className="w-4 h-4" />, fields:[
-    { key:"diametro_muneca",  label:"Muñeca (Biestiloideo)",     type:"number", step:"0.1" },
-    { key:"diametro_codo",    label:"Codo (Biepicondíleo)",      type:"number", step:"0.1" },
-    { key:"diametro_rodilla", label:"Rodilla (Bicondíleo)",      type:"number", step:"0.1" },
+  { label:"DiÃ¡metros Ã³seos (cm) - Rocha", icon:<Activity className="w-4 h-4" />, fields:[
+    { key:"diametro_muneca",  label:"MuÃ±eca (Biestiloideo)",     type:"number", step:"0.1" },
+    { key:"diametro_codo",    label:"Codo (BiepicondÃ­leo)",      type:"number", step:"0.1" },
+    { key:"diametro_rodilla", label:"Rodilla (BicondÃ­leo)",      type:"number", step:"0.1" },
   ]},
   { label:"Outputs Calculados", icon:<BarChart2 className="w-4 h-4" />, fields:[
     { key:"calc_masa_grasa",    label:"Masa Grasa (kg)",      type:"number", readOnly:true },
     { key:"calc_masa_muscular", label:"Masa Muscular (kg)",   type:"number", readOnly:true },
-    { key:"calc_masa_osea",     label:"Masa Ósea (kg)",       type:"number", readOnly:true },
+    { key:"calc_masa_osea",     label:"Masa Ã“sea (kg)",       type:"number", readOnly:true },
     { key:"calc_masa_residual", label:"Masa Residual (kg)",   type:"number", readOnly:true },
     { key:"grasa_pct",          label:"% Grasa (Siri)",       type:"number", readOnly:true },
     { key:"somatotipo_x",       label:"Somatotipo X",         type:"number", readOnly:true },
     { key:"somatotipo_y",       label:"Somatotipo Y",         type:"number", readOnly:true },
   ]},
-  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
+  { label:"ClÃ­nicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
     { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
-    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
+    { key:"presion_arterial", label:"PresiÃ³n arterial", type:"text", placeholder:"120/80" },
   ]}
 ];
 
 const METRIC_GROUPS_INBODY = [
-  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
+  { label:"BÃ¡sicas", icon:<Scale className="w-4 h-4" />, fields:[
     { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
     { key:"estatura",  label:"Estatura (cm)", type:"number" },
   ]},
-  { label:"Composición corporal (InBody)", icon:<Microscope className="w-4 h-4" />, fields:[
+  { label:"ComposiciÃ³n corporal (InBody)", icon:<Microscope className="w-4 h-4" />, fields:[
     { key:"inbody_smm",          label:"Masa Muscular Esq. (SMM kg)", type:"number", step:"0.1" },
     { key:"calc_masa_grasa",     label:"Masa Grasa Corporal (kg)",    type:"number", step:"0.1" },
     { key:"grasa_pct",           label:"% Grasa Corporal",            type:"number", step:"0.1" },
     { key:"inbody_tbw",          label:"Agua Corporal Total (TBW L)", type:"number", step:"0.1" },
-    { key:"inbody_mineral_oseo", label:"Masa Mineral Ósea (kg)",      type:"number", step:"0.1" },
-    { key:"inbody_proteina",     label:"Proteína (kg)",               type:"number", step:"0.1" },
+    { key:"inbody_mineral_oseo", label:"Masa Mineral Ã“sea (kg)",      type:"number", step:"0.1" },
+    { key:"inbody_proteina",     label:"ProteÃ­na (kg)",               type:"number", step:"0.1" },
   ]},
-  { label:"Índices y metabolismo", icon:<Activity className="w-4 h-4" />, fields:[
+  { label:"Ãndices y metabolismo", icon:<Activity className="w-4 h-4" />, fields:[
     { key:"imc",                   label:"IMC",                         type:"number", step:"0.1" },
     { key:"inbody_grasa_visceral", label:"Grasa Visceral (Nivel)",      type:"number", step:"1" },
-    { key:"inbody_bmr",            label:"Tasa Metabólica Basal (kcal)",type:"number", step:"1" },
+    { key:"inbody_bmr",            label:"Tasa MetabÃ³lica Basal (kcal)",type:"number", step:"1" },
     { key:"inbody_score",          label:"Puntaje InBody",              type:"number", step:"1" },
-    { key:"icc",                   label:"Relación Cintura-Cadera",     type:"number", step:"0.01" },
+    { key:"icc",                   label:"RelaciÃ³n Cintura-Cadera",     type:"number", step:"0.01" },
   ]},
-  { label:"Análisis Segmentado Magra (kg)", icon:<Dumbbell className="w-4 h-4" />, fields:[
+  { label:"AnÃ¡lisis Segmentado Magra (kg)", icon:<Dumbbell className="w-4 h-4" />, fields:[
     { key:"inbody_magra_brazo_der",  label:"Brazo Derecho",  type:"number", step:"0.1" },
     { key:"inbody_magra_brazo_izq",  label:"Brazo Izquierdo",type:"number", step:"0.1" },
     { key:"inbody_magra_pierna_der", label:"Pierna Derecha", type:"number", step:"0.1" },
     { key:"inbody_magra_pierna_izq", label:"Pierna Izquierda",type:"number", step:"0.1" },
     { key:"inbody_magra_tronco",     label:"Tronco",         type:"number", step:"0.1" },
   ]},
-  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
+  { label:"ClÃ­nicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
     { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
-    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
+    { key:"presion_arterial", label:"PresiÃ³n arterial", type:"text", placeholder:"120/80" },
   ]}
 ];
 
@@ -100,7 +100,7 @@ const emptyForm = () => ({
   cuello: "", cintura: "", cadera: "", pecho: "", brazo_relajado: "", brazo_contraido: "", 
   muslo: "", pantorrilla: "",
 
-  // Diámetros óseos (cm)
+  // DiÃ¡metros Ã³seos (cm)
   diametro_muneca: "", diametro_codo: "", diametro_rodilla: "",
 
   // InBody
@@ -200,7 +200,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         const h = parseFloat(next.estatura) / 100;
         next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(2) : "";
       }
-      // Auto-calcular ICC (cintura ÷ cadera)
+      // Auto-calcular ICC (cintura Ã· cadera)
       if ((key==="cintura" || key==="cadera") && next.cintura && next.cadera) {
         const icc = parseFloat(next.cintura) / parseFloat(next.cadera);
         next.icc = icc > 0 ? icc.toFixed(2) : "";
@@ -234,7 +234,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         }
       });
 
-      // Aplicar cálculos si es manual
+      // Aplicar cÃ¡lculos si es manual
       if (data.metodo_evaluacion === 'manual') {
          const edad = selected.edad || (selected.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
          const calc = calculateBodyComposition(data, selected.sexo, edad);
@@ -253,17 +253,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
         if (editingId) {
           await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> EvaluaciÃ³n actualizada</div>);
         } else {
           await dbPost("metricas_progreso", data);
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> EvaluaciÃ³n guardada</div>);
           
           // Send notification if patient is uploading their own progress
           if (sessionStorage.getItem('flux_role') === 'cliente' && selected.nutriologo_id) {
             await dbPost("notificaciones", {
               profile_id: selected.nutriologo_id,
               titulo: "Nuevo progreso registrado",
-              mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
+              mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas mÃ©tricas de progreso.`,
               tipo: "progreso",
               link_url: "clientes", // Redirect to directory
               entidad_id: selected.id
@@ -308,9 +308,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   };
 
   const deleteMetrica = async (id) => {
-    if (!confirm("¿Eliminar esta evaluación? Esta acción no se puede deshacer.")) return;
+    if (!confirm("Â¿Eliminar esta evaluaciÃ³n? Esta acciÃ³n no se puede deshacer.")) return;
     await dbDel(`metricas_progreso?id=eq.${id}`);
-    setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>); await load();
+    setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> EvaluaciÃ³n eliminada</div>); await load();
   };
 
   const edadCalc = selected?.edad || (selected?.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
@@ -326,14 +326,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     { key:"peso",               label:"Peso",      unit:"kg",    icon:<Scale className="w-3.5 h-3.5" /> },
     { key:"imc",                label:"IMC",       unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"grasa_pct",          label:"Grasa",     unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
-    { key:"musculo_pct",        label:"Músculo",   unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
+    { key:"musculo_pct",        label:"MÃºsculo",   unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
     { key:"calc_masa_grasa",    label:"M. Grasa",  unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"calc_masa_muscular", label:"M. Muscular",unit:"kg",   icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
-    { key:"calc_masa_osea",     label:"M. Ósea",   unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"calc_masa_osea",     label:"M. Ã“sea",   unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"calc_masa_residual", label:"M. Residual",unit:"kg",   icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"inbody_smm",         label:"SMM",       unit:"kg",    icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
     { key:"inbody_tbw",         label:"TBW",       unit:"L",     icon:<Activity className="w-3.5 h-3.5" /> },
-    { key:"inbody_score",       label:"Puntuación",unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
+    { key:"inbody_score",       label:"PuntuaciÃ³n",unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
     { key:"cintura",            label:"Cintura",   unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"cadera",             label:"Cadera",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"icc",                label:"ICC",       unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
@@ -343,10 +343,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     { key:"somatotipo_x",       label:"Somato X",  unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
     { key:"somatotipo_y",       label:"Somato Y",  unit:"",      icon:<Target className="w-3.5 h-3.5" /> },
     { key:"glucosa",            label:"Glucosa",   unit:"mg/dL", icon:<Stethoscope className="w-3.5 h-3.5" /> },
-    { key:"presion_arterial",   label:"Presión",   unit:"",      icon:<Heart className="w-3.5 h-3.5" /> },
+    { key:"presion_arterial",   label:"PresiÃ³n",   unit:"",      icon:<Heart className="w-3.5 h-3.5" /> },
   ];
 
-  if (loading) return <div className="text-[#6B7A8D] text-center p-10">Cargando…</div>;
+  if (loading) return <div className="text-[#6B7A8D] text-center p-10">Cargandoâ€¦</div>;
 
   return (
     <div className="pb-24">
@@ -360,7 +360,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         </button>
       </div>
 
-      {/* ── EVALUACIONES ── */}
+      {/* â”€â”€ EVALUACIONES â”€â”€ */}
       {sub==="evaluaciones"&&(
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -372,15 +372,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 </button>
               )}
               <button onClick={()=>{setForm(emptyForm());setShowModal(true);}} className="bg-[var(--brand-primary)] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5">
-                <Plus className="w-4 h-4" /> Nueva evaluación
+                <Plus className="w-4 h-4" /> Nueva evaluaciÃ³n
               </button>
             </div>
           </div>
           {metricas.length===0?(
             <div className="text-center py-16 text-[#6B7A8D]">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><BarChart2 className="w-12 h-12" /></div>
-              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones aún</div>
-              <div className="text-[13px]">Registra la primera evaluación corporal del cliente.</div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones aÃºn</div>
+              <div className="text-[13px]">Registra la primera evaluaciÃ³n corporal del cliente.</div>
             </div>
           ):metricas.map((m,idx)=>{
             const prev = metricas[idx+1];
@@ -389,7 +389,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 <div className="flex justify-between items-center mb-3.5">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
-                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
+                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold">MÃ¡s reciente</span>}
                     <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
                       {m.metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}
                     </span>
@@ -436,7 +436,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                           <img src={url} onClick={()=>setLightbox(url)}
                             className="w-20 h-20 object-cover rounded-[10px] cursor-zoom-in border-2 border-[#E2E8F0]"
                             alt={`foto ${fi+1}`}/>
-                          <button onClick={()=>deleteFoto(m,url)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                          <button onClick={()=>deleteFoto(m,url)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">Ã—</button>
                         </div>
                       ))}
                     </div>
@@ -448,7 +448,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         </div>
       )}
 
-      {/* ── RUTINAS DEL CLIENTE ── */}
+      {/* â”€â”€ RUTINAS DEL CLIENTE â”€â”€ */}
       {sub==="rutinas"&&(
         <div>
           {/* Cycle selector */}
@@ -481,7 +481,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               <div key={r.id} className="mb-6">
                 <div className="font-bold text-[15px] mb-2.5 text-[var(--brand-primary)] flex items-center gap-2">
                   <Dumbbell className="w-4 h-4" /> {r.nombre}
-                  {!tieneData&&<span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
+                  {!tieneData&&<span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aÃºn</span>}
                 </div>
                 {tieneData&&(
                   <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] shadow-sm">
@@ -541,7 +541,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
                                   
-                                  let emptyText = "—";
+                                  let emptyText = "â€”";
                                   let emptyColorClass = "text-[#CBD5E1]";
                                   let emptyWeightClass = "font-normal";
                                   
@@ -581,12 +581,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         </div>
       )}
 
-      {/* ── MODAL NUEVA EVALUACIÓN ── */}
+      {/* â”€â”€ MODAL NUEVA EVALUACIÃ“N â”€â”€ */}
       {showModal&&(
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluación" : "Nueva evaluación corporal"}</h2>
+              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluaciÃ³n" : "Nueva evaluaciÃ³n corporal"}</h2>
               <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929]"><X className="w-6 h-6" /></button>
             </div>
             
@@ -618,9 +618,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-sm font-bold text-yellow-800">Cambio de método detectado</h4>
+                    <h4 className="text-sm font-bold text-yellow-800">Cambio de mÃ©todo detectado</h4>
                     <p className="text-[13px] text-yellow-700 mt-0.5">
-                      El historial reciente de este paciente está en modo <strong>{metricas[0].metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}</strong>. Se recomienda mantener consistencia para que las gráficas de progreso y comparativas sean exactas.
+                      El historial reciente de este paciente estÃ¡ en modo <strong>{metricas[0].metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}</strong>. Se recomienda mantener consistencia para que las grÃ¡ficas de progreso y comparativas sean exactas.
                     </p>
                   </div>
                 </div>
@@ -651,7 +651,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             
             <div className="flex flex-col gap-1.5 mb-6">
               <label className="text-sm font-bold text-[#0B1929]">Notas</label>
-              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
+              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriÃ³logoâ€¦" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
             </div>
 
             {/* Fotos existentes cuando se edita */}
@@ -662,7 +662,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                   {existingFotos.map((url,i) => (
                     <div key={i} className="relative w-20 h-20">
                       <img src={url} onClick={()=>setLightbox(url)} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#E2E8F0] cursor-zoom-in" alt=""/>
-                      <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                      <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">Ã—</button>
                     </div>
                   ))}
                 </div>
@@ -671,7 +671,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
             {/* Foto upload */}
             <div className="mb-6">
-              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
+              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ? "Agregar mÃ¡s fotos" : "Fotos de progreso"}</div>
               <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
                 <Plus className="w-4 h-4" /> Agregar fotos
                 <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
@@ -681,7 +681,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                   {previewUrls.map((url,i)=>(
                     <div key={i} className="relative w-20 h-20">
                       <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[var(--brand-primary)]" alt=""/>
-                      <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                      <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">Ã—</button>
                     </div>
                   ))}
                 </div>
@@ -691,7 +691,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
               <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">Cancelar</button>
               <button onClick={saveMetrica} disabled={saving} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
+                {saving?"Subiendoâ€¦":editingId?"Guardar cambios":"Guardar evaluaciÃ³n"}
               </button>
             </div>
           </div>

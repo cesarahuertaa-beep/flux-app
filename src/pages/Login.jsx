@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from "lucide-react";
 import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from "../lib/supabase";
 
@@ -45,7 +45,7 @@ export default function Login({ onLogin }) {
       const params = new URLSearchParams(hash.replace("#","?"));
       const desc = params.get("error_description");
       if (desc) {
-        setErr("El enlace es inválido o ya expiró (recuerda que los enlaces de invitación son de un solo uso).");
+        setErr("El enlace es invÃ¡lido o ya expirÃ³ (recuerda que los enlaces de invitaciÃ³n son de un solo uso).");
         window.history.replaceState(null,"",window.location.pathname);
       }
     }
@@ -100,8 +100,8 @@ export default function Login({ onLogin }) {
         });
       }
 
-      // 3. AUTO-CREACIÓN DE ATLETA INDEPENDIENTE
-      // Todos los usuarios deben tener una cuenta de Atleta Independiente, EXCEPTO Nutriólogos y Superadmin
+      // 3. AUTO-CREACIÃ“N DE ATLETA INDEPENDIENTE
+      // Todos los usuarios deben tener una cuenta de Atleta Independiente, EXCEPTO NutriÃ³logos y Superadmin
       const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
       
       if (!isNutriOrSuper) {
@@ -134,7 +134,7 @@ export default function Login({ onLogin }) {
 
       let multiRoles = availableRoles.map(r => ({ role: r.role, data: r.data }));
       
-      // Si ES nutriólogo o superadmin, NO le mostramos el rol "cliente" en el switch normal (usan Modo Atleta)
+      // Si ES nutriÃ³logo o superadmin, NO le mostramos el rol "cliente" en el switch normal (usan Modo Atleta)
       if (isNutriOrSuper) {
         multiRoles = multiRoles.filter(r => r.role !== 'cliente');
       }
@@ -147,7 +147,7 @@ export default function Login({ onLogin }) {
 
       const sorted = multiRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
       const firstRole = sorted[0];
-      // Un "civil" es un cliente sin nutriólogo asignado
+      // Un "civil" es un cliente sin nutriÃ³logo asignado
       const isCivilUser = firstRole.role === 'cliente' && !firstRole.data?.nutriologo_id;
       const finalRole = isCivilUser ? 'civil' : firstRole.role;
 
@@ -183,7 +183,7 @@ export default function Login({ onLogin }) {
         mapa_url: mapaUrl.trim(),
         estado: 'pendiente'
       });
-      setInfo("Solicitud enviada con éxito. Nuestro equipo la revisará pronto.");
+      setInfo("Solicitud enviada con Ã©xito. Nuestro equipo la revisarÃ¡ pronto.");
       setMode("login");
     } catch (e) {
       setErr("Error al enviar solicitud: " + e.message);
@@ -198,7 +198,7 @@ export default function Login({ onLogin }) {
       return;
     }
     if (pass.length < 6) {
-      setErr("La contraseña debe tener al menos 6 caracteres");
+      setErr("La contraseÃ±a debe tener al menos 6 caracteres");
       return;
     }
     setLoading(true); setErr(""); setInfo("");
@@ -220,13 +220,13 @@ export default function Login({ onLogin }) {
             activo: true, 
             nutriologo_id: null 
           });
-          await submit(); // Intenta iniciar sesión si no hay confirmación de email
+          await submit(); // Intenta iniciar sesiÃ³n si no hay confirmaciÃ³n de email
         } catch (postErr) {
-          // Si la BD rebota el insert (por ejemplo, si "Confirmar Email" está activado en Supabase 
-          // y el usuario aún no tiene Token), no es un error crítico. 
-          // El perfil se creará cuando inicien sesión por primera vez.
-          console.log("Perfil no insertado aún (posible Confirmación de Email pendiente):", postErr.message);
-          setInfo("¡Cuenta creada! Por favor revisa tu bandeja de correo para confirmar tu email e iniciar sesión.");
+          // Si la BD rebota el insert (por ejemplo, si "Confirmar Email" estÃ¡ activado en Supabase 
+          // y el usuario aÃºn no tiene Token), no es un error crÃ­tico. 
+          // El perfil se crearÃ¡ cuando inicien sesiÃ³n por primera vez.
+          console.log("Perfil no insertado aÃºn (posible ConfirmaciÃ³n de Email pendiente):", postErr.message);
+          setInfo("Â¡Cuenta creada! Por favor revisa tu bandeja de correo para confirmar tu email e iniciar sesiÃ³n.");
           setMode("login");
         }
     } catch(e) {
@@ -240,19 +240,19 @@ export default function Login({ onLogin }) {
     setLoading(true); setErr("");
     try {
       await authResetPassword(email.trim());
-      setInfo("Revisa tu email para restablecer tu contraseña.");
+      setInfo("Revisa tu email para restablecer tu contraseÃ±a.");
       setMode("login");
     } catch(e) { setErr("ERR_CATCH: " + e.message); }
     setLoading(false);
   };
 
   const setPassword = async () => {
-    if (!newPass || newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
-    if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
+    if (!newPass || newPass.length < 6) { setErr("MÃ­nimo 6 caracteres"); return; }
+    if (newPass !== confirmPass) { setErr("Las contraseÃ±as no coinciden"); return; }
     setLoading(true); setErr("");
     try {
       await authUpdatePassword(accessToken, newPass);
-      setInfo("Contraseña establecida. Ya puedes entrar.");
+      setInfo("ContraseÃ±a establecida. Ya puedes entrar.");
       setMode("login");
     } catch(e) { setErr("ERR_CATCH: " + e.message); }
     setLoading(false);
@@ -260,21 +260,21 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center relative overflow-hidden font-['Inter',sans-serif]">
-      {/* ── Splash Screen Overlay ── */}
+      {/* â”€â”€ Splash Screen Overlay â”€â”€ */}
       {showSplash && (
         <div className={`absolute inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[800ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[320px] h-auto" />
         </div>
       )}
 
-      {/* ── Login Card ── */}
+      {/* â”€â”€ Login Card â”€â”€ */}
       <div className="animate-in w-full max-w-[420px] px-10 pt-11 pb-9 bg-white rounded-3xl border border-[#E2E8F0] shadow-2xl relative z-10 mx-4">
         
         {/* Top Spacer / Toggle */}
         <div className={`text-center ${mode === "reset" || mode === "set_password" ? 'mb-6' : 'mb-5'}`}>
           {(mode === "reset" || mode === "set_password") && (
             <div className="mt-3 text-[13px] text-[#6B7A8D] tracking-wide">
-              {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
+              {mode === "reset" ? "Recuperar contraseÃ±a" : "Crear nueva contraseÃ±a"}
             </div>
           )}
           {(mode === "login" || mode.startsWith("signup")) && (
@@ -283,7 +283,7 @@ export default function Login({ onLogin }) {
                 onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
                 className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode === "login" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
               >
-                Iniciar Sesión
+                Iniciar SesiÃ³n
               </button>
               <button
                 onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
@@ -309,7 +309,7 @@ export default function Login({ onLogin }) {
           </div>
         )}
 
-        {/* ── LOGIN FORM ── */}
+        {/* â”€â”€ LOGIN FORM â”€â”€ */}
         {mode === "login" && <>
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Email</div>
@@ -328,7 +328,7 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <div className="mb-6">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Contraseña</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">ContraseÃ±a</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
@@ -338,7 +338,7 @@ export default function Login({ onLogin }) {
                 value={pass}
                 onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && submit()}
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm"
               />
               <button 
@@ -352,7 +352,7 @@ export default function Login({ onLogin }) {
           </div>
 
           <button onClick={submit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "VERIFICANDO…" : <>ENTRAR <ArrowRight size={16} /></>}
+            {loading ? "VERIFICANDOâ€¦" : <>ENTRAR <ArrowRight size={16} /></>}
           </button>
 
           <div className="text-center">
@@ -360,7 +360,7 @@ export default function Login({ onLogin }) {
               onClick={() => { setMode("reset"); setErr(""); }}
               className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8] tracking-wide"
             >
-              ¿Olvidaste tu contraseña?
+              Â¿Olvidaste tu contraseÃ±a?
             </button>
           </div>
         </>}
@@ -369,7 +369,7 @@ export default function Login({ onLogin }) {
         {/* SIGNUP TYPE */}
         {mode === "signup_type" && <>
           <div className="mb-6 text-center">
-            <h3 className="text-lg font-bold text-[#0B1929] mb-2">¿Cómo usarás Flux?</h3>
+            <h3 className="text-lg font-bold text-[#0B1929] mb-2">Â¿CÃ³mo usarÃ¡s Flux?</h3>
             <p className="text-xs text-[#6B7A8D]">Selecciona el tipo de cuenta que deseas crear.</p>
           </div>
           <div className="flex flex-col gap-3 mb-4">
@@ -379,7 +379,7 @@ export default function Login({ onLogin }) {
               </div>
               <div>
                 <p className="text-sm font-bold text-[#0B1929]">Atleta Independiente</p>
-                <p className="text-xs text-[#6B7A8D] mt-0.5">Entrena, sigue tu dieta y vincula a tu nutriólogo.</p>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">Entrena, sigue tu dieta y vincula a tu nutriÃ³logo.</p>
               </div>
             </button>
             <button onClick={() => { setSignupType("nutriologo"); setMode("signup_pro"); }} className="p-4 bg-white border border-[#E2E8F0] rounded-2xl flex items-center gap-4 hover:border-emerald-500 hover:shadow-md transition-all text-left">
@@ -387,7 +387,7 @@ export default function Login({ onLogin }) {
                 <CheckCircle size={20} />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#0B1929]">Nutriólogo</p>
+                <p className="text-sm font-bold text-[#0B1929]">NutriÃ³logo</p>
                 <p className="text-xs text-[#6B7A8D] mt-0.5">Gestiona pacientes y crea planes personalizados.</p>
               </div>
             </button>
@@ -396,7 +396,7 @@ export default function Login({ onLogin }) {
                 <AlertCircle size={20} />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#0B1929]">Estudiante de Nutrición</p>
+                <p className="text-sm font-bold text-[#0B1929]">Estudiante de NutriciÃ³n</p>
                 <p className="text-xs text-[#6B7A8D] mt-0.5">Para estudiantes con credencial vigente.</p>
               </div>
             </button>
@@ -420,17 +420,17 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <div className="mb-6">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Contraseña</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">ContraseÃ±a</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Lock size={18} /></div>
-              <input type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && signUpSubmit()} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && signUpSubmit()} placeholder="MÃ­nimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">{showPass ? <EyeOff size={18} /> : <Eye size={18} />}</button>
             </div>
           </div>
                       <div className="mb-6 flex items-start gap-2">
               <input type="checkbox" id="aviso" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1" />
               <label htmlFor="aviso" className="text-xs text-[#6B7A8D] leading-tight">
-                He le�do y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
+                He leído y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
               </label>
             </div>
             <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
@@ -444,7 +444,7 @@ export default function Login({ onLogin }) {
         {/* SIGNUP PRO */}
         {mode === "signup_pro" && <>
           <div className="mb-6 text-center">
-            <h3 className="text-lg font-bold text-[#0B1929] mb-1">{signupType === 'nutriologo' ? 'Solicitud Nutriólogo' : 'Solicitud Estudiante de Nutrición'}</h3>
+            <h3 className="text-lg font-bold text-[#0B1929] mb-1">{signupType === 'nutriologo' ? 'Solicitud NutriÃ³logo' : 'Solicitud Estudiante de NutriciÃ³n'}</h3>
             <p className="text-xs text-[#6B7A8D]">Revisaremos tus datos para habilitar tu cuenta.</p>
           </div>
           <div className="mb-4">
@@ -468,23 +468,23 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <div className="mb-4">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Ubicación (Google Maps) (Opcional)</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">UbicaciÃ³n (Google Maps) (Opcional)</div>
             <div className="relative">
               <input value={mapaUrl} onChange={e => setMapaUrl(e.target.value)} placeholder="Enlace de Maps" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
           {signupType === 'nutriologo' && (
           <div className="mb-6">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Número de Cédula Profesional</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">NÃºmero de CÃ©dula Profesional</div>
             <div className="relative">
-              <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu número de cédula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
+              <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu nÃºmero de cÃ©dula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
           )}
                       <div className="mb-6 flex items-start gap-2">
               <input type="checkbox" id="aviso" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1" />
               <label htmlFor="aviso" className="text-xs text-[#6B7A8D] leading-tight">
-                He le�do y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
+                He leído y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
               </label>
             </div>
             <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
@@ -496,7 +496,7 @@ export default function Login({ onLogin }) {
         </>}
 
 
-        {/* ── RESET FORM ── */}
+        {/* â”€â”€ RESET FORM â”€â”€ */}
         {mode === "reset" && <>
           <div className="mb-5">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Tu email</div>
@@ -512,7 +512,7 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "ENVIANDO…" : "ENVIAR INSTRUCCIONES"}
+            {loading ? "ENVIANDOâ€¦" : "ENVIAR INSTRUCCIONES"}
           </button>
           <div className="text-center">
             <button onClick={() => { setMode("login"); setErr(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
@@ -521,15 +521,15 @@ export default function Login({ onLogin }) {
           </div>
         </>}
 
-        {/* ── SET PASSWORD FORM ── */}
+        {/* â”€â”€ SET PASSWORD FORM â”€â”€ */}
         {mode === "set_password" && <>
           <div className="mb-4">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nueva contraseña</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nueva contraseÃ±a</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
               </div>
-              <input type={showPass ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="MÃ­nimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button 
                 type="button"
                 onClick={() => setShowPass(!showPass)}
@@ -540,12 +540,12 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <div className="mb-6">
-            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Confirmar contraseña</div>
+            <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Confirmar contraseÃ±a</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
               </div>
-              <input type={showPass ? "text" : "password"} value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ? "text" : "password"} value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseÃ±a" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button 
                 type="button"
                 onClick={() => setShowPass(!showPass)}
@@ -556,13 +556,13 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "GUARDANDO…" : "ESTABLECER CONTRASEÑA"}
+            {loading ? "GUARDANDOâ€¦" : "ESTABLECER CONTRASEÃ‘A"}
           </button>
         </>}
 
         {/* Footer */}
         <div className="mt-7 text-center text-[10px] text-[#6B7A8D] tracking-[2px] uppercase font-['Space_Grotesk',sans-serif]">
-          KEEP GOING 💪
+          KEEP GOING ðŸ’ª
         </div>
       </div>
     </div>
