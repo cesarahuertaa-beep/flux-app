@@ -20,22 +20,22 @@ function TimerCard({ brandColor }) {
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
-    <div className="bg-[#0B1929] rounded-xl p-4 flex items-center gap-4 mb-3">
+    <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3">
       <div>
         <p className="text-[10px] text-[#6B7A8D] font-mono tracking-widest uppercase">Cronómetro</p>
-        <p className="text-3xl font-mono font-bold text-white mt-1">{fmt(seconds)}</p>
+        <p className="text-3xl font-mono font-bold text-[#0B1929] mt-1">{fmt(seconds)}</p>
       </div>
       <div className="flex gap-2 ml-auto">
         <button
           onClick={() => setRunning(r => !r)}
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors"
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors shadow-sm"
           style={{ background: brandColor || "var(--brand-primary)" }}
         >
           {running ? <Pause size={16} /> : <Play size={16} />}
         </button>
         <button
           onClick={() => { setRunning(false); setSeconds(0); }}
-          className="w-10 h-10 rounded-full bg-[#1E2D3D] flex items-center justify-center text-[#6B7A8D] hover:text-white transition-colors"
+          className="w-10 h-10 rounded-full bg-[#F0F4FA] flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
         >
           <RotateCcw size={14} />
         </button>
@@ -409,16 +409,16 @@ export default function Training({
                     {/* Miniatura Activa */}
                       <button
                         onClick={() => setPreviewEx(activeObj)}
-                        className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#0B1929] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0 border-none"
+                        className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0"
                       >
                       {activeObj.gif_url ? (
-                        <img src={activeObj.gif_url} alt={activeObj.nombre} className="w-full h-full object-contain" />
+                        <img src={activeObj.gif_url} alt={activeObj.nombre} className="w-full h-full object-contain mix-blend-multiply" />
                       ) : (
-                        <Dumbbell size={28} className="text-[#3D5A80]" />
+                        <Dumbbell size={28} className="text-[#6B7A8D]" />
                       )}
                       {activeObj.gif_url && (
-                        <div className="absolute bottom-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
-                          <span className="text-[8px] font-mono text-white tracking-widest uppercase">GIF</span>
+                        <div className="absolute bottom-1 right-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1.5 py-0.5">
+                          <span className="text-[8px] font-mono font-bold text-[#0B1929] tracking-widest uppercase">GIF</span>
                         </div>
                       )}
                       </button>
@@ -431,14 +431,14 @@ export default function Training({
                           onClick={() => setActiveVariant(s => ({ ...s, [ex.id]: v.variantId }))}
                           className="w-16 sm:w-20 flex-shrink-0 flex flex-col gap-1.5 items-center opacity-60 hover:opacity-100 transition-opacity"
                         >
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#0B1929] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
                             {v.obj.gif_url ? (
-                              <img src={v.obj.gif_url} className="w-full h-full object-contain" />
+                              <img src={v.obj.gif_url} className="w-full h-full object-contain mix-blend-multiply" />
                             ) : (
-                              <Dumbbell size={20} className="text-[#3D5A80]" />
+                              <Dumbbell size={20} className="text-[#6B7A8D]" />
                             )}
-                            <div className="absolute top-1 left-1 bg-black/60 rounded px-1 py-0.5">
-                              <span className="text-[7px] font-bold text-white uppercase">{v.variantId === 'original' ? 'ORG' : 'ALT'}</span>
+                            <div className="absolute top-1 left-1 bg-white/90 backdrop-blur border border-[#E2E8F0] rounded px-1 py-0.5">
+                              <span className="text-[7px] font-bold text-[#0B1929] uppercase">{v.variantId === 'original' ? 'ORG' : 'ALT'}</span>
                             </div>
                           </div>
                           <p className="text-[9px] font-medium text-center text-[#6B7A8D] leading-tight line-clamp-2">
@@ -598,9 +598,9 @@ export default function Training({
           >
             <button onClick={() => setPreviewEx(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
             {previewEx.gif_url ? (
-              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#0B1929] object-contain max-h-[300px]" />
+              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#F8FAFC] border border-[#E2E8F0] object-contain max-h-[300px] mix-blend-multiply" />
             ) : (
-              <div className="w-full h-[200px] bg-[#F0F4FA] rounded-xl mb-4 flex items-center justify-center">
+              <div className="w-full h-[200px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl mb-4 flex items-center justify-center shadow-sm">
                 <Dumbbell size={48} className="text-[#CBD5E1]" />
               </div>
             )}
@@ -614,7 +614,7 @@ export default function Training({
             </div>
             <button
               onClick={() => setPreviewEx(null)}
-              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-[13px] font-semibold transition-colors border border-gray-200"
+              className="px-5 py-2 bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] rounded-xl text-[13px] font-semibold transition-colors border border-[#E2E8F0]"
             >
               Cerrar
             </button>

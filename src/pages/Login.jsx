@@ -85,9 +85,12 @@ export default function Login({ onLogin }) {
       const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}`);
       for (const clientData of clientRows) {
         if (clientData.nutriologo_id) {
-          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo`);
-          if (nut.length && nut[0].activo === false) {
-            continue; // Suspended clinic, skip this client profile
+          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre`);
+          if (nut.length) {
+            if (nut[0].activo === false) {
+              continue; // Suspended clinic, skip this client profile
+            }
+            clientData.nombre_clinica = nut[0].nombre;
           }
         }
         availableRoles.push({
@@ -96,44 +99,42 @@ export default function Login({ onLogin }) {
         });
       }
 
-      if (availableRoles.length === 0) {
-        if (profiles.length === 0 || !["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(profiles[0].role)) {
+      // 3. AUTO-CREACIÓN DE ATLETA INDEPENDIENTE
+      // Todos los usuarios deben tener una cuenta de Atleta Independiente, EXCEPTO Nutriólogos y Superadmin
+      const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
+      
+      if (!isNutriOrSuper) {
+        const hasIndep = clientRows.some(c => c.nutriologo_id === null);
+        if (!hasIndep) {
           try {
-            // Usuario verificó su email pero no tiene tabla clientes (Civil nuevo)
-            const nombreMeta = data.user?.user_metadata?.nombre || email.trim().split("@")[0];
-            const newClient = await dbPostMinimal("clientes", {
-               nombre: nombreMeta,
-               email: email.trim(),
-               auth_id: data.user.id,
-               activo: true,
-               nutriologo_id: null
-            });
-            
-            // Re-evaluar si se insertó bien
-            const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}`);
-            if (checkAgain.length > 0) {
-                availableRoles.push({ role: 'cliente', data: checkAgain[0] });
-            } else {
-                setAuthToken(null); setProfileId(null);
-                setErr("No se pudo crear tu perfil de cliente. Contacta soporte.");
-                setLoading(false); return;
-            }
-          } catch (postErr) {
-            setAuthToken(null); setProfileId(null);
-            setErr("Error creando perfil: " + postErr.message);
-            setLoading(false); return;
+             const nombreMeta = data.user?.user_metadata?.nombre || (profiles.length ? profiles[0].nombre : email.trim().split("@")[0]);
+             const newClient = await dbPostMinimal("clientes", {
+                nombre: nombreMeta,
+                email: email.trim(),
+                auth_id: data.user.id,
+                activo: true,
+                nutriologo_id: null
+             });
+             const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}&nutriologo_id=is.null`);
+             if (checkAgain.length > 0) {
+                 availableRoles.push({ role: 'cliente', data: checkAgain[0] });
+             }
+          } catch(e) {
+             console.error("No se pudo auto-crear Atleta Independiente", e);
           }
-        } else {
-          setAuthToken(null); setProfileId(null);
-          setErr("ERR_DIAG_1: Perfil intruso detectado: " + JSON.stringify(profiles[0]));
-          setLoading(false); return;
         }
       }
 
-      
+      if (availableRoles.length === 0) {
+          setAuthToken(null); setProfileId(null);
+          setErr("ERR_DIAG_1: Perfil intruso detectado o no se pudo crear cuenta de atleta.");
+          setLoading(false); return;
+      }
+
       let multiRoles = availableRoles.map(r => ({ role: r.role, data: r.data }));
-      const hasPro = multiRoles.some(r => ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(r.role));
-      if (hasPro) {
+      
+      // Si ES nutriólogo o superadmin, NO le mostramos el rol "cliente" en el switch normal (usan Modo Atleta)
+      if (isNutriOrSuper) {
         multiRoles = multiRoles.filter(r => r.role !== 'cliente');
       }
 

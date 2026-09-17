@@ -360,15 +360,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
           {isEstandar && (
             <div className="absolute inset-0 z-50 backdrop-blur-md bg-[#0B1929]/70 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#1E2D3D]">
               <Lock size={48} className="text-amber-400 mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Desarrollo Muscular Premium</h3>
+              <h3 className="text-xl font-bold text-[#0B1929] mb-2">Desarrollo Muscular Premium</h3>
               <p className="text-[#9BA5B0] text-sm max-w-sm mb-6">Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.</p>
               <div className="text-[11px] uppercase tracking-widest font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-lg">Adquiere Premium en Mi Membresía</div>
             </div>
           )}
-          <div className={`bg-[#0B1929] rounded-3xl p-6 md:p-8 shadow-lg overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
+          <div className={`bg-white rounded-3xl p-6 md:p-8 shadow-lg overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
             <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none" />
           
-          <h2 className="text-lg font-bold text-white mb-2 relative z-10">Desarrollo Muscular</h2>
+          <h2 className="text-lg font-bold text-[#0B1929] mb-2 relative z-10">Desarrollo Muscular</h2>
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 relative z-10">
@@ -395,7 +395,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 </div>
             </div>
 
-            <div className="bg-[#152336] border border-[#1E2D3D] rounded-2xl p-5 w-full md:w-64">
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 w-full md:w-64">
               <p className="text-xs font-bold text-[#6B7A8D] tracking-widest mb-4">RANGOS ALCANZADOS</p>
               <div className="space-y-3">
                 {Object.entries(groupAvg).sort((a,b)=>b[1]-a[1]).map(([g, pct]) => {
@@ -404,7 +404,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <div key={g} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.3)]" style={{ background: rank.color }} />
-                        <span className="text-sm font-semibold text-white capitalize">{g.replace(/_/g, " ")}</span>
+                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g, " ")}</span>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
@@ -421,13 +421,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
           </div>
 
           {/* Leyenda de rangos */}
-          <div className="mt-8 pt-6 border-t border-[#1E2D3D]">
+          <div className="mt-8 pt-6 border-t border-[#E2E8F0]">
             <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest text-center mb-4">ESCALA DE EVOLUCIÓN</p>
             <div className="flex flex-wrap justify-center gap-3">
               {RANKS.slice(1).map(r => (
-                <div key={r.name} className="flex items-center gap-1.5 bg-[#152336] px-3 py-1.5 rounded-full border border-[#1E2D3D]">
+                <div key={r.name} className="flex items-center gap-1.5 bg-[#F8FAFC] px-3 py-1.5 rounded-full border border-[#E2E8F0]">
                   <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
-                  <span className="text-[10px] font-bold text-white uppercase">{r.name}</span>
+                  <span className="text-[10px] font-bold text-[#0B1929] uppercase">{r.name}</span>
                 </div>
               ))}
             </div>
