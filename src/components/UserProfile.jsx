@@ -39,6 +39,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       }
     } catch (e) {
       console.error("Error saving profile", e);
+      alert("Error guardando: " + e.message);
     }
     setIsSaving(false);
   };

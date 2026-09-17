@@ -240,10 +240,10 @@ export const syncPersonalData = async (email, data) => {
 
   const promises = [];
   if (Object.keys(dataForProfile).length > 0) {
-    promises.push(dbPatch(`profiles?email=eq.${email}`, dataForProfile).catch(e => console.warn("warn profiles:", e)));
+    promises.push(dbPatch(`profiles?email=ilike.${email}`, dataForProfile));
   }
   if (Object.keys(dataForCliente).length > 0) {
-    promises.push(dbPatch(`clientes?email=eq.${email}`, dataForCliente).catch(e => console.warn("warn clientes:", e)));
+    promises.push(dbPatch(`clientes?email=ilike.${email}`, dataForCliente));
   }
 
   await Promise.all(promises);

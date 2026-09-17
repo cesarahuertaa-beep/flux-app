@@ -104,6 +104,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       }
     } catch (e) {
       setErr("Error guardando datos personales.");
+      alert("Error guardando datos: " + e.message);
     }
     setSavingPersonal(false);
   };

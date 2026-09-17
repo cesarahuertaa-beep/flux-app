@@ -1,0 +1,1 @@
+const fs = require('fs'); const code = fs.readFileSync('src/lib/supabase.js', 'utf8'); const u = code.split('SUPA_URL = \x22')[1].split('\x22')[0]; const k = code.split('SUPA_KEY = \x22')[1].split('\x22')[0]; fetch(u+'/rest/v1/profiles?email=ilike.*betopros54*', {headers:{apikey:k,Authorization:'Bearer '+k}}).then(r=>r.json()).then(d=>console.log(d));  
