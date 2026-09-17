@@ -21,7 +21,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       if (form.avatar_url && form.avatar_url.includes("storage/v1/object/public/logos/")) {
         const oldPath = form.avatar_url.split("/public/logos/")[1];
         if (oldPath) {
-          await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar el avatar anterior", err));
+          await storageDelete("logos", oldPath).catch(err => alert("⚠️ No se pudo borrar la foto anterior del servidor. Por favor, asegúrate de que el bucket 'logos' tenga permisos de DELETE (Update/Delete) en Supabase para usuarios autenticados."));
         }
       }
 
