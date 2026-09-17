@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, User, Loader2 } from 'lucide-react';
 
-export default function RoleSwitcher({ currentRole, multiRoles, onChangeRole }) {
+export default function RoleSwitcher({ currentRole, currentData, multiRoles, onChangeRole }) {
   const [switchingTo, setSwitchingTo] = useState(null);
 
   const rolesToShow = (currentRole === 'nutriologo' || currentRole === 'nutriologo_estudiante' || currentRole === 'superadmin')
@@ -36,7 +36,16 @@ export default function RoleSwitcher({ currentRole, multiRoles, onChangeRole }) 
         {rolesToShow.map((r, i) => {
           const isCivilRole = r.role === 'cliente' && !r.data?.nutriologo_id;
           const roleIdentifier = isCivilRole ? 'civil' : r.role;
-          const isActive = currentRole === roleIdentifier;
+          
+          let isActive = false;
+          if (currentRole === roleIdentifier) {
+            // Si hay currentData, hacemos match exacto por ID para evitar conflictos entre múltiples pacientes
+            if (currentData?.id && r.data?.id) {
+               isActive = currentData.id === r.data.id;
+            } else {
+               isActive = true;
+            }
+          }
 
           let label = 'Administrativo';
           if (r.role === 'cliente') {

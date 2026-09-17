@@ -88,7 +88,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         </div>
       )}
 
-      <RoleSwitcher currentRole={session.role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
+      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <button 
