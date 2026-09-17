@@ -63,7 +63,7 @@ const LogoPicker = ({ value, onChange, uploading }) => {
   );
 };
 
-export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, setSelected, setTab }) {
+export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, setSelected, setTab, setEditClient, toggleActivo }) {
   const [nutriologos, setNutriologos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -393,17 +393,25 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 {nClients.map(c => (
                   <div 
                     key={c.id} 
-                    onClick={() => { setSelected(c); setTab("programar"); }}
-                    className="bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
+                    className="bg-white border border-slate-200 rounded-xl p-4 transition-all group relative overflow-hidden flex flex-col"
                   >
                     <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[#1A6FD4]' : 'bg-red-400'}`} />
-                    <div className="pl-2">
+                    <div 
+                      className="pl-2 cursor-pointer flex-1"
+                      onClick={() => { setSelected(c); setTab("programar"); }}
+                    >
                       <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-blue-600 transition-colors">{c.nombre}</h4>
                       <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                       <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
                         <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
                         <span>{c.objetivo || "Sin objetivo definido"}</span>
                       </div>
+                    </div>
+                    <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
+                      <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
+                        {c.activo ? "Suspender" : "Activar"}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -498,11 +506,14 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                           {atletasIndependientes.map(c => {
                             const plan = c.plan_tipo || 'estandar';
                             return (
-                              <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all relative overflow-hidden">
+                              <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 transition-all relative overflow-hidden flex flex-col group">
                                 <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`}></div>
-                                <div className="pl-2 min-w-0">
+                                <div 
+                                  className="pl-2 min-w-0 cursor-pointer flex-1"
+                                  onClick={() => { setSelected(c); setTab("programar"); }}
+                                >
                                   <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2">{c.nombre || "Sin nombre"}</h4>
+                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-blue-600 transition-colors">{c.nombre || "Sin nombre"}</h4>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
                                       plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                                     }`}>
@@ -515,6 +526,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                                       {c.activo ? "Activo" : "Inactivo"}
                                     </span>
                                   </div>
+                                </div>
+                                <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
+                                  <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
+                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
+                                    {c.activo ? "Suspender" : "Activar"}
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -672,3 +689,4 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     </div>
   );
 }
+
