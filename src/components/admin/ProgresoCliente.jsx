@@ -396,15 +396,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                   </div>
                 )}
                 <div className={isLocked ? "blur-sm pointer-events-none select-none" : ""}>
-                <div className="flex justify-between items-center mb-3.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
-                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold">Más reciente</span>}
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5 whitespace-nowrap"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
+                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap">Más reciente</span>}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
                       {m.metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}
                     </span>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5 self-start sm:self-auto">
                     <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1">
                       <Edit2 className="w-3.5 h-3.5" /> Editar
                     </button>
@@ -413,7 +413,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
                   {DISPLAY_KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
                     const d = (!isFreemium && prev) ? delta(m,prev,f.key) : null;
                     return (
