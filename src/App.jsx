@@ -145,6 +145,8 @@ export default function App() {
       profileId: session.profileId,
       multiRoles: session.multiRoles
     };
+    // Clear saved tab so the new role always starts on its own default tab
+    localStorage.removeItem('flux_admin_tab');
     saveSessionMeta(s);
     setSession(s);
   };
