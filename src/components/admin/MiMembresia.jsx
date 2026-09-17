@@ -56,9 +56,14 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       (r.estado === 'aprobado' || r.estado === 'pendiente')
     );
 
-    // Si el nutriólogo se registró después del último corte, no debe nada de ese corte
-    const nutriCreatedAt = perfil?.created_at ? new Date(perfil.created_at) : today;
-    if (nutriCreatedAt > lastPassedCutoff) {
+    // Si no tiene pacientes o el primero entró después del último corte, no debe nada de ese corte
+    const myClients = clientes ? clientes.filter(c => c.nutriologo_id === profileId) : [];
+    let firstClientDate = null;
+    if (myClients.length > 0) {
+      firstClientDate = new Date(myClients[0].created_at);
+    }
+
+    if (!firstClientDate || firstClientDate > lastPassedCutoff) {
       yaPagado = true;
     }
 

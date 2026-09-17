@@ -126,13 +126,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
         }
         
-        let creationDate = today;
+        let firstClientDate = null;
         if (myId) {
-          const prof = await dbGet(`profiles?id=eq.${myId}&select=created_at`);
-          if (prof && prof.length > 0) creationDate = new Date(prof[0].created_at);
+          const firstClient = await dbGet(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc&limit=1`);
+          if (firstClient && firstClient.length > 0) {
+            firstClientDate = new Date(firstClient[0].created_at);
+          }
         }
 
-        if (creationDate > lastPassedCutoff) {
+        // Si no tiene pacientes, no debe nada. O si su primer paciente entró después del último corte, tampoco.
+        if (!firstClientDate || firstClientDate > lastPassedCutoff) {
           setBloqueado(false);
           setDiasGracia(false);
           return;
