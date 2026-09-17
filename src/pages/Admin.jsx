@@ -844,7 +844,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {isCivil && tab === "perfil" && (
         <SubComponentWrapper title="Mi Perfil">
           <UserProfile
-            session={{ role: "cliente", data: clienteData }}
+            session={{ role: "civil", data: clienteData }}
             onLogout={onLogout}
             onChangeRole={onChangeRole}
             multiRoles={multiRoles}

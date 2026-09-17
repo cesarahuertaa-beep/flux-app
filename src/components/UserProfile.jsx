@@ -8,7 +8,7 @@ import RoleSwitcher from "./RoleSwitcher";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const user = session?.data || session; // Cliente o Admin
-  const isCliente = session?.role === "cliente";
+  const isCliente = session?.role === "cliente" || session?.role === "civil";
   
   const [form, setForm] = useState({
     nombre: user?.nombre || "",
