@@ -35,6 +35,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         multiRoles.forEach(r => {
           if (r.data) Object.assign(r.data, formData);
         });
+        localStorage.setItem("flux_multi_roles", JSON.stringify(multiRoles));
       }
     } catch (e) {
       console.error("Error saving profile", e);

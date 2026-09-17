@@ -226,12 +226,25 @@ export const dbPostMinimal = (p,b) => q(p, { method:"POST", body:JSON.stringify(
 /** Sincroniza datos personales universales en todas las identidades del usuario */
 export const syncPersonalData = async (email, data) => {
   if (!email) return;
-  try {
-    await Promise.all([
-      dbPatch(`profiles?email=eq.${email}`, data),
-      dbPatch(`clientes?email=eq.${email}`, data)
-    ]);
-  } catch (err) {
-    console.error("Error sincronizando datos personales:", err);
+  
+  const profileFields = ["nombre", "telefono", "email", "avatar_url", "firma_url"];
+  const clienteFields = ["nombre", "telefono", "email", "avatar_url", "fecha_nacimiento", "genero", "pais", "estado_provincia", "objetivo"];
+  
+  const dataForProfile = {};
+  const dataForCliente = {};
+  
+  Object.keys(data).forEach(k => {
+    if (profileFields.includes(k)) dataForProfile[k] = data[k];
+    if (clienteFields.includes(k)) dataForCliente[k] = data[k];
+  });
+
+  const promises = [];
+  if (Object.keys(dataForProfile).length > 0) {
+    promises.push(dbPatch(`profiles?email=eq.${email}`, dataForProfile).catch(e => console.warn("warn profiles:", e)));
   }
+  if (Object.keys(dataForCliente).length > 0) {
+    promises.push(dbPatch(`clientes?email=eq.${email}`, dataForCliente).catch(e => console.warn("warn clientes:", e)));
+  }
+
+  await Promise.all(promises);
 };

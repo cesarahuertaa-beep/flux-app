@@ -100,6 +100,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         multiRoles.forEach(r => {
           if (r.data) Object.assign(r.data, formData);
         });
+        localStorage.setItem("flux_multi_roles", JSON.stringify(multiRoles));
       }
     } catch (e) {
       setErr("Error guardando datos personales.");
