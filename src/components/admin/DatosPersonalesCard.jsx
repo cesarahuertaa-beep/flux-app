@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { User, Phone, MapPin, Calendar, Camera } from "lucide-react";
 import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
-import { storageUpload } from "../../lib/supabase";
+import { storageUpload, storageDelete } from "../../lib/supabase";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -12,9 +12,19 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
     if (!file) return;
     setUploading(true);
     try {
+      // 1. Subir la nueva imagen
       const ext = file.name.split('.').pop();
       const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
       const url = await storageUpload("logos", path, file);
+      
+      // 2. Eliminar la imagen vieja de Supabase Storage para no acumular basura
+      if (form.avatar_url && form.avatar_url.includes("storage/v1/object/public/logos/")) {
+        const oldPath = form.avatar_url.split("/public/logos/")[1];
+        if (oldPath) {
+          await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar el avatar anterior", err));
+        }
+      }
+
       setForm((prev) => ({ ...prev, avatar_url: url }));
       // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });

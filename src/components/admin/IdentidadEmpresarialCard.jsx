@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Building2, Image as ImageIcon } from "lucide-react";
-import { storageUpload } from "../../lib/supabase";
+import { storageUpload, storageDelete } from "../../lib/supabase";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -14,6 +14,14 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         const ext = file.name.split('.').pop();
         const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
         const url = await storageUpload("logos", path, file);
+
+        if (form.logo_url && form.logo_url.includes("storage/v1/object/public/logos/")) {
+          const oldPath = form.logo_url.split("/public/logos/")[1];
+          if (oldPath) {
+            await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar logo anterior", err));
+          }
+        }
+
         setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {

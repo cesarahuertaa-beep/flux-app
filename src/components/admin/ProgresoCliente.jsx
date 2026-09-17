@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
@@ -206,6 +206,13 @@ export function ProgresoCliente({ selected, setMsg }) {
   const deleteFoto = async (metrica, fotoUrl) => {
     const newFotos = parseFotos(metrica.fotos).filter(u => u !== fotoUrl);
     await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
+    
+    if (fotoUrl && fotoUrl.includes("storage/v1/object/public/progress-photos/")) {
+      const oldPath = fotoUrl.split("/public/progress-photos/")[1];
+      if (oldPath) {
+        await storageDelete("progress-photos", oldPath).catch(err => console.warn("No se pudo borrar foto progreso", err));
+      }
+    }
     await load();
   };
 
