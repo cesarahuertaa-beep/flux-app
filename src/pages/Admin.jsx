@@ -407,6 +407,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           ] : [])
         ];
 
+  const handlePaymentUploaded = async () => {
+    setBloqueado(false);
+    setDiasGracia(false);
+    if (myId) {
+      await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
+    }
+  };
+
+
   if (bloqueado && tab !== "membresia") {
     return <BloqueadoNutriologo onLogout={onLogout} onGoToMembresia={() => setTab("membresia")} />;
   }
@@ -655,7 +664,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {!isCivil && (
         <div className={tab === "membresia" ? "block" : "hidden"}>
-          <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} /></SubComponentWrapper>
+          <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} /></SubComponentWrapper>
         </div>
       )}
 

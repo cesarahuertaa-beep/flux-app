@@ -3,7 +3,7 @@ import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from "lucide-react";
 
-export default function MiMembresia({ clientes, profileId, setMsg }) {
+export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const [perfil, setPerfil] = useState(null);
   const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
   const [loading, setLoading] = useState(true);
@@ -189,6 +189,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       });
 
       setMsg("✓ Comprobante subido y en revisión.");
+      if (onPaymentUploaded) onPaymentUploaded();
       loadData();
     } catch (error) {
       console.error(error);
