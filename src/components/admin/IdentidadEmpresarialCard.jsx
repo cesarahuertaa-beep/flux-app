@@ -72,7 +72,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             value={form.nombre_marca} 
             onChange={e => setForm({...form, nombre_marca: e.target.value})}
             onBlur={() => onSave(form)}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="Ej: NutriFit, FLUX Sport"
           />
         </div>
@@ -83,7 +83,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             value={form.especialidad} 
             onChange={e => setForm({...form, especialidad: e.target.value})}
             onBlur={() => onSave(form)}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="Ej: Nutrición Deportiva"
           />
         </div>
@@ -94,7 +94,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             value={form.cedula} 
             onChange={e => setForm({...form, cedula: e.target.value})}
             onBlur={() => onSave(form)}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="Opcional"
           />
         </div>
@@ -105,7 +105,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             value={form.ubicacion_texto} 
             onChange={e => setForm({...form, ubicacion_texto: e.target.value})}
             onBlur={() => onSave(form)}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="Ej: CDMX, Polanco"
           />
         </div>
@@ -116,7 +116,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             value={form.mapa_url} 
             onChange={e => setForm({...form, mapa_url: e.target.value})}
             onBlur={() => onSave(form)}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="https://maps.app.goo.gl/..."
           />
         </div>

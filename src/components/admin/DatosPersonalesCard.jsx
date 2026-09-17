@@ -45,7 +45,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
         Datos Personales
       </h2>
       
-      <div className="flex flex-col md:flex-row gap-8 mb-6">
+      <div className="flex flex-col sm:flex-row gap-6 mb-6">
         {/* Avatar Upload */}
         <div className="flex flex-col items-center gap-2 shrink-0">
           <div className="relative group cursor-pointer" onClick={() => !uploading && fileInputRef.current?.click()}>
@@ -73,7 +73,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
               value={form.nombre} 
               onChange={e => setForm({...form, nombre: e.target.value})}
               onBlur={() => onSave(form)}
-              className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             />
           </div>
           <div>
@@ -82,7 +82,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
               type="email" 
               value={form.email} 
               disabled
-              className="w-full bg-slate-100 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#6B7A8D] cursor-not-allowed"
+              className="w-full min-w-0 bg-slate-100 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#6B7A8D] cursor-not-allowed"
             />
           </div>
           <div>
@@ -92,7 +92,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
               value={form.telefono} 
               onChange={e => setForm({...form, telefono: e.target.value})}
               onBlur={() => onSave(form)}
-              className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             />
           </div>
           <div>
@@ -100,7 +100,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
             <select 
               value={form.genero} 
               onChange={e => { setForm({...form, genero: e.target.value}); onSave({...form, genero: e.target.value}); }}
-              className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             >
               <option value="">Selecciona...</option>
               <option value="Femenino">Femenino</option>
@@ -116,16 +116,16 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
               type="date" 
               value={form.fecha_nacimiento} 
               onChange={e => { setForm({...form, fecha_nacimiento: e.target.value}); onSave({...form, fecha_nacimiento: e.target.value}); }}
-              className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-sm font-medium text-[#0B1929] mb-1">País</label>
               <select 
                 value={form.pais} 
                 onChange={e => { setForm({...form, pais: e.target.value}); onSave({...form, pais: e.target.value}); }}
-                className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+                className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
               >
                 {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
@@ -136,7 +136,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
                 <select 
                   value={form.estado_provincia} 
                   onChange={e => { setForm({...form, estado_provincia: e.target.value}); onSave({...form, estado_provincia: e.target.value}); }}
-                  className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+                  className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
                 >
                   <option value="">Selecciona...</option>
                   {ESTADOS_MEXICO.map(e => <option key={e} value={e}>{e}</option>)}
@@ -148,7 +148,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
                   onChange={e => setForm({...form, estado_provincia: e.target.value})}
                   onBlur={() => onSave(form)}
                   placeholder="Provincia/Región"
-                  className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+                  className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
                 />
               )}
             </div>

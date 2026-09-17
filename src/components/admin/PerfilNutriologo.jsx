@@ -137,7 +137,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const handleStore = () => window.open('https://flux-sport.mitiendanube.com/', '_blank');
 
   return (
-    <div className="max-w-4xl mx-auto w-full pb-10">
+    <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 
@@ -153,7 +153,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                 <p className="text-sm text-[#0B1929]">
                   <strong>{req.from_nutriologo_nombre}</strong> desea agregarte como paciente para asignarte planes.
                 </p>
-                <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                   <button onClick={async () => { await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, {estado:'rechazada'}); loadProfile(); }} className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-gray-50 flex-1">Rechazar</button>
                   <button onClick={async () => { 
                     await dbPost("clientes", { nombre: personalForm.nombre || "Colega", objetivo: "Entrenamiento entre colegas", email: personalForm.email, telefono: personalForm.telefono, nutriologo_id: req.from_nutriologo_id, auth_id: profileId, activo: true });

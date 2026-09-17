@@ -57,7 +57,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 pb-32">
+    <div className="max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 pb-32 overflow-x-hidden px-4 sm:px-0">
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
         <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
@@ -82,7 +82,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
             onBlur={handleSaveObjetivo}
             placeholder="Ej. Pérdida de grasa, hipertrofia..."
             rows={3}
-            className="w-full bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#0B1929] outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all resize-none"
+            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#0B1929] outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all resize-none"
           />
         </div>
       )}
@@ -122,7 +122,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       <div className="flex flex-col sm:flex-row gap-4">
         <button 
           onClick={handleStore}
-          className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
+          className="w-full min-w-0 sm:w-auto px-6 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
         >
           <ShoppingBag size={18} /> Ir a la tienda FLUX
         </button>
@@ -130,7 +130,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         {onLogout && (
           <button 
             onClick={onLogout}
-            className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2 transition-all border border-red-100"
+            className="w-full min-w-0 sm:w-auto px-6 py-3.5 rounded-xl font-bold text-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2 transition-all border border-red-100"
           >
             <LogOut size={18} /> Cerrar Sesión
           </button>
