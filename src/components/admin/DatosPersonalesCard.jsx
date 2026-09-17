@@ -12,7 +12,9 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
     if (!file) return;
     setUploading(true);
     try {
-      const url = await storageUpload(file, "avatars");
+      const ext = file.name.split('.').pop();
+      const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+      const url = await storageUpload("avatars", path, file);
       setForm((prev) => ({ ...prev, avatar_url: url }));
       // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });

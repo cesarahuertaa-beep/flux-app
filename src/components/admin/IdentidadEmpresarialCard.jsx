@@ -10,9 +10,11 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    try {
-      const url = await storageUpload(file, "logos");
-      setForm((prev) => ({ ...prev, logo_url: url }));
+      try {
+        const ext = file.name.split('.').pop();
+        const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const url = await storageUpload("logos", path, file);
+        setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {
       alert("Error subiendo logo: " + error.message);
