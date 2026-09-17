@@ -12,12 +12,12 @@ import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
-  localStorage.setItem("flux_role", s.role);
+  sessionStorage.setItem("flux_role", s.role);
   // "civil" y "cliente" ambos guardan su ID de cliente en flux_client_id
   if ((s.role === "cliente" || s.role === "civil") && s.data?.id) {
-    localStorage.setItem("flux_client_id", s.data.id);
+    sessionStorage.setItem("flux_client_id", s.data.id);
   } else {
-    localStorage.removeItem("flux_client_id");
+    sessionStorage.removeItem("flux_client_id");
   }
   
   if (s.multiRoles) {
@@ -28,14 +28,25 @@ const saveSessionMeta = (s) => {
 };
 
 const clearSessionMeta = () => {
-  localStorage.removeItem("flux_role");
-  localStorage.removeItem("flux_client_id");
+  sessionStorage.removeItem("flux_role");
+  sessionStorage.removeItem("flux_client_id");
   localStorage.removeItem("flux_multi_roles");
 };
 
 export default function App() {
   const [session,    setSession]    = useState(null);
-  const [atletaData, setAtletaData] = useState(null);
+  const [atletaData, setAtletaData] = useState(() => {
+    try {
+      const s = sessionStorage.getItem("flux_atleta_data");
+      return s ? JSON.parse(s) : null;
+    } catch(e) { return null; }
+  });
+
+  useEffect(() => {
+    if (atletaData) sessionStorage.setItem("flux_atleta_data", JSON.stringify(atletaData));
+    else sessionStorage.removeItem("flux_atleta_data");
+  }, [atletaData]);
+
   const [restoring,  setRestoring]  = useState(true);
 
   useEffect(() => {
@@ -53,8 +64,8 @@ export default function App() {
     const restore = async () => {
       const token = restoreSession();
       const profileId = restoreProfileId();
-      const savedRole = localStorage.getItem("flux_role");
-      const savedClientId = localStorage.getItem("flux_client_id");
+      const savedRole = sessionStorage.getItem("flux_role");
+      const savedClientId = sessionStorage.getItem("flux_client_id");
       const savedMultiRolesRaw = localStorage.getItem("flux_multi_roles");
       let savedMultiRoles = null;
       if (savedMultiRolesRaw) {
@@ -165,8 +176,9 @@ export default function App() {
     setProfileId(null);
     saveRefreshToken(null);
     clearSessionMeta();
-    setSession(null);
+    sessionStorage.removeItem('flux_atleta_data');
     setAtletaData(null);
+    setSession(null);
   };
 
   const handleRoleSelect = (roleObj) => {
@@ -179,8 +191,13 @@ export default function App() {
       profileId: session.profileId,
       multiRoles: session.multiRoles
     };
-    // Clear saved tab so the new role always starts on its own default tab
-    localStorage.removeItem('flux_admin_tab');
+    // Clear saved tabs so the new role always starts on its own default tab
+    sessionStorage.removeItem('flux_admin_tab');
+    sessionStorage.removeItem('flux_cliente_tab');
+    sessionStorage.removeItem('flux_programar_subtab');
+    sessionStorage.removeItem('flux_admin_selected_client');
+    sessionStorage.removeItem('flux_atleta_data');
+    setAtletaData(null);
     saveSessionMeta(s);
     setSession(s);
   };

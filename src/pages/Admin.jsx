@@ -45,16 +45,27 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const { setBrandColor } = brand;
   
   const [tab, setTab] = useState(() => {
-    const saved = localStorage.getItem("flux_admin_tab");
+    const saved = sessionStorage.getItem("flux_admin_tab");
     return saved ? saved : "perfil";
   });
 
   useEffect(() => {
-    if (tab) localStorage.setItem("flux_admin_tab", tab);
+    if (tab) sessionStorage.setItem("flux_admin_tab", tab);
   }, [tab]);
   
-  const [clientes, setClientes]             = useState([]);
-  const [selected, setSelected]             = useState(null);
+  const [clientes, setClientes] = useState([]);
+  const [selected, setSelected] = useState(() => {
+    try {
+      const s = sessionStorage.getItem("flux_admin_selected_client");
+      return s ? JSON.parse(s) : null;
+    } catch(e) { return null; }
+  });
+
+  useEffect(() => {
+    if (selected) sessionStorage.setItem("flux_admin_selected_client", JSON.stringify(selected));
+    else sessionStorage.removeItem("flux_admin_selected_client");
+  }, [selected]);
+
   const [loading, setLoading]               = useState(true);
   const [showNewClient, setShowNewClient]   = useState(false);
   const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"", telefono:"" });

@@ -27,13 +27,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const brand = useBrand();
   
   const [tabState, setTab] = useState(() => {
-    const saved = localStorage.getItem("flux_cliente_tab");
+    const saved = sessionStorage.getItem("flux_cliente_tab");
     return saved ? saved : "perfil";
   });
+
   const tab = isEmbedded ? embeddedTab : tabState;
 
   useEffect(() => {
-    if (tab) localStorage.setItem("flux_cliente_tab", tab);
+    if (tab) sessionStorage.setItem("flux_cliente_tab", tab);
   }, [tab]);
 
   const [nutri, setNutri] = useState(null);

@@ -25,14 +25,25 @@ import { ProgresoCliente } from "./ProgresoCliente";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
-  const [subtab, setSubtab] = useState("nutri");
+  const [subtab, setSubtab] = useState(() => {
+    const s = sessionStorage.getItem("flux_programar_subtab");
+    return s ? s : "nutri";
+  });
+
+  useEffect(() => {
+    if (subtab) sessionStorage.setItem("flux_programar_subtab", subtab);
+  }, [subtab]);
+
   const [searchProg, setSearchProg] = useState("");
 
   // ── Ciclos ──
   const [ciclos, setCiclos] = useState([]);
   const [cicloSel, setCicloSel] = useState(null);
   const [showPastCycles, setShowPastCycles] = useState(false);
-  useEffect(() => { if (cicloSel && !cicloSel.activo) setShowPastCycles(true); }, [cicloSel]); // ciclo seleccionado para ver/editar
+  useEffect(() => { 
+    if (cicloSel && !cicloSel.activo) setShowPastCycles(true); 
+    if (cicloSel) sessionStorage.setItem("flux_programar_ciclo", cicloSel.id);
+  }, [cicloSel]); // ciclo seleccionado para ver/editar
 
   // ── Datos del ciclo seleccionado ──
   const [nutri, setNutri] = useState(null);
@@ -147,9 +158,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     try {
       const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`);
       setCiclos(cs);
-      // Seleccionar el ciclo activo por defecto
-      const activo = cs.find(c => c.activo) || cs[0] || null;
-      setCicloSel(activo);
+      // Seleccionar el ciclo guardado en sesión, o el activo por defecto
+      let chosen = null;
+      const savedCycleId = sessionStorage.getItem("flux_programar_ciclo");
+      if (savedCycleId) {
+        chosen = cs.find(c => c.id === savedCycleId);
+      }
+      if (!chosen) {
+        chosen = cs.find(c => c.activo) || cs[0] || null;
+      }
+      setCicloSel(chosen);
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
   }, [selected]);
 
