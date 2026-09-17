@@ -125,8 +125,21 @@ export default function ControlPagos({ setMsg }) {
   const updateEstado = async (id, nuevoEstado, nutriologoId) => {
     try {
       await dbPatch(`recibos_pago?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado === "aprobado" && nutriologoId)
+      if (nuevoEstado === "aprobado" && nutriologoId) {
         await dbPatch(`profiles?id=eq.${nutriologoId}`, { bloqueado: false });
+      }
+
+      if (nutriologoId) {
+        await dbPost("notificaciones", {
+          profile_id: nutriologoId,
+          titulo: nuevoEstado === "aprobado" ? "Pago Aprobado" : "Pago Rechazado",
+          mensaje: nuevoEstado === "aprobado" ? "Tu pago ha sido validado exitosamente. Ya tienes acceso." : "Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
+          tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
+          link_url: "membresia",
+          entidad_id: id
+        });
+      }
+
       setMsg("✓ Recibo " + nuevoEstado);
       loadData();
     } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
@@ -160,6 +173,25 @@ export default function ControlPagos({ setMsg }) {
           await dbPatch(`clientes?id=eq.${clienteId}`, { plan_tipo: 'estandar' });
         }
       }
+
+      if (clienteId) {
+        try {
+          const cliente = await dbGet(`clientes?id=eq.${clienteId}`);
+          if (cliente && cliente.length > 0 && cliente[0].auth_id) {
+            await dbPost("notificaciones", {
+              profile_id: cliente[0].auth_id,
+              titulo: nuevoEstado === "aprobado" ? "Pago Aprobado" : "Pago Rechazado",
+              mensaje: nuevoEstado === "aprobado" ? "Tu membresía premium ha sido activada." : "Hubo un problema validando tu pago. Revísalo en tu membresía.",
+              tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
+              link_url: "membresia",
+              entidad_id: id
+            });
+          }
+        } catch (err) {
+          console.error("No se pudo notificar al atleta", err);
+        }
+      }
+
       setMsg("✓ Pago de atleta " + nuevoEstado);
       loadDataCivil();
     } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }

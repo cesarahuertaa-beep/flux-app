@@ -180,15 +180,33 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const url = await storageUpload('comprobantes', path, file);
 
       // 2. Insertar en DB
-      await dbPost('recibos_pago', {
+      const reciboRes = await dbPost('recibos_pago', {
         nutriologo_id: profileId,
         monto: totalAmount,
         fecha_corte_mes: nextCutoff.toISOString().split('T')[0],
         comprobante_url: url,
         estado: 'pendiente'
       });
+      
+      // 3. Notificar a los superadmins
+      try {
+        const superadmins = await dbGet("profiles?role=eq.superadmin");
+        const notifs = superadmins.map(admin => ({
+          profile_id: admin.id,
+          titulo: "Nuevo comprobante de pago",
+          mensaje: "Un profesional ha subido un comprobante para revisión.",
+          tipo: "pago",
+          link_url: "pagos",
+          entidad_id: reciboRes[0]?.id
+        }));
+        for (const n of notifs) {
+          await dbPost("notificaciones", n);
+        }
+      } catch (err) {
+        console.error("Error enviando notif", err);
+      }
 
-      setMsg("✓ Comprobante subido y en revisión.");
+      setMsg(<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Comprobante enviado para revisión</div>);
       if (onPaymentUploaded) onPaymentUploaded();
       loadData();
     } catch (error) {

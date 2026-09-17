@@ -105,13 +105,28 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       const path = `civil_${clienteData.id}_${Date.now()}.${ext}`;
       const url = await storageUpload('comprobantes', path, file);
 
-      await dbPost('recibos_pago_civil', {
+      const reciboRes = await dbPost('recibos_pago_civil', {
         cliente_id: clienteData.id,
         monto: TARIFA,
         fecha_corte_mes: targetCutoff.toISOString().split('T')[0],
         comprobante_url: url,
         estado: 'pendiente'
       });
+
+      // Notificar superadmins
+      try {
+        const superadmins = await dbGet("profiles?role=eq.superadmin");
+        for (const admin of superadmins) {
+          await dbPost("notificaciones", {
+            profile_id: admin.id,
+            titulo: "Pago de Atleta Independiente",
+            mensaje: `El atleta ${clienteData.nombre} ha subido su comprobante.`,
+            tipo: "pago",
+            link_url: "pagos",
+            entidad_id: reciboRes[0]?.id
+          });
+        }
+      } catch(e) {}
 
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Comprobante subido. Lo revisaremos en menos de 24 horas.</div>);
       loadData();

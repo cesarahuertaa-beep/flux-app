@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { Capacitor } from "@capacitor/core";
+import NotificationBell from "./NotificationBell";
 
 /**
  * AppLayout — Mobile-First
@@ -73,19 +74,27 @@ export function AppLayout({ children, nav, active, setActive, session }) {
 
         {/* User Pill */}
         {!collapsed ? (
-          <button onClick={() => setActive("perfil")} className={`mx-3 mt-4 mb-1 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active === "perfil" ? "bg-white border-[var(--brand-primary)] shadow-sm" : "bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
-              <User size={13} strokeWidth={2} className="text-white" />
+          <div className="mx-3 mt-4 mb-1 flex items-center justify-between">
+            <button onClick={() => setActive("perfil")} className={`flex-1 min-w-0 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active === "perfil" ? "bg-white border-[var(--brand-primary)] shadow-sm" : "bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                <User size={13} strokeWidth={2} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#0B1929] truncate leading-tight">{userName}</p>
+                <p className="text-[10px] text-[#6B7A8D] leading-tight truncate">{subtitle}</p>
+              </div>
+            </button>
+            <div className="ml-2">
+              <NotificationBell profileId={session?.profileId} />
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#0B1929] truncate leading-tight">{userName}</p>
-              <p className="text-[10px] text-[#6B7A8D] leading-tight truncate">{subtitle}</p>
-            </div>
-          </button>
+          </div>
         ) : (
-          <button onClick={() => setActive("perfil")} className={`mx-auto mt-4 mb-1 w-8 h-8 rounded-full flex items-center justify-center transition-all ${active === "perfil" ? "ring-2 ring-offset-2 ring-[var(--brand-primary)]" : "hover:scale-105"}`} style={{ background: "var(--brand-primary)" }}>
-            <User size={13} strokeWidth={2} className="text-white" />
-          </button>
+          <div className="flex flex-col items-center gap-2 mt-4 mb-1">
+            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${active === "perfil" ? "ring-2 ring-offset-2 ring-[var(--brand-primary)]" : "hover:scale-105"}`} style={{ background: "var(--brand-primary)" }}>
+              <User size={13} strokeWidth={2} className="text-white" />
+            </button>
+            <NotificationBell profileId={session?.profileId} />
+          </div>
         )}
 
         {/* Nav links */}
@@ -153,7 +162,13 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           - Mobile:   ocupa todo el ancho, deja padding-bottom para la bottom nav
           - Desktop:  flex-1 al lado del sidebar
       ══════════════════════════════════════════════ */}
-      <main className="flex-1 min-w-0 overflow-hidden bg-white flex flex-col">
+      <main className="flex-1 min-w-0 overflow-hidden bg-white flex flex-col relative">
+        
+        {/* Mobile Notification Bell */}
+        <div className="md:hidden absolute top-4 right-4 z-50">
+          <NotificationBell profileId={session?.profileId} />
+        </div>
+
         {/* Área de contenido que hace scroll */}
         <div className="flex-1 overflow-y-auto pb-20 md:pb-0 flex flex-col">
           {children}

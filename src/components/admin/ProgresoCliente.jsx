@@ -251,14 +251,26 @@ export function ProgresoCliente({ selected, setMsg }) {
       const allFotos = [...existingFotos, ...uploadedUrls];
       if (allFotos.length) data.fotos = allFotos;
 
-      if (editingId) {
-        await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
-        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
-      } else {
-        await dbPost("metricas_progreso", data);
-        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
-      }
-      closeModal();
+        if (editingId) {
+          await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
+        } else {
+          await dbPost("metricas_progreso", data);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
+          
+          // Send notification if patient is uploading their own progress
+          if (sessionStorage.getItem('flux_role') === 'cliente' && selected.nutriologo_id) {
+            await dbPost("notificaciones", {
+              profile_id: selected.nutriologo_id,
+              titulo: "Nuevo progreso registrado",
+              mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
+              tipo: "progreso",
+              link_url: "clientes", // Redirect to directory
+              entidad_id: selected.id
+            });
+          }
+        }
+        closeModal();
       await load();
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);

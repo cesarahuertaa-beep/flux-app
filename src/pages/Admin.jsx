@@ -28,7 +28,7 @@ import { useBrand } from "../components/BrandContext";
 const SubComponentWrapper = ({ children, title, action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] overflow-hidden">
     {title && (
-      <div className="px-4 md:px-8 py-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between shadow-sm z-10 shrink-0">
+      <div className="px-4 md:px-8 py-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between shadow-sm z-10 shrink-0 pr-12 md:pr-4">
         <h1 className="text-lg font-bold tracking-tight text-[#0B1929]">{title}</h1>
         {action}
       </div>
@@ -476,7 +476,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       ) : tab === "clientes" && (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header */}
-          <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4">
+          <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
             {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>

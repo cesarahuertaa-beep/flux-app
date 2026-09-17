@@ -256,6 +256,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setCicloSel(cRes[0]);
       setShowPlanModal(false);
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
+      
+      // Notify the patient
+      // we need to make sure we don't notify if the user is a civil (isMiPlan)
+      if (!isMiPlan && selected.auth_id) {
+        await dbPost("notificaciones", {
+          profile_id: selected.auth_id,
+          titulo: "Nuevo plan disponible",
+          mensaje: "Tu nutriólogo ha creado un nuevo ciclo para ti.",
+          tipo: "plan",
+          link_url: "mi_plan",
+          entidad_id: cRes[0].id
+        });
+      }
     } catch(e) { 
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
     }
