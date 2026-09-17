@@ -95,7 +95,9 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
           </h3>
           <div className="flex flex-col gap-2">
             {multiRoles.map((r, i) => {
-              const isActive = session.role === r.role;
+              const isCivilRole = r.role === 'cliente' && !r.data?.nutriologo_id;
+              const roleIdentifier = isCivilRole ? 'civil' : r.role;
+              const isActive = session.role === roleIdentifier;
               return (
                 <button
                   key={i}

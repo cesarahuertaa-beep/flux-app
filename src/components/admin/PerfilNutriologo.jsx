@@ -183,9 +183,11 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               <RefreshCw size={16} className="text-[#6B7A8D]" /> Cambiar Perfil (Sesión Múltiple)
             </h3>
             <div className="flex flex-col gap-2">
-              {rolesToShow.map((r, i) => {
-                const isActive = role === r.role;
-                return (
+                {rolesToShow.map((r, i) => {
+                  const isCivilRole = r.role === 'cliente' && !r.data?.nutriologo_id;
+                  const roleIdentifier = isCivilRole ? 'civil' : r.role;
+                  const isActive = role === roleIdentifier;
+                  return (
                   <button key={i} disabled={isActive} onClick={() => onChangeRole && onChangeRole(r)} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isActive ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5" : "border-[#E2E8F0] bg-white hover:border-[#CBD5E1]"}`}>
                     <div className="text-left min-w-0 flex-1 pr-4">
                       <p className={`font-bold text-sm truncate ${isActive ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
