@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { Capacitor } from "@capacitor/core";
-import NotificationBell from "./NotificationBell";
+import NotificationListener from "./NotificationListener";
 
 /**
  * AppLayout — Mobile-First
@@ -45,6 +45,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
 
   return (
     <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height: "100dvh", width: "100vw" }}>
+      <NotificationListener profileId={session?.profileId} />
 
       {/* ══════════════════════════════════════════════
           SIDEBAR — sólo visible en pantallas ≥ md
@@ -84,16 +85,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 <p className="text-[10px] text-[#6B7A8D] leading-tight truncate">{subtitle}</p>
               </div>
             </button>
-            <div className="ml-2">
-              <NotificationBell profileId={session?.profileId} />
-            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 mt-4 mb-1">
             <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${active === "perfil" ? "ring-2 ring-offset-2 ring-[var(--brand-primary)]" : "hover:scale-105"}`} style={{ background: "var(--brand-primary)" }}>
               <User size={13} strokeWidth={2} className="text-white" />
             </button>
-            <NotificationBell profileId={session?.profileId} />
           </div>
         )}
 
@@ -166,7 +163,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         
         {/* Mobile Notification Bell */}
         <div className="md:hidden absolute top-4 right-4 z-50">
-          <NotificationBell profileId={session?.profileId} />
+          
         </div>
 
         {/* Área de contenido que hace scroll */}
@@ -262,3 +259,6 @@ export function AppLayout({ children, nav, active, setActive, session }) {
     </div>
   );
 }
+
+
+
