@@ -77,7 +77,13 @@ export default function App() {
         let optimisticData = null;
           if (savedMultiRoles) {
             const searchRole = savedRole === "civil" ? "cliente" : savedRole;
-            const matchingRole = savedMultiRoles.find(r => r.role === searchRole);
+            const matchingRole = savedMultiRoles.find(r => {
+              if (r.role !== searchRole) return false;
+              if (searchRole === "cliente" && savedClientId) {
+                return String(r.data?.id) === String(savedClientId);
+              }
+              return true;
+            });
             if (matchingRole) optimisticData = matchingRole.data;
           }
         
