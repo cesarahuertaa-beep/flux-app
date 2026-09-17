@@ -48,11 +48,33 @@ export const restoreSession = () => {
   return null;
 };
 
-/** Registrar callback para cuando la sesión expire (401) */
+/** Registrar callback para cuando la sesión expire (401) */// ── Caché de Consultas GET ──
+const queryCache = new Map();
+
+export const invalidateCache = (table) => {
+  if (!table) { queryCache.clear(); return; }
+  for (const key of queryCache.keys()) {
+    if (key.startsWith(table)) queryCache.delete(key);
+  }
+};
+
 export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
 
 // ── Función base de petición ──
 const q = async (path, opts={}) => {
+  const isGet = !opts.method || opts.method === "GET";
+  const table = path.split('?')[0];
+  
+  if (isGet) {
+    const cached = queryCache.get(path);
+    if (cached && (Date.now() - cached.timestamp < 300000)) { // 5 minutos de caché
+      return cached.data;
+    }
+  } else {
+    // Es mutación (POST, PATCH, DELETE), invalidar caché de la tabla
+    invalidateCache(table);
+  }
+
   const { headers: extraHeaders, upsert, ...restOpts } = opts;
   const prefer = upsert
     ? "resolution=merge-duplicates,return=representation"
@@ -70,6 +92,10 @@ const q = async (path, opts={}) => {
       ...restOpts
     });
   } catch (err) {
+    if (isGet) {
+      const cached = queryCache.get(path);
+      if (cached) return cached.data; // Retornar caché viejo si no hay red
+    }
     throw new Error("OFFLINE");
   }
   // Interceptar 401 — intentar renovar el token antes de cerrar sesión
@@ -88,16 +114,24 @@ const q = async (path, opts={}) => {
         if (_onSessionExpired) _onSessionExpired();
         throw new Error("Sesión expirada — inicia sesión de nuevo");
       }
-      // Reintentar la petición original con el token nuevo
-      return q(path, opts);
     } else {
-      // Esperar a que termine el refresh en curso y reintentar
-      await new Promise(resolve => _refreshQueue.push(resolve));
-      return q(path, opts);
+      await new Promise(res => _refreshQueue.push(res));
     }
+    return q(path, opts);
   }
+  
+  // Para POST minimal
+  if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
+
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
-  const t = await r.text(); return t ? JSON.parse(t) : [];
+  const t = await r.text(); 
+  const data = t ? JSON.parse(t) : [];
+  
+  if (isGet) {
+    queryCache.set(path, { data, timestamp: Date.now() });
+  }
+  
+  return data;
 };
 
 // ── Operaciones de base de datos ──
@@ -106,6 +140,7 @@ export const dbPost   = (p,b) => q(p, { method:"POST", body:JSON.stringify(b) })
 export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), headers:{Prefer:"return=representation"} });
 export const dbDel    = (p)   => q(p, { method:"DELETE" });
 export const dbUpsert = async (p, b) => {
+  invalidateCache(p.split('?')[0]); // Invalidar caché en upsert
   const r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
     method: "POST",
     headers: {
