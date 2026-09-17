@@ -96,6 +96,11 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     setSavingPersonal(true);
     try {
       await syncPersonalData(personalForm.email, formData);
+      if (multiRoles) {
+        multiRoles.forEach(r => {
+          if (r.data) Object.assign(r.data, formData);
+        });
+      }
     } catch (e) {
       setErr("Error guardando datos personales.");
     }

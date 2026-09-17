@@ -31,6 +31,11 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       if (user) {
         Object.assign(user, formData); // Actualizar cache local de sesión
       }
+      if (multiRoles) {
+        multiRoles.forEach(r => {
+          if (r.data) Object.assign(r.data, formData);
+        });
+      }
     } catch (e) {
       console.error("Error saving profile", e);
     }
