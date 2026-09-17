@@ -384,8 +384,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             </div>
           ):metricas.map((m,idx)=>{
             const prev = metricas[idx+1];
+            const isFreemium = isMiPlan && selected?.plan_tipo !== 'premium';
+            const isLocked = isFreemium && idx > 0;
             return (
-              <div key={m.id} className="bg-white rounded-[14px] border border-[#E2E8F0] p-4 mb-3 shadow-sm">
+              <div key={m.id} className="relative bg-white rounded-[14px] border border-[#E2E8F0] p-4 mb-3 shadow-sm overflow-hidden">
+                {isLocked && (
+                  <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 flex flex-col items-center justify-center gap-2 rounded-[14px]">
+                    <Lock className="w-6 h-6 text-amber-500" />
+                    <p className="text-xs font-bold text-[#0B1929] text-center px-4">Historial exclusivo Premium</p>
+                    <p className="text-[11px] text-[#6B7A8D] text-center px-6">Actualiza tu plan para ver evaluaciones anteriores y comparar tu progreso.</p>
+                  </div>
+                )}
+                <div className={isLocked ? "blur-sm pointer-events-none select-none" : ""}>
                 <div className="flex justify-between items-center mb-3.5">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
@@ -405,7 +415,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
                   {DISPLAY_KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
-                    const d = prev ? delta(m,prev,f.key) : null;
+                    const d = (!isFreemium && prev) ? delta(m,prev,f.key) : null;
                     return (
                       <div key={f.key} className="bg-gray-50 rounded-[10px] p-2.5 border border-[#E2E8F0] text-center">
                         <div className="text-[11px] text-[#6B7A8D] mb-1 flex items-center justify-center gap-1">{f.icon} {f.label}</div>
@@ -416,6 +426,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                           <div className={`text-[11px] mt-0.5 font-bold flex items-center justify-center gap-0.5 ${d<0?"text-green-500":"text-red-500"}`}>
                             {d>0?<ArrowUp className="w-3 h-3" />:<ArrowDown className="w-3 h-3" />} {Math.abs(d).toFixed(1)}{f.unit}
                           </div>
+                        )}
+                        {isFreemium && idx===0 && prev && (
+                          <div className="text-[10px] mt-0.5 text-amber-500 font-bold">📈 Premium</div>
                         )}
                       </div>
                     );
@@ -442,6 +455,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             );
           })}

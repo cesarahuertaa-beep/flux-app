@@ -293,7 +293,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {COMP_KEYS.map(k => {
                 const val = current[k.key];
-                const d = delta(current, prev, k.key);
+                const hasPrev = metricas.length > 1;
+                const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
                 let colorClass = "text-[#6B7A8D]";
                 let Icon = Minus;
                 let sign = "";
@@ -316,6 +317,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
                         <Icon size={14} />
                         {sign}{d.toFixed(1)} {k.unit}
                       </div>
+                    )}
+                    {isEstandar && hasPrev && (
+                      <div className="text-[10px] text-amber-500 font-bold mt-1">📈 Comparativa Premium</div>
                     )}
                   </div>
                 );
