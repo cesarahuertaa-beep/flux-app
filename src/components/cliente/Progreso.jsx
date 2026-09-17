@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import Model from "react-body-highlighter";
+import Model from "@phelian/react-body-highlighter";
 import { dbGet } from "../../lib/supabase";
 import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
 import { useBrand } from "../BrandContext";
@@ -109,6 +109,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [loading, setLoading] = useState(true);
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium';
+  const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
@@ -321,6 +322,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
                 <div className="w-24 h-48 md:w-32 md:h-56 shrink-0 flex items-center justify-center">
                   <Model 
+                    bodyType={currentBodyType}
                     data={[]} 
                     style={{ width: '100%', height: '100%' }}
                     bodyColor="#CBD5E1"
@@ -374,6 +376,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               <div className="flex justify-center gap-2 md:gap-4 w-full max-w-[400px] mx-auto">
                   <div className="w-1/2 flex justify-center">
                     <Model 
+                      bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
                       style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
                       highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
@@ -382,6 +385,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                   </div>
                   <div className="w-1/2 flex justify-center">
                     <Model 
+                      bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
                       style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
                       highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
