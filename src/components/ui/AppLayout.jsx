@@ -45,7 +45,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
 
   return (
     <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height: "100dvh", width: "100vw" }}>
-      <NotificationListener profileId={session?.profileId} />
+      
 
       {/* ══════════════════════════════════════════════
           SIDEBAR — sólo visible en pantallas ≥ md
@@ -160,6 +160,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           - Desktop:  flex-1 al lado del sidebar
       ══════════════════════════════════════════════ */}
       <main className="flex-1 min-w-0 overflow-hidden bg-white flex flex-col relative">
+          <NotificationListener profileId={session?.profileId} />
         
         {/* Mobile Notification Bell */}
         <div className="md:hidden absolute top-4 right-4 z-50">
@@ -259,6 +260,8 @@ export function AppLayout({ children, nav, active, setActive, session }) {
     </div>
   );
 }
+
+
 
 
 
