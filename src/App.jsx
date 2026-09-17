@@ -63,11 +63,16 @@ export default function App() {
 
       if (token && savedRole) {
         try {
-          if ((savedRole === "cliente" || savedRole === "civil") && savedClientId) {
+          // If the user has admin roles in their multiRoles, ALWAYS restore via profileId
+          // so we land on the correct role (not on a stale civil/cliente view)
+          const hasAdminRole = Array.isArray(savedMultiRoles) &&
+            savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
+
+          if (!hasAdminRole && (savedRole === "cliente" || savedRole === "civil") && savedClientId) {
             const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
             if (rows.length) {
-              // Preservar el rol "civil" si no tiene nutriólogo, "cliente" si sí tiene
-              const restoredRole = savedRole === "civil" ? "civil" : 
+              // Preserve "civil" if no nutriólogo, "cliente" if has one
+              const restoredRole = savedRole === "civil" ? "civil" :
                                    (rows[0].nutriologo_id ? "cliente" : "civil");
               setSession({ role: restoredRole, data: rows[0], token, profileId, multiRoles: savedMultiRoles });
             } else {
