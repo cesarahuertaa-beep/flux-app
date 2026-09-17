@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Model from "react-body-highlighter";
 import { dbGet } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
 import { useBrand } from "../BrandContext";
 
 // ── Helpers ──
@@ -108,6 +108,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(true);
   const brand = useBrand();
+  const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium';
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
@@ -353,8 +354,17 @@ export default function Progreso({ cliente, isSelfManaged }) {
         )}
 
         {/* EVALUACIÓN MUSCULAR (Simétrico) */}
-        <div className="bg-[#0B1929] rounded-3xl p-6 md:p-8 shadow-lg overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none" />
+        <div className="relative">
+          {isEstandar && (
+            <div className="absolute inset-0 z-50 backdrop-blur-md bg-[#0B1929]/70 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#1E2D3D]">
+              <Lock size={48} className="text-amber-400 mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">Desarrollo Muscular Premium</h3>
+              <p className="text-[#9BA5B0] text-sm max-w-sm mb-6">Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.</p>
+              <div className="text-[11px] uppercase tracking-widest font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-lg">Adquiere Premium en Mi Membresía</div>
+            </div>
+          )}
+          <div className={`bg-[#0B1929] rounded-3xl p-6 md:p-8 shadow-lg overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
+            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none" />
           
           <h2 className="text-lg font-bold text-white mb-2 relative z-10">Desarrollo Muscular</h2>
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
@@ -418,6 +428,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               ))}
             </div>
           </div>
+        </div>
         </div>
 
       </div>
