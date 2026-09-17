@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GRUPOS } from "../../styles/theme";
+import { GRUPOS } from "../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from "lucide-react";
 
