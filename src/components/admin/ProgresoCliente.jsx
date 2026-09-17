@@ -7,7 +7,7 @@ import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
-  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target
+  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock
 } from "lucide-react";
 
 const METRIC_GROUPS_MANUAL = [
