@@ -191,15 +191,15 @@ export default function ControlPagos({ setMsg }) {
     <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
 
       {/* ── SECCIÓN NUTRIÓLOGOS ─────────────────────────────────────────── */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
-        <div>
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+        <div className="flex-1">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
             <Banknote className="text-green-500" />
             Auditoría de Pagos — Nutriólogos
           </h2>
           <p className="text-[#6B7A8D] mt-1 text-sm">Revisa y valida las transferencias mensuales de los nutriólogos.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+        <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
             <Calendar size={16} className="text-[#6B7A8D]" />
             <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize">
@@ -207,7 +207,7 @@ export default function ControlPagos({ setMsg }) {
               {mesesDisponibles.map(m => <option key={m} value={m}>{formatMes(m)}</option>)}
             </select>
           </div>
-          <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
+          <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full">
             {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
               <button key={st} onClick={() => setFiltroEstado(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstado === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>{st}</button>
             ))}
@@ -384,15 +384,15 @@ export default function ControlPagos({ setMsg }) {
       )}
 
       {/* ── SECCIÓN ATLETAS INDEPENDIENTES ──────────────────────────────── */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
-        <div>
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+        <div className="flex-1">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
             <Dumbbell className="text-[var(--brand-primary)]" size={22} />
             Pagos — Atletas Independientes
           </h2>
           <p className="text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium ($75 MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
         </div>
-        <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
+        <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full shrink-0">
           {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
             <button key={st} onClick={() => setFiltroEstadoCivil(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstadoCivil === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>{st}</button>
           ))}
