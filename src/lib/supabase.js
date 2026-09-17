@@ -48,14 +48,44 @@ export const restoreSession = () => {
   return null;
 };
 
-/** Registrar callback para cuando la sesión expire (401) */// ── Caché de Consultas GET ──
+/** Registrar callback para cuando la sesión expire (401) */
+// ── Caché de Consultas GET ──
 const queryCache = new Map();
 
+const loadCache = () => {
+  try {
+    const stored = localStorage.getItem("flux_query_cache");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Limpiar caché viejo al cargar (>5 min)
+      Object.keys(parsed).forEach(k => {
+        if (Date.now() - parsed[k].timestamp < 300000) {
+          queryCache.set(k, parsed[k]);
+        }
+      });
+    }
+  } catch(e) {}
+};
+loadCache();
+
+const saveCache = () => {
+  try {
+    const obj = {};
+    for (const [k, v] of queryCache.entries()) {
+      obj[k] = v;
+    }
+    localStorage.setItem("flux_query_cache", JSON.stringify(obj));
+  } catch(e) {
+    if (e.name === 'QuotaExceededError') localStorage.removeItem("flux_query_cache");
+  }
+};
+
 export const invalidateCache = (table) => {
-  if (!table) { queryCache.clear(); return; }
+  if (!table) { queryCache.clear(); saveCache(); return; }
   for (const key of queryCache.keys()) {
     if (key.startsWith(table)) queryCache.delete(key);
   }
+  saveCache();
 };
 
 export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
@@ -129,6 +159,7 @@ const q = async (path, opts={}) => {
   
   if (isGet) {
     queryCache.set(path, { data, timestamp: Date.now() });
+    saveCache();
   }
   
   return data;
