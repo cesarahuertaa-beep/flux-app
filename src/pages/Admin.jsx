@@ -382,7 +382,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     setSaving(true);
     try {
       // Borrar fotos de storage (progress-photos)
-      const { storageListFolder, storageRemoveMany } = await import("../../lib/supabase");
+      const { storageListFolder, storageRemoveMany } = await import("../lib/supabase");
       const files = await storageListFolder("progress-photos", editClient.id);
       if (files && files.length > 0) {
         const paths = files.map(f => `${editClient.id}/${f.name}`);
@@ -502,7 +502,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           loadClientes={loadClientes} 
           setMsg={setMsg} 
           setSelected={setSelected} 
-          setTab={setTab} 
+          setTab={setTab}
+          setEditClient={setEditClient}
+          toggleActivo={toggleActivo}
         />
       ) : tab === "clientes" && (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
@@ -944,3 +946,4 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 </AppLayout>
   );
 }
+

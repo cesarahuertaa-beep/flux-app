@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { Capacitor } from "@capacitor/core";
-import NotificationListener from "./NotificationListener";
+
 
 /**
  * AppLayout — Mobile-First
@@ -160,7 +160,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           - Desktop:  flex-1 al lado del sidebar
       ══════════════════════════════════════════════ */}
       <main className="flex-1 min-w-0 overflow-hidden bg-white flex flex-col relative">
-          <NotificationListener profileId={session?.profileId} />
+          
         
         {/* Mobile Notification Bell */}
         <div className="md:hidden absolute top-4 right-4 z-50">
@@ -260,6 +260,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
     </div>
   );
 }
+
 
 
 
