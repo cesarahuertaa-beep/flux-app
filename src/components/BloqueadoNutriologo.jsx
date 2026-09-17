@@ -1,7 +1,7 @@
 import React from "react";
 import { Lock, Mail } from "lucide-react";
 
-export default function BloqueadoNutriologo({ onLogout }) {
+export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
   return (
     <div className="min-h-screen bg-[#F0F4FA] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-lg border border-[#E2E8F0] max-w-md w-full overflow-hidden">
@@ -43,7 +43,13 @@ export default function BloqueadoNutriologo({ onLogout }) {
           </p>
         </div>
 
-        <div className="px-8 pb-8">
+        <div className="px-8 pb-8 space-y-3">
+          <button
+            onClick={onGoToMembresia}
+            className="w-full py-3 text-sm text-white font-semibold bg-[#1A6FD4] hover:bg-[#155ab0] rounded-xl transition-colors shadow-sm"
+          >
+            Ir a Mi Membresía
+          </button>
           <button
             onClick={onLogout}
             className="w-full py-3 text-sm text-[#6B7A8D] hover:text-[#0B1929] font-semibold border border-[#E2E8F0] rounded-xl transition-colors hover:bg-gray-50"

@@ -407,8 +407,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           ] : [])
         ];
 
-  if (bloqueado) {
-    return <BloqueadoNutriologo onLogout={onLogout} />;
+  if (bloqueado && tab !== "membresia") {
+    return <BloqueadoNutriologo onLogout={onLogout} onGoToMembresia={() => setTab("membresia")} />;
   }
 
   return (

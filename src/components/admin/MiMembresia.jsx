@@ -57,13 +57,14 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
     );
 
     // Si no tiene pacientes o el primero entró después del último corte, no debe nada de ese corte
+    // PERO si aún estamos cargando, no asumimos que tiene 0 pacientes para evitar un bug visual/cálculo
     const myClients = clientes ? clientes.filter(c => c.nutriologo_id === profileId) : [];
     let firstClientDate = null;
     if (myClients.length > 0) {
       firstClientDate = new Date(myClients[0].created_at);
     }
 
-    if (!firstClientDate || firstClientDate > lastPassedCutoff) {
+    if (!loading && (!firstClientDate || firstClientDate > lastPassedCutoff)) {
       yaPagado = true;
     }
 
@@ -156,7 +157,7 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
       fechaCorteText: strCorte,
       nextCutoff
     };
-  }, [clientes, perfil]);
+  }, [clientes, perfil, loading]);
 
   // Estado del componente
   const status = "active"; // active, pending, review
@@ -391,12 +392,12 @@ export default function MiMembresia({ clientes, profileId, setMsg }) {
               </div>
 
               <div className="mt-6">
-                <button disabled={uploading} 
+                <button disabled={uploading || loading} 
                   onClick={handleUploadClick}
-                  className="w-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                  className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   <Upload size={18} />
-                  {uploading ? 'Subiendo...' : 'Subir Comprobante'}
+                  {loading ? 'Calculando corte...' : uploading ? 'Subiendo...' : 'Subir Comprobante'}
                 </button>
                 <p className="text-xs text-center text-[#6B7A8D] mt-3 flex items-center justify-center gap-1">
                   <AlertCircle size={12}/> Validado manualmente en menos de 2h
