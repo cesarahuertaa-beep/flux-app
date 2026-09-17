@@ -19,6 +19,7 @@ export default function Login({ onLogin }) {
   const [showPass, setShowPass] = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [showSplash, setShowSplash] = useState(true);
+  const [avisoAceptado, setAvisoAceptado] = useState(false);
   const [fadeSplash, setFadeSplash] = useState(false);
 
   useEffect(() => {
@@ -166,6 +167,7 @@ export default function Login({ onLogin }) {
 
   
   const submitProRequest = async () => {
+    if (!avisoAceptado) { setErr('Debes aceptar el Aviso de Privacidad'); return; }
     if (!nombre || !email || (signupType === 'nutriologo' && !cedula)) {
       setErr("Por favor llena los campos obligatorios");
       return;
@@ -190,6 +192,7 @@ export default function Login({ onLogin }) {
   };
 
   const signUpSubmit = async () => {
+    if (!avisoAceptado) { setErr('Debes aceptar el Aviso de Privacidad'); return; }
     if (!nombre.trim() || !email.trim() || !pass) {
       setErr("Por favor llena todos los campos");
       return;
@@ -424,7 +427,13 @@ export default function Login({ onLogin }) {
               <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">{showPass ? <EyeOff size={18} /> : <Eye size={18} />}</button>
             </div>
           </div>
-          <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+                      <div className="mb-6 flex items-start gap-2">
+              <input type="checkbox" id="aviso" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1" />
+              <label htmlFor="aviso" className="text-xs text-[#6B7A8D] leading-tight">
+                He leído y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
+              </label>
+            </div>
+            <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
             {loading ? "CREANDO..." : <>CREAR CUENTA <ArrowRight size={16} /></>}
           </button>
           <div className="text-center">
@@ -472,7 +481,13 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           )}
-          <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
+                      <div className="mb-6 flex items-start gap-2">
+              <input type="checkbox" id="aviso" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1" />
+              <label htmlFor="aviso" className="text-xs text-[#6B7A8D] leading-tight">
+                He leído y acepto el <a href="https://flux-sport.com/privacidad" target="_blank" className="text-[#1A6FD4] underline">Aviso de Privacidad</a> para el tratamiento de mis datos personales y de salud.
+              </label>
+            </div>
+            <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
             {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}
           </button>
           <div className="text-center">
@@ -553,3 +568,4 @@ export default function Login({ onLogin }) {
     </div>
   );
 }
+

@@ -948,7 +948,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
 
         {subtab === "progreso" && (
-          <ProgresoCliente selected={selected} setMsg={setMsg}/>
+          <ProgresoCliente selected={selected} setMsg={setMsg} isMiPlan={isMiPlan} />
         )}
       </>}
 

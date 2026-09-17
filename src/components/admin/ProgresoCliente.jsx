@@ -115,7 +115,7 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 
-export function ProgresoCliente({ selected, setMsg }) {
+export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [metricas,     setMetricas]     = useState([]);
   const [rutinas,      setRutinas]      = useState([]);
   const [ciclos,       setCiclos]       = useState([]);
@@ -591,20 +591,22 @@ export function ProgresoCliente({ selected, setMsg }) {
             </div>
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div className="flex bg-[#F0F4FA] rounded-xl p-1 inline-flex w-full md:w-auto">
-                  <button 
-                    onClick={() => updForm("metodo_evaluacion", "manual")}
-                    className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "manual" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                  >
-                    MANUAL
-                  </button>
-                  <button 
-                    onClick={() => updForm("metodo_evaluacion", "inbody")}
-                    className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                  >
-                    INBODY
-                  </button>
-                </div>
+                {!isMiPlan && (
+                  <div className="flex bg-[#F0F4FA] rounded-xl p-1 inline-flex w-full md:w-auto">
+                    <button 
+                      onClick={() => updForm("metodo_evaluacion", "manual")}
+                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "manual" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                    >
+                      MANUAL
+                    </button>
+                    <button 
+                      onClick={() => updForm("metodo_evaluacion", "inbody")}
+                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                    >
+                      INBODY
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5 w-full md:w-auto">
                   <label className="text-sm font-bold text-[#0B1929] hidden md:block">Fecha</label>
@@ -612,7 +614,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                 </div>
               </div>
 
-              {metricas.length > 0 && metricas[0].metodo_evaluacion !== form.metodo_evaluacion && !editingId && (
+              {!isMiPlan && metricas.length > 0 && metricas[0].metodo_evaluacion !== form.metodo_evaluacion && !editingId && (
                 <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
                   <div>
@@ -624,7 +626,7 @@ export function ProgresoCliente({ selected, setMsg }) {
                 </div>
               )}
   
-              {(form.metodo_evaluacion === 'inbody' ? METRIC_GROUPS_INBODY : METRIC_GROUPS_MANUAL).map(group=>(
+              {(form.metodo_evaluacion === 'inbody' ? METRIC_GROUPS_INBODY : (isMiPlan ? METRIC_GROUPS_MANUAL.filter(g => g.label.includes('B') && g.label.includes('sicas')) : METRIC_GROUPS_MANUAL)).map(group=>(
               <div key={group.label} className="mb-6">
                 <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
                   {group.icon} {group.label}
@@ -708,3 +710,5 @@ export function ProgresoCliente({ selected, setMsg }) {
     </div>
   );
 }
+
+
