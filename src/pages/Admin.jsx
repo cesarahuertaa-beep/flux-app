@@ -846,8 +846,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           <UserProfile
             session={{ role: "cliente", data: clienteData }}
             onLogout={onLogout}
-            onChangeRole={null}
-            multiRoles={null}
+            onChangeRole={onChangeRole}
+            multiRoles={multiRoles}
           />
         </SubComponentWrapper>
       )}
