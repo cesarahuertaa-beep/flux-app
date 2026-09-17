@@ -212,13 +212,29 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const prev = metricas[1] || {};
 
   const COMP_KEYS = [
+    { key: "inbody_score", label: "SCORE INBODY", unit: "pts" },
     { key: "peso", label: "PESO", unit: "kg" },
     { key: "grasa_pct", label: "GRASA CORPORAL", unit: "%" },
+    { key: "calc_masa_grasa", label: "MASA GRASA", unit: "kg" },
     { key: "musculo_pct", label: "MASA MUSCULAR", unit: "%" },
+    { key: "calc_masa_muscular", label: "MASA MUSCULAR", unit: "kg" },
+    { key: "inbody_smm", label: "MASA MUSCULAR (SMM)", unit: "kg" },
     { key: "imc", label: "IMC", unit: "" },
     { key: "agua_pct", label: "AGUA CORPORAL", unit: "%" },
+    { key: "inbody_tbw", label: "AGUA CORPORAL", unit: "L" },
     { key: "masa_osea", label: "MASA ÓSEA", unit: "kg" },
+    { key: "calc_masa_osea", label: "MASA ÓSEA", unit: "kg" },
+    { key: "calc_masa_residual", label: "MASA RESIDUAL", unit: "kg" },
+    { key: "inbody_grasa_visceral", label: "GRASA VISCERAL", unit: "lvl" },
+    { key: "inbody_bmr", label: "METABOLISMO BASAL", unit: "kcal" },
     { key: "cintura", label: "CINTURA", unit: "cm" },
+    { key: "cadera", label: "CADERA", unit: "cm" },
+    { key: "icc", label: "ICC", unit: "" },
+    { key: "pecho", label: "PECHO", unit: "cm" },
+    { key: "brazo", label: "BRAZO", unit: "cm" },
+    { key: "brazo_relajado", label: "BRAZO", unit: "cm" },
+    { key: "muslo", label: "MUSLO", unit: "cm" },
+    { key: "pantorrilla", label: "PANTORRILLA", unit: "cm" },
   ].filter(k => current[k.key] != null && current[k.key] !== ""); // Solo mostrar los que tienen datos
 
   const getBodyData = (groups) => {
@@ -283,8 +299,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 let sign = "";
                 
                 if (d !== null) {
-                  const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") ? d < 0 : d > 0;
-                  colorClass = isImprovement ? "text-green-500" : "text-red-500";
+                    const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") || k.key.includes("cadera") || k.key.includes("icc") ? d < 0 : d > 0;
+                    colorClass = isImprovement ? "text-green-500" : "text-red-500";
                   Icon = d > 0 ? TrendingUp : TrendingDown;
                   sign = d > 0 ? "+" : "";
                 }
