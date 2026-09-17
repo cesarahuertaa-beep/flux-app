@@ -166,13 +166,24 @@ export function CitasCliente({ cliente }) {
     setSaving(true);
     setErrorReq("");
     try {
-      await dbPost("citas", {
+      const cRes = await dbPost("citas", {
         cliente_id: clienteId,
         nutriologo_id: nutriologoId,
         fecha_hora: selectedSlot.iso,
         modalidad,
         estado: "pendiente"
       });
+
+      // Notify nutritionist
+      await dbPost("notificaciones", {
+        profile_id: nutriologoId,
+        titulo: "Nueva Solicitud de Cita",
+        mensaje: `Un paciente ha solicitado una cita para el ${new Date(selectedSlot.iso).toLocaleDateString('es-ES')}.`,
+        tipo: "plan",
+        link_url: "agenda",
+        entidad_id: cRes[0]?.id
+      });
+
       setExito(true);
       setShowModal(false);
       setSelectedDate(""); 
