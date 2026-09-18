@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from"react";
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import {
@@ -46,7 +47,7 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
   );
 };
 
-const Modal = ({ title, onClose, children }) => (
+const Modal = ({ title, onClose, children }) => createPortal(
   <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
     <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
       <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
@@ -59,7 +60,8 @@ const Modal = ({ title, onClose, children }) => (
         {children}
       </div>
     </div>
-  </div>
+  </div>,
+  document.body
 );
 
 const Field = ({ label, children }) => (
@@ -251,7 +253,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   // ── Render ──
   return (
-    <div className="animate-in w-full">
+    <div className="w-full">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
