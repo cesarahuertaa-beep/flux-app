@@ -108,14 +108,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 key={id}
                 onClick={() => {
                   if (id ==="tienda_link") {
-                    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
-                    if (isAppMode) {
-                      // En App nativa (Electron o Android), abrimos el navegador web real
-                      window.open("https://www.flux-sport.com","_blank"); 
-                    } else {
-                      // En web (https://), navegamos a la raíz (landing page)
-                      window.location.href ="/";
-                    }
+                    navigate("/tienda");
                   } else {
                     setActive(id);
                   }
@@ -227,14 +220,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               <button
                 onClick={() => {
                   if (id ==="tienda_link") {
-                    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
-                    if (isAppMode) {
-                      // En App nativa (Electron o Android), abrimos el navegador web real
-                      window.open("https://www.flux-sport.com","_blank"); 
-                    } else {
-                      // En web (https://), navegamos a la raíz (landing page)
-                      window.location.href ="/";
-                    }
+                    navigate("/tienda");
                   } else {
                     setActive(id);
                   }

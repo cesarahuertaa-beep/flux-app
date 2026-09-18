@@ -45,7 +45,7 @@ function Stars({ n }) {
 function Navbar({ session, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const links = ["Suplementos","Ropa","Nutriólogos"];
-  const hasAppAccess = session && (session.role !== 'cliente' || !!session.data?.nutriologo_id);
+  const hasAppAccess = !!session;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#E2E5EA]">
