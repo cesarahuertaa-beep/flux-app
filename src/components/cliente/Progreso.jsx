@@ -207,32 +207,50 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const loadPersonalPhotos = useCallback(async () => {
     if (!cliente?.id) return;
     try {
-      const files = await storageListFolder("progress-photos", `${cliente.id}/personal/`);
       const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-      const urls = files
-        .filter(f => f.name && f.name !== '.emptyFolderPlaceholder')
-        .map(f => `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/${f.name}`);
-      setPersonalPhotos(urls);
+      const indexUrl = `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/index.json?t=${Date.now()}`;
+      const r = await fetch(indexUrl);
+      if (r.ok) {
+        const urls = await r.json();
+        setPersonalPhotos(Array.isArray(urls) ? urls : []);
+      } else {
+        setPersonalPhotos([]);
+      }
     } catch (e) {
-      console.error("Error loading personal photos", e);
+      console.error("Error loading personal photos index", e);
+      setPersonalPhotos([]);
     }
   }, [cliente?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (view === 'galeria') loadPersonalPhotos(); }, [view, loadPersonalPhotos]);
 
+  const saveIndex = async (urls) => {
+    try {
+      const indexPath = `${cliente.id}/personal/index.json`;
+      await storageDelete("progress-photos", indexPath).catch(() => {}); // Ignore error if it doesn't exist
+      const blob = new Blob([JSON.stringify(urls)], { type: "application/json" });
+      await storageUpload("progress-photos", indexPath, blob);
+    } catch (e) {
+      console.error("Error saving index", e);
+    }
+  };
+
   const handlePersonalUpload = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setUploadingPersonal(true);
     try {
-      const urls = [];
+      const newUrls = [];
       for (const file of Array.from(files)) {
         const path = `${cliente.id}/personal/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
         const url = await storageUpload("progress-photos", path, file);
-        urls.push(url);
+        newUrls.push(url);
       }
-      setPersonalPhotos(prev => [...prev, ...urls]);
+      
+      const updatedUrls = [...personalPhotos, ...newUrls];
+      await saveIndex(updatedUrls);
+      setPersonalPhotos(updatedUrls);
     } catch (error) {
       console.error(error);
       alert("Error subiendo fotos personales.");
@@ -247,9 +265,11 @@ export default function Progreso({ cliente, isSelfManaged }) {
     try {
       const pathPart = url.split("progress-photos/")[1];
       if (pathPart) {
-        await storageDelete("progress-photos", pathPart);
-        setPersonalPhotos(prev => prev.filter(u => u !== url));
+        await storageDelete("progress-photos", pathPart).catch(() => {});
       }
+      const updatedUrls = personalPhotos.filter(u => u !== url);
+      await saveIndex(updatedUrls);
+      setPersonalPhotos(updatedUrls);
     } catch (e) {
       console.error("Error deleting", e);
     }
