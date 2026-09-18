@@ -13,12 +13,12 @@ import { BrandProvider } from"./components/BrandContext";
 import { AppUpdater } from"./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
-  sessionStorage.setItem("flux_role", s.role);
+  localStorage.setItem("flux_role", s.role);
   //"civil" y"cliente" ambos guardan su ID de cliente en flux_client_id
   if ((s.role ==="cliente" || s.role ==="civil") && s.data?.id) {
-    sessionStorage.setItem("flux_client_id", s.data.id);
+    localStorage.setItem("flux_client_id", s.data.id);
   } else {
-    sessionStorage.removeItem("flux_client_id");
+    localStorage.removeItem("flux_client_id");
   }
   
   if (s.multiRoles) {
@@ -29,8 +29,8 @@ const saveSessionMeta = (s) => {
 };
 
 const clearSessionMeta = () => {
-  sessionStorage.removeItem("flux_role");
-  sessionStorage.removeItem("flux_client_id");
+  localStorage.removeItem("flux_role");
+  localStorage.removeItem("flux_client_id");
   localStorage.removeItem("flux_multi_roles");
 };
 
@@ -65,8 +65,8 @@ export default function App() {
     const restore = async () => {
       const token = restoreSession();
       const profileId = restoreProfileId();
-      const savedRole = sessionStorage.getItem("flux_role");
-      const savedClientId = sessionStorage.getItem("flux_client_id");
+      const savedRole = localStorage.getItem("flux_role");
+      const savedClientId = localStorage.getItem("flux_client_id");
       const savedMultiRolesRaw = localStorage.getItem("flux_multi_roles");
       let savedMultiRoles = null;
       if (savedMultiRolesRaw) {
