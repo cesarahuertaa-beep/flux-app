@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Model from "@phelian/react-body-highlighter";
-import { dbGet } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
+import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
+import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from "lucide-react";
+import { parseFotos } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
 
 // ── Helpers ──
@@ -110,6 +111,12 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
+  
+  const [view, setView] = useState('metricas');
+  const [personalPhotos, setPersonalPhotos] = useState([]);
+  const [uploadingPersonal, setUploadingPersonal] = useState(false);
+  const [fullImage, setFullImage] = useState(null);
+  const fileInputRef = useRef(null);
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
@@ -197,7 +204,56 @@ export default function Progreso({ cliente, isSelfManaged }) {
     setLoading(false);
   }, [cliente]);
 
+  const loadPersonalPhotos = useCallback(async () => {
+    if (!cliente?.id) return;
+    try {
+      const files = await storageListFolder("progress-photos", `${cliente.id}/personal/`);
+      const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
+      const urls = files
+        .filter(f => f.name && f.name !== '.emptyFolderPlaceholder')
+        .map(f => `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/${f.name}`);
+      setPersonalPhotos(urls);
+    } catch (e) {
+      console.error("Error loading personal photos", e);
+    }
+  }, [cliente?.id]);
+
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { if (view === 'galeria') loadPersonalPhotos(); }, [view, loadPersonalPhotos]);
+
+  const handlePersonalUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingPersonal(true);
+    try {
+      const urls = [];
+      for (const file of Array.from(files)) {
+        const path = `${cliente.id}/personal/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
+        const url = await storageUpload("progress-photos", path, file);
+        urls.push(url);
+      }
+      setPersonalPhotos(prev => [...prev, ...urls]);
+    } catch (error) {
+      console.error(error);
+      alert("Error subiendo fotos personales.");
+    } finally {
+      setUploadingPersonal(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handlePersonalDelete = async (url) => {
+    if (!confirm("¿Eliminar esta foto personal?")) return;
+    try {
+      const pathPart = url.split("progress-photos/")[1];
+      if (pathPart) {
+        await storageDelete("progress-photos", pathPart);
+        setPersonalPhotos(prev => prev.filter(u => u !== url));
+      }
+    } catch (e) {
+      console.error("Error deleting", e);
+    }
+  };
 
   if (loading) {
     return (
@@ -275,6 +331,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
   };
 
 
+  const nutriPhotos = metricas.flatMap(m => parseFotos(m.fotos)).filter(Boolean);
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#F7F9FC]">
       <div className="px-6 md:px-8 pt-6 md:pt-8 pb-12 max-w-5xl mx-auto space-y-8">
@@ -287,10 +345,26 @@ export default function Progreso({ cliente, isSelfManaged }) {
           </p>
         </div>
 
-        {COMP_KEYS.length > 0 ? (
-          <>
-            {/* KPI GRID */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="flex bg-[#E2E8F0] p-1 rounded-xl w-max">
+          <button
+            onClick={() => setView('metricas')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'metricas' ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+          >
+            Métricas
+          </button>
+          <button
+            onClick={() => setView('galeria')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'galeria' ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+          >
+            Galería
+          </button>
+        </div>
+
+        {view === 'metricas' && (
+          COMP_KEYS.length > 0 ? (
+            <>
+              {/* KPI GRID */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {COMP_KEYS.map(k => {
                 const val = current[k.key];
                 const hasPrev = metricas.length > 1;
@@ -470,8 +544,125 @@ export default function Progreso({ cliente, isSelfManaged }) {
           </div>
         </div>
         </div>
+        </>
+        ) : (
+          <div className="bg-white rounded-2xl p-8 text-center text-[#6B7A8D] shadow-sm border border-[#E2E8F0]">
+            No hay evaluaciones registradas.
+          </div>
+        ))}
+
+        {view === 'galeria' && (
+          <div className="space-y-12">
+            
+            {/* Sección Nutriólogo */}
+            {(!isSelfManaged && nutriPhotos.length > 0) && (
+              <div>
+                <div className="flex items-center gap-3 mb-6 border-b border-[#E2E8F0] pb-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#F0F4FA] text-[#1A6FD4] flex items-center justify-center">
+                    <ImageIcon size={18} />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#0B1929]">Fotos de tu Nutriólogo</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {nutriPhotos.map((url, i) => (
+                    <div 
+                      key={i} 
+                      className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
+                      onClick={() => setFullImage(url)}
+                    >
+                      <img src={url} alt={`Progreso nutriologo ${i}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-[#0B1929]/0 group-hover:bg-[#0B1929]/20 transition-colors" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sección Personal */}
+            <div>
+              <div className="flex items-center justify-between mb-6 border-b border-[#E2E8F0] pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Lock size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#0B1929]">Galería Personal (Privada)</h3>
+                    <p className="text-xs text-[#6B7A8D]">Solo tú puedes ver estas fotos</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPersonal}
+                  className="flex items-center gap-2 bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                >
+                  <Camera size={16} />
+                  {uploadingPersonal ? "Subiendo..." : "Agregar fotos"}
+                </button>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handlePersonalUpload} 
+                />
+              </div>
+
+              {personalPhotos.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {personalPhotos.map((url, i) => (
+                    <div key={i} className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative">
+                      <img 
+                        src={url} 
+                        alt={`Progreso personal ${i}`} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                        onClick={() => setFullImage(url)}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handlePersonalDelete(url); }}
+                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#F8FAFC] border border-dashed border-[#CBD5E1] rounded-2xl p-12 text-center flex flex-col items-center">
+                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-[#9BA5B0] mb-4">
+                    <UploadCloud size={24} />
+                  </div>
+                  <h4 className="text-[#0B1929] font-bold mb-1">Sube fotos de tu progreso</h4>
+                  <p className="text-sm text-[#6B7A8D] max-w-sm mb-6">Guarda un registro visual de tus cambios. Estas fotos son 100% privadas y no se comparten con nadie.</p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-[#10B981] text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-[#059669] transition-colors shadow-lg shadow-emerald-500/20"
+                  >
+                    Elegir fotos
+                  </button>
+                </div>
+              )}
+            </div>
+            
+          </div>
+        )}
 
       </div>
+
+      {/* Full Image Modal */}
+      {fullImage && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setFullImage(null)}>
+          <button 
+            onClick={() => setFullImage(null)}
+            className="absolute top-6 right-6 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors"
+          >
+            <X size={24} />
+          </button>
+          <img src={fullImage} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Vista ampliada" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }
