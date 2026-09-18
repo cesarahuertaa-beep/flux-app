@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, User, Loader2 } from 'lucide-react';
 
-export default function RoleSwitcher({ currentRole, currentData, multiRoles, onChangeRole }) {
+export default function RoleSwitcher({ currentRole, currentData, multiRoles, onChangeRole, activeNutriologo }) {
   const [switchingTo, setSwitchingTo] = useState(null);
 
   const rolesToShow = (currentRole === 'nutriologo' || currentRole === 'nutriologo_estudiante' || currentRole === 'superadmin')
@@ -52,10 +52,18 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
 
           if (r.role === 'cliente') {
              if (r.data?.nutriologo_id) {
-               // Compatibility fallback for users who haven't logged out
-               const isOldFormat = !r.data.nutriologo_nombre;
-               const clinic = isOldFormat ? 'Consultorio' : (r.data.nombre_clinica || 'Consultorio');
-               const nutName = isOldFormat ? (r.data.nombre_clinica || 'Especialista') : r.data.nutriologo_nombre;
+               // If this is the active client profile, we can use the live fetched data to bypass cache
+               const isCurrentActiveClient = isActive && activeNutriologo;
+               
+               let clinic, nutName;
+               if (isCurrentActiveClient) {
+                 clinic = activeNutriologo.nombre_marca || 'Consultorio';
+                 nutName = activeNutriologo.nombre || 'Especialista';
+               } else {
+                 const isOldFormat = !r.data.nutriologo_nombre;
+                 clinic = isOldFormat ? 'Consultorio' : (r.data.nombre_clinica || 'Consultorio');
+                 nutName = isOldFormat ? (r.data.nombre_clinica || 'Especialista') : r.data.nutriologo_nombre;
+               }
                
                label = `Paciente de ${clinic}`;
                subtitle = `Nutriólogo: ${nutName}`;

@@ -81,7 +81,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
       </div>
 
-      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} />
+      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 
       <DatosPersonalesCard 
         form={form} 
