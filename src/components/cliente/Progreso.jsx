@@ -575,7 +575,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
             {(!isSelfManaged && nutriPhotos.length > 0) && (
               <div>
                 <div className="flex items-center gap-3 mb-6 border-b border-[#E2E8F0] pb-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#F0F4FA] text-[#1A6FD4] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#1A6FD4' }}>
                     <ImageIcon size={18} />
                   </div>
                   <h3 className="text-lg font-bold text-[#0B1929]">Fotos de tu Nutriólogo</h3>
@@ -599,7 +599,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
             <div>
               <div className="flex items-center justify-between mb-6 border-b border-[#E2E8F0] pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#ecfdf5', color: brand?.color_primario || '#059669' }}>
                     <Lock size={18} />
                   </div>
                   <div>
@@ -610,7 +610,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingPersonal}
-                  className="flex items-center gap-2 bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 hover:opacity-80"
+                  style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#0B1929' }}
                 >
                   <Camera size={16} />
                   {uploadingPersonal ? "Subiendo..." : "Agregar fotos"}
@@ -628,12 +629,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
               {personalPhotos.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {personalPhotos.map((url, i) => (
-                    <div key={i} className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative">
+                    <div 
+                      key={i} 
+                      className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
+                      onClick={() => setFullImage(url)}
+                    >
                       <img 
                         src={url} 
                         alt={`Progreso personal ${i}`} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                        onClick={() => setFullImage(url)}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
                         <button 
@@ -647,17 +651,18 @@ export default function Progreso({ cliente, isSelfManaged }) {
                   ))}
                 </div>
               ) : (
-                <div className="bg-[#F8FAFC] border border-dashed border-[#CBD5E1] rounded-2xl p-12 text-center flex flex-col items-center">
-                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-[#9BA5B0] mb-4">
-                    <UploadCloud size={24} />
+                <div className="bg-[#F8FAFC] border border-dashed rounded-2xl p-12 text-center flex flex-col items-center" style={{ borderColor: brand?.color_primario ? `${brand.color_primario}40` : '#CBD5E1' }}>
+                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-4" style={{ color: brand?.color_primario || '#9BA5B0' }}>
+                    <Camera size={24} />
                   </div>
-                  <h4 className="text-[#0B1929] font-bold mb-1">Sube fotos de tu progreso</h4>
-                  <p className="text-sm text-[#6B7A8D] max-w-sm mb-6">Guarda un registro visual de tus cambios. Estas fotos son 100% privadas y no se comparten con nadie.</p>
+                  <h4 className="text-sm font-bold text-[#0B1929] mb-1">Galería vacía</h4>
+                  <p className="text-xs text-[#6B7A8D] max-w-[200px] mb-4">Sube fotos para registrar tu progreso. Solo tú podrás verlas.</p>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="bg-[#10B981] text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-[#059669] transition-colors shadow-lg shadow-emerald-500/20"
+                    className="px-6 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 shadow-sm"
+                    style={{ backgroundColor: brand?.color_primario || '#0B1929', color: '#fff' }}
                   >
-                    Elegir fotos
+                    Subir mi primera foto
                   </button>
                 </div>
               )}
