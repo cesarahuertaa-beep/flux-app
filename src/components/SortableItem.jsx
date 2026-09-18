@@ -1,6 +1,6 @@
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { useSortable } from"@dnd-kit/sortable";
+import { CSS } from"@dnd-kit/utilities";
+import { GripVertical } from"lucide-react";
 
 export const DragHandle = ({ listeners, attributes }) => (
   <span
@@ -26,9 +26,9 @@ export const SortableItem = ({ id, children }) => {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : "auto",
+    zIndex: isDragging ? 50 :"auto",
     opacity: isDragging ? 0.9 : 1,
-    position: "relative",
+    position:"relative",
   };
 
   const dragHandle = <DragHandle listeners={listeners} attributes={attributes} />;
@@ -37,7 +37,7 @@ export const SortableItem = ({ id, children }) => {
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={isDragging ? "shadow-2xl ring-2 ring-[var(--brand-primary)] ring-opacity-50 rounded-xl" : ""}
+      className={isDragging ?"shadow-2xl ring-2 ring-[var(--brand-primary)] ring-opacity-50 rounded-xl" :""}
     >
       {children({ dragHandle, isDragging })}
     </div>

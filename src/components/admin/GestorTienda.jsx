@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
-import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, ShoppingBag } from "lucide-react";
+import { useState, useEffect } from"react";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
+import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, ShoppingBag } from"lucide-react";
 
 export default function GestorTienda({ setMsg }) {
   const [productos, setProductos] = useState([]);
@@ -8,7 +8,7 @@ export default function GestorTienda({ setMsg }) {
   const [showModal, setShowModal] = useState(false);
   const [editProd, setEditProd] = useState(null);
   const [form, setForm] = useState({
-    nombre: "", subtitulo: "", precio: "", categoria: "suplemento", variantes: "", badge: "", imagen_url: ""
+    nombre:"", subtitulo:"", precio:"", categoria:"suplemento", variantes:"", badge:"", imagen_url:""
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,7 +40,7 @@ export default function GestorTienda({ setMsg }) {
       setForm(prev => ({ ...prev, imagen_url: url }));
       setMsg("Imagen subida correctamente");
     } catch (e) {
-      setMsg("Error subiendo imagen: " + e.message);
+      setMsg("Error subiendo imagen:" + e.message);
     }
     setUploading(false);
   };
@@ -75,7 +75,7 @@ export default function GestorTienda({ setMsg }) {
       setEditProd(null);
       loadProductos();
     } catch (e) {
-      setMsg("Error al guardar: " + e.message);
+      setMsg("Error al guardar:" + e.message);
     }
     setSaving(false);
   };
@@ -87,12 +87,12 @@ export default function GestorTienda({ setMsg }) {
       setMsg("Producto eliminado");
       loadProductos();
     } catch (e) {
-      setMsg("Error al eliminar: " + e.message);
+      setMsg("Error al eliminar:" + e.message);
     }
   };
 
   const filtered = productos.filter(p => {
-    if (filtroCat !== "Todas" && p.categoria !== filtroCat) return false;
+    if (filtroCat !=="Todas" && p.categoria !== filtroCat) return false;
     if (busqueda && !p.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
     return true;
   });
@@ -107,7 +107,7 @@ export default function GestorTienda({ setMsg }) {
         <button
           onClick={() => {
             setEditProd(null);
-            setForm({ nombre: "", subtitulo: "", precio: "", categoria: "suplemento", variantes: "", badge: "", imagen_url: "" });
+            setForm({ nombre:"", subtitulo:"", precio:"", categoria:"suplemento", variantes:"", badge:"", imagen_url:"" });
             setShowModal(true);
           }}
           className="flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity"
@@ -128,7 +128,7 @@ export default function GestorTienda({ setMsg }) {
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           <Filter className="w-4 h-4 text-[#6B7A8D] ml-2" />
-          {["Todas", "suplemento", "ropa"].map(c => (
+          {["Todas","suplemento","ropa"].map(c => (
             <button
               key={c}
               onClick={() => setFiltroCat(c)}
@@ -173,7 +173,7 @@ export default function GestorTienda({ setMsg }) {
                         setEditProd(p);
                         setForm({
                           nombre: p.nombre, subtitulo: p.subtitulo||"", precio: p.precio,
-                          categoria: p.categoria, variantes: (p.variantes||[]).join(", "),
+                          categoria: p.categoria, variantes: (p.variantes||[]).join(","),
                           badge: p.badge||"", imagen_url: p.imagen_url||""
                         });
                         setShowModal(true);
@@ -259,7 +259,7 @@ export default function GestorTienda({ setMsg }) {
                   <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#E2E8F0] rounded-xl p-4 hover:bg-[#F0F4FA] cursor-pointer transition-colors text-center">
                     <ImageIcon className="w-6 h-6 text-[#9BA5B0] mb-2" />
                     <span className="text-xs font-medium text-[var(--brand-primary)]">
-                      {uploading ? "Subiendo..." : "Subir nueva foto (JPG/PNG)"}
+                      {uploading ?"Subiendo..." :"Subir nueva foto (JPG/PNG)"}
                     </span>
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                       if(e.target.files[0]) uploadImg(e.target.files[0]);
@@ -272,7 +272,7 @@ export default function GestorTienda({ setMsg }) {
             <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3 shrink-0">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
               <button onClick={saveProducto} disabled={saving || uploading} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-                {saving ? "Guardando..." : "Guardar Producto"}
+                {saving ?"Guardando..." :"Guardar Producto"}
               </button>
             </div>
           </div>

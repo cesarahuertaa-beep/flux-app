@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../../lib/supabase";
-import { useBrand } from "../BrandContext";
+import { useState, useEffect, useCallback } from"react";
+import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
+import { useBrand } from"../BrandContext";
 import {
   Clock,
   Clock3,
@@ -13,30 +13,30 @@ import {
   Building,
   MessageCircle,
   Plus
-} from "lucide-react";
+} from"lucide-react";
 
 // ── UI Components (Tailwind Light Theme) ──────────────────────────────────────
-const Tag = ({ children, className = "" }) => (
+const Tag = ({ children, className ="" }) => (
   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border ${className}`}>
     {children}
   </span>
 );
 
 const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad }) => {
-  let base = "inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
-  let size = small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  let base ="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+  let size = small ?"px-3 py-1.5 text-xs" :"px-4 py-2 text-sm";
   
-  let variant = "bg-[var(--brand-primary)] text-white hover:opacity-90 shadow-sm"; // default
+  let variant ="bg-[var(--brand-primary)] text-white hover:opacity-90 shadow-sm"; // default
   if (outline) {
-    if (color === "#ef4444" || danger) {
-      variant = "border border-red-200 text-red-600 hover:bg-red-50 bg-white";
+    if (color ==="#ef4444" || danger) {
+      variant ="border border-red-200 text-red-600 hover:bg-red-50 bg-white";
     } else {
-      variant = "border border-slate-200 text-slate-600 hover:bg-slate-50 bg-white";
+      variant ="border border-slate-200 text-slate-600 hover:bg-slate-50 bg-white";
     }
   } else if (danger) {
-    variant = "bg-red-600 text-white hover:bg-red-700 shadow-sm";
+    variant ="bg-red-600 text-white hover:bg-red-700 shadow-sm";
   } else if (grad) {
-    variant = "bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90";
+    variant ="bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90";
   }
 
   return (
@@ -70,22 +70,22 @@ const Field = ({ label, children }) => (
 );
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const HORAS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const HORAS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,"0")}:00`);
 
 const fmtFechaHora = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return"—";
   const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })
-    + " • " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("es-MX", { weekday:"short", day:"numeric", month:"short" })
+    +" •" + d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
 };
 
 const ESTADO_COLOR = {
-  pendiente:  { bg: "bg-yellow-50",  border: "border-yellow-200",  text: "text-yellow-700", bar: "bg-yellow-400", label: "Pendiente", Icon: Clock },
-  confirmada: { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700", bar: "bg-green-400", label: "Confirmada", Icon: CheckCircle2 },
-  completada: { bg: "bg-slate-50",    border: "border-slate-200",    text: "text-[var(--brand-primary)]", bar: "bg-[var(--brand-primary)]", label: "Completada", Icon: CheckCircle2 },
-  rechazada:  { bg: "bg-red-50",     border: "border-red-200",     text: "text-red-700", bar: "bg-red-400", label: "Rechazada", Icon: XCircle },
-  cancelada:  { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700", bar: "bg-slate-400", label: "Cancelada", Icon: Ban },
+  pendiente:  { bg:"bg-yellow-50",  border:"border-yellow-200",  text:"text-yellow-700", bar:"bg-yellow-400", label:"Pendiente", Icon: Clock },
+  confirmada: { bg:"bg-green-50",   border:"border-green-200",   text:"text-green-700", bar:"bg-green-400", label:"Confirmada", Icon: CheckCircle2 },
+  completada: { bg:"bg-slate-50",    border:"border-slate-200",    text:"text-[var(--brand-primary)]", bar:"bg-[var(--brand-primary)]", label:"Completada", Icon: CheckCircle2 },
+  rechazada:  { bg:"bg-red-50",     border:"border-red-200",     text:"text-red-700", bar:"bg-red-400", label:"Rechazada", Icon: XCircle },
+  cancelada:  { bg:"bg-slate-50",   border:"border-slate-200",   text:"text-slate-700", bar:"bg-slate-400", label:"Cancelada", Icon: Ban },
 };
 
 // ── Componente principal ─────────────────────────────────────────────────────
@@ -94,14 +94,14 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [clientes, setClientes]             = useState([]);
   const [loading, setLoading]               = useState(true);
-  const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
-  const [filtro, setFiltro]                 = useState("pendiente"); // "todos" | "pendiente" | "confirmada" | "rechazada"
+  const [subTab, setSubTab]                 = useState("citas");   //"citas" |"horarios"
+  const [filtro, setFiltro]                 = useState("pendiente"); //"todos" |"pendiente" |"confirmada" |"rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
   const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
-  const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio: "09:00", hora_fin: "17:00" });
+  const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
 
   const myId = profileId || getProfileId();
 
@@ -156,17 +156,17 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const confirmar = async (cita) => {
     setSaving(true);
     try {
-      await dbPatch(`citas?id=eq.${cita.id}`, { estado: "confirmada" });
+      await dbPatch(`citas?id=eq.${cita.id}`, { estado:"confirmada" });
       
       // Notify patient
       const cInfo = clientes.find(c => c.id === cita.cliente_id);
       if (cInfo && cInfo.auth_id) {
         await dbPost("notificaciones", {
           profile_id: cInfo.auth_id,
-          titulo: "Cita Confirmada",
+          titulo:"Cita Confirmada",
           mensaje: `Tu nutriólogo ha confirmado tu cita para el ${new Date(cita.fecha_hora).toLocaleDateString('es-ES')}.`,
-          tipo: "plan",
-          link_url: "agenda",
+          tipo:"plan",
+          link_url:"agenda",
           entidad_id: cita.id
         });
       }
@@ -180,7 +180,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const marcarCompletada = async (cita) => {
     setSaving(true);
     try {
-      await dbPatch(`citas?id=eq.${cita.id}`, { estado: "completada" });
+      await dbPatch(`citas?id=eq.${cita.id}`, { estado:"completada" });
       setMsg("Cita marcada como completada. El paciente ahora puede calificarla.");
       loadCitas();
     } catch (e) { setMsg(e.message); }
@@ -191,17 +191,17 @@ export function AgendaAdmin({ setMsg, profileId }) {
     if (!motivoRechazo.trim()) { setMsg("Escribe el motivo del rechazo"); return; }
     setSaving(true);
     try {
-      await dbPatch(`citas?id=eq.${modalRechazo.id}`, { estado: "rechazada", motivo_rechazo: motivoRechazo });
+      await dbPatch(`citas?id=eq.${modalRechazo.id}`, { estado:"rechazada", motivo_rechazo: motivoRechazo });
       
       // Notify patient
       const cInfo = clientes.find(c => c.id === modalRechazo.cliente_id);
       if (cInfo && cInfo.auth_id) {
         await dbPost("notificaciones", {
           profile_id: cInfo.auth_id,
-          titulo: "Cita Rechazada",
+          titulo:"Cita Rechazada",
           mensaje: `Tu cita ha sido rechazada: ${motivoRechazo}`,
-          tipo: "alerta",
-          link_url: "agenda",
+          tipo:"alerta",
+          link_url:"agenda",
           entidad_id: modalRechazo.id
         });
       }
@@ -216,7 +216,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const cancelar = async (cita) => {
     setSaving(true);
     try {
-      await dbPatch(`citas?id=eq.${cita.id}`, { estado: "cancelada" });
+      await dbPatch(`citas?id=eq.${cita.id}`, { estado:"cancelada" });
       setMsg("Cita cancelada");
       loadCitas();
     } catch (e) { setMsg(e.message); }
@@ -242,12 +242,12 @@ export function AgendaAdmin({ setMsg, profileId }) {
   };
 
   // ── Helpers de render ──
-  const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre || "Cliente";
+  const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre ||"Cliente";
   const clienteTelefono = (id) => clientes.find(c => c.id === id)?.telefono;
 
   const citasFiltradas = citas;
 
-  const pendientesCount = citas.filter(c => c.estado === "pendiente").length;
+  const pendientesCount = citas.filter(c => c.estado ==="pendiente").length;
 
   // ── Render ──
   return (
@@ -260,16 +260,16 @@ export function AgendaAdmin({ setMsg, profileId }) {
           </h2>
           <div className="text-sm text-[#6B7A8D] mt-1">
             {pendientesCount > 0
-              ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
-              : "Todo al día"}
+              ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ?"s" :""} pendiente{pendientesCount > 1 ?"s" :""} de confirmar</span>
+              :"Todo al día"}
           </div>
         </div>
         {/* Sub-tabs */}
         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
-          {[["citas", "Citas"], ["horarios", "Horarios"]].map(([k, lb]) => (
+          {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
             <button key={k} onClick={() => setSubTab(k)} className={`
               px-4 py-1.5 rounded-lg text-sm font-semibold transition-all
-              ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm border border-slate-200" : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
+              ${subTab === k ?"bg-white text-[var(--brand-primary)] shadow-sm border border-slate-200" :"text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
             `}>
               {lb}
             </button>
@@ -282,7 +282,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-[var(--brand-primary)] animate-spin mx-auto mb-4" />
           Cargando agenda…
         </div>
-      ) : subTab === "citas" ? (
+      ) : subTab ==="citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
           
@@ -317,11 +317,11 @@ export function AgendaAdmin({ setMsg, profileId }) {
                             {estado.label}
                           </Tag>
                           <Tag className="bg-slate-100 border-slate-200 text-slate-700">
-                            {cita.modalidad === "virtual" ? <><Monitor className="w-3.5 h-3.5" /> Virtual</> : <><Building className="w-3.5 h-3.5" /> Presencial</>}
+                            {cita.modalidad ==="virtual" ? <><Monitor className="w-3.5 h-3.5" /> Virtual</> : <><Building className="w-3.5 h-3.5" /> Presencial</>}
                           </Tag>
                           {tel && (
                             <a
-                              href={`https://wa.me/${tel.replace(/\D/g, "")}?text=Hola+${clienteNombre(cita.cliente_id)}%2C+sobre+tu+cita+el+${encodeURIComponent(fmtFechaHora(cita.fecha_hora))}`}
+                              href={`https://wa.me/${tel.replace(/\D/g,"")}?text=Hola+${clienteNombre(cita.cliente_id)}%2C+sobre+tu+cita+el+${encodeURIComponent(fmtFechaHora(cita.fecha_hora))}`}
                               target="_blank" rel="noreferrer"
                               className="text-green-600 text-xs font-bold no-underline inline-flex items-center gap-1 hover:text-green-700 transition-colors bg-green-50 px-2 py-1 rounded-md border border-green-200"
                             >
@@ -338,7 +338,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
                       {/* Acciones derecha */}
                       <div className="flex gap-2 flex-wrap">
-                        {cita.estado === "pendiente" && (
+                        {cita.estado ==="pendiente" && (
                           <>
                             <Btn small grad onClick={() => confirmar(cita)} disabled={saving}>
                               <CheckCircle2 className="w-4 h-4" /> Confirmar
@@ -348,7 +348,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
                             </Btn>
                           </>
                         )}
-                        {cita.estado === "confirmada" && (
+                        {cita.estado ==="confirmada" && (
                           <>
                             <button onClick={() => marcarCompletada(cita)} disabled={saving} className="text-[11px] font-bold bg-slate-50 text-[var(--brand-primary)] border border-slate-200 hover:bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
                               <CheckCircle2 size={12} /> Completada
@@ -412,7 +412,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
       {modalRechazo && (
         <Modal title="Rechazar cita" onClose={() => setModalRechazo(null)}>
           <div className="text-sm text-[#6B7A8D] leading-relaxed">
-            Rechazando la cita de <strong className="text-[#0B1929]">{clienteNombre(modalRechazo.cliente_id)}</strong> el{" "}
+            Rechazando la cita de <strong className="text-[#0B1929]">{clienteNombre(modalRechazo.cliente_id)}</strong> el{""}
             <strong className="text-[#0B1929]">{fmtFechaHora(modalRechazo.fecha_hora)}</strong>.
             <br/>El cliente verá el motivo en su aplicación.
           </div>
@@ -428,7 +428,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           <div className="flex gap-2 justify-end mt-2">
             <Btn outline onClick={() => setModalRechazo(null)}>Cancelar</Btn>
             <Btn danger onClick={rechazar} disabled={saving || !motivoRechazo.trim()}>
-              {saving ? "Rechazando…" : "Confirmar rechazo"}
+              {saving ?"Rechazando…" :"Confirmar rechazo"}
             </Btn>
           </div>
         </Modal>

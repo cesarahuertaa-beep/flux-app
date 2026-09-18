@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import Model from "@phelian/react-body-highlighter";
-import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from "lucide-react";
-import { parseFotos } from "../../utils/helpers";
-import { useBrand } from "../BrandContext";
+import { useState, useEffect, useCallback, useRef } from"react";
+import Model from"@phelian/react-body-highlighter";
+import { dbGet, storageUpload, storageListFolder, storageDelete } from"../../lib/supabase";
+import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from"lucide-react";
+import { parseFotos } from"../../utils/helpers";
+import { useBrand } from"../BrandContext";
 
 // ── Helpers ──
 const fmtDate = (d) => {
-  if (!d) return "";
-  const date = new Date(d + "T12:00:00");
-  return date.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
+  if (!d) return"";
+  const date = new Date(d +"T12:00:00");
+  return date.toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 };
 
 const delta = (curr, prev, key) => {
-  if (curr[key] == null || prev[key] == null || curr[key] === "" || prev[key] === "") return null;
+  if (curr[key] == null || prev[key] == null || curr[key] ==="" || prev[key] ==="") return null;
   const d = parseFloat(curr[key]) - parseFloat(prev[key]);
   return d === 0 ? 0 : d;
 };
@@ -26,28 +26,28 @@ const calcular1RM = (peso, reps) => {
 };
 
 const normalizeGroup = (g) => {
-  if (!g) return "otro";
+  if (!g) return"otro";
   const str = g.toLowerCase();
-  if (str.includes("pecho") || str.includes("pectoral")) return "pecho";
-  if (str.includes("espalda") || str.includes("dorsal")) return "espalda";
-  if (str.includes("pierna") || str.includes("glúteo") || str.includes("cuádriceps") || str.includes("isquio") || str.includes("pantorrilla")) return "pierna";
-  if (str.includes("brazo") || str.includes("bíceps") || str.includes("tríceps") || str.includes("antebrazo")) return "brazo";
-  if (str.includes("hombro") || str.includes("deltoide")) return "hombro";
-  if (str.includes("abdomen") || str.includes("core")) return "abdomen";
-  return "otro";
+  if (str.includes("pecho") || str.includes("pectoral")) return"pecho";
+  if (str.includes("espalda") || str.includes("dorsal")) return"espalda";
+  if (str.includes("pierna") || str.includes("glúteo") || str.includes("cuádriceps") || str.includes("isquio") || str.includes("pantorrilla")) return"pierna";
+  if (str.includes("brazo") || str.includes("bíceps") || str.includes("tríceps") || str.includes("antebrazo")) return"brazo";
+  if (str.includes("hombro") || str.includes("deltoide")) return"hombro";
+  if (str.includes("abdomen") || str.includes("core")) return"abdomen";
+  return"otro";
 };
 
 const RANKS = [
-  { name: "Clase G", min: 0, color: "#94A3B8", level: 1 }, // Gris claro
-  { name: "Clase F", min: 100, color: "#64748B", level: 1 }, // Gris oscuro
-  { name: "Clase E", min: 300, color: "#4ADE80", level: 2 }, // Verde claro
-  { name: "Clase D", min: 600, color: "#16A34A", level: 2 }, // Verde oscuro
-  { name: "Clase C", min: 1000, color: "#60A5FA", level: 3 }, // Azul claro
-  { name: "Clase B", min: 1500, color: "#2563EB", level: 3 }, // Azul oscuro
-  { name: "Clase A", min: 2100, color: "#A855F7", level: 4 }, // Morado
-  { name: "Clase S", min: 2800, color: "#FBBF24", level: 5 }, // Amarillo
-  { name: "Clase SS", min: 3600, color: "#F97316", level: 5 }, // Naranja
-  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 } // Rojo
+  { name:"Clase G", min: 0, color:"#94A3B8", level: 1 }, // Gris claro
+  { name:"Clase F", min: 100, color:"#64748B", level: 1 }, // Gris oscuro
+  { name:"Clase E", min: 300, color:"#4ADE80", level: 2 }, // Verde claro
+  { name:"Clase D", min: 600, color:"#16A34A", level: 2 }, // Verde oscuro
+  { name:"Clase C", min: 1000, color:"#60A5FA", level: 3 }, // Azul claro
+  { name:"Clase B", min: 1500, color:"#2563EB", level: 3 }, // Azul oscuro
+  { name:"Clase A", min: 2100, color:"#A855F7", level: 4 }, // Morado
+  { name:"Clase S", min: 2800, color:"#FBBF24", level: 5 }, // Amarillo
+  { name:"Clase SS", min: 3600, color:"#F97316", level: 5 }, // Naranja
+  { name:"Clase SSS", min: 4500, color:"#EF4444", level: 6 } // Rojo
 ];
 
 const getRank = (xp) => {
@@ -229,7 +229,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
     try {
       const indexPath = `${cliente.id}/personal/index.json`;
       await storageDelete("progress-photos", indexPath).catch(() => {}); // Ignore error if it doesn't exist
-      const blob = new Blob([JSON.stringify(urls)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(urls)], { type:"application/json" });
       await storageUpload("progress-photos", indexPath, blob);
     } catch (e) {
       console.error("Error saving index", e);
@@ -256,7 +256,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
       alert("Error subiendo fotos personales.");
     } finally {
       setUploadingPersonal(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value ="";
     }
   };
 
@@ -288,30 +288,30 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const prev = metricas[1] || {};
 
   const COMP_KEYS = [
-    { key: "inbody_score", label: "SCORE INBODY", unit: "pts" },
-    { key: "peso", label: "PESO", unit: "kg" },
-    { key: "grasa_pct", label: "GRASA CORPORAL", unit: "%" },
-    { key: "calc_masa_grasa", label: "MASA GRASA", unit: "kg" },
-    { key: "musculo_pct", label: "MASA MUSCULAR", unit: "%" },
-    { key: "calc_masa_muscular", label: "MASA MUSCULAR", unit: "kg" },
-    { key: "inbody_smm", label: "MASA MUSCULAR (SMM)", unit: "kg" },
-    { key: "imc", label: "IMC", unit: "" },
-    { key: "agua_pct", label: "AGUA CORPORAL", unit: "%" },
-    { key: "inbody_tbw", label: "AGUA CORPORAL", unit: "L" },
-    { key: "masa_osea", label: "MASA ÓSEA", unit: "kg" },
-    { key: "calc_masa_osea", label: "MASA ÓSEA", unit: "kg" },
-    { key: "calc_masa_residual", label: "MASA RESIDUAL", unit: "kg" },
-    { key: "inbody_grasa_visceral", label: "GRASA VISCERAL", unit: "lvl" },
-    { key: "inbody_bmr", label: "METABOLISMO BASAL", unit: "kcal" },
-    { key: "cintura", label: "CINTURA", unit: "cm" },
-    { key: "cadera", label: "CADERA", unit: "cm" },
-    { key: "icc", label: "ICC", unit: "" },
-    { key: "pecho", label: "PECHO", unit: "cm" },
-    { key: "brazo", label: "BRAZO", unit: "cm" },
-    { key: "brazo_relajado", label: "BRAZO", unit: "cm" },
-    { key: "muslo", label: "MUSLO", unit: "cm" },
-    { key: "pantorrilla", label: "PANTORRILLA", unit: "cm" },
-  ].filter(k => current[k.key] != null && current[k.key] !== ""); // Solo mostrar los que tienen datos
+    { key:"inbody_score", label:"SCORE INBODY", unit:"pts" },
+    { key:"peso", label:"PESO", unit:"kg" },
+    { key:"grasa_pct", label:"GRASA CORPORAL", unit:"%" },
+    { key:"calc_masa_grasa", label:"MASA GRASA", unit:"kg" },
+    { key:"musculo_pct", label:"MASA MUSCULAR", unit:"%" },
+    { key:"calc_masa_muscular", label:"MASA MUSCULAR", unit:"kg" },
+    { key:"inbody_smm", label:"MASA MUSCULAR (SMM)", unit:"kg" },
+    { key:"imc", label:"IMC", unit:"" },
+    { key:"agua_pct", label:"AGUA CORPORAL", unit:"%" },
+    { key:"inbody_tbw", label:"AGUA CORPORAL", unit:"L" },
+    { key:"masa_osea", label:"MASA ÓSEA", unit:"kg" },
+    { key:"calc_masa_osea", label:"MASA ÓSEA", unit:"kg" },
+    { key:"calc_masa_residual", label:"MASA RESIDUAL", unit:"kg" },
+    { key:"inbody_grasa_visceral", label:"GRASA VISCERAL", unit:"lvl" },
+    { key:"inbody_bmr", label:"METABOLISMO BASAL", unit:"kcal" },
+    { key:"cintura", label:"CINTURA", unit:"cm" },
+    { key:"cadera", label:"CADERA", unit:"cm" },
+    { key:"icc", label:"ICC", unit:"" },
+    { key:"pecho", label:"PECHO", unit:"cm" },
+    { key:"brazo", label:"BRAZO", unit:"cm" },
+    { key:"brazo_relajado", label:"BRAZO", unit:"cm" },
+    { key:"muslo", label:"MUSLO", unit:"cm" },
+    { key:"pantorrilla", label:"PANTORRILLA", unit:"cm" },
+  ].filter(k => current[k.key] != null && current[k.key] !==""); // Solo mostrar los que tienen datos
 
   const getBodyData = (groups) => {
     const data = [];
@@ -359,9 +359,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
         
         {/* HEADER */}
         <div>
-          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Mis Resultados</h1>
+          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>Mis Resultados</h1>
           <p className="text-sm text-[#6B7A8D] mt-1">
-            {current.fecha ? `Última evaluación: ${fmtDate(current.fecha)}` : "Aún no hay evaluaciones registradas"}
+            {current.fecha ? `Última evaluación: ${fmtDate(current.fecha)}` :"Aún no hay evaluaciones registradas"}
           </p>
         </div>
 
@@ -390,15 +390,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 const val = current[k.key];
                 const hasPrev = metricas.length > 1;
                 const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
-                let colorClass = "text-[#6B7A8D]";
+                let colorClass ="text-[#6B7A8D]";
                 let Icon = Minus;
-                let sign = "";
+                let sign ="";
                 
                 if (d !== null) {
                     const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") || k.key.includes("cadera") || k.key.includes("icc") ? d < 0 : d > 0;
-                    colorClass = isImprovement ? "text-green-500" : "text-red-500";
+                    colorClass = isImprovement ?"text-green-500" :"text-red-500";
                   Icon = d > 0 ? TrendingUp : TrendingDown;
-                  sign = d > 0 ? "+" : "";
+                  sign = d > 0 ?"+" :"";
                 }
 
                 return (
@@ -427,7 +427,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               <div className="flex flex-row items-center justify-center gap-4 md:gap-16">
                 
                 <div className="flex flex-col gap-6 text-right flex-1">
-                  {current.peso != null && current.peso !== "" && (
+                  {current.peso != null && current.peso !=="" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">PESO</p>
                       <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.peso} <span className="text-[10px] md:text-xs text-[#9BA5B0]">kg</span></p>
@@ -445,13 +445,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 </div>
 
                 <div className="flex flex-col gap-6 text-left flex-1">
-                  {current.grasa_pct != null && current.grasa_pct !== "" && (
+                  {current.grasa_pct != null && current.grasa_pct !=="" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">GRASA</p>
                       <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.grasa_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
                     </div>
                   )}
-                  {current.musculo_pct != null && current.musculo_pct !== "" && (
+                  {current.musculo_pct != null && current.musculo_pct !=="" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">MÚSCULO</p>
                       <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.musculo_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
@@ -466,7 +466,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
             <Scale className="w-12 h-12 text-[#9BA5B0] mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">Sin métricas de composición</h3>
-            <p className="text-sm text-[#6B7A8D]">{isSelfManaged ? "Aún no has registrado ninguna evaluación física." : "Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
+            <p className="text-sm text-[#6B7A8D]">{isSelfManaged ?"Aún no has registrado ninguna evaluación física." :"Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
           </div>
         )}
 
@@ -494,7 +494,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
                       style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
-                      highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
+                      highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="anterior"
                     />
                   </div>
@@ -503,7 +503,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
                       style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
-                      highlightedColors={["#9BA5B0", "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444"]}
+                      highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="posterior"
                     />
                   </div>
@@ -519,7 +519,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <div key={g} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.3)]" style={{ background: rank.color }} />
-                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g, " ")}</span>
+                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g,"")}</span>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
@@ -614,7 +614,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                   style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#0B1929' }}
                 >
                   <Camera size={16} />
-                  {uploadingPersonal ? "Subiendo..." : "Agregar fotos"}
+                  {uploadingPersonal ?"Subiendo..." :"Agregar fotos"}
                 </button>
                 <input 
                   type="file" 

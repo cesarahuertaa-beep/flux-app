@@ -1,7 +1,7 @@
-import React, { useRef, useState } from "react";
-import { User, Phone, MapPin, Calendar, Camera } from "lucide-react";
-import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
-import { storageUpload, storageDelete } from "../../lib/supabase";
+import React, { useRef, useState } from"react";
+import { User, Phone, MapPin, Calendar, Camera } from"lucide-react";
+import { PAISES, ESTADOS_MEXICO } from"../../lib/constants";
+import { storageUpload, storageDelete } from"../../lib/supabase";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -29,13 +29,13 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });
     } catch (error) {
-      alert("Error subiendo foto: " + error.message);
+      alert("Error subiendo foto:" + error.message);
     }
     setUploading(false);
   };
 
   const calcularEdad = (fechaStr) => {
-    if (!fechaStr) return "";
+    if (!fechaStr) return"";
     const hoy = new Date();
     const nac = new Date(fechaStr);
     let edad = hoy.getFullYear() - nac.getFullYear();
@@ -144,7 +144,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
             </div>
             <div>
               <label className="block text-sm font-medium text-[#0B1929] mb-1">Estado</label>
-              {form.pais === "México" ? (
+              {form.pais ==="México" ? (
                 <select 
                   value={form.estado_provincia} 
                   onChange={e => { setForm({...form, estado_provincia: e.target.value}); onSave({...form, estado_provincia: e.target.value}); }}

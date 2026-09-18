@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { GRUPOS } from "../../lib/constants";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
-import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState } from"react";
+import { GRUPOS } from"../../lib/constants";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
+import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from"lucide-react";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
@@ -40,7 +40,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   const deleteEj = async (e) => {
-    if (!confirm(`¿Eliminar "${e.nombre}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar"${e.nombre}"? Esta acción no se puede deshacer.`)) return;
     await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
     setMsg(<div className='flex gap-2 items-center'><Trash2 className='w-4 h-4 text-red-500'/> Ejercicio eliminado</div>); onUpdate();
   };
@@ -54,7 +54,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // Group accent colors by muscle group
   const groupColors = {
     Pecho:"#38bdf8", Espalda:"#818cf8", Piernas:"#34d399",
-    Hombros:"#f472b6", "Bíceps":"#fb923c", "Tríceps":"#a78bfa",
+    Hombros:"#f472b6","Bíceps":"#fb923c","Tríceps":"#a78bfa",
     Core:"#fbbf24", Cardio:"#ef4444"
   };
 
@@ -67,7 +67,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             Biblioteca de Ejercicios
           </h2>
           <p className="text-[13px] text-[#6B7A8D]">
-            {biblioteca.length} ejercicio{biblioteca.length !== 1 ? "s" : ""} en la colección global
+            {biblioteca.length} ejercicio{biblioteca.length !== 1 ?"s" :""} en la colección global
           </p>
         </div>
         {isSuperadmin && (
@@ -97,7 +97,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           {GRUPOS.map(g => <option key={g}>{g}</option>)}
         </select>
         
-        {(filtroGrupo !== "Todos" || busqueda) && (
+        {(filtroGrupo !=="Todos" || busqueda) && (
           <button
             onClick={() => { setBusqueda(""); setFiltroGrupo("Todos"); }}
             className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
@@ -112,16 +112,16 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
           <Dumbbell size={48} className="mx-auto mb-4 opacity-20" />
           <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
-            {biblioteca.length === 0 ? "La biblioteca está vacía" : "No hay ejercicios que coincidan"}
+            {biblioteca.length === 0 ?"La biblioteca está vacía" :"No hay ejercicios que coincidan"}
           </div>
           <div className="text-[13px] text-[#6B7A8D]">
-            {biblioteca.length === 0 && isSuperadmin ? "Agrega el primer ejercicio con el botón de arriba" : "Intenta con otros filtros"}
+            {biblioteca.length === 0 && isSuperadmin ?"Agrega el primer ejercicio con el botón de arriba" :"Intenta con otros filtros"}
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px]">
           {filtrados.map((e, i) => {
-            const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
+            const accentColor = groupColors[e.grupo_muscular] ||"#38bdf8";
             return (
               <div
                 key={e.id}
@@ -238,7 +238,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         htmlFor="gif-upload"
                         className="inline-block px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg font-semibold text-[12px] cursor-pointer transition-colors shadow-sm"
                       >
-                        {uploading ? "Subiendo..." : "Seleccionar archivo"}
+                        {uploading ?"Subiendo..." :"Seleccionar archivo"}
                       </label>
                     </div>
                   )}
@@ -251,7 +251,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 Cancelar
               </button>
               <button onClick={save} disabled={saving || uploading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2">
-                {saving ? "Guardando..." : "Guardar ejercicio"}
+                {saving ?"Guardando..." :"Guardar ejercicio"}
               </button>
             </div>
           </div>
@@ -277,7 +277,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               {preview.nombre}
             </div>
             <div className="flex gap-1.5 justify-center mb-4">
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor:`${groupColors[preview.grupo_muscular] || "#38bdf8"}20`, color: groupColors[preview.grupo_muscular] || "#38bdf8" }}>
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor:`${groupColors[preview.grupo_muscular] ||"#38bdf8"}20`, color: groupColors[preview.grupo_muscular] ||"#38bdf8" }}>
                 {preview.grupo_muscular}
               </span>
               

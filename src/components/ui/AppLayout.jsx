@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, User } from "lucide-react";
-import { useBrand } from "../BrandContext";
-import { Capacitor } from "@capacitor/core";
+import React, { useState, useRef, useEffect } from"react";
+import { ChevronLeft, ChevronRight, User } from"lucide-react";
+import { useBrand } from"../BrandContext";
+import { Capacitor } from"@capacitor/core";
 
 
 /**
@@ -38,13 +38,13 @@ export function AppLayout({ children, nav, active, setActive, session }) {
     return () => window.removeEventListener("resize", checkScroll);
   }, [nav]);
 
-  const userName = session?.data?.nombre || session?.nombre || "Usuario";
-  const subtitle = session?.role === "civil" ? "Civil Premium" 
-                 : session?.role === "cliente" ? "Vista Atleta" 
-                 : "Panel Admin";
+  const userName = session?.data?.nombre || session?.nombre ||"Usuario";
+  const subtitle = session?.role ==="civil" ?"Civil Premium" 
+                 : session?.role ==="cliente" ?"Vista Atleta" 
+                 :"Panel Admin";
 
   return (
-    <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height: "100dvh", width: "100vw" }}>
+    <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height:"100dvh", width:"100vw" }}>
       
 
       {/* ══════════════════════════════════════════════
@@ -55,7 +55,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         style={{ width: collapsed ? 64 : 220 }}
       >
         {/* Logo de Marca Dinámico */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-[#E2E5EA] min-h-[72px] ${collapsed ? "justify-center" : ""}`}>
+        <div className={`flex items-center gap-3 px-4 py-5 border-b border-[#E2E5EA] min-h-[72px] ${collapsed ?"justify-center" :""}`}>
           <img
             src={brand.logo_url}
             alt="Logo"
@@ -63,7 +63,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           />
           {!collapsed && (
             <div className="leading-tight truncate pr-2">
-              <p className="text-[16px] font-bold tracking-tight text-[#0B1929] truncate" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              <p className="text-[16px] font-bold tracking-tight text-[#0B1929] truncate" style={{ fontFamily:"DM Sans, sans-serif" }}>
                 {brand.nombre_marca}
               </p>
               <p className="text-[10px] font-semibold tracking-widest text-[var(--brand-primary)] uppercase truncate">
@@ -76,8 +76,8 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         {/* User Pill */}
         {!collapsed ? (
           <div className="mx-3 mt-4 mb-1 flex items-center justify-between">
-            <button onClick={() => setActive("perfil")} className={`flex-1 min-w-0 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active === "perfil" ? "bg-white border-[var(--brand-primary)] shadow-sm" : "bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+            <button onClick={() => setActive("perfil")} className={`flex-1 min-w-0 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active ==="perfil" ?"bg-white border-[var(--brand-primary)] shadow-sm" :"bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
                 <User size={13} strokeWidth={2} className="text-white" />
               </div>
               <div className="min-w-0">
@@ -88,7 +88,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 mt-4 mb-1">
-            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${active === "perfil" ? "ring-2 ring-offset-2 ring-[var(--brand-primary)]" : "hover:scale-105"}`} style={{ background: "var(--brand-primary)" }}>
+            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${active ==="perfil" ?"ring-2 ring-offset-2 ring-[var(--brand-primary)]" :"hover:scale-105"}`} style={{ background:"var(--brand-primary)" }}>
               <User size={13} strokeWidth={2} className="text-white" />
             </button>
           </div>
@@ -105,14 +105,14 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               <button
                 key={id}
                 onClick={() => {
-                  if (id === "tienda_link") {
+                  if (id ==="tienda_link") {
                     const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
                     if (isAppMode) {
                       // En App nativa (Electron o Android), abrimos el navegador web real
-                      window.open("https://www.flux-sport.com", "_blank"); 
+                      window.open("https://www.flux-sport.com","_blank"); 
                     } else {
                       // En web (https://), navegamos a la raíz (landing page)
-                      window.location.href = "/";
+                      window.location.href ="/";
                     }
                   } else {
                     setActive(id);
@@ -121,13 +121,13 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 title={collapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
                   isActive
-                    ? "bg-white text-[var(--brand-primary)] shadow-sm border border-[#E2E5EA]"
-                    : "text-[#6B7A8D] hover:bg-white/70 hover:text-[#0B1929]"
-                } ${collapsed ? "justify-center" : ""}`}
+                    ?"bg-white text-[var(--brand-primary)] shadow-sm border border-[#E2E5EA]"
+                    :"text-[#6B7A8D] hover:bg-white/70 hover:text-[#0B1929]"
+                } ${collapsed ?"justify-center" :""}`}
               >
-                <span className={`flex-shrink-0 ${isActive ? "text-[var(--brand-primary)]" : ""}`}>{icon}</span>
+                <span className={`flex-shrink-0 ${isActive ?"text-[var(--brand-primary)]" :""}`}>{icon}</span>
                 {!collapsed && (
-                  <span className={`text-sm font-medium truncate ${isActive ? "text-[var(--brand-primary)] font-semibold" : ""}`}>
+                  <span className={`text-sm font-medium truncate ${isActive ?"text-[var(--brand-primary)] font-semibold" :""}`}>
                     {label}
                   </span>
                 )}
@@ -140,11 +140,11 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         </nav>
 
         {/* Footer: colapsar */}
-        <div className={`px-2 pb-5 pt-3 border-t border-[#E2E5EA] flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
+        <div className={`px-2 pb-5 pt-3 border-t border-[#E2E5EA] flex flex-col gap-1 ${collapsed ?"items-center" :""}`}>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#6B7A8D] hover:bg-white hover:text-[var(--brand-primary)] transition-all text-xs font-medium border border-transparent hover:border-[#E2E5EA] w-full mt-1"
-            style={{ justifyContent: collapsed ? "center" : "flex-start" }}
+            style={{ justifyContent: collapsed ?"center" :"flex-start" }}
           >
             {collapsed
               ? <ChevronRight size={16} strokeWidth={1.5} />
@@ -177,12 +177,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           BOTTOM NAV BAR — sólo visible en mobile (< md)
           Fija en la parte inferior de la pantalla.
       ══════════════════════════════════════════════ */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E2E8F0] shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" style={{ paddingBottom:"env(safe-area-inset-bottom)" }}>
         {/* Left Indicator */}
         <div 
           className="absolute left-0 top-0 bottom-0 w-10 pointer-events-none transition-opacity duration-300 z-10" 
           style={{ 
-            background: "linear-gradient(to right, var(--brand-primary), transparent)", 
+            background:"linear-gradient(to right, var(--brand-primary), transparent)", 
             opacity: canScrollLeft ? 0.35 : 0 
           }} 
         />
@@ -191,7 +191,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         <div 
           className="absolute right-0 top-0 bottom-0 w-10 pointer-events-none transition-opacity duration-300 z-10" 
           style={{ 
-            background: "linear-gradient(to left, var(--brand-primary), transparent)", 
+            background:"linear-gradient(to left, var(--brand-primary), transparent)", 
             opacity: canScrollRight ? 0.35 : 0 
           }} 
         />
@@ -204,50 +204,50 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         {nav.map(({ id, label, icon }, index) => {
           const isActive = active === id;
           const isMid = index === Math.ceil(nav.length / 2);
-          const isPerfilActive = active === "perfil";
+          const isPerfilActive = active ==="perfil";
           
           return (
             <React.Fragment key={id}>
               {isMid && (
                 <button
                   onClick={() => setActive("perfil")}
-                  className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
+                  className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
                 >
-                  <span className="block h-0.5 w-5 rounded-full mb-1 transition-all" style={{ background: isPerfilActive ? "var(--brand-primary)" : "transparent" }} />
-                  <span className={`transition-transform ${isPerfilActive ? "scale-110" : "scale-100"}`}>
+                  <span className="block h-0.5 w-5 rounded-full mb-1 transition-all" style={{ background: isPerfilActive ?"var(--brand-primary)" :"transparent" }} />
+                  <span className={`transition-transform ${isPerfilActive ?"scale-110" :"scale-100"}`}>
                     <User size={18} strokeWidth={1.5} />
                   </span>
-                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${isPerfilActive ? "font-semibold" : ""}`}>
+                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${isPerfilActive ?"font-semibold" :""}`}>
                     Perfil
                   </span>
                 </button>
               )}
               <button
                 onClick={() => {
-                  if (id === "tienda_link") {
+                  if (id ==="tienda_link") {
                     const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform();
                     if (isAppMode) {
                       // En App nativa (Electron o Android), abrimos el navegador web real
-                      window.open("https://www.flux-sport.com", "_blank"); 
+                      window.open("https://www.flux-sport.com","_blank"); 
                     } else {
                       // En web (https://), navegamos a la raíz (landing page)
-                      window.location.href = "/";
+                      window.location.href ="/";
                     }
                   } else {
                     setActive(id);
                   }
                 }}
-                className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ? "text-[var(--brand-primary)]" : "text-[#9BA5B0]"}`}
+                className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
               >
                 {/* Indicador activo encima del ícono */}
                 <span
                   className="block h-0.5 w-5 rounded-full mb-1 transition-all"
-                  style={{ background: isActive ? "var(--brand-primary)" : "transparent" }}
+                  style={{ background: isActive ?"var(--brand-primary)" :"transparent" }}
                 />
-                <span className={`transition-transform ${isActive ? "scale-110" : "scale-100"}`}>
+                <span className={`transition-transform ${isActive ?"scale-110" :"scale-100"}`}>
                   {icon}
                 </span>
-                <span className={`text-[10px] font-medium leading-none mt-0.5 ${isActive ? "font-semibold" : ""}`}>
+                <span className={`text-[10px] font-medium leading-none mt-0.5 ${isActive ?"font-semibold" :""}`}>
                   {label}
                 </span>
               </button>

@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { calculateBodyComposition } from "../../lib/bodyComposition";
-import { createPortal } from "react-dom";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
-import { useBrand } from "../BrandContext";
-import { generateProgresoPDF } from "../../utils/pdf";
-import { parseFotos, getSemanasConFecha } from "../../utils/helpers";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from"react";
+import { calculateBodyComposition } from"../../lib/bodyComposition";
+import { createPortal } from"react-dom";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../../lib/supabase";
+import { useBrand } from"../BrandContext";
+import { generateProgresoPDF } from"../../utils/pdf";
+import { parseFotos, getSemanasConFecha } from"../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock
-} from "lucide-react";
+} from"lucide-react";
 
 const METRIC_GROUPS_MANUAL = [
   { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
@@ -89,31 +89,31 @@ const METRIC_GROUPS_INBODY = [
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split("T")[0],
-  metodo_evaluacion: "manual",
-  peso: "", estatura: "", imc: "",
+  metodo_evaluacion:"manual",
+  peso:"", estatura:"", imc:"",
   
   // Pliegues (mm)
-  pliegue_triceps: "", pliegue_subescapular: "", pliegue_suprailiaco: "", pliegue_abdominal: "", 
-  pliegue_muslo: "", pliegue_pantorrilla: "", pliegue_pectoral: "", pliegue_biceps: "",
+  pliegue_triceps:"", pliegue_subescapular:"", pliegue_suprailiaco:"", pliegue_abdominal:"", 
+  pliegue_muslo:"", pliegue_pantorrilla:"", pliegue_pectoral:"", pliegue_biceps:"",
 
   // Circunferencias (cm)
-  cuello: "", cintura: "", cadera: "", pecho: "", brazo_relajado: "", brazo_contraido: "", 
-  muslo: "", pantorrilla: "",
+  cuello:"", cintura:"", cadera:"", pecho:"", brazo_relajado:"", brazo_contraido:"", 
+  muslo:"", pantorrilla:"",
 
   // Diámetros óseos (cm)
-  diametro_muneca: "", diametro_codo: "", diametro_rodilla: "",
+  diametro_muneca:"", diametro_codo:"", diametro_rodilla:"",
 
   // InBody
-  inbody_smm: "", inbody_tbw: "", inbody_proteina: "", inbody_mineral_oseo: "",
-  inbody_grasa_visceral: "", inbody_bmr: "", inbody_score: "",
-  inbody_magra_brazo_der: "", inbody_magra_brazo_izq: "", inbody_magra_pierna_der: "",
-  inbody_magra_pierna_izq: "", inbody_magra_tronco: "",
+  inbody_smm:"", inbody_tbw:"", inbody_proteina:"", inbody_mineral_oseo:"",
+  inbody_grasa_visceral:"", inbody_bmr:"", inbody_score:"",
+  inbody_magra_brazo_der:"", inbody_magra_brazo_izq:"", inbody_magra_pierna_der:"",
+  inbody_magra_pierna_izq:"", inbody_magra_tronco:"",
 
   // Legacy/Calculated
-  grasa_pct: "", musculo_pct: "", icc: "", glucosa: "", presion_arterial: "", notas: "",
+  grasa_pct:"", musculo_pct:"", icc:"", glucosa:"", presion_arterial:"", notas:"",
 });
 
-const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
+const fmtDate = (d) => new Date(d +"T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [metricas,     setMetricas]     = useState([]);
@@ -198,12 +198,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       // Auto-calcular IMC
       if ((key==="peso" || key==="estatura") && next.peso && next.estatura) {
         const h = parseFloat(next.estatura) / 100;
-        next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(2) : "";
+        next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(2) :"";
       }
       // Auto-calcular ICC (cintura ÷ cadera)
       if ((key==="cintura" || key==="cadera") && next.cintura && next.cadera) {
         const icc = parseFloat(next.cintura) / parseFloat(next.cadera);
-        next.icc = icc > 0 ? icc.toFixed(2) : "";
+        next.icc = icc > 0 ? icc.toFixed(2) :"";
       }
       return next;
     });
@@ -228,7 +228,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       if (!editingId) data.cliente_id = selected.id;
       const STRING_KEYS = new Set(["fecha","presion_arterial","notas","metodo_evaluacion"]);
       Object.entries(form).forEach(([k, v]) => {
-        if (v !== "" && v !== null && v !== undefined) {
+        if (v !=="" && v !== null && v !== undefined) {
           if (STRING_KEYS.has(k)) { data[k] = v; }
           else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
         }
@@ -262,10 +262,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
           if (sessionStorage.getItem('flux_role') === 'cliente' && selected.nutriologo_id) {
             await dbPost("notificaciones", {
               profile_id: selected.nutriologo_id,
-              titulo: "Nuevo progreso registrado",
+              titulo:"Nuevo progreso registrado",
               mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
-              tipo: "progreso",
-              link_url: "clientes", // Redirect to directory
+              tipo:"progreso",
+              link_url:"clientes", // Redirect to directory
               entidad_id: selected.id
             });
           }
@@ -285,7 +285,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const startEdit = (m) => {
     const filled = emptyForm();
     Object.keys(filled).forEach(k => {
-      if (m[k] !== null && m[k] !== undefined && m[k] !== "") filled[k] = String(m[k]);
+      if (m[k] !== null && m[k] !== undefined && m[k] !=="") filled[k] = String(m[k]);
     });
     setForm(filled);
     setEditingId(m.id);
@@ -352,10 +352,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     <div className="pb-24">
       {/* Sub-nav */}
       <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex gap-1 mb-5">
-        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <BarChart2 className="w-4 h-4" /> Evaluaciones
         </button>
-        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold" : "text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <Dumbbell className="w-4 h-4" /> Rutinas del cliente
         </button>
       </div>
@@ -395,7 +395,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                     <p className="text-[11px] text-[#6B7A8D] text-center px-6">Actualiza tu plan para ver evaluaciones anteriores y comparar tu progreso.</p>
                   </div>
                 )}
-                <div className={isLocked ? "blur-sm pointer-events-none select-none" : ""}>
+                <div className={isLocked ?"blur-sm pointer-events-none select-none" :""}>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5 whitespace-nowrap"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
@@ -473,11 +473,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 {ciclos.map(c => (
                   <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
                     cicloSel?.id===c.id 
-                      ? (c.activo ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" : "bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
-                      : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                      ? (c.activo ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" :"bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
+                      :"bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
                   }`}>
                     {c.nombre.split("|")[0]}
-                    {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ? "bg-white" : "bg-green-400"}`}/>}
+                    {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>}
                   </button>
                 ))}
               </div>
@@ -532,12 +532,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                           const activeVariants = Array.from(variantsWithData).sort();
 
                           return activeVariants.map((vid, vidIdx) => {
-                            const isOriginal = vid === "original";
-                            const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_", ""));
+                            const isOriginal = vid ==="original";
+                            const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_",""));
                             const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
                             
-                            const rowBg = eji % 2 === 0 ? "bg-white" : "bg-gray-50/30";
-                            const highlight = !isOriginal ? "bg-[var(--brand-primary)]/5" : rowBg;
+                            const rowBg = eji % 2 === 0 ?"bg-white" :"bg-gray-50/30";
+                            const highlight = !isOriginal ?"bg-[var(--brand-primary)]/5" : rowBg;
 
                             return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
                               <tr key={`${ej.id}-${vid}-${si}`} className={highlight}>
@@ -552,31 +552,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                                 )}
                                 <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
                                 {semanas.map((_, wi) => {
-                                  const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
-                                  const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
+                                  const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] ||"";
+                                  const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] ||"";
                                   
-                                  let emptyText = "—";
-                                  let emptyColorClass = "text-[#CBD5E1]";
-                                  let emptyWeightClass = "font-normal";
+                                  let emptyText ="—";
+                                  let emptyColorClass ="text-[#CBD5E1]";
+                                  let emptyWeightClass ="font-normal";
                                   
                                   if (!pVal && !rVal) {
                                     const otherVariantHasData = activeVariants.some(otherVid => 
                                       otherVid !== vid && (progreso[`${ej.id}-${wi}-${si}-peso-${otherVid}`] || progreso[`${ej.id}-${wi}-${si}-reps-${otherVid}`])
                                     );
                                     if (otherVariantHasData) {
-                                      emptyText = isOriginal ? "ALT" : "ORG";
-                                      emptyColorClass = "text-[#6B7A8D]";
-                                      emptyWeightClass = "font-bold";
+                                      emptyText = isOriginal ?"ALT" :"ORG";
+                                      emptyColorClass ="text-[#6B7A8D]";
+                                      emptyWeightClass ="font-bold";
                                     }
                                   }
 
                                   return (
                                     <Fragment key={`w${wi}`}>
-                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ? "bg-[var(--brand-primary)]/10" : ""}`}>
-                                        <span className={`text-[11px] ${pVal ? "text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
+                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ?"bg-[var(--brand-primary)]/10" :""}`}>
+                                        <span className={`text-[11px] ${pVal ?"text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
                                       </td>
-                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ? "bg-[var(--brand-primary)]/5" : ""}`}>
-                                        <span className={`text-[11px] ${rVal ? "text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
+                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ?"bg-[var(--brand-primary)]/5" :""}`}>
+                                        <span className={`text-[11px] ${rVal ?"text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
                                       </td>
                                     </Fragment>
                                   );
@@ -600,7 +600,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluación" : "Nueva evaluación corporal"}</h2>
+              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ?"Editar evaluación" :"Nueva evaluación corporal"}</h2>
               <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929]"><X className="w-6 h-6" /></button>
             </div>
             
@@ -608,14 +608,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 {!isMiPlan && (
                   <div className="flex bg-[#F0F4FA] rounded-xl p-1 inline-flex w-full md:w-auto">
                     <button 
-                      onClick={() => updForm("metodo_evaluacion", "manual")}
-                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "manual" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                      onClick={() => updForm("metodo_evaluacion","manual")}
+                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion ==="manual" ?"bg-white shadow-sm text-[#0B1929]" :"text-[#6B7A8D] hover:text-[#0B1929]"}`}
                     >
                       MANUAL
                     </button>
                     <button 
-                      onClick={() => updForm("metodo_evaluacion", "inbody")}
-                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                      onClick={() => updForm("metodo_evaluacion","inbody")}
+                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion ==="inbody" ?"bg-white shadow-sm text-[#0B1929]" :"text-[#6B7A8D] hover:text-[#0B1929]"}`}
                     >
                       INBODY
                     </button>
@@ -654,7 +654,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                         value={f.readOnly && form.metodo_evaluacion === 'manual' ? (liveCalculations[f.key] || '') : form[f.key]}
                         readOnly={!!f.readOnly}
                         placeholder={f.readOnly?"Auto":(f.placeholder||"")}
-                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ?"opacity-60 cursor-not-allowed" :""}`}
                         onChange={e=>!f.readOnly&&updForm(f.key,e.target.value)}
                       />
                     </div>
@@ -685,7 +685,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
             {/* Foto upload */}
             <div className="mb-6">
-              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
+              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ?"Agregar más fotos" :"Fotos de progreso"}</div>
               <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
                 <Plus className="w-4 h-4" /> Agregar fotos
                 <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>

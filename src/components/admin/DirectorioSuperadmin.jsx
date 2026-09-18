@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from"react";
+import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from"../../lib/supabase";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell } from"lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -10,17 +10,17 @@ const uploadLogo = async (file) => {
   return await storageUpload("logos", fname, file);
 };
 
-const Btn = ({ children, onClick, disabled, small, outline, grad, className = "" }) => {
-  let baseClass = "inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ";
-  if (small) baseClass += "px-3 py-1.5 text-xs ";
-  else baseClass += "px-4 py-2 text-sm ";
+const Btn = ({ children, onClick, disabled, small, outline, grad, className ="" }) => {
+  let baseClass ="inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  if (small) baseClass +="px-3 py-1.5 text-xs";
+  else baseClass +="px-4 py-2 text-sm";
   
-  if (grad) baseClass += "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500 ";
-  else if (outline) baseClass += "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200 ";
-  else baseClass += "bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500 ";
+  if (grad) baseClass +="bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500";
+  else if (outline) baseClass +="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200";
+  else baseClass +="bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500";
   
   if (outline && className.includes("text-red-500")) {
-    baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50", "text-red-600 hover:bg-red-50 border-red-200");
+    baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50","text-red-600 hover:bg-red-50 border-red-200");
   }
   
   return <button onClick={onClick} disabled={disabled} className={baseClass + className}>{children}</button>;
@@ -56,7 +56,7 @@ const LogoPicker = ({ value, onChange, uploading }) => {
       <div className="flex-1">
         <input type="file" accept="image/*" className="hidden" ref={fileRef} onChange={onChange}/>
         <Btn small outline onClick={() => fileRef.current?.click()} disabled={uploading}>
-          {uploading ? "Subiendo..." : value ? "Cambiar logo" : "Subir logo"}
+          {uploading ?"Subiendo..." : value ?"Cambiar logo" :"Subir logo"}
         </Btn>
       </div>
     </div>
@@ -97,10 +97,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       
       if (currentUser.length > 0) {
         let owner = currentUser[0];
-        setMyName(owner.nombre || "Staff");
+        setMyName(owner.nombre ||"Staff");
         
-        // Si es staff/administrativo, el "dueño" del directorio es su jefe (el superadmin)
-        if (owner.role === "staff" || owner.role === "administrativo") {
+        // Si es staff/administrativo, el"dueño" del directorio es su jefe (el superadmin)
+        if (owner.role ==="staff" || owner.role ==="administrativo") {
           if (owner.nutriologo_id) {
             const boss = await dbGet(`profiles?id=eq.${owner.nutriologo_id}`);
             if (boss.length > 0) owner = boss[0];
@@ -111,10 +111,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         
         owner.isSuperadmin = true;
         
-        if (currentUser[0].role !== "superadmin") {
-          owner.nombre_marca = owner.nombre_marca || "Flux Sports";
+        if (currentUser[0].role !=="superadmin") {
+          owner.nombre_marca = owner.nombre_marca ||"Flux Sports";
         } else {
-          owner.nombre_marca = owner.nombre_marca || "Flux Sports (Tú)";
+          owner.nombre_marca = owner.nombre_marca ||"Flux Sports (Tú)";
         }
         
         setNutriologos([owner, ...data]);
@@ -138,7 +138,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setFnc(p => ({...p, logo_url: url}));
       setMsg("✅ Logo subido");
     } catch(err) {
-      setMsg("❌ Error al subir logo: " + err.message);
+      setMsg("❌ Error al subir logo:" + err.message);
     }
     setUploadingLogo(false);
   };
@@ -163,7 +163,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         return;
       }
 
-      const authUser = await authInvite(formNutri.email, { role: "nutriologo", nombre: formNutri.nombre });
+      const authUser = await authInvite(formNutri.email, { role:"nutriologo", nombre: formNutri.nombre });
       await updateProfile(authUser.id, {
         nombre: formNutri.nombre,
         telefono: formNutri.telefono,
@@ -179,7 +179,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setMsg("✅ Invitación enviada");
     } catch(e) {
       if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
-      else setMsg("❌ " + e.message);
+      else setMsg("❌" + e.message);
     }
     setSaving(false);
   };
@@ -192,7 +192,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       loadNutriologos();
       setMsg("✅ Cambios guardados");
     } catch(e) {
-      setMsg("❌ " + e.message);
+      setMsg("❌" + e.message);
     }
     setSaving(false);
   };
@@ -201,9 +201,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     try {
       await updateProfile(n.id, { activo: n.activo === false ? true : false });
       loadNutriologos();
-      setMsg(`✅ Nutriólogo ${n.activo === false ? "activado" : "suspendido"}`);
+      setMsg(`✅ Nutriólogo ${n.activo === false ?"activado" :"suspendido"}`);
     } catch(e) {
-      setMsg("❌ Error: " + e.message);
+      setMsg("❌ Error:" + e.message);
     }
   };
 
@@ -218,12 +218,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         const profile = existingProfiles[0];
 
         // Consentimiento si es colega o rol superior (solo para cuando lo invitan como paciente)
-        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo","nutriologo_estudiante","administrativo","staff","superadmin"].includes(profile.role)) {
           await dbPost("solicitudes_entrenamiento", {
             from_nutriologo_id: myId,
             from_nutriologo_nombre: myName || 'Superadmin',
             to_email: formClient.email,
-            estado: "pendiente"
+            estado:"pendiente"
           });
 
           setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
@@ -245,7 +245,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         return;
       }
 
-      const authUser = await authInvite(formClient.email, { role: "cliente", nombre: formClient.nombre });
+      const authUser = await authInvite(formClient.email, { role:"cliente", nombre: formClient.nombre });
       await dbPost("clientes", {
         nombre: formClient.nombre,
         objetivo: formClient.objetivo,
@@ -261,7 +261,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setMsg("✅ Paciente creado (asignado a ti)");
     } catch(e) { 
       if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
-      else setMsg("❌ "+e.message); 
+      else setMsg("❌"+e.message); 
     }
     setSaving(false);
   };
@@ -276,10 +276,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
       const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
 
-      if (conflictType === "nutri") {
+      if (conflictType ==="nutri") {
         if (p) {
           await dbPatch(`profiles?id=eq.${p.id}`, {
-            role: "nutriologo",
+            role:"nutriologo",
             nombre: finalNombre,
             telefono: finalTelefono,
             nombre_marca: useNewData ? conflictUser.typedData.nombre_marca : p.nombre_marca,
@@ -294,7 +294,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       } else {
         await dbPost("clientes", {
           nombre: finalNombre,
-          objetivo: conflictUser.typedData.objetivo || "Mejorar salud",
+          objetivo: conflictUser.typedData.objetivo ||"Mejorar salud",
           email: conflictUser.email,
           telefono: finalTelefono,
           nutriologo_id: resolvedOwnerId,
@@ -311,7 +311,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setFormNutri({ nombre:"", email:"", telefono:"", nombre_marca:"", logo_url:"", color_primario:"#56CCF2" });
       setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
     } catch (e) {
-      setMsg("❌ Error al resolver: " + e.message);
+      setMsg("❌ Error al resolver:" + e.message);
     }
     setSaving(false);
   };
@@ -336,10 +336,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
-                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
+                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre ||"Sin nombre"}</h3>
+                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ?"TÚ" :"CORPORATIVO"}</span>}
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                  {n.activo !== false ? "Activo" : "Suspendido"}
+                  {n.activo !== false ?"Activo" :"Suspendido"}
                 </span>
               </div>
               <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
@@ -375,8 +375,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
               }}>Editar</Btn>
               {!n.isSuperadmin && (
-                <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
-                  {n.activo !== false ? "Suspender" : "Activar"}
+                <Btn small outline className={n.activo !== false ?"text-red-500" :""} onClick={() => toggleActivoNutri(n)}>
+                  {n.activo !== false ?"Suspender" :"Activar"}
                 </Btn>
               )}
             </div>
@@ -404,13 +404,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                       <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
                         <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
-                        <span>{c.objetivo || "Sin objetivo definido"}</span>
+                        <span>{c.objetivo ||"Sin objetivo definido"}</span>
                       </div>
                     </div>
                     <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
                       <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
-                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
-                        {c.activo ? "Suspender" : "Activar"}
+                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ?"text-red-500 hover:text-red-600" :"text-green-600 hover:text-green-700"}`}>
+                        {c.activo ?"Suspender" :"Activar"}
                       </button>
                     </div>
                   </div>
@@ -423,7 +423,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     );
   };
 
-  const InputClass = "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
+  const InputClass ="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
 
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC]">
@@ -432,7 +432,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Panel de Super Administrador</p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Directorio</h1>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>Directorio</h1>
             <p className="text-sm text-[#6B7A8D] mt-1">{clientes.length} pacientes y {nutriologos.length} nutriólogos en la plataforma</p>
           </div>
           
@@ -468,7 +468,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
             {(() => {
               const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
-              const isExpanded = expandedNutri === "__atletas__";
+              const isExpanded = expandedNutri ==="__atletas__";
               return (
                 <div key="__atletas__" className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
                   {/* Header row */}
@@ -487,7 +487,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                     </div>
 
                     <button
-                      onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
+                      onClick={() => setExpandedNutri(isExpanded ? null :"__atletas__")}
                       className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
                     >
                       <Users size={16} />
@@ -513,7 +513,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                                   onClick={() => { setSelected(c); setTab("programar"); }}
                                 >
                                   <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-blue-600 transition-colors">{c.nombre || "Sin nombre"}</h4>
+                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-blue-600 transition-colors">{c.nombre ||"Sin nombre"}</h4>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
                                       plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                                     }`}>
@@ -523,14 +523,14 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                                   <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                      {c.activo ? "Activo" : "Inactivo"}
+                                      {c.activo ?"Activo" :"Inactivo"}
                                     </span>
                                   </div>
                                 </div>
                                 <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
                                   <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
-                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
-                                    {c.activo ? "Suspender" : "Activar"}
+                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ?"text-red-500 hover:text-red-600" :"text-green-600 hover:text-green-700"}`}>
+                                    {c.activo ?"Suspender" :"Activar"}
                                   </button>
                                 </div>
                               </div>
@@ -562,8 +562,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               El correo <strong>{conflictUser.email}</strong> ya pertenece a otro usuario de la plataforma.
               <br/><br/>
               <strong>Datos Actuales:</strong><br/>
-              Nombre: {conflictUser.cliente?.nombre || conflictUser.profile?.nombre || "Sin nombre"}<br/>
-              Teléfono: {conflictUser.cliente?.telefono || conflictUser.profile?.telefono || "Sin teléfono"}
+              Nombre: {conflictUser.cliente?.nombre || conflictUser.profile?.nombre ||"Sin nombre"}<br/>
+              Teléfono: {conflictUser.cliente?.telefono || conflictUser.profile?.telefono ||"Sin teléfono"}
             </div>
 
             <p className="text-[#6B7A8D] text-sm mb-5">
@@ -623,13 +623,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Color principal de su marca">
             <div className="flex gap-2 flex-wrap mt-1">
               {COLORS.map(col => (
-                <div key={col} onClick={() => setFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: formNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: formNutri.color_primario===col ? `0 0 0 2px ${col}` : "none" }}/>
+                <div key={col} onClick={() => setFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: formNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: formNutri.color_primario===col ? `0 0 0 2px ${col}` :"none" }}/>
               ))}
             </div>
           </Field>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowInviteNutri(false)}>Cancelar</Btn>
-            <Btn grad onClick={inviteNutri} disabled={saving || uploadingLogo}>{saving ? "Enviando..." : "Invitar Nutriólogo"}</Btn>
+            <Btn grad onClick={inviteNutri} disabled={saving || uploadingLogo}>{saving ?"Enviando..." :"Invitar Nutriólogo"}</Btn>
           </div>
         </Modal>
       )}
@@ -651,13 +651,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Color de marca">
             <div className="flex gap-2 flex-wrap mt-1">
               {COLORS.map(col => (
-                <div key={col} onClick={() => setEditFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: editFormNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: editFormNutri.color_primario===col ? `0 0 0 2px ${col}` : "none" }}/>
+                <div key={col} onClick={() => setEditFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: editFormNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: editFormNutri.color_primario===col ? `0 0 0 2px ${col}` :"none" }}/>
               ))}
             </div>
           </Field>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowEditNutri(null)}>Cancelar</Btn>
-            <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ? "Guardando..." : "Guardar cambios"}</Btn>
+            <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ?"Guardando..." :"Guardar cambios"}</Btn>
           </div>
         </Modal>
       )}
@@ -678,11 +678,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <input className={InputClass} type="tel" value={formClient.telefono} onChange={e => setFormClient(p=>({...p,telefono:e.target.value}))}/>
           </Field>
           <Field label="Objetivo principal">
-            <textarea className={InputClass + " min-h-[80px] resize-none"} value={formClient.objetivo} onChange={e => setFormClient(p=>({...p,objetivo:e.target.value}))} placeholder="Ej. Pérdida de grasa, hipertrofia..."/>
+            <textarea className={InputClass +" min-h-[80px] resize-none"} value={formClient.objetivo} onChange={e => setFormClient(p=>({...p,objetivo:e.target.value}))} placeholder="Ej. Pérdida de grasa, hipertrofia..."/>
           </Field>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowNewClient(false)}>Cancelar</Btn>
-            <Btn grad onClick={createClient} disabled={saving}>{saving ? "Creando..." : "Crear paciente"}</Btn>
+            <Btn grad onClick={createClient} disabled={saving}>{saving ?"Creando..." :"Crear paciente"}</Btn>
           </div>
         </Modal>
       )}

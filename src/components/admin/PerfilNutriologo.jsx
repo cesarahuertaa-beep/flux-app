@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { dbGet, dbPatch, dbPost } from "../../lib/supabase";
-import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle } from "lucide-react";
-import { useBrand } from "../BrandContext";
-import DatosPersonalesCard from "./DatosPersonalesCard";
-import IdentidadEmpresarialCard from "./IdentidadEmpresarialCard";
-import RoleSwitcher from "../RoleSwitcher";
-import { syncPersonalData } from "../../lib/supabase";
+import { useState, useEffect, useRef } from"react";
+import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
+import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle } from"lucide-react";
+import { useBrand } from"../BrandContext";
+import DatosPersonalesCard from"./DatosPersonalesCard";
+import IdentidadEmpresarialCard from"./IdentidadEmpresarialCard";
+import RoleSwitcher from"../RoleSwitcher";
+import { syncPersonalData } from"../../lib/supabase";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
     const [loading, setLoading] = useState(true);
@@ -14,21 +14,21 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
-  const isSuperadmin = role === "superadmin";
-  const isTeam = role === "staff" || role === "administrativo";
+  const isSuperadmin = role ==="superadmin";
+  const isTeam = role ==="staff" || role ==="administrativo";
 
   const [personalForm, setPersonalForm] = useState({
-    nombre: "", telefono: "", email: "", avatar_url: "", fecha_nacimiento: "", genero: "", pais: "México", estado_provincia: ""
+    nombre:"", telefono:"", email:"", avatar_url:"", fecha_nacimiento:"", genero:"", pais:"México", estado_provincia:""
   });
 
   const [businessForm, setBusinessForm] = useState({
-    nombre_marca: "", especialidad: "", ubicacion_texto: "", cedula: "", mapa_url: "", color_primario: "#1A6FD4", logo_url: ""
+    nombre_marca:"", especialidad:"", ubicacion_texto:"", cedula:"", mapa_url:"", color_primario:"#1A6FD4", logo_url:""
   });
 
   const [bossId, setBossId] = useState(null);
 
   // Config de cobro (solo superadmin)
-  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
+  const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
   const [savingConfig, setSavingConfig] = useState(false);
   const [configSuccess, setConfigSuccess] = useState(false);
   const [configError, setConfigError] = useState(false);
@@ -43,14 +43,14 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       if (rows.length > 0) {
         const p = rows[0];
         setPersonalForm({
-          nombre: p.nombre || "",
-          telefono: p.telefono || "",
-          email: p.email || "",
-          avatar_url: p.avatar_url || "",
-          fecha_nacimiento: p.fecha_nacimiento || "",
-          genero: p.genero || "",
-          pais: p.pais || "México",
-          estado_provincia: p.estado_provincia || ""
+          nombre: p.nombre ||"",
+          telefono: p.telefono ||"",
+          email: p.email ||"",
+          avatar_url: p.avatar_url ||"",
+          fecha_nacimiento: p.fecha_nacimiento ||"",
+          genero: p.genero ||"",
+          pais: p.pais ||"México",
+          estado_provincia: p.estado_provincia ||""
         });
 
         const targetBusinessId = (isTeam && p.nutriologo_id) ? p.nutriologo_id : profileId;
@@ -60,13 +60,13 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         if (busRows.length > 0) {
           const b = busRows[0];
           setBusinessForm({
-            nombre_marca: b.nombre_marca || "",
-            especialidad: b.especialidad || "",
-            ubicacion_texto: b.ubicacion_texto || "",
-            cedula: b.cedula || "",
-            mapa_url: b.mapa_url || "",
-            color_primario: b.color_primario || "#1A6FD4",
-            logo_url: b.logo_url || ""
+            nombre_marca: b.nombre_marca ||"",
+            especialidad: b.especialidad ||"",
+            ubicacion_texto: b.ubicacion_texto ||"",
+            cedula: b.cedula ||"",
+            mapa_url: b.mapa_url ||"",
+            color_primario: b.color_primario ||"#1A6FD4",
+            logo_url: b.logo_url ||""
           });
                   }
 
@@ -80,14 +80,14 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         const cfg = await dbGet("configuracion_plataforma?id=eq.1");
         if (cfg && cfg.length > 0) {
           setConfigPago({
-            clabe: cfg[0].clabe || "",
-            banco: cfg[0].banco || "",
-            beneficiario: cfg[0].beneficiario || ""
+            clabe: cfg[0].clabe ||"",
+            banco: cfg[0].banco ||"",
+            beneficiario: cfg[0].beneficiario ||""
           });
         }
       }
     } catch (error) {
-      setErr("Error cargando perfil: " + error.message);
+      setErr("Error cargando perfil:" + error.message);
     }
     setLoading(false);
   };
@@ -104,7 +104,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       }
     } catch (e) {
       setErr("Error guardando datos personales.");
-      alert("Error guardando datos: " + e.message);
+      alert("Error guardando datos:" + e.message);
     }
     setSavingPersonal(false);
   };
@@ -164,7 +164,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                   <button onClick={async () => { await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, {estado:'rechazada'}); loadProfile(); }} className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-gray-50 flex-1">Rechazar</button>
                   <button onClick={async () => { 
-                    await dbPost("clientes", { nombre: personalForm.nombre || "Colega", objetivo: "Entrenamiento entre colegas", email: personalForm.email, telefono: personalForm.telefono, nutriologo_id: req.from_nutriologo_id, auth_id: profileId, activo: true });
+                    await dbPost("clientes", { nombre: personalForm.nombre ||"Colega", objetivo:"Entrenamiento entre colegas", email: personalForm.email, telefono: personalForm.telefono, nutriologo_id: req.from_nutriologo_id, auth_id: profileId, activo: true });
                     await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, {estado:'aceptada'}); 
                     loadProfile(); 
                   }} className="px-4 py-2 text-sm font-bold bg-[var(--brand-primary)] text-white rounded-lg hover:opacity-90 flex-1">Aceptar</button>
@@ -203,7 +203,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             </div>
           </div>
           <p className="text-xs text-[#6B7A8D] mb-5">
-            {isSuperadmin ? 'Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo.' : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
+            {isSuperadmin ? 'Esta información aparecerá en el panel de"Mi Membresía" de cada nutriólogo.' : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>

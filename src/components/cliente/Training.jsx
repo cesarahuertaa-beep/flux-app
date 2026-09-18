@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useEffect, useRef } from"react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square } from"lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from"recharts";
 
 function TimerCard({ brandColor }) {
   const [seconds, setSeconds] = useState(90);
@@ -54,7 +54,7 @@ function TimerCard({ brandColor }) {
   };
 
   useEffect(() => {
-    if (status === "RUNNING") {
+    if (status ==="RUNNING") {
       timerRef.current = setInterval(() => {
         setSeconds(s => {
           if (s <= 1) {
@@ -76,12 +76,12 @@ function TimerCard({ brandColor }) {
   }, []);
 
   const handleAction = () => {
-    if (status === "IDLE") {
+    if (status ==="IDLE") {
       if (seconds > 0) setStatus("RUNNING");
-    } else if (status === "RUNNING") {
+    } else if (status ==="RUNNING") {
       setStatus("IDLE");
       setSeconds(initialSeconds);
-    } else if (status === "ALARMING") {
+    } else if (status ==="ALARMING") {
       stopAlarm();
       setSeconds(initialSeconds);
       setStatus("IDLE");
@@ -89,7 +89,7 @@ function TimerCard({ brandColor }) {
   };
 
   const changeTime = (type, isUp) => {
-    if (status !== "IDLE") return;
+    if (status !=="IDLE") return;
     setSeconds(prev => {
       let mins = Math.floor(prev / 60);
       let secs = prev % 60;
@@ -115,7 +115,7 @@ function TimerCard({ brandColor }) {
   };
 
   const handleTouchMove = (e, type) => {
-    if (status !== "IDLE") return;
+    if (status !=="IDLE") return;
     const startY = parseFloat(e.currentTarget.dataset.startY);
     const currentY = e.touches[0].clientY;
     const diff = startY - currentY;
@@ -128,24 +128,24 @@ function TimerCard({ brandColor }) {
   const pad = n => String(n).padStart(2, '0');
 
   let btnIcon = <Play size={16} className="ml-0.5" />;
-  let btnClass = "text-white";
-  let btnBg = brandColor || "var(--brand-primary)";
+  let btnClass ="text-white";
+  let btnBg = brandColor ||"var(--brand-primary)";
   
-  if (status === "RUNNING") {
+  if (status ==="RUNNING") {
     btnIcon = <Square size={14} className="fill-current" />;
-  } else if (status === "ALARMING") {
+  } else if (status ==="ALARMING") {
     btnIcon = <Square size={14} className="fill-current" />;
-    btnClass = "text-white animate-pulse";
-    btnBg = "#ef4444"; // red-500
+    btnClass ="text-white animate-pulse";
+    btnBg ="#ef4444"; // red-500
   }
 
   return (
     <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3">
       <div>
-        <p className={`text-[10px] font-mono tracking-widest uppercase ${status === "ALARMING" ? "text-red-500 font-bold" : "text-[#6B7A8D]"}`}>
-          {status === "ALARMING" ? "¡TIEMPO!" : "Descanso"}
+        <p className={`text-[10px] font-mono tracking-widest uppercase ${status ==="ALARMING" ?"text-red-500 font-bold" :"text-[#6B7A8D]"}`}>
+          {status ==="ALARMING" ?"¡TIEMPO!" :"Descanso"}
         </p>
-        <div className={`flex items-center text-3xl font-mono font-bold mt-1 select-none touch-none ${status === "ALARMING" ? "text-red-500" : "text-[#0B1929]"}`}>
+        <div className={`flex items-center text-3xl font-mono font-bold mt-1 select-none touch-none ${status ==="ALARMING" ?"text-red-500" :"text-[#0B1929]"}`}>
           <div 
             className={`cursor-ns-resize px-1 rounded transition-colors ${status==="IDLE"?'hover:bg-gray-100':'pointer-events-none'}`}
             onWheel={(e)=>handleWheel(e, 'min')}
@@ -185,7 +185,7 @@ export default function Training({
   clienteNombre,
   onProgressChange,
   semanaActualCiclo = 1,
-  syncStatus = "synced",
+  syncStatus ="synced",
   isLocked = false,
   ultimoPeso = null,
   isSelfManaged = false,
@@ -207,11 +207,11 @@ export default function Training({
         <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
           <Dumbbell size={32} className="text-[#6B7A8D]" />
         </div>
-        <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+        <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
           Rutina en preparación
         </h2>
         <p className="text-sm text-[#6B7A8D]">
-          {isSelfManaged ? "Aún no has diseñado tu plan de entrenamiento." : "Tu nutriólogo está diseñando tu plan de entrenamiento."}
+          {isSelfManaged ?"Aún no has diseñado tu plan de entrenamiento." :"Tu nutriólogo está diseñando tu plan de entrenamiento."}
         </p>
       </div>
     );
@@ -221,9 +221,9 @@ export default function Training({
   const ejercicios   = rutinaActiva?.ejercicios || [];
 
   const getVariantObj = (ex) => {
-    const variantId = activeVariant[ex.id] || "original";
-    if (variantId === "original") return { obj: ex, variantId: "original" };
-    const altIdx = parseInt(variantId.replace("alt_", ""));
+    const variantId = activeVariant[ex.id] ||"original";
+    if (variantId ==="original") return { obj: ex, variantId:"original" };
+    const altIdx = parseInt(variantId.replace("alt_",""));
     return { obj: (ex.alternativas || [])[altIdx] || ex, variantId };
   };
 
@@ -248,7 +248,7 @@ export default function Training({
           const variantId = activeVariant[targetEx.id] || 'original';
           const p = parseFloat(progreso[`${targetEx.id}-${w}-${s}-peso-${variantId}`]);
           const rVal = progreso[`${targetEx.id}-${w}-${s}-reps-${variantId}`];
-          const r = rVal === "Falta" ? 0 : parseFloat(rVal);
+          const r = rVal ==="Falta" ? 0 : parseFloat(rVal);
           
           if (!isNaN(p) && !isNaN(r) && p > 0 && r > 0) {
             const e1rm = calcular1RMForGraph(p, r);
@@ -267,18 +267,18 @@ export default function Training({
 
   const getPrevVal = (exId, variantId, exObj, si, tipo) => {
     if (wi === 0) {
-      if (tipo === "reps") return exObj.reps_sugeridas || "10";
-      if (tipo === "peso") return exObj.peso_sugerido || "-";
-      return "";
+      if (tipo ==="reps") return exObj.reps_sugeridas ||"10";
+      if (tipo ==="peso") return exObj.peso_sugerido ||"-";
+      return"";
     }
     const key = `${exId}-${wi - 1}-${si}-${tipo}-${variantId}`;
     const val = progresoSemanaAnterior[key] || progreso[key];
-    return val || "N/A";
+    return val ||"N/A";
   };
 
   const parseDisplayWeight = (dbVal, unit) => {
-    if (typeof dbVal === 'string' && dbVal.startsWith("LB:")) return dbVal.replace("LB:", "");
-    if (!dbVal || dbVal === "-" || isNaN(dbVal)) return dbVal;
+    if (typeof dbVal === 'string' && dbVal.startsWith("LB:")) return dbVal.replace("LB:","");
+    if (!dbVal || dbVal ==="-" || isNaN(dbVal)) return dbVal;
     
     // If unit is lb, convert stored kg back to lb
     if (unit === 'lb') {
@@ -291,14 +291,14 @@ export default function Training({
   };
 
   const parseDBWeight = (inputVal, unit) => {
-    if (!inputVal || inputVal === "-") return inputVal;
+    if (!inputVal || inputVal ==="-") return inputVal;
     
     if (unit === 'lb') {
-      // If user types something like "12." or "12.0", we must handle it carefully.
+      // If user types something like"12." or"12.0", we must handle it carefully.
       // But since DB stores kg, we have to convert.
       // We will allow trailing dots by keeping them in the string temporarily.
       // Wait, if we return a string ending in '.' as kg, it will be stored as such.
-      // The DB is text, so we can technically store "12.5 (lb)" in the DB? 
+      // The DB is text, so we can technically store"12.5 (lb)" in the DB? 
       // No, we must store kg.
       // A trick is to append a special marker for lb if it ends with dot, but that's messy.
       const p = parseFloat(inputVal);
@@ -310,7 +310,7 @@ export default function Training({
       if (inputVal.endsWith('.')) {
         // We will store the kg equivalent but append a '.' so parseDisplayWeight could theoretically reconstruct it? No.
         // Let's just return the lb value temporarily in the DB state. It will be overwritten when they finish typing.
-        // The DB is text, so we can store "LB:12." to preserve it!
+        // The DB is text, so we can store"LB:12." to preserve it!
         return `LB:${inputVal}`;
       }
       return (p * 0.453592).toFixed(1);
@@ -350,12 +350,12 @@ export default function Training({
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Rutina Semanal
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
               Entrenamiento
             </h1>
             {clienteNombre && (
               <p className="text-sm text-[#6B7A8D] mt-1">
-                Paciente:{" "}
+                Paciente:{""}
                 <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
               </p>
             )}
@@ -364,8 +364,8 @@ export default function Training({
             onClick={() => setShowProgress(s => !s)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
               showProgress
-                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                : "bg-white text-[var(--brand-primary)] border-[#E2E8F0] hover:border-[var(--brand-primary)]"
+                ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                :"bg-white text-[var(--brand-primary)] border-[#E2E8F0] hover:border-[var(--brand-primary)]"
             }`}
           >
             <TrendingUp size={15} />
@@ -384,13 +384,13 @@ export default function Training({
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={graficaData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} />
-                <YAxis tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} />
+                <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily:"JetBrains Mono", fill:"#6B7A8D" }} />
+                <YAxis tick={{ fontSize: 10, fontFamily:"JetBrains Mono", fill:"#6B7A8D" }} />
                 <Tooltip
                   contentStyle={{
-                    fontFamily: "JetBrains Mono",
+                    fontFamily:"JetBrains Mono",
                     fontSize: 11,
-                    border: "1px solid #E2E8F0",
+                    border:"1px solid #E2E8F0",
                     borderRadius: 8,
                   }}
                   formatter={(value, name) => [`${value} kg`, name]}
@@ -401,7 +401,7 @@ export default function Training({
                     dataKey="serie_0"
                     stroke="#0ea5e9"
                     strokeWidth={2}
-                    dot={{ fill: "#0ea5e9", r: 3 }}
+                    dot={{ fill:"#0ea5e9", r: 3 }}
                     name="Serie 1"
                     connectNulls={false}
                   />
@@ -412,7 +412,7 @@ export default function Training({
                     dataKey="serie_1"
                     stroke="#10b981"
                     strokeWidth={2}
-                    dot={{ fill: "#10b981", r: 3 }}
+                    dot={{ fill:"#10b981", r: 3 }}
                     name="Serie 2"
                     connectNulls={false}
                   />
@@ -423,7 +423,7 @@ export default function Training({
                     dataKey="serie_2"
                     stroke="#f59e0b"
                     strokeWidth={2}
-                    dot={{ fill: "#f59e0b", r: 3 }}
+                    dot={{ fill:"#f59e0b", r: 3 }}
                     name="Serie 3"
                     connectNulls={false}
                   />
@@ -434,7 +434,7 @@ export default function Training({
                     dataKey="serie_3"
                     stroke="#8b5cf6"
                     strokeWidth={2}
-                    dot={{ fill: "#8b5cf6", r: 3 }}
+                    dot={{ fill:"#8b5cf6", r: 3 }}
                     name="Serie 4"
                     connectNulls={false}
                   />
@@ -445,7 +445,7 @@ export default function Training({
                     dataKey="serie_4"
                     stroke="#ef4444"
                     strokeWidth={2}
-                    dot={{ fill: "#ef4444", r: 3 }}
+                    dot={{ fill:"#ef4444", r: 3 }}
                     name="Serie 5"
                     connectNulls={false}
                   />
@@ -456,7 +456,7 @@ export default function Training({
                     dataKey="serie_5"
                     stroke="#14b8a6"
                     strokeWidth={2}
-                    dot={{ fill: "#14b8a6", r: 3 }}
+                    dot={{ fill:"#14b8a6", r: 3 }}
                     name="Serie 6"
                     connectNulls={false}
                   />
@@ -489,8 +489,8 @@ export default function Training({
               onClick={() => { setActiveRutinaIdx(i); setExpandedEx(0); }}
               className={`flex-1 min-w-[52px] py-2.5 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center ${
                 isActive
-                  ? "bg-[var(--brand-primary)] text-white shadow-md"
-                  : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
+                  ?"bg-[var(--brand-primary)] text-white shadow-md"
+                  :"bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
               }`}
             >
               <span className="uppercase">{shortTab}</span>
@@ -527,8 +527,8 @@ export default function Training({
           const activeVarId = varData.variantId;
 
           const otherVariants = [];
-          if (activeVarId !== "original") {
-            otherVariants.push({ obj: ex, variantId: "original" });
+          if (activeVarId !=="original") {
+            otherVariants.push({ obj: ex, variantId:"original" });
           }
           (ex.alternativas || []).forEach((alt, altIdx) => {
             const vid = `alt_${altIdx}`;
@@ -536,13 +536,13 @@ export default function Training({
           });
 
           // Check if there is data this week for any variant of this exercise
-          const isSaved = ["original", "alt_0", "alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+          const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
 
           return (
             <div
               key={ex.id || i}
               className={`bg-white rounded-xl border overflow-hidden transition-all ${
-                isExpanded ? "border-[var(--brand-primary)] shadow-sm" : "border-[#E2E8F0]"
+                isExpanded ?"border-[var(--brand-primary)] shadow-sm" :"border-[#E2E8F0]"
               }`}
             >
               <button
@@ -554,7 +554,7 @@ export default function Training({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                  <p className="text-xs text-[#6B7A8D]">{activeObj.grupo_muscular || activeObj.musculo || "General"}</p>
+                  <p className="text-xs text-[#6B7A8D]">{activeObj.grupo_muscular || activeObj.musculo ||"General"}</p>
                 </div>
                 {isSaved && (
                   <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
@@ -563,7 +563,7 @@ export default function Training({
                 )}
                 <ChevronDown
                   size={16}
-                  className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                  className={`text-[#CBD5E1] transition-transform flex-shrink-0 ${isExpanded ?"rotate-180" :""}`}
                 />
               </button>
 
@@ -627,11 +627,11 @@ export default function Training({
                     {Array.from({ length: numSeries }).map((_, si) => {
                       const repKey   = `${ex.id}-${wi}-${si}-reps-${activeVarId}`;
                       const kgKey    = `${ex.id}-${wi}-${si}-peso-${activeVarId}`;
-                      const repVal   = progreso[repKey] || "";
-                      const kgVal    = progreso[kgKey] || "";
+                      const repVal   = progreso[repKey] ||"";
+                      const kgVal    = progreso[kgKey] ||"";
                       
-                      const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si, "reps");
-                      const prevKg   = getPrevVal(ex.id, activeVarId, activeObj, si, "peso");
+                      const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si,"reps");
+                      const prevKg   = getPrevVal(ex.id, activeVarId, activeObj, si,"peso");
                       
                       const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || activeObj.unidad || 'kg';
                       
@@ -658,7 +658,7 @@ export default function Training({
                                 disabled={isLocked}
                                 onFocus={() => setFocusedInput({ exId: ex.id, wi, si })}
                                 onBlur={() => setTimeout(() => setFocusedInput(null), 150)}
-                                onChange={(e) => onProgressChange(ex.id, wi, si, "reps", e.target.value, activeVarId)}
+                                onChange={(e) => onProgressChange(ex.id, wi, si,"reps", e.target.value, activeVarId)}
                                 className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
                               />
                             </div>
@@ -674,7 +674,7 @@ export default function Training({
                                 onBlur={() => setTimeout(() => setFocusedInput(null), 150)}
                                 onChange={(e) => {
                                   const dbVal = parseDBWeight(e.target.value, prefUnit);
-                                  onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                                  onProgressChange(ex.id, wi, si,"peso", dbVal, activeVarId);
                                 }}
                                 className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 pr-6 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
                               />
@@ -710,8 +710,8 @@ export default function Training({
                               <button
                                 onMouseDown={(e) => {
                                   e.preventDefault();
-                                  onProgressChange(ex.id, wi, si, "reps", "Falta", activeVarId);
-                                  onProgressChange(ex.id, wi, si, "peso", "0", activeVarId);
+                                  onProgressChange(ex.id, wi, si,"reps","Falta", activeVarId);
+                                  onProgressChange(ex.id, wi, si,"peso","0", activeVarId);
                                   setFocusedInput(null);
                                 }}
                                 className="flex-1 bg-[#FEE2E2] text-[#EF4444] text-[10px] font-bold py-1.5 rounded-md hover:bg-[#FCA5A5] transition-colors"
@@ -722,7 +722,7 @@ export default function Training({
                                 <button
                                   onMouseDown={(e) => {
                                     e.preventDefault();
-                                    onProgressChange(ex.id, wi, si, "peso", ultimoPeso.toString(), activeVarId);
+                                    onProgressChange(ex.id, wi, si,"peso", ultimoPeso.toString(), activeVarId);
                                     setFocusedInput(null);
                                   }}
                                   className="flex-1 bg-[#E0E7FF] text-[#4F46E5] text-[10px] font-bold py-1.5 rounded-md hover:bg-[#C7D2FE] transition-colors"
@@ -738,11 +738,11 @@ export default function Training({
                   </div>
 
                   <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
-                    {syncStatus === "saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
-                    {syncStatus === "local" && <Check size={14} />}
-                    {syncStatus === "synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
+                    {syncStatus ==="saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
+                    {syncStatus ==="local" && <Check size={14} />}
+                    {syncStatus ==="synced" && <CheckCheck size={14} className="text-[var(--brand-primary)]" />}
                     <span>
-                      {syncStatus === "saving" ? "Guardando..." : syncStatus === "local" ? "Guardado localmente" : "Sincronizado"}
+                      {syncStatus ==="saving" ?"Guardando..." : syncStatus ==="local" ?"Guardado localmente" :"Sincronizado"}
                     </span>
                   </div>
                 </div>

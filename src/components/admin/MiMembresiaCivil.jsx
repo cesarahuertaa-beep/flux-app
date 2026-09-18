@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
-import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from "lucide-react";
+import React, { useState, useEffect } from"react";
+import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
+import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from"lucide-react";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
@@ -8,7 +8,7 @@ import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarC
  * Reutiliza la estructura visual de MiMembresia.jsx.
  */
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
-  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
+  const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -23,7 +23,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     const lastValid = historial.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
 
     if (!lastValid) {
-      // Si nunca ha pagado o no hay recibo válido, su "vencimiento" esperado es HOY + 30 días
+      // Si nunca ha pagado o no hay recibo válido, su"vencimiento" esperado es HOY + 30 días
       const d = new Date();
       d.setDate(d.getDate() + 30);
       return { targetCutoff: d, expirationDate: null };
@@ -31,7 +31,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
     // Su membresía vence en la fecha del último recibo válido
     // (cuando pague de nuevo, cubrirá 30 días a partir de esa fecha, o a partir de hoy si ya venció)
-    const lastExp = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+    const lastExp = new Date(lastValid.fecha_corte_mes +"T23:59:59");
     
     // Si ya venció y pasaron los días de gracia, el nuevo ciclo empieza hoy
     const blockDate = new Date(lastExp);
@@ -73,9 +73,9 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`)
       ]);
       if (cfg && cfg.length > 0) setConfigPago({
-        clabe: cfg[0].clabe || "",
-        banco: cfg[0].banco || "",
-        beneficiario: cfg[0].beneficiario || ""
+        clabe: cfg[0].clabe ||"",
+        banco: cfg[0].banco ||"",
+        beneficiario: cfg[0].beneficiario ||""
       });
       if (recibos) setHistorial(recibos);
     } catch (e) {
@@ -119,10 +119,10 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         for (const admin of superadmins) {
           await dbPost("notificaciones", {
             profile_id: admin.id,
-            titulo: "Pago de Atleta Independiente",
+            titulo:"Pago de Atleta Independiente",
             mensaje: `El atleta ${clienteData.nombre} ha subido su comprobante.`,
-            tipo: "pago",
-            link_url: "pagos",
+            tipo:"pago",
+            link_url:"pagos",
             entidad_id: reciboRes[0]?.id
           });
         }
@@ -132,14 +132,14 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       loadData();
     } catch (error) {
       console.error(error);
-      if (error.message?.includes('relation "recibos_pago_civil" does not exist')) {
+      if (error.message?.includes('relation"recibos_pago_civil" does not exist')) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error: La base de datos aún no está configurada para recibir pagos de atletas independientes. Contacta a soporte.</div>);
       } else {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error al subir: {error.message}</div>);
       }
     } finally {
       setUploading(false);
-      e.target.value = "";
+      e.target.value ="";
     }
   };
 
@@ -149,7 +149,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         type="file"
         id="comprobanteUploadCivil"
         accept="image/*,.pdf"
-        style={{ display: "none" }}
+        style={{ display:"none" }}
         onChange={handleFileChange}
       />
 
@@ -200,10 +200,10 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           <div className="text-[#6B7A8D] text-sm mb-6">MXN / mes · Sin contrato</div>
           <ul className="space-y-3">
             {[
-              { icon: <Dumbbell size={15} />, text: "Constructor de rutinas ilimitado" },
-              { icon: <FileText size={15} />, text: "Planeación nutricional propia" },
-              { icon: <BarChart2 size={15} />, text: "Seguimiento de progreso y métricas" },
-              { icon: <ShieldCheck size={15} />, text: "Modo Atleta con cronómetro" }
+              { icon: <Dumbbell size={15} />, text:"Constructor de rutinas ilimitado" },
+              { icon: <FileText size={15} />, text:"Planeación nutricional propia" },
+              { icon: <BarChart2 size={15} />, text:"Seguimiento de progreso y métricas" },
+              { icon: <ShieldCheck size={15} />, text:"Modo Atleta con cronómetro" }
             ].map((b, i) => (
               <li key={i} className="flex items-center gap-2.5 text-sm text-[#0B1929] font-medium">
                 <span className="text-[var(--brand-primary)]">{b.icon}</span>
@@ -228,15 +228,15 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             <div className="space-y-3 text-sm mb-6">
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario || "FLUX Sport S.A."}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario ||"FLUX Sport S.A."}</p>
               </div>
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Banco</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco || "—"}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco ||"—"}</p>
               </div>
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">CLABE</span>
-                <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe || "—"}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe ||"—"}</p>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
                 Transfiere <strong>$75.00 MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
@@ -250,7 +250,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             className="w-full bg-[var(--brand-primary)] text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Upload size={16} />
-            {uploading ? "Subiendo..." : historial.some(r => r.estado === 'pendiente') ? "Comprobante en Revisión" : "Subir Comprobante de Pago"}
+            {uploading ?"Subiendo..." : historial.some(r => r.estado === 'pendiente') ?"Comprobante en Revisión" :"Subir Comprobante de Pago"}
           </button>
         </div>
       </div>

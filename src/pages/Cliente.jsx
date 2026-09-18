@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef } from "react";
-import { AppLayout } from "../components/ui/AppLayout";
-import { dbGet, dbUpsert } from "../lib/supabase";
-import { enqueue, getAll } from "../lib/offlineQueue";
-import { useBrand } from "../components/BrandContext";
-import { CitasCliente } from "../components/CitasCliente";
-import Nutrition from "../components/cliente/Nutrition";
-import Training from "../components/cliente/Training";
-import Progreso from "../components/cliente/Progreso";
-import UserProfile from "../components/UserProfile";
-import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
+import { useState, useEffect, useRef } from"react";
+import { AppLayout } from"../components/ui/AppLayout";
+import { dbGet, dbUpsert } from"../lib/supabase";
+import { enqueue, getAll } from"../lib/offlineQueue";
+import { useBrand } from"../components/BrandContext";
+import { CitasCliente } from"../components/CitasCliente";
+import Nutrition from"../components/cliente/Nutrition";
+import Training from"../components/cliente/Training";
+import Progreso from"../components/cliente/Progreso";
+import UserProfile from"../components/UserProfile";
+import PerfilNutriologo from"../components/admin/PerfilNutriologo";
+import BloqueadoPaciente from"../components/BloqueadoPaciente";
+import { ProgramarCliente } from"../components/admin/ProgramarCliente";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from"lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -28,7 +28,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   
   const [tabState, setTab] = useState(() => {
     const saved = sessionStorage.getItem("flux_cliente_tab");
-    return saved ? saved : "perfil";
+    return saved ? saved :"perfil";
   });
 
   const tab = isEmbedded ? embeddedTab : tabState;
@@ -129,7 +129,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
   const timeoutRefs = useRef({});
 
-  const handleProgressChange = (ejId, wi, si, tipo, val, variante_id = "original") => {
+  const handleProgressChange = (ejId, wi, si, tipo, val, variante_id ="original") => {
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
     
@@ -151,7 +151,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           variante_id,
           updated_at: new Date().toISOString() 
         });
-        setSyncStatus(navigator.onLine ? "synced" : "local");
+        setSyncStatus(navigator.onLine ?"synced" :"local");
       } catch(e) {
         console.error("Error guardando progreso:", e);
         setSyncStatus("local");
@@ -163,11 +163,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const isActuallyCivil = cliente?.nutriologo_id === null;
 
   const SIDEBAR_ITEMS = [
-    { id: "nutricion",label: "Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-    { id: "deporte",  label: "Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
-    { id: "progreso", label: "Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
-    ...((!isActuallyCivil && cliente?.objetivo !== "Mi entrenamiento personal") ? [
-      { id: "citas",    label: "Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
+    { id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+    { id:"deporte",  label:"Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id:"progreso", label:"Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
+    ...((!isActuallyCivil && cliente?.objetivo !=="Mi entrenamiento personal") ? [
+      { id:"citas",    label:"Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
     ] : [])
   ];
   const { currentCycleWeek, isFuture } = (() => {
@@ -206,14 +206,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         <div className="bg-[#10B981] bg-opacity-10 border-b border-[#10B981] border-opacity-20 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex flex-col">
             <span className="font-bold text-[#065F46] text-sm md:text-base flex items-center gap-2">
-              <Dumbbell size={16} /> {cliente?.nutriologo_id === null || isAtletaMode ? "Entrenando" : "Estás en Modo Atleta"}
+              <Dumbbell size={16} /> {cliente?.nutriologo_id === null || isAtletaMode ?"Entrenando" :"Estás en Modo Atleta"}
             </span>
             <span className="text-[#047857] text-xs md:text-sm hidden sm:block">
-              {cliente?.nutriologo_id === null ? "Modo de ejecución de rutina." : "Previsualiza tu app exactamente como lo verían tus pacientes."}
+              {cliente?.nutriologo_id === null ?"Modo de ejecución de rutina." :"Previsualiza tu app exactamente como lo verían tus pacientes."}
             </span>
           </div>
           <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
-            {cliente?.nutriologo_id === null ? "Volver al Editor" : "Volver al Panel"}
+            {cliente?.nutriologo_id === null ?"Volver al Editor" :"Volver al Panel"}
           </button>
         </div>
       )}
@@ -221,26 +221,26 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
       ) : (
         <>
-          {isFinished && (tab === "nutricion" || tab === "deporte") ? (
+          {isFinished && (tab ==="nutricion" || tab ==="deporte") ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
               <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center shadow-sm mb-4">
                 <Trophy size={32} className="text-[#10B981]" />
               </div>
-              <h3 className="text-[#0B1929] font-bold text-xl mb-2" style={{ fontFamily: "DM Sans" }}>
+              <h3 className="text-[#0B1929] font-bold text-xl mb-2" style={{ fontFamily:"DM Sans" }}>
                 ¡Felicidades, terminaste!
               </h3>
               <p className="text-[#6B7A8D] text-sm max-w-[280px]">
-                {cliente?.nutriologo_id === null ? "Has completado exitosamente todas las semanas de este ciclo. ¡Es momento de ir al editor y diseñar tu próximo plan!" : "Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan."}
+                {cliente?.nutriologo_id === null ?"Has completado exitosamente todas las semanas de este ciclo. ¡Es momento de ir al editor y diseñar tu próximo plan!" :"Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan."}
               </p>
             </div>
           ) : (
             <>
               
-              {tab === "nutricion" && (
+              {tab ==="nutricion" && (
                 <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
               )}
 
-              {tab === "deporte" && (
+              {tab ==="deporte" && (
                 <Training 
                   rutinas={rutinas} 
                   progreso={progreso}
@@ -258,15 +258,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </>
           )}
 
-          {tab === "progreso" && (
+          {tab ==="progreso" && (
             <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
           )}
 
-          {tab === "citas" && (
+          {tab ==="citas" && (
             <CitasCliente cliente={cliente} />
           )}
 
-          {tab === "perfil" && (
+          {tab ==="perfil" && (
             isAtletaMode ? (
               <div className="flex-1 overflow-y-auto">
                 <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />

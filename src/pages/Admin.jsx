@@ -1,27 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from"react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2} from "lucide-react";
-import { AppLayout } from "../components/ui/AppLayout";
-import { Biblioteca } from "../components/admin/Biblioteca";
-import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import { ProgresoCliente } from "../components/admin/ProgresoCliente";
-import MiMembresiaCivil from "../components/admin/MiMembresiaCivil";
-import { GestionEquipo } from "../components/admin/GestionEquipo";
-import { AgendaAdmin } from "../components/admin/AgendaAdmin";
-import ClienteView from "./Cliente";
-import UserProfile from "../components/UserProfile";
-import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import Aprobaciones from "../components/admin/Aprobaciones";
-import GestorTienda from "../components/admin/GestorTienda";
-import MiMembresia from "../components/admin/MiMembresia";
-import ControlPagos from "../components/admin/ControlPagos";
-import MisComisiones from "../components/admin/MisComisiones";
-import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
-import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
-import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../lib/supabase";
-import { useBrand } from "../components/BrandContext";
+, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2} from"lucide-react";
+import { AppLayout } from"../components/ui/AppLayout";
+import { Biblioteca } from"../components/admin/Biblioteca";
+import { ProgramarCliente } from"../components/admin/ProgramarCliente";
+import { ProgresoCliente } from"../components/admin/ProgresoCliente";
+import MiMembresiaCivil from"../components/admin/MiMembresiaCivil";
+import { GestionEquipo } from"../components/admin/GestionEquipo";
+import { AgendaAdmin } from"../components/admin/AgendaAdmin";
+import ClienteView from"./Cliente";
+import UserProfile from"../components/UserProfile";
+import PerfilNutriologo from"../components/admin/PerfilNutriologo";
+import Aprobaciones from"../components/admin/Aprobaciones";
+import GestorTienda from"../components/admin/GestorTienda";
+import MiMembresia from"../components/admin/MiMembresia";
+import ControlPagos from"../components/admin/ControlPagos";
+import MisComisiones from"../components/admin/MisComisiones";
+import BloqueadoNutriologo from"../components/BloqueadoNutriologo";
+import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
+import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../lib/supabase";
+import { useBrand } from"../components/BrandContext";
 
 // Contenedor temporal para los sub-componentes oscuros (legacy)
 // Ocupa al menos el 100% de la altura para que no se corte el fondo
@@ -40,13 +40,13 @@ const SubComponentWrapper = ({ children, title, action }) => (
 );
 
 export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles, clienteData, session }) {
-  const isCivil = role === "civil";
+  const isCivil = role ==="civil";
   const brand = useBrand();
   const { setBrandColor } = brand;
   
   const [tab, setTab] = useState(() => {
     const saved = sessionStorage.getItem("flux_admin_tab");
-    return saved ? saved : "perfil";
+    return saved ? saved :"perfil";
   });
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   // ── VERIFICACIÓN DE MORA (Nutriólogos y Civiles) ──
   useEffect(() => {
     const checkPago = async () => {
-      if (role !== "nutriologo" && role !== "nutriologo_estudiante" && role !== "civil") return;
+      if (role !=="nutriologo" && role !=="nutriologo_estudiante" && role !=="civil") return;
 
       try {
         const today = new Date();
@@ -106,7 +106,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
 
           // Su vencimiento es la fecha_corte_mes del recibo válido
-          const expirationDate = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+          const expirationDate = new Date(lastValid.fecha_corte_mes +"T23:59:59");
           const blockDate = new Date(expirationDate);
           blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
 
@@ -185,10 +185,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     checkPago();
   }, [myId, role, isCivil, clienteData]);
 
-  const clientesFilter = (isSuperadmin || role === "staff")
-    ? "clientes?order=created_at.asc"
+  const clientesFilter = (isSuperadmin || role ==="staff")
+    ?"clientes?order=created_at.asc"
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
-  const bibliotecaFilter = "biblioteca_ejercicios?order=nombre.asc";
+  const bibliotecaFilter ="biblioteca_ejercicios?order=nombre.asc";
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
@@ -231,10 +231,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   }, [loadClientes, loadBiblioteca]);
 
   useEffect(() => {
-    if (tab === "programar" && !selected) {
+    if (tab ==="programar" && !selected) {
       setTab("clientes");
     }
-    if (tab === "membresia" && isSuperadmin) {
+    if (tab ==="membresia" && isSuperadmin) {
       setTab("pagos");
     }
   }, [tab, selected, isSuperadmin]);
@@ -262,7 +262,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         const profile = existingProfiles[0];
         
         // Bloqueo / Consentimiento: Si es un colega o rol superior
-        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo","nutriologo_estudiante","administrativo","staff","superadmin"].includes(profile.role)) {
           const me = await dbGet(`profiles?id=eq.${myId}`);
           const myName = me[0]?.nombre || 'Nutriólogo';
           
@@ -270,7 +270,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             from_nutriologo_id: myId,
             from_nutriologo_nombre: myName,
             to_email: newClient.email,
-            estado: "pendiente"
+            estado:"pendiente"
           });
 
           setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
@@ -292,7 +292,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         return;
       }
 
-      const authUser = await authInvite(newClient.email, { role: "cliente", nombre: newClient.nombre });
+      const authUser = await authInvite(newClient.email, { role:"cliente", nombre: newClient.nombre });
       await dbPost("clientes", {
         nombre: newClient.nombre,
         objetivo: newClient.objetivo,
@@ -308,7 +308,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       if (e.message?.includes("already been registered")) {
         setMsg("❌ Este usuario ya tiene cuenta (oculta). Verifica en Authentication.");
       } else {
-        setMsg("❌ "+e.message); 
+        setMsg("❌"+e.message); 
       }
     }
     setSaving(false);
@@ -326,7 +326,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       // Creamos una nueva fila de cliente en la tabla clientes
       await dbPost("clientes", {
         nombre: finalNombre,
-        objetivo: conflictClient.typedData.objetivo || "Mejorar salud",
+        objetivo: conflictClient.typedData.objetivo ||"Mejorar salud",
         email: conflictClient.email,
         telefono: finalTelefono,
         auth_id: p?.id || c?.auth_id,
@@ -344,7 +344,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
       loadClientes();
     } catch (e) {
-      setMsg("❌ Error al vincular paciente: " + e.message);
+      setMsg("❌ Error al vincular paciente:" + e.message);
     }
     setSaving(false);
   };
@@ -359,8 +359,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       }
       await dbPatch(`clientes?id=eq.${c.id}`, payload);
       await loadClientes();
-      setMsg(`✓ Cliente ${!c.activo ? "activado" : "desactivado"}`);
-    } catch(e) { setMsg("❌ Error: "+e.message); }
+      setMsg(`✓ Cliente ${!c.activo ?"activado" :"desactivado"}`);
+    } catch(e) { setMsg("❌ Error:"+e.message); }
   };
 
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
@@ -369,9 +369,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useEffect(() => {
     if (editClient) {
       setEditClientForm({
-        nombre: editClient.nombre || "",
-        telefono: editClient.telefono || "",
-        objetivo: editClient.objetivo || ""
+        nombre: editClient.nombre ||"",
+        telefono: editClient.telefono ||"",
+        objetivo: editClient.objetivo ||""
       });
     }
   }, [editClient]);
@@ -383,12 +383,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setMsg("✓ Cliente actualizado");
       setEditClient(null);
       loadClientes();
-    } catch(e) { setMsg("❌ " + e.message); }
+    } catch(e) { setMsg("❌" + e.message); }
     setSaving(false);
   };
 
   const deleteClient = async () => {
-    if (confirmDeleteText !== "ELIMINAR") return;
+    if (confirmDeleteText !=="ELIMINAR") return;
     setSaving(true);
     try {
       // Borrar fotos de storage (progress-photos)
@@ -409,7 +409,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       if (selected?.id === editClient.id) setSelected(null);
       loadClientes();
     } catch(e) {
-      setMsg("❌ Error eliminando: " + e.message);
+      setMsg("❌ Error eliminando:" + e.message);
     }
     setSaving(false);
   };
@@ -428,41 +428,41 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   );
 
   const SIDEBAR_ITEMS = isCivil ? [
-    { id: "mi_plan",         label: "Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
-    { id: "nutricion",       label: "Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-    { id: "entrenamiento",   label: "Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
-    { id: "progreso_atleta", label: "Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
-    { id: "membresia",       label: "Membresía",     icon: <CreditCard size={18} strokeWidth={1.5} /> },
+    { id:"mi_plan",         label:"Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
+    { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+    { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
+    { id:"membresia",       label:"Membresía",     icon: <CreditCard size={18} strokeWidth={1.5} /> },
   ]
-  : role === "staff"
+  : role ==="staff"
     ? [
-        { id: "clientes",   label: "Directorio", icon: <Users size={18} strokeWidth={1.5} /> },
-        { id: "aprobaciones", label: "Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
-        { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
-        { id: "tienda",     label: "Tienda",     icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
-        { id: "comisiones", label: "Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
+        { id:"clientes",   label:"Directorio", icon: <Users size={18} strokeWidth={1.5} /> },
+        { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
+        { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
+        { id:"tienda",     label:"Tienda",     icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+        { id:"comisiones", label:"Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
       ]
-    : role === "administrativo"
+    : role ==="administrativo"
       ? [
-          { id: "clientes",   label: "Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
-          { id: "agenda",     label: "Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> },
-          { id: "comisiones", label: "Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
+          { id:"clientes",   label:"Clientes", icon: <Users size={18} strokeWidth={1.5} /> },
+          { id:"agenda",     label:"Agenda",   icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+          { id:"comisiones", label:"Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
         ]
       : [
-          { id: "clientes",   label: isSuperadmin ? "Directorio" : "Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
-          { id: "mi_entrenamiento", label: "Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
+          { id:"clientes",   label: isSuperadmin ?"Directorio" :"Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
+          { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
-            { id: "aprobaciones", label: "Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
-            { id: "biblioteca", label: "Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
+            { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
+            { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
           ] : []),
-          { id: "agenda",     label: "Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
-          { id: "equipo",     label: "Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
+          { id:"agenda",     label:"Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+          { id:"equipo",     label:"Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           ...(!isSuperadmin ? [
-            { id: "membresia",  label: "Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> }
+            { id:"membresia",  label:"Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> }
           ] : []),
           ...(isSuperadmin ? [
-            { id: "tienda", label: "Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
-            { id: "pagos", label: "Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
+            { id:"tienda", label:"Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+            { id:"pagos", label:"Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
           ] : [])
         ];
 
@@ -475,7 +475,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   };
 
 
-  if (bloqueado && tab !== "membresia") {
+  if (bloqueado && tab !=="membresia") {
     return <BloqueadoNutriologo onLogout={onLogout} onGoToMembresia={() => setTab("membresia")} />;
   }
 
@@ -490,7 +490,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     >
       {diasGracia && !isCivil && (
         <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
-          <AlertCircle className="w-4 h-4 shrink-0 text-yellow-600" /> Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.
+          <AlertCircle className="w-4 h-4 shrink-0 text-yellow-600" /> Tu suscripción vence pronto. Sube tu comprobante en"Mi Membresía" antes de 48 horas para evitar la suspensión.
         </div>
       )}
       {/* Toast Notification (z-[110] para que siempre esté arriba) */}
@@ -505,7 +505,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && tab === "clientes" && (isSuperadmin || role === "staff") ? (
+      {!isCivil && tab ==="clientes" && (isSuperadmin || role ==="staff") ? (
         <DirectorioSuperadmin 
           myId={myId} 
           clientes={clientes} 
@@ -516,7 +516,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           setEditClient={setEditClient}
           toggleActivo={toggleActivo}
         />
-      ) : tab === "clientes" && (
+      ) : tab ==="clientes" && (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header */}
           <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
@@ -526,7 +526,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
                   Panel de Administración
                 </p>
-                <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+                <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
                   Pacientes
                 </h1>
                 <p className="text-sm text-[#6B7A8D] mt-1">
@@ -566,7 +566,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <div className="w-16 h-16 bg-[#E2E8F0] rounded-full flex items-center justify-center mb-4">
                   <Users size={32} className="text-[#6B7A8D]" />
                 </div>
-                <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+                <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
                   No se encontraron pacientes
                 </h2>
                 <p className="text-sm text-[#6B7A8D]">Agrega un nuevo paciente para comenzar.</p>
@@ -591,13 +591,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                               ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
                               : 'bg-red-50 text-red-500'
                           }`}>
-                            {c.activo ? "Activo" : "Inactivo"}
+                            {c.activo ?"Activo" :"Inactivo"}
                           </span>
                         </div>
                         <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
                         
                         <div className="text-sm text-[#4A5568] mb-4 line-clamp-2 min-h-[40px]">
-                          {c.objetivo || "Sin objetivo definido"}
+                          {c.objetivo ||"Sin objetivo definido"}
                         </div>
 
                         {c.telefono && (
@@ -614,14 +614,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
                         {isSuperadmin && c.nutriologo_id && (
                           <div className="text-[10px] text-[#6B7A8D] mt-3 font-medium flex items-center gap-1">
-                            <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
+                            <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] ||"Nutriólogo desconocido"}
                           </div>
                         )}
                       </div>
                     </div>
                     
                     <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-3 flex items-center gap-2">
-                      {role !== "administrativo" && (
+                      {role !=="administrativo" && (
                         <button 
                           onClick={() => { setSelected(c); setTab("programar"); }}
                           className="flex-1 bg-white border border-[#E2E8F0] text-[var(--brand-primary)] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[var(--brand-primary)] hover:text-white transition-colors"
@@ -644,7 +644,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                         className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-1.5 rounded-lg transition-colors ${
                           c.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'
                         }`}
-                        title={c.activo ? "Desactivar" : "Activar"}
+                        title={c.activo ?"Desactivar" :"Activar"}
                       >
                         {c.activo ? <X size={16} /> : <AlertCircle size={16} />}
                       </button>
@@ -658,9 +658,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {/* Legacy Dark Mode Sub-Components */}
-      {(role === "superadmin" || role === "staff") && tab === "biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/></SubComponentWrapper>}
+      {(role ==="superadmin" || role ==="staff") && tab ==="biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/></SubComponentWrapper>}
       
-      {tab === "mi_entrenamiento" && (
+      {tab ==="mi_entrenamiento" && (
         <SubComponentWrapper 
           title="Mi Plan"
           action={
@@ -689,12 +689,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                   if (profiles.length) {
                     await dbPost("clientes", {
                       nombre: profiles[0].nombre, email: profiles[0].email,
-                      objetivo: "Mi entrenamiento personal",
+                      objetivo:"Mi entrenamiento personal",
                       nutriologo_id: myId, activo: true
                     });
                     await loadClientes();
                   }
-                } catch(e) { setMsg("❌ Error: " + e.message); }
+                } catch(e) { setMsg("❌ Error:" + e.message); }
                 setLoading(false);
               }} className="bg-[var(--brand-primary)] text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:opacity-90">
                 Activar Mi Perfil
@@ -704,40 +704,40 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      <div className={tab === "programar" ? "block" : "hidden"}>
+      <div className={tab ==="programar" ?"block" :"hidden"}>
         <SubComponentWrapper title="Asignador de Dietas y Rutinas">
           <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
         </SubComponentWrapper>
       </div>
 
-      {(role !== "administrativo" && role !== "staff") && (
-        <div className={tab === "equipo" ? "block" : "hidden"}>
+      {(role !=="administrativo" && role !=="staff") && (
+        <div className={tab ==="equipo" ?"block" :"hidden"}>
           <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>
         </div>
       )}
 
-      <div className={tab === "agenda" ? "block" : "hidden"}>
+      <div className={tab ==="agenda" ?"block" :"hidden"}>
         <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>
       </div>
 
-      <div className={tab === "aprobaciones" && (isSuperadmin || role === "staff") ? "block" : "hidden"}>
+      <div className={tab ==="aprobaciones" && (isSuperadmin || role ==="staff") ?"block" :"hidden"}>
         <SubComponentWrapper title="Aprobaciones"><Aprobaciones setMsg={setMsg} /></SubComponentWrapper>
       </div>
 
       {!isCivil && (
-        <div className={tab === "membresia" ? "block" : "hidden"}>
+        <div className={tab ==="membresia" ?"block" :"hidden"}>
           <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} /></SubComponentWrapper>
         </div>
       )}
 
       {isSuperadmin && (
-        <div className={tab === "pagos" ? "block" : "hidden"}>
+        <div className={tab ==="pagos" ?"block" :"hidden"}>
           <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>
         </div>
       )}
 
-      {(role === "staff" || role === "administrativo") && (
-        <div className={tab === "comisiones" ? "block" : "hidden"}>
+      {(role ==="staff" || role ==="administrativo") && (
+        <div className={tab ==="comisiones" ?"block" :"hidden"}>
           <SubComponentWrapper title="Mis Comisiones"><MisComisiones myId={myId} setMsg={setMsg} /></SubComponentWrapper>
         </div>
       )}
@@ -754,8 +754,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               El correo <strong>{conflictClient.email}</strong> ya pertenece a otro paciente de la plataforma.
               <br/><br/>
               <strong>Datos Actuales:</strong><br/>
-              Nombre: {conflictClient.cliente?.nombre || conflictClient.profile?.nombre || "Sin nombre"}<br/>
-              Teléfono: {conflictClient.cliente?.telefono || conflictClient.profile?.telefono || "Sin teléfono"}
+              Nombre: {conflictClient.cliente?.nombre || conflictClient.profile?.nombre ||"Sin nombre"}<br/>
+              Teléfono: {conflictClient.cliente?.telefono || conflictClient.profile?.telefono ||"Sin teléfono"}
             </div>
 
             <p className="text-[#6B7A8D] text-sm mb-5">
@@ -828,7 +828,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3">
               <button onClick={() => setShowNewClient(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
               <button onClick={createClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-                {saving ? "Enviando..." : "Crear y enviar invitación"}
+                {saving ?"Enviando..." :"Crear y enviar invitación"}
               </button>
             </div>
           </div>
@@ -873,8 +873,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                     />
                     <div className="flex justify-end gap-2">
                       <button onClick={()=>setShowConfirmDelete(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7A8D] hover:bg-white transition-colors">Cancelar</button>
-                      <button onClick={deleteClient} disabled={confirmDeleteText !== "ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-                        {saving ? "Eliminando..." : "Eliminar Definitivamente"}
+                      <button onClick={deleteClient} disabled={confirmDeleteText !=="ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                        {saving ?"Eliminando..." :"Eliminar Definitivamente"}
                       </button>
                     </div>
                   </div>
@@ -886,7 +886,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                     <div className="flex gap-2">
                       <button onClick={() => { setEditClient(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
                       <button onClick={saveEditClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-                        {saving ? "Guardando..." : "Guardar cambios"}
+                        {saving ?"Guardando..." :"Guardar cambios"}
                       </button>
                     </div>
                   </div>
@@ -896,16 +896,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && tab === "perfil" && (
+      {!isCivil && tab ==="perfil" && (
         <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
       )}
 
-      {tab === "tienda" && (isSuperadmin || role === "staff") && (
+      {tab ==="tienda" && (isSuperadmin || role ==="staff") && (
         <SubComponentWrapper><GestorTienda setMsg={setMsg}/></SubComponentWrapper>
       )}
     
       {/* ════════════ CIVIL PREMIUM TABS ════════════ */}
-      {isCivil && tab === "mi_plan" && (
+      {isCivil && tab ==="mi_plan" && (
         <SubComponentWrapper
           title="Mi Plan"
           
@@ -925,16 +925,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      {isCivil && tab === "membresia" && (
+      {isCivil && tab ==="membresia" && (
         <SubComponentWrapper title="Mi Membresía">
           <MiMembresiaCivil clienteData={clienteData} setMsg={setMsg} />
         </SubComponentWrapper>
       )}
 
-      {isCivil && tab === "perfil" && (
+      {isCivil && tab ==="perfil" && (
         <SubComponentWrapper title="Mi Perfil">
           <UserProfile
-            session={{ role: "civil", data: clienteData }}
+            session={{ role:"civil", data: clienteData }}
             onLogout={onLogout}
             onChangeRole={onChangeRole}
             multiRoles={multiRoles}

@@ -1,5 +1,5 @@
-import React from "react";
-import { Lock } from "lucide-react";
+import React from"react";
+import { Lock } from"lucide-react";
 
 export default function BloqueadoPaciente({ onLogout }) {
   return (

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from "lucide-react";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from "../lib/supabase";
+import { useState, useEffect } from"react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from"lucide-react";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from"../lib/supabase";
 
 export default function Login({ onLogin }) {
   const [mode, setMode]           = useState("login");
@@ -64,15 +64,15 @@ export default function Login({ onLogin }) {
       // 1. Fetch from profiles
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       let adminRole = profiles.length ? profiles[0].role : null;
-      if (adminRole === "administrativo" && profiles[0].nutriologo_id) {
+      if (adminRole ==="administrativo" && profiles[0].nutriologo_id) {
         const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-        if (boss.length && boss[0].role === "superadmin") {
-          adminRole = "staff";
+        if (boss.length && boss[0].role ==="superadmin") {
+          adminRole ="staff";
         }
       }
 
-      if (adminRole && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole)) {
-        if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
+      if (adminRole && ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(adminRole)) {
+        if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(adminRole) && profiles[0].activo === false) {
            // Suspended admin account (ignore or we could error, but we skip to allow client login if any)
         } else {
            availableRoles.push({
@@ -91,19 +91,19 @@ export default function Login({ onLogin }) {
             if (nut[0].activo === false) {
               continue; // Suspended clinic, skip this client profile
             }
-            clientData.nombre_clinica = nut[0].nombre_marca || "Consultorio";
+            clientData.nombre_clinica = nut[0].nombre_marca ||"Consultorio";
             clientData.nutriologo_nombre = nut[0].nombre;
           }
         }
         availableRoles.push({
-          role: "cliente",
+          role:"cliente",
           data: clientData
         });
       }
 
       // 3. AUTO-CREACIÓN DE ATLETA INDEPENDIENTE
       // Todos los usuarios deben tener una cuenta de Atleta Independiente, EXCEPTO Nutriólogos y Superadmin
-      const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
+      const isNutriOrSuper = adminRole && ["nutriologo","nutriologo_estudiante","superadmin"].includes(adminRole);
       
       if (!isNutriOrSuper) {
         const hasIndep = clientRows.some(c => c.nutriologo_id === null);
@@ -135,7 +135,7 @@ export default function Login({ onLogin }) {
 
       let multiRoles = availableRoles.map(r => ({ role: r.role, data: r.data }));
       
-      // Si ES nutriólogo o superadmin, NO le mostramos el rol "cliente" en el switch normal (usan Modo Atleta)
+      // Si ES nutriólogo o superadmin, NO le mostramos el rol"cliente" en el switch normal (usan Modo Atleta)
       if (isNutriOrSuper) {
         multiRoles = multiRoles.filter(r => r.role !== 'cliente');
       }
@@ -148,7 +148,7 @@ export default function Login({ onLogin }) {
 
       const sorted = multiRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
       const firstRole = sorted[0];
-      // Un "civil" es un cliente sin nutriólogo asignado
+      // Un"civil" es un cliente sin nutriólogo asignado
       const isCivilUser = firstRole.role === 'cliente' && !firstRole.data?.nutriologo_id;
       const finalRole = isCivilUser ? 'civil' : firstRole.role;
 
@@ -163,7 +163,7 @@ export default function Login({ onLogin }) {
           multiRoles: sorted 
         });
       }
-} catch(e) { setAuthToken(null); setProfileId(null); setErr("ERR_CATCH: " + e.message); setLoading(false); }
+} catch(e) { setAuthToken(null); setProfileId(null); setErr("ERR_CATCH:" + e.message); setLoading(false); }
   };
 
   
@@ -190,7 +190,7 @@ export default function Login({ onLogin }) {
       setInfo("Solicitud enviada con éxito. Nuestro equipo la revisará pronto.");
       setMode("login");
     } catch (e) {
-      setErr("Error al enviar solicitud: " + e.message);
+      setErr("Error al enviar solicitud:" + e.message);
     }
     setLoading(false);
   };
@@ -216,7 +216,7 @@ export default function Login({ onLogin }) {
         
 
         if (!userId) {
-          throw new Error("No se pudo crear el usuario en Auth. " + JSON.stringify(data));
+          throw new Error("No se pudo crear el usuario en Auth." + JSON.stringify(data));
         }
       
       try {
@@ -229,7 +229,7 @@ export default function Login({ onLogin }) {
           });
           await submit(); // Intenta iniciar sesión si no hay confirmación de email
         } catch (postErr) {
-          // Si la BD rebota el insert (por ejemplo, si "Confirmar Email" está activado en Supabase 
+          // Si la BD rebota el insert (por ejemplo, si"Confirmar Email" está activado en Supabase 
           // y el usuario aún no tiene Token), no es un error crítico. 
           // El perfil se creará cuando inicien sesión por primera vez.
           console.log("Perfil no insertado aún (posible Confirmación de Email pendiente):", postErr.message);
@@ -237,7 +237,7 @@ export default function Login({ onLogin }) {
           setMode("login");
         }
     } catch(e) {
-      setErr("ERR_CATCH: " + e.message);
+      setErr("ERR_CATCH:" + e.message);
       setLoading(false);
     }
   };
@@ -249,7 +249,7 @@ export default function Login({ onLogin }) {
       await authResetPassword(email.trim());
       setInfo("Revisa tu email para restablecer tu contraseña.");
       setMode("login");
-    } catch(e) { setErr("ERR_CATCH: " + e.message); }
+    } catch(e) { setErr("ERR_CATCH:" + e.message); }
     setLoading(false);
   };
 
@@ -261,7 +261,7 @@ export default function Login({ onLogin }) {
       await authUpdatePassword(accessToken, newPass);
       setInfo("Contraseña establecida. Ya puedes entrar.");
       setMode("login");
-    } catch(e) { setErr("ERR_CATCH: " + e.message); }
+    } catch(e) { setErr("ERR_CATCH:" + e.message); }
     setLoading(false);
   };
 
@@ -278,17 +278,17 @@ export default function Login({ onLogin }) {
       <div className="animate-in w-full max-w-[420px] px-10 pt-11 pb-9 bg-white rounded-3xl border border-[#E2E8F0] shadow-2xl relative z-10 mx-4">
         
         {/* Top Spacer / Toggle */}
-        <div className={`text-center ${mode === "reset" || mode === "set_password" ? 'mb-6' : 'mb-5'}`}>
-          {(mode === "reset" || mode === "set_password") && (
+        <div className={`text-center ${mode ==="reset" || mode ==="set_password" ? 'mb-6' : 'mb-5'}`}>
+          {(mode ==="reset" || mode ==="set_password") && (
             <div className="mt-3 text-[13px] text-[#6B7A8D] tracking-wide">
-              {mode === "reset" ? "Recuperar contraseña" : "Crear nueva contraseña"}
+              {mode ==="reset" ?"Recuperar contraseña" :"Crear nueva contraseña"}
             </div>
           )}
-          {(mode === "login" || mode.startsWith("signup")) && (
+          {(mode ==="login" || mode.startsWith("signup")) && (
             <div className="flex bg-[#F0F4FA] rounded-full p-1 mx-auto w-fit mt-2">
               <button
                 onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode === "login" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${mode ==="login" ? 'bg-white shadow-sm text-[var(--brand-primary)]' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
               >
                 Iniciar Sesión
               </button>
@@ -317,7 +317,7 @@ export default function Login({ onLogin }) {
         )}
 
         {/* ── LOGIN FORM ── */}
-        {mode === "login" && <>
+        {mode ==="login" && <>
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Email</div>
             <div className="relative">
@@ -327,7 +327,7 @@ export default function Login({ onLogin }) {
               <input
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && submit()}
+                onKeyDown={e => e.key ==="Enter" && submit()}
                 placeholder="tu@email.com"
                 type="email"
                 className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
@@ -341,10 +341,10 @@ export default function Login({ onLogin }) {
                 <Lock size={18} />
               </div>
               <input
-                type={showPass ? "text" : "password"}
+                type={showPass ?"text" :"password"}
                 value={pass}
                 onChange={e => setPass(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && submit()}
+                onKeyDown={e => e.key ==="Enter" && submit()}
                 placeholder="••••••••"
                 className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm"
               />
@@ -359,7 +359,7 @@ export default function Login({ onLogin }) {
           </div>
 
           <button onClick={submit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "VERIFICANDO…" : <>ENTRAR <ArrowRight size={16} /></>}
+            {loading ?"VERIFICANDO…" : <>ENTRAR <ArrowRight size={16} /></>}
           </button>
 
           <div className="text-center">
@@ -374,7 +374,7 @@ export default function Login({ onLogin }) {
 
         
         {/* SIGNUP TYPE */}
-        {mode === "signup_type" && <>
+        {mode ==="signup_type" && <>
           <div className="mb-6 text-center">
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">¿Cómo usarás Flux?</h3>
             <p className="text-xs text-[#6B7A8D]">Selecciona el tipo de cuenta que deseas crear.</p>
@@ -411,26 +411,26 @@ export default function Login({ onLogin }) {
         </>}
 
         {/* SIGNUP CIVIL */}
-        {mode === "signup_civil" && <>
+        {mode ==="signup_civil" && <>
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nombre Completo</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><User size={18} /></div>
-              <input value={nombre} onChange={e => setNombre(e.target.value)} onKeyDown={e => e.key === "Enter" && signUpSubmit()} placeholder="Tu nombre" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
+              <input value={nombre} onChange={e => setNombre(e.target.value)} onKeyDown={e => e.key ==="Enter" && signUpSubmit()} placeholder="Tu nombre" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Email</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Mail size={18} /></div>
-              <input value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && signUpSubmit()} placeholder="tu@email.com" type="email" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
+              <input value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key ==="Enter" && signUpSubmit()} placeholder="tu@email.com" type="email" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm" />
             </div>
           </div>
           <div className="mb-6">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Contraseña</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Lock size={18} /></div>
-              <input type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && signUpSubmit()} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ?"text" :"password"} value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key ==="Enter" && signUpSubmit()} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">{showPass ? <EyeOff size={18} /> : <Eye size={18} />}</button>
             </div>
           </div>
@@ -441,7 +441,7 @@ export default function Login({ onLogin }) {
             </label>
           </div>
           <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "CREANDO..." : <>CREAR CUENTA <ArrowRight size={16} /></>}
+            {loading ?"CREANDO..." : <>CREAR CUENTA <ArrowRight size={16} /></>}
           </button>
           <div className="text-center">
             <button onClick={() => setMode("signup_type")} className="text-xs text-[#6B7A8D] hover:text-[#0B1929]">Volver</button>
@@ -449,7 +449,7 @@ export default function Login({ onLogin }) {
         </>}
 
         {/* SIGNUP PRO */}
-        {mode === "signup_pro" && <>
+        {mode ==="signup_pro" && <>
           <div className="mb-6 text-center">
             <h3 className="text-lg font-bold text-[#0B1929] mb-1">{signupType === 'nutriologo' ? 'Solicitud Nutriólogo' : 'Solicitud Estudiante de Nutrición'}</h3>
             <p className="text-xs text-[#6B7A8D]">Revisaremos tus datos para habilitar tu cuenta.</p>
@@ -495,7 +495,7 @@ export default function Login({ onLogin }) {
             </label>
           </div>
           <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
-            {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}
+            {loading ?"ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}
           </button>
           <div className="text-center">
             <button onClick={() => setMode("signup_type")} className="text-xs text-[#6B7A8D] hover:text-[#0B1929]">Volver</button>
@@ -504,7 +504,7 @@ export default function Login({ onLogin }) {
 
 
         {/* ── RESET FORM ── */}
-        {mode === "reset" && <>
+        {mode ==="reset" && <>
           <div className="mb-5">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Tu email</div>
             <div className="relative">
@@ -519,7 +519,7 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "ENVIANDO…" : "ENVIAR INSTRUCCIONES"}
+            {loading ?"ENVIANDO…" :"ENVIAR INSTRUCCIONES"}
           </button>
           <div className="text-center">
             <button onClick={() => { setMode("login"); setErr(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
@@ -529,14 +529,14 @@ export default function Login({ onLogin }) {
         </>}
 
         {/* ── SET PASSWORD FORM ── */}
-        {mode === "set_password" && <>
+        {mode ==="set_password" && <>
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nueva contraseña</div>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
               </div>
-              <input type={showPass ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ?"text" :"password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button 
                 type="button"
                 onClick={() => setShowPass(!showPass)}
@@ -552,7 +552,7 @@ export default function Login({ onLogin }) {
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
               </div>
-              <input type={showPass ? "text" : "password"} value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key === "Enter" && setPassword()} placeholder="Repite tu contraseña" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
+              <input type={showPass ?"text" :"password"} value={confirmPass} onChange={e => setConfirmPass(e.target.value)} onKeyDown={e => e.key ==="Enter" && setPassword()} placeholder="Repite tu contraseña" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-12 py-3 w-full outline-none transition-all text-sm" />
               <button 
                 type="button"
                 onClick={() => setShowPass(!showPass)}
@@ -563,7 +563,7 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ? "GUARDANDO…" : "ESTABLECER CONTRASEÑA"}
+            {loading ?"GUARDANDO…" :"ESTABLECER CONTRASEÑA"}
           </button>
         </>}
 

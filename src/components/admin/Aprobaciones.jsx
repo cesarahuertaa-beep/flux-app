@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
-import { dbGet, dbPatch, dbDel, authInvite } from "../../lib/supabase";
+import { useState, useEffect } from"react";
+import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from"lucide-react";
+import { dbGet, dbPatch, dbDel, authInvite } from"../../lib/supabase";
 
 export default function Aprobaciones({ setMsg }) {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -31,9 +31,9 @@ export default function Aprobaciones({ setMsg }) {
           const profs = await dbGet(`profiles?email=eq.${sol.email}`);
           if (profs.length > 0) {
             await dbPatch(`profiles?id=eq.${profs[0].id}`, {
-               cedula: sol.cedula || "",
-               nombre_marca: sol.nombre_marca || "",
-               mapa_url: sol.mapa_url || ""
+               cedula: sol.cedula ||"",
+               nombre_marca: sol.nombre_marca ||"",
+               mapa_url: sol.mapa_url ||""
             });
           }
         } catch(e) {}
@@ -42,7 +42,7 @@ export default function Aprobaciones({ setMsg }) {
       setMsg("✅ Solicitud aprobada y correo enviado.");
       loadData();
     } catch (e) {
-      setMsg("❌ Error al aprobar: " + e.message);
+      setMsg("❌ Error al aprobar:" + e.message);
     }
   };
 
@@ -53,7 +53,7 @@ export default function Aprobaciones({ setMsg }) {
       setMsg("⚠️ Solicitud rechazada.");
       loadData();
     } catch (e) {
-      setMsg("❌ Error al rechazar: " + e.message);
+      setMsg("❌ Error al rechazar:" + e.message);
     }
   };
 
@@ -63,7 +63,7 @@ export default function Aprobaciones({ setMsg }) {
       await dbDel("solicitudes_profesionales", id);
       loadData();
     } catch (e) {
-      setMsg("❌ Error al eliminar: " + e.message);
+      setMsg("❌ Error al eliminar:" + e.message);
     }
   };
 

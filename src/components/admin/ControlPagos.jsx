@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { dbGet, dbPatch, dbPost } from "../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from"react";
+import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell } from"lucide-react";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
 const StatusBadge = ({ s }) => {
-  if (s === "pendiente") return <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><Clock size={12}/> Pendiente</span>;
-  if (s === "aprobado")  return <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><CheckCircle2 size={12}/> Aprobado</span>;
-  if (s === "rechazado") return <span className="px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><XCircle size={12}/> Rechazado</span>;
+  if (s ==="pendiente") return <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><Clock size={12}/> Pendiente</span>;
+  if (s ==="aprobado")  return <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><CheckCircle2 size={12}/> Aprobado</span>;
+  if (s ==="rechazado") return <span className="px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><XCircle size={12}/> Rechazado</span>;
   return null;
 };
 
@@ -48,7 +48,7 @@ export default function ControlPagos({ setMsg }) {
       setRecibos(dataRecibos);
     } catch (e) {
       console.error(e);
-      setMsg("❌ Error cargando pagos: " + e.message);
+      setMsg("❌ Error cargando pagos:" + e.message);
     }
     setLoading(false);
   };
@@ -90,14 +90,14 @@ export default function ControlPagos({ setMsg }) {
   }, [mesesDisponibles]);
 
   const filtrados = useMemo(() => recibos.filter(r => {
-    const matchEstado = filtroEstado === "todos" ? true : r.estado === filtroEstado;
-    const matchMes = filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
+    const matchEstado = filtroEstado ==="todos" ? true : r.estado === filtroEstado;
+    const matchMes = filtroMes ==="todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
     return matchEstado && matchMes;
   }), [recibos, filtroEstado, filtroMes]);
 
   // ── Filtros Civil ───────────────────────────────────────────────────────
   const filtradosCivil = useMemo(() =>
-    recibosCivil.filter(r => filtroEstadoCivil === "todos" ? true : r.estado === filtroEstadoCivil),
+    recibosCivil.filter(r => filtroEstadoCivil ==="todos" ? true : r.estado === filtroEstadoCivil),
   [recibosCivil, filtroEstadoCivil]);
 
   // ── Comisiones colaboradores ────────────────────────────────────────────
@@ -109,7 +109,7 @@ export default function ControlPagos({ setMsg }) {
       const colab = nutri.creado_por;
       if (!map[colab]) map[colab] = { totalGenerado: 0, nutriologos: new Set(), recibosCount: 0 };
       map[colab].totalGenerado += Number(r.monto) || 0;
-      map[colab].nutriologos.add(nutri.nombre || "Desconocido");
+      map[colab].nutriologos.add(nutri.nombre ||"Desconocido");
       map[colab].recibosCount++;
     });
     return Object.entries(map)
@@ -125,36 +125,36 @@ export default function ControlPagos({ setMsg }) {
   const updateEstado = async (id, nuevoEstado, nutriologoId) => {
     try {
       await dbPatch(`recibos_pago?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado === "aprobado" && nutriologoId) {
+      if (nuevoEstado ==="aprobado" && nutriologoId) {
         await dbPatch(`profiles?id=eq.${nutriologoId}`, { bloqueado: false });
       }
 
       if (nutriologoId) {
         await dbPost("notificaciones", {
           profile_id: nutriologoId,
-          titulo: nuevoEstado === "aprobado" ? "Pago Aprobado" : "Pago Rechazado",
-          mensaje: nuevoEstado === "aprobado" ? "Tu pago ha sido validado exitosamente. Ya tienes acceso." : "Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
-          tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
-          link_url: "membresia",
+          titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
+          mensaje: nuevoEstado ==="aprobado" ?"Tu pago ha sido validado exitosamente. Ya tienes acceso." :"Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
+          tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
+          link_url:"membresia",
           entidad_id: id
         });
       }
 
-      setMsg("✓ Recibo " + nuevoEstado);
+      setMsg("✓ Recibo" + nuevoEstado);
       loadData();
-    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
+    } catch (e) { setMsg("❌ Error al actualizar:" + e.message); }
   };
 
   const updateEstadoCivil = async (id, nuevoEstado, clienteId) => {
     try {
       await dbPatch(`recibos_pago_civil?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado === "aprobado" && clienteId) {
+      if (nuevoEstado ==="aprobado" && clienteId) {
         await dbPatch(`clientes?id=eq.${clienteId}`, { 
           activo: true, 
           deactivated_at: null,
           plan_tipo: 'premium'
         });
-      } else if (nuevoEstado === "rechazado" && clienteId) {
+      } else if (nuevoEstado ==="rechazado" && clienteId) {
         // Re-evaluar si tiene derecho a ser premium por algún otro recibo anterior
         const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteId}&order=created_at.desc`);
         const lastAprobado = recibos?.find(r => r.estado === 'aprobado');
@@ -163,7 +163,7 @@ export default function ControlPagos({ setMsg }) {
           downgrade = true;
         } else {
           const today = new Date();
-          const expirationDate = new Date(lastAprobado.fecha_corte_mes + "T23:59:59");
+          const expirationDate = new Date(lastAprobado.fecha_corte_mes +"T23:59:59");
           const blockDate = new Date(expirationDate);
           blockDate.setDate(blockDate.getDate() + 2);
           if (today > blockDate) downgrade = true;
@@ -180,10 +180,10 @@ export default function ControlPagos({ setMsg }) {
           if (cliente && cliente.length > 0 && cliente[0].auth_id) {
             await dbPost("notificaciones", {
               profile_id: cliente[0].auth_id,
-              titulo: nuevoEstado === "aprobado" ? "Pago Aprobado" : "Pago Rechazado",
-              mensaje: nuevoEstado === "aprobado" ? "Tu membresía premium ha sido activada." : "Hubo un problema validando tu pago. Revísalo en tu membresía.",
-              tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
-              link_url: "membresia",
+              titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
+              mensaje: nuevoEstado ==="aprobado" ?"Tu membresía premium ha sido activada." :"Hubo un problema validando tu pago. Revísalo en tu membresía.",
+              tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
+              link_url:"membresia",
               entidad_id: id
             });
           }
@@ -192,9 +192,9 @@ export default function ControlPagos({ setMsg }) {
         }
       }
 
-      setMsg("✓ Pago de atleta " + nuevoEstado);
+      setMsg("✓ Pago de atleta" + nuevoEstado);
       loadDataCivil();
-    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
+    } catch (e) { setMsg("❌ Error al actualizar:" + e.message); }
   };
 
   const handleMarcarTransferido = async (colaboradorNombre, monto) => {
@@ -210,7 +210,7 @@ export default function ControlPagos({ setMsg }) {
       }
       setMsg("✓ Marcado como transferido");
       loadData();
-    } catch (e) { setMsg("❌ Error: " + e.message); }
+    } catch (e) { setMsg("❌ Error:" + e.message); }
   };
 
   const formatMes = (yyyyMm) => {
@@ -271,7 +271,7 @@ export default function ControlPagos({ setMsg }) {
                       <span className="block text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
                     </td>
                     <td className="py-3 px-6 font-semibold text-[#0B1929]">
-                      {nutriologos[r.nutriologo_id]?.nombre || "Desconocido"}
+                      {nutriologos[r.nutriologo_id]?.nombre ||"Desconocido"}
                       {nutriologos[r.nutriologo_id]?.creado_por && <span className="block text-[11px] text-[#6B7A8D] font-normal">Inv. por: {nutriologos[r.nutriologo_id].creado_por}</span>}
                     </td>
                     <td className="py-3 px-6 text-sm text-center text-[#6B7A8D]">
@@ -282,9 +282,9 @@ export default function ControlPagos({ setMsg }) {
                     <td className="py-3 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
-                        {r.estado === "pendiente" && <>
-                          <button onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                          <button onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                        {r.estado ==="pendiente" && <>
+                          <button onClick={() => updateEstado(r.id,"aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                          <button onClick={() => updateEstado(r.id,"rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
                         </>}
                       </div>
                     </td>
@@ -302,7 +302,7 @@ export default function ControlPagos({ setMsg }) {
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <div className="font-semibold text-[#0B1929]">
-                        {nutriologos[r.nutriologo_id]?.nombre || "Desconocido"}
+                        {nutriologos[r.nutriologo_id]?.nombre ||"Desconocido"}
                       </div>
                       {nutriologos[r.nutriologo_id]?.creado_por && (
                         <div className="text-[11px] text-[#6B7A8D] font-normal">
@@ -329,9 +329,9 @@ export default function ControlPagos({ setMsg }) {
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
                     <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
-                    {r.estado === "pendiente" && <>
-                      <button onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                      <button onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                    {r.estado ==="pendiente" && <>
+                      <button onClick={() => updateEstado(r.id,"aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                      <button onClick={() => updateEstado(r.id,"rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
                     </>}
                   </div>
                 </div>
@@ -447,7 +447,7 @@ export default function ControlPagos({ setMsg }) {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtradosCivil.length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-[#6B7A8D]">{recibosCivil.length === 0 ? "Aún no hay comprobantes de atletas independientes." : "No hay recibos en esta categoría."}</td></tr>
+                  <tr><td colSpan="6" className="py-8 text-center text-[#6B7A8D]">{recibosCivil.length === 0 ?"Aún no hay comprobantes de atletas independientes." :"No hay recibos en esta categoría."}</td></tr>
                 ) : filtradosCivil.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="py-3 px-6 text-sm text-[#0B1929]">
@@ -455,7 +455,7 @@ export default function ControlPagos({ setMsg }) {
                       <span className="block text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
                     </td>
                     <td className="py-3 px-6 font-semibold text-[#0B1929]">
-                      {clientesCivil[r.cliente_id] || "Atleta Independiente"}
+                      {clientesCivil[r.cliente_id] ||"Atleta Independiente"}
                       <span className="block text-[11px] text-[var(--brand-primary)] font-normal">Atleta Independiente Premium</span>
                     </td>
                     <td className="py-3 px-6 text-sm text-center text-[#6B7A8D]">
@@ -466,9 +466,9 @@ export default function ControlPagos({ setMsg }) {
                     <td className="py-3 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         {r.comprobante_url && <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver comprobante"><Eye size={18} /></button>}
-                        {r.estado === "pendiente" && <>
-                          <button onClick={() => updateEstadoCivil(r.id, "aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                          <button onClick={() => updateEstadoCivil(r.id, "rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                        {r.estado ==="pendiente" && <>
+                          <button onClick={() => updateEstadoCivil(r.id,"aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                          <button onClick={() => updateEstadoCivil(r.id,"rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
                         </>}
                       </div>
                     </td>
@@ -481,14 +481,14 @@ export default function ControlPagos({ setMsg }) {
             <div className="md:hidden flex flex-col divide-y divide-gray-100">
               {filtradosCivil.length === 0 ? (
                 <div className="py-8 text-center text-[#6B7A8D]">
-                  {recibosCivil.length === 0 ? "Aún no hay comprobantes de atletas independientes." : "No hay recibos en esta categoría."}
+                  {recibosCivil.length === 0 ?"Aún no hay comprobantes de atletas independientes." :"No hay recibos en esta categoría."}
                 </div>
               ) : filtradosCivil.map((r) => (
                 <div key={r.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors">
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <div className="font-semibold text-[#0B1929]">
-                        {clientesCivil[r.cliente_id] || "Atleta Independiente"}
+                        {clientesCivil[r.cliente_id] ||"Atleta Independiente"}
                       </div>
                       <div className="text-[11px] text-[var(--brand-primary)] font-normal">
                         Atleta Independiente Premium
@@ -513,9 +513,9 @@ export default function ControlPagos({ setMsg }) {
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
                     {r.comprobante_url && <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver comprobante"><Eye size={18} /></button>}
-                    {r.estado === "pendiente" && <>
-                      <button onClick={() => updateEstadoCivil(r.id, "aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                      <button onClick={() => updateEstadoCivil(r.id, "rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
+                    {r.estado ==="pendiente" && <>
+                      <button onClick={() => updateEstadoCivil(r.id,"aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
+                      <button onClick={() => updateEstadoCivil(r.id,"rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
                     </>}
                   </div>
                 </div>

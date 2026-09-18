@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
-import { useBrand } from "../BrandContext";
-import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from "lucide-react";
+import React, { useState, useEffect, useMemo } from"react";
+import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
+import { useBrand } from"../BrandContext";
+import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from"lucide-react";
 
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const [perfil, setPerfil] = useState(null);
-  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
+  const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -22,9 +22,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       ]);
       if (data && data.length > 0) setPerfil(data[0]);
       if (cfg && cfg.length > 0) setConfigPago({
-        clabe: cfg[0].clabe || "",
-        banco: cfg[0].banco || "",
-        beneficiario: cfg[0].beneficiario || ""
+        clabe: cfg[0].clabe ||"",
+        banco: cfg[0].banco ||"",
+        beneficiario: cfg[0].beneficiario ||""
       });
       if (recibos) setHistorial(recibos);
     } catch (e) {
@@ -160,7 +160,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   }, [clientes, perfil, loading]);
 
   // Estado del componente
-  const status = "active"; // active, pending, review
+  const status ="active"; // active, pending, review
 
   const handleUploadClick = () => {
     document.getElementById("comprobanteUpload").click();
@@ -193,10 +193,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         const superadmins = await dbGet("profiles?role=eq.superadmin");
         const notifs = superadmins.map(admin => ({
           profile_id: admin.id,
-          titulo: "Nuevo comprobante de pago",
-          mensaje: "Un profesional ha subido un comprobante para revisión.",
-          tipo: "pago",
-          link_url: "pagos",
+          titulo:"Nuevo comprobante de pago",
+          mensaje:"Un profesional ha subido un comprobante para revisión.",
+          tipo:"pago",
+          link_url:"pagos",
           entidad_id: reciboRes[0]?.id
         }));
         for (const n of notifs) {
@@ -211,10 +211,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       loadData();
     } catch (error) {
       console.error(error);
-      setMsg("❌ Error al subir: " + error.message);
+      setMsg("❌ Error al subir:" + error.message);
     } finally {
       setUploading(false);
-      e.target.value = ""; // Limpiar input
+      e.target.value =""; // Limpiar input
     }
   };
 
@@ -224,7 +224,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         type="file" 
         id="comprobanteUpload" 
         accept="image/*,.pdf" 
-        style={{ display: "none" }} 
+        style={{ display:"none" }} 
         onChange={handleFileChange} 
       />
       
@@ -235,7 +235,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           <p className="text-[#6B7A8D] mt-1">Controla tu suscripción, revisa tu nivel de cobro y sube tus comprobantes.</p>
         </div>
         
-        {status === "active" && (
+        {status ==="active" && (
           <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold">
             <CheckCircle2 size={18} />
             Servicio Activo

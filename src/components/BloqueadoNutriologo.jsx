@@ -1,5 +1,5 @@
-import React from "react";
-import { Lock, Mail } from "lucide-react";
+import React from"react";
+import { Lock, Mail } from"lucide-react";
 
 export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
   return (

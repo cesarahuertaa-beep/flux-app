@@ -1,7 +1,7 @@
-import { useBrand } from "../BrandContext";
-import { useState, useEffect, useCallback } from "react";
-import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from "lucide-react";
-import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
+import { useBrand } from"../BrandContext";
+import { useState, useEffect, useCallback } from"react";
+import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from"lucide-react";
+import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../../lib/supabase";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
 // Permite que un nutriólogo invite y gestione a su personal administrativo.
@@ -13,9 +13,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const [loading, setLoading]       = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving]         = useState(false);
-  const [form, setForm]             = useState({ nombre: "", email: "", telefono: "" });
+  const [form, setForm]             = useState({ nombre:"", email:"", telefono:"" });
   const [editUser, setEditUser]     = useState(null);
-  const [editForm, setEditForm]     = useState({ nombre: "", telefono: "" });
+  const [editForm, setEditForm]     = useState({ nombre:"", telefono:"" });
   
   // Interceptor State
   const [conflictUser, setConflictUser] = useState(null);
@@ -27,8 +27,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     try {
       const rows = await dbGet(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);
       const myTeam = rows.filter(r => 
-        (r.role === "administrativo" && r.nutriologo_id === myId) || 
-        (isSuperadmin && r.role === "staff")
+        (r.role ==="administrativo" && r.nutriologo_id === myId) || 
+        (isSuperadmin && r.role ==="staff")
       );
       setEquipo(myTeam);
     } catch { }
@@ -61,7 +61,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       }
 
       const authUser = await authInvite(form.email, {
-        role: "administrativo",
+        role:"administrativo",
         nombre: form.nombre,
         telefono: form.telefono
       });
@@ -69,19 +69,19 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       // Explicitly update profile to ensure nutriologo_id is linked properly
       await dbPatch(`profiles?id=eq.${authUser.id}`, {
         nutriologo_id: myId,
-        role: isSuperadmin ? "staff" : "administrativo"
+        role: isSuperadmin ?"staff" :"administrativo"
       });
 
       setMsg(`✅ Invitación enviada — el ${isSuperadmin ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
       setShowInvite(false);
-      setForm({ nombre: "", email: "", telefono: "" });
+      setForm({ nombre:"", email:"", telefono:"" });
       setTimeout(load, 2000);
     } catch (e) { 
       // Supabase lanza error si el usuario ya existe en auth.users pero no lo encontramos en profiles
       if (e.message?.includes("already been registered")) {
         setMsg("❌ Este usuario ya tiene cuenta, pero está oculto en la bóveda. Búscalo en Authentication.");
       } else {
-        setMsg("❌ " + e.message); 
+        setMsg("❌" + e.message); 
       }
     }
     setSaving(false);
@@ -97,7 +97,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       // Los datos finales a guardar
       const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
       const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
-      const newRole = isSuperadmin ? "staff" : "administrativo";
+      const newRole = isSuperadmin ?"staff" :"administrativo";
 
       // 1. Asegurarnos que exista en profiles y tenga el rol administrativo
       if (p) {
@@ -120,10 +120,10 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
 
       setMsg(`✅ Permisos otorgados exitosamente sin necesidad de registro. Al usuario le aparecerá el Selector de Roles.`);
       setConflictUser(null);
-      setForm({ nombre: "", email: "", telefono: "" });
+      setForm({ nombre:"", email:"", telefono:"" });
       load();
     } catch (e) {
-      setMsg("❌ Error al otorgar accesos: " + e.message);
+      setMsg("❌ Error al otorgar accesos:" + e.message);
     }
     setSaving(false);
   };
@@ -131,9 +131,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const toggleActivo = async (p) => {
     try {
       await dbPatch(`profiles?id=eq.${p.id}`, { activo: !p.activo });
-      setMsg(p.activo ? "🔴 Acceso suspendido" : "🟢 Acceso activado");
+      setMsg(p.activo ?"🔴 Acceso suspendido" :"🟢 Acceso activado");
       load();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg("❌" + e.message); }
   };
 
   const saveEdit = async () => {
@@ -143,20 +143,20 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       setMsg("✅ Colaborador actualizado");
       setEditUser(null);
       load();
-    } catch (e) { setMsg("❌ " + e.message); }
+    } catch (e) { setMsg("❌" + e.message); }
     setSaving(false);
   };
 
   return (
-    <div className="animate-in">
+    <div>
       {/* Header */}
       <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
         <div>
           <h2 className="font-['Rajdhani'] font-bold text-2xl text-[#0B1929] tracking-[0.5px] flex items-center gap-2">
-            <Users className="w-6 h-6 text-[var(--brand-primary)]" /> {isSuperadmin ? "Staff Corporativo" : "Equipo Administrativo"}
+            <Users className="w-6 h-6 text-[var(--brand-primary)]" /> {isSuperadmin ?"Staff Corporativo" :"Equipo Administrativo"}
           </h2>
           <div className="text-sm text-[#6B7A8D] mt-0.5">
-            {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
+            {equipo.length} colaborador{equipo.length !== 1 ?"es" :""} registrado{equipo.length !== 1 ?"s" :""}
           </div>
         </div>
         <button 
@@ -171,10 +171,10 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       <div className="bg-[#F8FAFC] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         {isSuperadmin 
-          ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa." 
-          : "Tiene acceso únicamente a la lista de clientes y a la gestión de citas. No puede ver ni editar dietas, rutinas ni la biblioteca."
+          ?"Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa." 
+          :"Tiene acceso únicamente a la lista de clientes y a la gestión de citas. No puede ver ni editar dietas, rutinas ni la biblioteca."
         }
-        {" "}Puedes suspender su acceso en cualquier momento.
+        {""}Puedes suspender su acceso en cualquier momento.
       </div>
 
       {/* Lista */}
@@ -207,13 +207,13 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               {/* Info */}
               <div className="pl-3.5">
                 <div className="font-bold text-[15px] text-[#0B1929] mb-1 font-['Space_Grotesk']">
-                  {p.nombre || "—"}
+                  {p.nombre ||"—"}
                 </div>
                 <div className="text-xs text-[#6B7A8D] flex items-center gap-2.5 flex-wrap">
-                  {p.email || "Sin email"}
+                  {p.email ||"Sin email"}
                   {p.telefono && (
                     <a
-                      href={`https://wa.me/${p.telefono.replace(/\D/g, "")}`}
+                      href={`https://wa.me/${p.telefono.replace(/\D/g,"")}`}
                       target="_blank" rel="noreferrer"
                       onClick={e => e.stopPropagation()}
                       className="text-[#22c55e] no-underline font-semibold inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
@@ -225,7 +225,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 <div className="mt-1.5">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${p.activo !== false ? 'bg-[#F8FAFC] text-[var(--brand-primary)]' : 'bg-[#FEF2F2] text-[#EF4444]'}`}>
                     {p.activo !== false ? <Circle className="w-3 h-3 fill-current" /> : <CircleDashed className="w-3 h-3" />}
-                    {p.activo !== false ? "Activo" : "Suspendido"}
+                    {p.activo !== false ?"Activo" :"Suspendido"}
                   </span>
                 </div>
               </div>
@@ -235,7 +235,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                 <button 
                   onClick={() => {
                     setEditUser(p);
-                    setEditForm({ nombre: p.nombre || "", telefono: p.telefono || "" });
+                    setEditForm({ nombre: p.nombre ||"", telefono: p.telefono ||"" });
                   }}
                   className="px-3 py-1.5 text-xs font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors flex items-center gap-1.5"
                 >
@@ -245,7 +245,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   onClick={() => toggleActivo(p)}
                   className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 ${p.activo !== false ? 'border-[#FEE2E2] text-[#EF4444] hover:bg-[#FEF2F2]' : 'border-[#E0E7FF] text-[#4F46E5] hover:bg-[#EEF2FF]'}`}
                 >
-                  {p.activo !== false ? "Suspender acceso" : "Activar acceso"}
+                  {p.activo !== false ?"Suspender acceso" :"Activar acceso"}
                 </button>
               </div>
             </div>
@@ -268,8 +268,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               El correo <strong>{conflictUser.email}</strong> ya está registrado en tu plataforma (posiblemente como paciente).
               <br/><br/>
               <strong>Datos Actuales Registrados:</strong><br/>
-              Nombre: {conflictUser.profile?.nombre || conflictUser.cliente?.nombre || "Sin nombre"}<br/>
-              Teléfono: {conflictUser.profile?.telefono || conflictUser.cliente?.telefono || "Sin teléfono"}
+              Nombre: {conflictUser.profile?.nombre || conflictUser.cliente?.nombre ||"Sin nombre"}<br/>
+              Teléfono: {conflictUser.profile?.telefono || conflictUser.cliente?.telefono ||"Sin teléfono"}
             </div>
 
             <p className="text-[#6B7A8D] text-sm mb-5">
@@ -368,12 +368,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   El colaborador recibirá un email de invitación para crear su contraseña.
                   {isSuperadmin ? (
                     <>
-                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Directorio</strong>,{" "}
+                      {""}Solo tendrá acceso a <strong className="text-[#0B1929]">Directorio</strong>,{""}
                       <strong className="text-[#0B1929]">Biblioteca</strong> y <strong className="text-[#0B1929]">Tienda</strong>.
                     </>
                   ) : (
                     <>
-                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{" "}
+                      {""}Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{""}
                       <strong className="text-[#0B1929]">Agenda</strong> — sin acceso a información clínica.
                     </>
                   )}
@@ -393,7 +393,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saving ? "Enviando invitación…" : "Invitar colaborador"}
+                  {saving ?"Enviando invitación…" :"Invitar colaborador"}
                 </button>
               </div>
             </div>
@@ -448,7 +448,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saving ? "Guardando…" : "Guardar cambios"}
+                  {saving ?"Guardando…" :"Guardar cambios"}
                 </button>
               </div>
             </div>

@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
-import { Building2, Image as ImageIcon } from "lucide-react";
-import { storageUpload, storageDelete } from "../../lib/supabase";
+import React, { useRef, useState } from"react";
+import { Building2, Image as ImageIcon } from"lucide-react";
+import { storageUpload, storageDelete } from"../../lib/supabase";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -25,7 +25,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {
-      alert("Error subiendo logo: " + error.message);
+      alert("Error subiendo logo:" + error.message);
     }
     setUploading(false);
   };
@@ -62,14 +62,14 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
         </div>
         <div className="flex-1 min-w-0 w-full text-center md:text-left">
-          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
+          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca ||"Nombre de tu Consultorio"}</h2>
           <p className="text-[#6B7A8D] text-sm">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
         </div>
         <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
           <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Color de Marca</label>
           <div className="flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0]">
-            <input type="color" value={form.color_primario || "#1A6FD4"} onChange={handleColorChange} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none" />
-            <span className="text-xs font-mono text-[#6B7A8D] px-2">{(form.color_primario || "#1A6FD4").toUpperCase()}</span>
+            <input type="color" value={form.color_primario ||"#1A6FD4"} onChange={handleColorChange} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none" />
+            <span className="text-xs font-mono text-[#6B7A8D] px-2">{(form.color_primario ||"#1A6FD4").toUpperCase()}</span>
           </div>
         </div>
       </div>

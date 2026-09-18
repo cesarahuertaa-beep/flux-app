@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { dbGet, getProfileId } from "../lib/supabase";
+import { createContext, useContext, useEffect, useState } from"react";
+import { dbGet, getProfileId } from"../lib/supabase";
 
 const BrandContext = createContext(null);
 
@@ -7,9 +7,9 @@ export const useBrand = () => useContext(BrandContext);
 
 // Default FLUX brand - used for superadmin or unauthenticated state
 const FLUX_DEFAULT = { 
-  nombre_marca: "FLUX", 
-  color_primario: "#1A6FD4", 
-  logo_url: "/flux_logo.jpeg" 
+  nombre_marca:"FLUX", 
+  color_primario:"#1A6FD4", 
+  logo_url:"/flux_logo.jpeg" 
 };
 
 export function BrandProvider({ children, session }) {
@@ -17,7 +17,7 @@ export function BrandProvider({ children, session }) {
 
   useEffect(() => {
     // Sin sesión o superadmin/admin → siempre FLUX
-    if (!session || session.role === "superadmin") {
+    if (!session || session.role ==="superadmin") {
       setBrand(FLUX_DEFAULT);
       return;
     }
@@ -26,10 +26,10 @@ export function BrandProvider({ children, session }) {
       try {
         let profileIdToFetch = null;
 
-        if (session.role === "cliente" && session.data?.nutriologo_id) {
+        if (session.role ==="cliente" && session.data?.nutriologo_id) {
           // Cliente ve la marca de su nutriólogo
           profileIdToFetch = session.data.nutriologo_id;
-        } else if (session.role === "nutriologo" || session.role === "nutriologo_estudiante") {
+        } else if (session.role ==="nutriologo" || session.role ==="nutriologo_estudiante") {
           // Nutriólogo ve su propia marca
           profileIdToFetch = session.profileId || getProfileId();
         }
@@ -39,9 +39,9 @@ export function BrandProvider({ children, session }) {
           if (res.length > 0) {
             const p = res[0];
             setBrand({
-              nombre_marca: p.nombre_marca || "FLUX",
-              color_primario: p.color_primario || "#1A6FD4",
-              logo_url: p.logo_url || "/flux_logo.jpeg"
+              nombre_marca: p.nombre_marca ||"FLUX",
+              color_primario: p.color_primario ||"#1A6FD4",
+              logo_url: p.logo_url ||"/flux_logo.jpeg"
             });
           }
         }
@@ -56,16 +56,16 @@ export function BrandProvider({ children, session }) {
   // Generamos variables CSS dinámicas basadas en el color primario de la marca.
   // Usamos color-mix para generar fondos ligeros y tonos oscuros (Figma style).
   const cssVars = {
-    "--brand-primary": brand.color_primario,
+"--brand-primary": brand.color_primario,
     // Fondo claro con 10% de opacidad para componentes seleccionados (ej: sidebar activo)
-    "--brand-secondary": `color-mix(in srgb, ${brand.color_primario} 10%, white)`,
-    "--brand-primary-hover": `color-mix(in srgb, ${brand.color_primario} 85%, black)`,
-    "--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
+"--brand-secondary": `color-mix(in srgb, ${brand.color_primario} 10%, white)`,
+"--brand-primary-hover": `color-mix(in srgb, ${brand.color_primario} 85%, black)`,
+"--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
   };
 
   return (
     <BrandContext.Provider value={brand}>
-      <div style={{ ...cssVars, minHeight: "100vh" }}>
+      <div style={{ ...cssVars, minHeight:"100vh" }}>
         {children}
       </div>
     </BrandContext.Provider>

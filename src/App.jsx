@@ -1,21 +1,21 @@
-import { useState, useEffect } from "react";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from "./lib/supabase";
-import { dbUpsert } from "./lib/supabase";
-import { syncQueue } from "./lib/offlineQueue";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import ClienteView from "./pages/Cliente";
-import Privacidad from "./pages/Privacidad";
-import { BrandProvider } from "./components/BrandContext";
-import { AppUpdater } from "./components/ui/AppUpdater";
+import { useState, useEffect } from"react";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from"react-router-dom";
+import { Capacitor } from"@capacitor/core";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from"./lib/supabase";
+import { dbUpsert } from"./lib/supabase";
+import { syncQueue } from"./lib/offlineQueue";
+import Landing from"./pages/Landing";
+import Login from"./pages/Login";
+import Admin from"./pages/Admin";
+import ClienteView from"./pages/Cliente";
+import Privacidad from"./pages/Privacidad";
+import { BrandProvider } from"./components/BrandContext";
+import { AppUpdater } from"./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
   sessionStorage.setItem("flux_role", s.role);
-  // "civil" y "cliente" ambos guardan su ID de cliente en flux_client_id
-  if ((s.role === "cliente" || s.role === "civil") && s.data?.id) {
+  //"civil" y"cliente" ambos guardan su ID de cliente en flux_client_id
+  if ((s.role ==="cliente" || s.role ==="civil") && s.data?.id) {
     sessionStorage.setItem("flux_client_id", s.data.id);
   } else {
     sessionStorage.removeItem("flux_client_id");
@@ -56,8 +56,8 @@ export default function App() {
       setProfileId(null);
       saveRefreshToken(null);
       clearSessionMeta();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login" + window.location.hash;
+      if (window.location.pathname !=="/login") {
+        window.location.href ="/login" + window.location.hash;
         return;
       }
     }
@@ -77,10 +77,10 @@ export default function App() {
         // --- OPTIMISTIC RESTORE ---
         let optimisticData = null;
           if (savedMultiRoles) {
-            const searchRole = savedRole === "civil" ? "cliente" : savedRole;
+            const searchRole = savedRole ==="civil" ?"cliente" : savedRole;
             const matchingRole = savedMultiRoles.find(r => {
               if (r.role !== searchRole) return false;
-              if (searchRole === "cliente" && savedClientId) {
+              if (searchRole ==="cliente" && savedClientId) {
                 return String(r.data?.id) === String(savedClientId);
               }
               return true;
@@ -96,7 +96,7 @@ export default function App() {
             try {
               if (profileId && Array.isArray(savedMultiRoles) && savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role))) {
                 const profiles = await dbGet(`profiles?id=eq.${profileId}`);
-                if (!profiles.length || (profiles[0].activo === false && profiles[0].role !== "superadmin")) {
+                if (!profiles.length || (profiles[0].activo === false && profiles[0].role !=="superadmin")) {
                   setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
                 }
               }
@@ -110,12 +110,12 @@ export default function App() {
           const hasAdminRole = Array.isArray(savedMultiRoles) &&
             savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
 
-          if (!hasAdminRole && (savedRole === "cliente" || savedRole === "civil") && savedClientId) {
+          if (!hasAdminRole && (savedRole ==="cliente" || savedRole ==="civil") && savedClientId) {
             const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
             if (rows.length) {
-              // Preserve "civil" if no nutriólogo, "cliente" if has one
-              const restoredRole = savedRole === "civil" ? "civil" :
-                                   (rows[0].nutriologo_id ? "cliente" : "civil");
+              // Preserve"civil" if no nutriólogo,"cliente" if has one
+              const restoredRole = savedRole ==="civil" ?"civil" :
+                                   (rows[0].nutriologo_id ?"cliente" :"civil");
               setSession({ role: restoredRole, data: rows[0], token, profileId, multiRoles: savedMultiRoles });
             } else {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
@@ -124,15 +124,15 @@ export default function App() {
             const profiles = await dbGet(`profiles?id=eq.${profileId}`);
             let role = profiles.length ? profiles[0].role : null;
             
-            if (role === "administrativo" && profiles[0].nutriologo_id) {
+            if (role ==="administrativo" && profiles[0].nutriologo_id) {
               const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-              if (boss.length && boss[0].role === "superadmin") {
-                role = "staff";
+              if (boss.length && boss[0].role ==="superadmin") {
+                role ="staff";
               }
             }
 
-            if (role && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(role)) {
-              if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(role) && profiles[0].activo === false) {
+            if (role && ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role)) {
+              if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role) && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
                 setSession({ role, data: profiles[0], token, profileId, multiRoles: savedMultiRoles });
@@ -144,7 +144,7 @@ export default function App() {
             clearSessionMeta();
           }
         } catch (e) {
-          if (e.message === "OFFLINE" && savedMultiRoles) {
+          if (e.message ==="OFFLINE" && savedMultiRoles) {
             // offline logic already handled by optimistic restore above if data exists,
             // but just in case we reach here:
             clearSessionMeta();
@@ -228,7 +228,7 @@ export default function App() {
     const sessionKey = `${session.role}-${session.data?.id || session.profileId}`;
     if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
       return <Admin key={sessionKey} role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} session={session} />;
-    if (session.role === "civil")
+    if (session.role ==="civil")
       return <Admin key={sessionKey} role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} clienteData={session.data} session={session} />;
     return <ClienteView key={sessionKey} session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
   };
@@ -245,7 +245,7 @@ export default function App() {
           <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/" element={
             isAppMode
-              ? <Navigate to={session ? "/app" : "/login"} replace />
+              ? <Navigate to={session ?"/app" :"/login"} replace />
               : <Landing session={session} onLogout={handleLogout} />
           } />
           <Route path="/login" element={
@@ -270,7 +270,7 @@ export default function App() {
               <MainApp />
             )
           } />
-          <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />
+          <Route path="*" element={<Navigate to={isAppMode ?"/login" :"/"} replace />} />
         </Routes>
       </Router>
     </BrandProvider>

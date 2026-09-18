@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Flame, ChevronRight, Apple, FileText } from "lucide-react";
-import { useBrand } from "../BrandContext";
-import { generateNutriPDF } from "../../utils/pdf";
+import { useState } from"react";
+import { Flame, ChevronRight, Apple, FileText } from"lucide-react";
+import { useBrand } from"../BrandContext";
+import { generateNutriPDF } from"../../utils/pdf";
 
-const DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const DAY_FULL  = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const DAY_SHORT = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+const DAY_FULL  = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 
 export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1, isSelfManaged }) {
   const [activeDay, setActiveDay]     = useState(0);
@@ -17,9 +17,9 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
           <Apple className="w-8 h-8 text-[#94A3B8]" />
         </div>
-        <h3 className="text-[#0B1929] font-bold text-lg mb-2">{isSelfManaged ? "Sin plan creado" : "Sin plan asignado"}</h3>
+        <h3 className="text-[#0B1929] font-bold text-lg mb-2">{isSelfManaged ?"Sin plan creado" :"Sin plan asignado"}</h3>
         <p className="text-[#6B7A8D] text-sm max-w-[250px]">
-          {isSelfManaged ? "Aún no has creado tu plan de alimentación para este ciclo." : "Tu nutriólogo aún no ha asignado tu dieta para este ciclo."}
+          {isSelfManaged ?"Aún no has creado tu plan de alimentación para este ciclo." :"Tu nutriólogo aún no ha asignado tu dieta para este ciclo."}
         </p>
       </div>
     );
@@ -38,7 +38,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   const getDayShort = (nombre, i) => {
     if (!nombre) return DAY_SHORT[i] ?? `Día ${i + 1}`;
     const parts = String(nombre).split('|');
-    return parts.length > 1 ? parts[0] : "S/D";
+    return parts.length > 1 ? parts[0] :"S/D";
   };
   const getDayFull = (nombre, i) => {
     if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
@@ -60,7 +60,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Plan de Alimentación
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
               Nutrición Semanal
             </h1>
             {clienteNombre && (
@@ -101,8 +101,8 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
               onClick={() => { setActiveDay(i); setExpandedMeal(0); }}
               className={`flex-1 min-w-[44px] py-2 rounded-lg text-sm font-semibold transition-all ${
                 activeDay === i
-                  ? "bg-[var(--brand-primary)] text-white shadow-md"
-                  : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
+                  ?"bg-[var(--brand-primary)] text-white shadow-md"
+                  :"bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
               }`}
             >
               {getDayShort(nombreDia, i)}
@@ -125,7 +125,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
           const isExpanded = expandedMeal === idx;
           // Etiqueta visual: usamos meal.nombre como label principal
           const label = meal.nombre || `Comida ${idx + 1}`;
-          const hora  = meal.hora || "";
+          const hora  = meal.hora ||"";
           // Extracto de texto para mostrar en el acordeón cerrado
           const preview = meal.opcion1
             ? meal.opcion1.split(",")[0].substring(0, 50)
@@ -135,7 +135,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             <div
               key={meal.id || idx}
               className={`bg-white rounded-xl border overflow-hidden transition-all ${
-                isExpanded ? "border-[var(--brand-primary)] shadow-sm" : "border-[#E2E8F0]"
+                isExpanded ?"border-[var(--brand-primary)] shadow-sm" :"border-[#E2E8F0]"
               }`}
             >
               {/* ── Row header ── */}
@@ -145,7 +145,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
               >
                 <div
                   className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    isExpanded ? "bg-[var(--brand-primary)]" : "bg-[#CBD5E1]"
+                    isExpanded ?"bg-[var(--brand-primary)]" :"bg-[#CBD5E1]"
                   }`}
                 />
                 <div className="flex-1 min-w-0">
@@ -173,7 +173,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
                   )}
                   <ChevronRight
                     size={16}
-                    className={`text-[#CBD5E1] transition-transform ${isExpanded ? "rotate-90 text-[var(--brand-primary)]" : ""}`}
+                    className={`text-[#CBD5E1] transition-transform ${isExpanded ?"rotate-90 text-[var(--brand-primary)]" :""}`}
                   />
                 </div>
               </button>

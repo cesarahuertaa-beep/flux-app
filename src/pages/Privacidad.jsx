@@ -1,4 +1,4 @@
-import { ArrowLeft, Shield } from "lucide-react";
+import { ArrowLeft, Shield } from"lucide-react";
 
 export default function Privacidad() {
   const currentDate = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -25,7 +25,7 @@ export default function Privacidad() {
         <div className="prose prose-sm md:prose-base prose-slate max-w-none text-[#475569] leading-relaxed space-y-6">
           <p>
             <strong>Responsable del tratamiento de datos personales</strong><br/>
-            Cesar Alberto Huerta Aguilar, con marca comercial "Flux Sports" y dominio www.flux-sport.com (en adelante "Flux Sports" o "nosotros"), es responsable del tratamiento de los datos personales que usted nos proporciona, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y su Reglamento.
+            Cesar Alberto Huerta Aguilar, con marca comercial"Flux Sports" y dominio www.flux-sport.com (en adelante"Flux Sports" o"nosotros"), es responsable del tratamiento de los datos personales que usted nos proporciona, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y su Reglamento.
           </p>
 
           <p>

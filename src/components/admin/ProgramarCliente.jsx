@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
+import { useState, useEffect, useCallback, useRef } from"react";
+import ReactCrop, { centerCrop, makeAspectCrop } from"react-image-crop";
+import"react-image-crop/dist/ReactCrop.css";
 import {
   DndContext,
   closestCenter,
@@ -8,26 +8,26 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-} from "@dnd-kit/core";
+} from"@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
-import { EjercicioSelector } from "./EjercicioSelector";
-import { generateNutriPDF } from "../../utils/pdf";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
-import { useBrand } from "../BrandContext";
-import { ProgresoCliente } from "./ProgresoCliente";
+} from"@dnd-kit/sortable";
+import { SortableItem } from"../SortableItem";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from"lucide-react";
+import { EjercicioSelector } from"./EjercicioSelector";
+import { generateNutriPDF } from"../../utils/pdf";
+import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
+import { useBrand } from"../BrandContext";
+import { ProgresoCliente } from"./ProgresoCliente";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState(() => {
     const s = sessionStorage.getItem("flux_programar_subtab");
-    return s ? s : "nutri";
+    return s ? s :"nutri";
   });
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
   const [activeAltSlot, setActiveAltSlot] = useState(null);
 
-  const ORDINALES = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
+  const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
   const isReadOnly = cicloSel && !cicloSel.activo;
   const isEstandar = selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium';
@@ -77,7 +77,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [completedCrop, setCompletedCrop] = useState(null);
   const imgCropRef = useRef(null);
   
-  const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre || "Desconocido";
+  const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre ||"Desconocido";
 
   const loadHistorial = useCallback(async () => {
     if (!clientes || clientes.length === 0) return;
@@ -106,7 +106,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const onSelectHistorialRutina = async (e) => {
     const rid = e.target.value;
     if (!rid) return;
-    e.target.value = ""; // reset select
+    e.target.value =""; // reset select
     const r = historialRutinas.find(x => String(x.id) === rid);
     if (!r) return;
     setLoading(true);
@@ -114,7 +114,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       const ejs = await dbGet(`ejercicios?rutina_id=eq.${rid}&order=orden.asc`);
       setRutinaForm(p => ({
         ...p,
-        nombre: r.nombre + " (Copia)",
+        nombre: r.nombre +" (Copia)",
         semanas: r.semanas,
         ejercicios: ejs.map(x => {
            const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
@@ -131,7 +131,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const onSelectHistorialDia = async (e) => {
     const did = e.target.value;
     if (!did) return;
-    e.target.value = ""; // reset select
+    e.target.value =""; // reset select
     const d = historialDias.find(x => String(x.id) === did);
     if (!d) return;
     setLoading(true);
@@ -139,7 +139,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
       setDiaForm(p => ({
         ...p,
-        dia: d.dia + " (Copia)",
+        dia: d.dia +" (Copia)",
         comidas: coms.map(x => {
            const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
            delete copy.id;
@@ -211,7 +211,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> No puedes borrar un ciclo que tiene planes o rutinas. Primero elimina su contenido.</div>);
         return;
       }
-      if (!confirm(`¿Eliminar el ciclo "${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
+      if (!confirm(`¿Eliminar el ciclo"${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
 
       // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
       if (ciclo.activo) {
@@ -219,7 +219,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if (anteriores.length > 0) {
           // El primero en la lista es el más reciente (orden desc por created_at)
           await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`}</div>);
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró:"${anteriores[0].nombre}"`}</div>);
         } else {
           setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
         }
@@ -238,7 +238,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const savePlan = async () => {
     setSaving(true);
     try {
-      const start = new Date(planForm.fecha_inicio + "T12:00:00");
+      const start = new Date(planForm.fecha_inicio +"T12:00:00");
       const end = new Date(start);
       end.setDate(end.getDate() + (parseInt(planForm.semanas) * 7) - 1);
       const options = { day: 'numeric', month: 'short' };
@@ -262,10 +262,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       if (!isMiPlan && selected.auth_id) {
         await dbPost("notificaciones", {
           profile_id: selected.auth_id,
-          titulo: "Nuevo plan disponible",
-          mensaje: "Tu nutriólogo ha creado un nuevo ciclo para ti.",
-          tipo: "plan",
-          link_url: "mi_plan",
+          titulo:"Nuevo plan disponible",
+          mensaje:"Tu nutriólogo ha creado un nuevo ciclo para ti.",
+          tipo:"plan",
+          link_url:"mi_plan",
           entidad_id: cRes[0].id
         });
       }
@@ -309,7 +309,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setShowDiaModal(true); 
   };
   const openEditDia = (d) => { 
-    const parts = (d.dia || "").split('|');
+    const parts = (d.dia ||"").split('|');
     const dayTab = parts.length > 1 ? parts[0] : '';
     const title = parts.length > 1 ? parts[1] : parts[0];
 
@@ -337,7 +337,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       }
 
       if (editDia) { 
-        const dayCode = diaForm.diasSeleccionados?.length > 0 ? diaForm.diasSeleccionados[0] : "S/D";
+        const dayCode = diaForm.diasSeleccionados?.length > 0 ? diaForm.diasSeleccionados[0] :"S/D";
         const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
         await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:finalName, orden:diaForm.orden }); 
         const diaId = editDia.id; 
@@ -387,7 +387,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar "${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>); await loadData(); };
+  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar"${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>); await loadData(); };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
@@ -401,14 +401,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setCrop(undefined);
     setCompletedCrop(null);
     // Reset el input para que se pueda volver a seleccionar el mismo archivo
-    e.target.value = "";
+    e.target.value ="";
   };
 
   // Cuando la imagen carga en el cropper, centrar el recorte cuadrado automáticamente
   const onCropImageLoad = (e) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     const centeredCrop = centerCrop(
-      makeAspectCrop({ unit: "%", width: 80 }, 1, naturalWidth, naturalHeight),
+      makeAspectCrop({ unit:"%", width: 80 }, 1, naturalWidth, naturalHeight),
       naturalWidth,
       naturalHeight
     );
@@ -440,10 +440,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     setMsg(<div className="flex items-center gap-1.5 text-blue-500">Subiendo foto...</div>);
     try {
-      const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+      const blob = await new Promise((res) => canvas.toBlob(res,"image/jpeg", 0.92));
       const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
       const url = await storageUpload("comidas", path, blob);
-      updComida(idx, "foto_url", url);
+      updComida(idx,"foto_url", url);
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto subida</div>);
     } catch (err) {
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
@@ -461,15 +461,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setShowRutinaModal(true); 
   };
   const openEditRutina = (r) => { 
-    const parts = (r.nombre || "").split('|');
+    const parts = (r.nombre ||"").split('|');
     let dSel = [];
-    let tPers = r.nombre || "";
+    let tPers = r.nombre ||"";
     if (parts.length > 1) {
       dSel = [parts[0].trim()];
       tPers = parts.slice(1).join('|').trim();
     } else if (["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].includes(r.nombre?.trim())) {
       dSel = [r.nombre.trim()];
-      tPers = "";
+      tPers ="";
     }
     setEditRutina(r); 
     setRutinaForm({ 
@@ -521,7 +521,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
         for (let idx=0; idx<diasToCreate.length; idx++) {
           const d = diasToCreate[idx];
-          const finalName = d === "S/D" ? rutinaForm.tituloPersonalizado : `${d}|${rutinaForm.tituloPersonalizado}`;
+          const finalName = d ==="S/D" ? rutinaForm.tituloPersonalizado : `${d}|${rutinaForm.tituloPersonalizado}`;
           const r = await dbPost("rutinas", {
             cliente_id: selected.id,
             ciclo_id: activeCiclo?.id || null,
@@ -561,7 +561,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar "${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>); await loadData(); };
+  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar"${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>); await loadData(); };
   const addEj = (ej) => {
     if (activeAltSlot === null) {
       if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
@@ -578,7 +578,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if ((main.alternativas || []).find(a => a.biblioteca_id === ej.id)) return p;
         const newAlt = {
           biblioteca_id: ej.id, nombre: ej.nombre, gif_url: ej.gif_url||"",
-          reps_sugeridas: main.reps_sugeridas || 10, peso_sugerido: main.peso_sugerido || "", unidad: main.unidad || "kg"
+          reps_sugeridas: main.reps_sugeridas || 10, peso_sugerido: main.peso_sugerido ||"", unidad: main.unidad ||"kg"
         };
         es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
         return { ...p, ejercicios: es };
@@ -590,8 +590,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const updEj = (i, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i],[f]:v}; return { ...p, ejercicios:es }; });
   const remEj = (i) => setRutinaForm(p => ({ ...p, ejercicios:p.ejercicios.filter((_,x)=>x!==i) }));
   
-  const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad === "lb" ? "kg" : "lb"}; return { ...p, ejercicios:es }; });
-  const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad === "lb" ? "kg" : "lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
+  const toggleUnidad = (i) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], unidad: es[i].unidad ==="lb" ?"kg" :"lb"}; return { ...p, ejercicios:es }; });
+  const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad ==="lb" ?"kg" :"lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
   const updAlt = (i, altIdx, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], [f]:v}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
   const remAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], alternativas: es[i].alternativas.filter((_,x)=>x!==altIdx)}; return { ...p, ejercicios:es }; });
 
@@ -661,7 +661,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     }
   };
 
-  const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) : "";
+  const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) :"";
 
   // ── Sin cliente seleccionado ──
   if (!selected) return null;
@@ -709,11 +709,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 className="flex items-center justify-center p-2 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors"
                 title="Ver planes anteriores"
               >
-                <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ?"rotate-180" :""}`} />
               </button>
             )}
             <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
-              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{ciclos.length === 0 ? "Crear Primer Plan" : "Siguiente Plan"}</span>
+              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{ciclos.length === 0 ?"Crear Primer Plan" :"Siguiente Plan"}</span>
             </button>
           </div>
         </div>
@@ -732,12 +732,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                   onClick={() => { setCicloSel(c); setShowPastCycles(false); }}
                   className={`flex items-center gap-1.5 px-4 py-2 text-[13px] transition-colors border ${
                     cicloSel?.id === c.id 
-                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold" 
-                      : "bg-[#0B1929]/5 border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[#0B1929]/10 font-medium" 
-                  } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
+                      ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold" 
+                      :"bg-[#0B1929]/5 border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[#0B1929]/10 font-medium" 
+                  } ${cicloSel?.id === c.id ?"rounded-l-xl border-r-0" :"rounded-xl"}`}
                 >
                   {c.nombre.split("|")[0]}
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ? "bg-white" : "bg-green-400"}`}/>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>
                 </button>
                 {cicloSel?.id === c.id && (
                   <button
@@ -774,9 +774,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                         onClick={() => setCicloSel(c)}
                         className={`flex items-center px-4 py-2 text-[13px] transition-colors border ${
                           cicloSel?.id === c.id 
-                            ? "bg-[#6B7A8D] text-white border-[#6B7A8D] font-bold" 
-                            : "bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
-                        } ${cicloSel?.id === c.id ? "rounded-l-xl border-r-0" : "rounded-xl"}`}
+                            ?"bg-[#6B7A8D] text-white border-[#6B7A8D] font-bold" 
+                            :"bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                        } ${cicloSel?.id === c.id ?"rounded-l-xl border-r-0" :"rounded-xl"}`}
                       >
                         {c.nombre.split("|")[0]}
                       </button>
@@ -807,17 +807,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── 🔴 Sub-tabs 🔴 ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
-          { k: "nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb: "Nutrición" },
-          { k: "deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb: "Rutinas" },
-          { k: "progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb: "Progreso" }
+          { k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" },
+          { k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Rutinas" },
+          { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Progreso" }
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
             onClick={() => setSubtab(k)} 
             className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none shrink-0 ${
               subtab === k 
-                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent" 
-                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+                ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent" 
+                :"text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
             }`}
           >
             {ic} {lb}
@@ -828,7 +828,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {loading ? <div className="text-[#6B7A8D] text-center p-10">Cargando…</div> : <>
 
         {/* ── NUTRICIÓN ── */}
-        {subtab === "nutri" && (
+        {subtab ==="nutri" && (
           <div>
             
             <div className="flex justify-between items-center mb-2.5">
@@ -850,7 +850,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
                 {dias.map(d => {
-                  const parts = (d.dia || "").split('|');
+                  const parts = (d.dia ||"").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts[1] : parts[0];
                   return (
@@ -864,7 +864,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                   {tab !== 'S/D' && (
                                     <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] text-[#6B7A8D] shrink-0">{tab}</span>
                                   )}
-                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
+                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title ||"Sin título"}</span>
                                 </div>
                                 <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
                                   <span className="font-medium bg-[#F0F4FA] px-1.5 rounded">{d.comidas.length} comidas</span>
@@ -896,7 +896,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
 
         {/* ── RUTINAS ── */}
-        {subtab === "deporte" && (
+        {subtab ==="deporte" && (
           <div>
             <div className="flex justify-between items-center mb-3">
               <span className="font-semibold">Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span></span>
@@ -905,7 +905,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
                 {rutinas.map(r => {
-                  const parts = (r.nombre || "").split('|');
+                  const parts = (r.nombre ||"").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
                   return (
@@ -919,7 +919,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                 {tab !== 'S/D' && (
                                   <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
                                 )}
-                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
+                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title ||"Sin título"}</span>
                               </div>
                               <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
                             </div>
@@ -947,7 +947,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           </div>
         )}
 
-        {subtab === "progreso" && (
+        {subtab ==="progreso" && (
           <ProgresoCliente selected={selected} setMsg={setMsg} isMiPlan={isMiPlan} />
         )}
       </>}
@@ -980,7 +980,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             <div className="p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5">
               <button onClick={() => setShowPlanModal(false)} className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors text-[14px]">Cancelar</button>
               <button onClick={savePlan} disabled={saving} className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white font-medium hover:opacity-90 transition-opacity text-[14px] shadow-sm disabled:opacity-50">
-                {saving ? "Creando..." : "Iniciar Plan"}
+                {saving ?"Creando..." :"Iniciar Plan"}
               </button>
             </div>
           </div>
@@ -993,7 +993,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0] gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
-                <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` : "Nuevo día"}</h3>
+                <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` :"Nuevo día"}</h3>
                 <div className="bg-[#F0F4FA] text-[#0B1929] px-3 py-1.5 rounded-lg text-xs font-semibold flex gap-3">
                   <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.calorias) || 0), 0)} Kcal</span>
                   <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0)}g P</span>
@@ -1013,7 +1013,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
                       <option value="">-- Seleccionar día preexistente --</option>
                       {historialDias.map(hd => (
-                        <option key={hd.id} value={hd.id}>{(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de {getClientName(hd.cliente_id)})</option>
+                        <option key={hd.id} value={hd.id}>{(hd.dia ||"").split('|').length > 1 ? (hd.dia ||"").split('|').join(' - ') : (hd.dia ||"Sin título")} (de {getClientName(hd.cliente_id)})</option>
                       ))}
                     </select>
                   </div>
@@ -1022,7 +1022,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
+                    {["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].map(d => (
                       <button
                         key={d}
                         onClick={() => {
@@ -1040,7 +1040,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     ))}
                   </div>
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2 mt-4">Título Libre (Subtítulo)</label>
-                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado || ""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen, Día de Pierna..." />
+                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado ||""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen, Día de Pierna..." />
                 </div>
               <div className="flex justify-between items-center mb-2.5">
                 <span className="font-semibold text-[14px]">Comidas</span>
@@ -1077,11 +1077,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               )}
                               <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[#1A6FD4] rounded-xl text-[#1A6FD4] text-xs font-bold cursor-pointer hover:bg-blue-50 transition-colors w-full sm:w-auto">
                                 <ImageIcon className="w-4 h-4" />
-                                <span>{c.foto_url ? "Cambiar foto" : "Subir foto"}</span>
+                                <span>{c.foto_url ?"Cambiar foto" :"Subir foto"}</span>
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
                               </label>
                               {c.foto_url && (
-                                <button onClick={() => updComida(i, "foto_url", "")} className="text-red-400 hover:text-red-600 p-2">
+                                <button onClick={() => updComida(i,"foto_url","")} className="text-red-400 hover:text-red-600 p-2">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
@@ -1089,7 +1089,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                           </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-1.5 mt-2">
-                            {[["calorias", "Kcal"], ["proteina", "Prot g"], ["carbohidratos", "Carbs g"], ["grasas", "Grasas g"]].map(([f, lb]) => (
+                            {[["calorias","Kcal"], ["proteina","Prot g"], ["carbohidratos","Carbs g"], ["grasas","Grasas g"]].map(([f, lb]) => (
                               <div key={f}><label className="block text-[11px] sm:text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1 sm:mb-1.5 truncate">{lb}</label><input type="number" className="w-full px-2 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-[#E2E8F0] bg-white text-[13px] sm:text-[14px] text-center sm:text-left" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
                             ))}
                           </div>
@@ -1101,7 +1101,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               </DndContext>
               <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
                 <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowDiaModal(false)}>Cancelar</button>
-                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveDia} disabled={saving}>{saving ? "Guardando…" : "Guardar día"}</button>
+                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveDia} disabled={saving}>{saving ?"Guardando…" :"Guardar día"}</button>
               </div>
             </div>
           </div>
@@ -1113,7 +1113,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
-              <h3 className="text-lg font-bold text-[#0B1929]">{editRutina ? `Editar: ${editRutina.nombre}` : "Nueva rutina"}</h3>
+              <h3 className="text-lg font-bold text-[#0B1929]">{editRutina ? `Editar: ${editRutina.nombre}` :"Nueva rutina"}</h3>
               <button onClick={() => setShowRutinaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X className="w-5 h-5" />
               </button>
@@ -1126,7 +1126,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     <select onChange={onSelectHistorialRutina} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
                       <option value="">-- Seleccionar rutina preexistente --</option>
                       {historialRutinas.map(hr => (
-                        <option key={hr.id} value={hr.id}>{(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de {getClientName(hr.cliente_id)})</option>
+                        <option key={hr.id} value={hr.id}>{(hr.nombre ||"").split('|').length > 1 ? (hr.nombre ||"").split('|').join(' - ') : (hr.nombre ||"Sin título")} (de {getClientName(hr.cliente_id)})</option>
                       ))}
                     </select>
                   </div>
@@ -1135,7 +1135,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {["LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"].map(d => (
+                    {["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].map(d => (
                       <button
                         key={d}
                         onClick={() => {
@@ -1155,7 +1155,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 </div>
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título de la Rutina</label>
-                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.tituloPersonalizado || ""} onChange={e=>setRutinaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
+                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.tituloPersonalizado ||""} onChange={e=>setRutinaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
                 </div>
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
               {rutinaForm.ejercicios.length > 0 && (
@@ -1261,7 +1261,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               )}
               <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
                 <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowRutinaModal(false)}>Cancelar</button>
-                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveRutina} disabled={saving}>{saving ? "Guardando…" : "Guardar rutina"}</button>
+                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveRutina} disabled={saving}>{saving ?"Guardando…" :"Guardar rutina"}</button>
               </div>
             </div>
           </div>

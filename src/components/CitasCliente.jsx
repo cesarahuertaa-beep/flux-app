@@ -1,40 +1,40 @@
-import { useState, useEffect, useCallback } from "react";
-import { dbGet, dbPost, dbPatch } from "../lib/supabase";
+import { useState, useEffect, useCallback } from"react";
+import { dbGet, dbPost, dbPatch } from"../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
   AlertCircle, Plus, CheckCircle2, ChevronRight, Star
-} from "lucide-react";
+} from"lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
 const fmtFechaHora = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return"—";
   const d = new Date(iso);
-  const dia = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
-  const hora = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const dia = d.toLocaleDateString("es-MX", { weekday:"long", day:"numeric", month:"long" });
+  const hora = d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
   return { dia, hora };
 };
 
 const fmtFechaCorta = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return"—";
   const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })
-    + " • " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("es-MX", { weekday:"short", day:"numeric", month:"short" })
+    +" •" + d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
 };
 
 const ESTADOS = {
-  pendiente:  { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: <Clock size={14}/>, label: "Pendiente" },
-  confirmada: { text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: <Check size={14}/>, label: "Confirmada" },
-  completada: { text: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200", icon: <CheckCircle2 size={14}/>, label: "Completada" },
-  rechazada:  { text: "text-red-600", bg: "bg-red-50", border: "border-red-200", icon: <X size={14}/>, label: "Rechazada" },
-  cancelada:  { text: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200", icon: <AlertCircle size={14}/>, label: "Cancelada" },
+  pendiente:  { text:"text-amber-600", bg:"bg-amber-50", border:"border-amber-200", icon: <Clock size={14}/>, label:"Pendiente" },
+  confirmada: { text:"text-emerald-700", bg:"bg-emerald-50", border:"border-emerald-200", icon: <Check size={14}/>, label:"Confirmada" },
+  completada: { text:"text-blue-700", bg:"bg-blue-50", border:"border-blue-200", icon: <CheckCircle2 size={14}/>, label:"Completada" },
+  rechazada:  { text:"text-red-600", bg:"bg-red-50", border:"border-red-200", icon: <X size={14}/>, label:"Rechazada" },
+  cancelada:  { text:"text-slate-600", bg:"bg-slate-100", border:"border-slate-200", icon: <AlertCircle size={14}/>, label:"Cancelada" },
 };
 
 // ── Genera horarios disponibles dado un rango de disponibilidad y citas ya tomadas ──
 const generarSlots = (disponibilidad, citasOcupadas, selectedDate) => {
   if (!selectedDate || !disponibilidad.length) return [];
-  const date = new Date(selectedDate + "T12:00:00");
+  const date = new Date(selectedDate +"T12:00:00");
   const diaSemana = date.getDay();
   const reglas = disponibilidad.filter(d => d.dia_semana === diaSemana);
   if (!reglas.length) return [];
@@ -48,14 +48,14 @@ const generarSlots = (disponibilidad, citasOcupadas, selectedDate) => {
     while (hora + 60 <= fin) {
       const h = Math.floor(hora / 60);
       const m = hora % 60;
-      const hStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const hStr = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
       
       const [y, mo, dDay] = selectedDate.split("-").map(Number);
       const slotDate = new Date(y, mo - 1, dDay, h, m, 0);
       const isoSlot = slotDate.toISOString();
 
       const ocupado = citasOcupadas.some(c => {
-        if (c.estado === "rechazada" || c.estado === "cancelada") return false;
+        if (c.estado ==="rechazada" || c.estado ==="cancelada") return false;
         if (!c.fecha_hora) return false;
         return new Date(c.fecha_hora).getTime() === slotDate.getTime();
       });
@@ -85,7 +85,7 @@ export function CitasCliente({ cliente }) {
   const [exito, setExito] = useState(false);
   
   // Estados del Modal de Calificar
-  const [ratingModal, setRatingModal] = useState({ open: false, citaId: null, puntuacion: 5, comentario: "" });
+  const [ratingModal, setRatingModal] = useState({ open: false, citaId: null, puntuacion: 5, comentario:"" });
   
   // Formulario
   const [selectedDate, setSelectedDate] = useState("");
@@ -154,7 +154,7 @@ export function CitasCliente({ cliente }) {
         comentario: ratingModal.comentario
       });
       setRatedCitas(prev => ({ ...prev, [ratingModal.citaId]: ratingModal.puntuacion }));
-      setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario: "" });
+      setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario:"" });
     } catch (e) {
       console.error("Error al calificar cita", e);
     }
@@ -171,16 +171,16 @@ export function CitasCliente({ cliente }) {
         nutriologo_id: nutriologoId,
         fecha_hora: selectedSlot.iso,
         modalidad,
-        estado: "pendiente"
+        estado:"pendiente"
       });
 
       // Notify nutritionist
       await dbPost("notificaciones", {
         profile_id: nutriologoId,
-        titulo: "Nueva Solicitud de Cita",
+        titulo:"Nueva Solicitud de Cita",
         mensaje: `Un paciente ha solicitado una cita para el ${new Date(selectedSlot.iso).toLocaleDateString('es-ES')}.`,
-        tipo: "plan",
-        link_url: "agenda",
+        tipo:"plan",
+        link_url:"agenda",
         entidad_id: cRes[0]?.id
       });
 
@@ -202,12 +202,12 @@ export function CitasCliente({ cliente }) {
   const today = new Date();
   today.setDate(today.getDate() + 1); // Mañana
   const minYear = today.getFullYear();
-  const minMonth = String(today.getMonth() + 1).padStart(2, "0");
-  const minDay = String(today.getDate()).padStart(2, "0");
+  const minMonth = String(today.getMonth() + 1).padStart(2,"0");
+  const minDay = String(today.getDate()).padStart(2,"0");
   const minDate = `${minYear}-${minMonth}-${minDay}`;
 
-  const citasProximas = citas.filter(c => new Date(c.fecha_hora) >= new Date() && !["cancelada", "rechazada", "completada"].includes(c.estado));
-  const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada", "rechazada", "completada"].includes(c.estado));
+  const citasProximas = citas.filter(c => new Date(c.fecha_hora) >= new Date() && !["cancelada","rechazada","completada"].includes(c.estado));
+  const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada","rechazada","completada"].includes(c.estado));
 
   return (
     <div className="h-full flex flex-col">
@@ -218,7 +218,7 @@ export function CitasCliente({ cliente }) {
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Agenda
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
               Mis Citas
             </h1>
             {cliente?.nombre && (
@@ -268,7 +268,7 @@ export function CitasCliente({ cliente }) {
             <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
               <CalendarDays size={32} className="text-[#6B7A8D]" />
             </div>
-            <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+            <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
               Agenda no disponible
             </h3>
             <p className="text-sm text-[#6B7A8D] max-w-sm">
@@ -290,7 +290,7 @@ export function CitasCliente({ cliente }) {
                     return (
                       <div key={cita.id} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden flex relative">
                         {/* Status color bar */}
-                        <div className={`w-1.5 flex-shrink-0 ${estado.bg} ${estado.border} border-l`} style={{ backgroundColor: "currentColor", color: `var(--brand-primary)` }} />
+                        <div className={`w-1.5 flex-shrink-0 ${estado.bg} ${estado.border} border-l`} style={{ backgroundColor:"currentColor", color: `var(--brand-primary)` }} />
                         
                         <div className="p-5 flex-1 min-w-0">
                           <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
@@ -300,7 +300,7 @@ export function CitasCliente({ cliente }) {
                             </div>
                             
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D] text-[11px] font-semibold">
-                              {cita.modalidad === "virtual" ? <Video size={12}/> : <MapPin size={12}/>}
+                              {cita.modalidad ==="virtual" ? <Video size={12}/> : <MapPin size={12}/>}
                               <span className="capitalize">{cita.modalidad}</span>
                             </div>
                           </div>
@@ -349,13 +349,13 @@ export function CitasCliente({ cliente }) {
                               {estado.label}
                             </span>
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D]">
-                              {cita.modalidad === "virtual" ? "Virtual" : "Presencial"}
+                              {cita.modalidad ==="virtual" ?"Virtual" :"Presencial"}
                             </span>
-                            {cita.estado === "completada" && (
+                            {cita.estado ==="completada" && (
                               yaCalificado ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md ml-2 border border-amber-200"><Star size={14} className="fill-amber-500"/> {yaCalificado}.0</span>
                               ) : (
-                                <button onClick={() => setRatingModal({ open: true, citaId: cita.id, puntuacion: 5, comentario: "" })} className="text-xs font-semibold text-white bg-[var(--brand-primary)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm ml-2">
+                                <button onClick={() => setRatingModal({ open: true, citaId: cita.id, puntuacion: 5, comentario:"" })} className="text-xs font-semibold text-white bg-[var(--brand-primary)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm ml-2">
                                   <Star size={12} className="fill-white"/> Calificar
                                 </button>
                               )
@@ -373,7 +373,7 @@ export function CitasCliente({ cliente }) {
                 <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
                   <Plus size={32} className="text-[#CBD5E1]" />
                 </div>
-                <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+                <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
                   Sin citas agendadas
                 </h3>
                 <p className="text-sm text-[#6B7A8D] max-w-sm">
@@ -392,7 +392,7 @@ export function CitasCliente({ cliente }) {
             
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl sm:rounded-2xl">
-              <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+              <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
                 Agendar nueva cita
               </h3>
               <button 
@@ -411,7 +411,7 @@ export function CitasCliente({ cliente }) {
                 <CalendarDays size={18} className="text-[var(--brand-primary)] mt-0.5" />
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
                   Días que atiende el nutriólogo: <br />
-                  <strong className="text-[#0B1929]">{diasDisponibles.map(d => DIAS_FULL[d]).join(", ")}</strong>
+                  <strong className="text-[#0B1929]">{diasDisponibles.map(d => DIAS_FULL[d]).join(",")}</strong>
                 </p>
               </div>
 
@@ -448,13 +448,13 @@ export function CitasCliente({ cliente }) {
                           onClick={() => setSelectedSlot(slot)}
                           className={`py-2 rounded-lg text-sm font-mono font-semibold transition-all border ${
                             slot.ocupado 
-                              ? "bg-[#F7F9FC] border-[#E2E8F0] text-[#CBD5E1] opacity-50 cursor-not-allowed" 
+                              ?"bg-[#F7F9FC] border-[#E2E8F0] text-[#CBD5E1] opacity-50 cursor-not-allowed" 
                               : selectedSlot?.iso === slot.iso
-                                ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-md"
-                                : "bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+                                ?"bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-md"
+                                :"bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
                           }`}
                         >
-                          {slot.hora} {slot.ocupado && "🔒"}
+                          {slot.hora} {slot.ocupado &&"🔒"}
                         </button>
                       ))}
                     </div>
@@ -471,9 +471,9 @@ export function CitasCliente({ cliente }) {
                   <button
                     onClick={() => setModalidad("presencial")}
                     className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border transition-all ${
-                      modalidad === "presencial"
-                        ? "border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
-                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
+                      modalidad ==="presencial"
+                        ?"border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
+                        :"border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
                     }`}
                   >
                     <MapPin size={20} />
@@ -482,9 +482,9 @@ export function CitasCliente({ cliente }) {
                   <button
                     onClick={() => setModalidad("virtual")}
                     className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border transition-all ${
-                      modalidad === "virtual"
-                        ? "border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
-                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
+                      modalidad ==="virtual"
+                        ?"border-[var(--brand-primary)] bg-[#E8F1FB] text-[var(--brand-primary)]"
+                        :"border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-[#F0F4FA]"
                     }`}
                   >
                     <Video size={20} />
@@ -517,7 +517,7 @@ export function CitasCliente({ cliente }) {
                 className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
               >
                 {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                {saving ? "Procesando..." : "Confirmar Cita"}
+                {saving ?"Procesando..." :"Confirmar Cita"}
               </button>
             </div>
           </div>
@@ -549,7 +549,7 @@ export function CitasCliente({ cliente }) {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
-                  onClick={() => setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario: "" })}
+                  onClick={() => setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario:"" })}
                   className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm border border-[#E2E8F0] text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
                 >
                   Cancelar
@@ -559,7 +559,7 @@ export function CitasCliente({ cliente }) {
                   disabled={saving}
                   className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm bg-amber-500 text-white shadow-sm hover:bg-amber-600 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
                 >
-                  {saving ? "Enviando..." : "Enviar Calificación"}
+                  {saving ?"Enviando..." :"Enviar Calificación"}
                 </button>
               </div>
             </div>

@@ -1,34 +1,34 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { dbGet } from "../lib/supabase";
-import { useEffect } from "react";
-import { version } from "../../package.json";
+import { useState } from"react";
+import { Link } from"react-router-dom";
+import { dbGet } from"../lib/supabase";
+import { useEffect } from"react";
+import { version } from"../../package.json";
 import {
   ShoppingCart, Star, MapPin, ChevronRight, Monitor, Smartphone,
   Globe, LogIn, Search, Filter, Phone, Mail, Share2,
   CheckCircle, Leaf, Zap, Shield, Users, User, X, Menu, MessageCircle,
-} from "lucide-react";
+} from"lucide-react";
 
 const MOCK_SUPPLEMENTS = [
-  { id: 1, name: "Proteína Whey Flux", subtitle: "Aislada + Concentrada", price: 899, rating: 4.9, reviews: 218, tag: "Más vendido", img: "photo-1593095948071-474c5cc2989d", flavors: ["Chocolate", "Vainilla", "Fresa"], badge: "bg-blue-100 text-blue-700" },
-  { id: 2, name: "Creatina Monohidratada", subtitle: "Fuerza y recuperación", price: 449, rating: 4.8, reviews: 143, tag: "Nuevo", img: "photo-1584308666744-24d5c474f2ae", flavors: ["Sin sabor"], badge: "bg-green-100 text-green-700" },
-  { id: 3, name: "Pre-Entreno Flux Rush", subtitle: "Energía sostenida | Sin crash", price: 649, rating: 4.7, reviews: 97, tag: null, img: "photo-1571019614242-c5c5dee9f50b", flavors: ["Sandía", "Blue Raspberry"], badge: "" },
-  { id: 4, name: "BCAA + Electrolitos", subtitle: "Recuperación muscular", price: 549, rating: 4.8, reviews: 185, tag: null, img: "photo-1593095948071-474c5cc2989d", flavors: ["Limón", "Mango"], badge: "" },
+  { id: 1, name:"Proteína Whey Flux", subtitle:"Aislada + Concentrada", price: 899, rating: 4.9, reviews: 218, tag:"Más vendido", img:"photo-1593095948071-474c5cc2989d", flavors: ["Chocolate","Vainilla","Fresa"], badge:"bg-blue-100 text-blue-700" },
+  { id: 2, name:"Creatina Monohidratada", subtitle:"Fuerza y recuperación", price: 449, rating: 4.8, reviews: 143, tag:"Nuevo", img:"photo-1584308666744-24d5c474f2ae", flavors: ["Sin sabor"], badge:"bg-green-100 text-green-700" },
+  { id: 3, name:"Pre-Entreno Flux Rush", subtitle:"Energía sostenida | Sin crash", price: 649, rating: 4.7, reviews: 97, tag: null, img:"photo-1571019614242-c5c5dee9f50b", flavors: ["Sandía","Blue Raspberry"], badge:"" },
+  { id: 4, name:"BCAA + Electrolitos", subtitle:"Recuperación muscular", price: 549, rating: 4.8, reviews: 185, tag: null, img:"photo-1593095948071-474c5cc2989d", flavors: ["Limón","Mango"], badge:"" },
 ];
 
 const MOCK_APPAREL = [
-  { id: 1, name: "Playera Compression Pro", subtitle: "Tejido técnico anti-sudor", price: 699, rating: 4.9, reviews: 132, img: "photo-1521572163474-6864f9cf17ab", sizes: ["S","M","L","XL"], color: "#1A6FD4" },
-  { id: 2, name: "Shorts Training Flux", subtitle: "Ergonómico | 4-way stretch", price: 549, rating: 4.7, reviews: 88, img: "photo-1605296867304-46d5465a13f1", sizes: ["S","M","L","XL","XXL"], color: "#0B1929" },
+  { id: 1, name:"Playera Compression Pro", subtitle:"Tejido técnico anti-sudor", price: 699, rating: 4.9, reviews: 132, img:"photo-1521572163474-6864f9cf17ab", sizes: ["S","M","L","XL"], color:"#1A6FD4" },
+  { id: 2, name:"Shorts Training Flux", subtitle:"Ergonómico | 4-way stretch", price: 549, rating: 4.7, reviews: 88, img:"photo-1605296867304-46d5465a13f1", sizes: ["S","M","L","XL","XXL"], color:"#0B1929" },
 ];
 
 const MOCK_NUTRITIONISTS = [
-  { id: 1, name: "Dra. Andrea Torres", specialty: "Nutrición deportiva | Pérdida de grasa", location: "CDMX | Colonia Nápoles", rating: 4.9, patients: 312, available: true, img: "photo-1559839734-2b71ea197ec2", verified: true },
-  { id: 2, name: "Dr. Miguel Sánchez", specialty: "Nutrición clínica | Masa muscular", location: "CDMX | Polanco", rating: 4.8, patients: 187, available: true, img: "photo-1612349317150-e413f6a5b16d", verified: true },
+  { id: 1, name:"Dra. Andrea Torres", specialty:"Nutrición deportiva | Pérdida de grasa", location:"CDMX | Colonia Nápoles", rating: 4.9, patients: 312, available: true, img:"photo-1559839734-2b71ea197ec2", verified: true },
+  { id: 2, name:"Dr. Miguel Sánchez", specialty:"Nutrición clínica | Masa muscular", location:"CDMX | Polanco", rating: 4.8, patients: 187, available: true, img:"photo-1612349317150-e413f6a5b16d", verified: true },
 ];
 
 const MOCK_MAPPINS = [
-  { top: "28%", left: "38%", name: "Dra. Andrea Torres", available: true },
-  { top: "32%", left: "52%", name: "Dr. Miguel Sánchez", available: true },
+  { top:"28%", left:"38%", name:"Dra. Andrea Torres", available: true },
+  { top:"32%", left:"52%", name:"Dr. Miguel Sánchez", available: true },
 ];
 
 function Stars({ n }) {
@@ -36,7 +36,7 @@ function Stars({ n }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1,2,3,4,5].map((i) => (
-        <Star key={i} size={11} fill={i <= Math.round(safeN) ? "#1A6FD4" : "none"} stroke={i <= Math.round(safeN) ? "#1A6FD4" : "#CBD5E1"} />
+        <Star key={i} size={11} fill={i <= Math.round(safeN) ?"#1A6FD4" :"none"} stroke={i <= Math.round(safeN) ?"#1A6FD4" :"#CBD5E1"} />
       ))}
     </div>
   );
@@ -44,7 +44,7 @@ function Stars({ n }) {
 
 function Navbar({ session, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const links = ["Suplementos", "Ropa", "Nutriólogos"];
+  const links = ["Suplementos","Ropa","Nutriólogos"];
   const hasAppAccess = session && (session.role !== 'cliente' || !!session.data?.nutriologo_id);
 
   return (
@@ -53,7 +53,7 @@ function Navbar({ session, onLogout }) {
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
           <div className="leading-tight">
-            <p className="text-[15px] font-bold tracking-tight text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>FLUX</p>
+            <p className="text-[15px] font-bold tracking-tight text-[#0B1929]" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</p>
             <p className="text-[8px] font-semibold tracking-widest text-[#1A6FD4] uppercase -mt-0.5">Health System</p>
           </div>
         </div>
@@ -67,7 +67,7 @@ function Navbar({ session, onLogout }) {
             <Link to="/login" className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] hover:text-[#1A6FD4] font-medium transition-colors"><LogIn size={15} strokeWidth={1.5} /> Iniciar sesión</Link>
           ) : (
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] font-medium"><User size={15} strokeWidth={1.5}/> Hola, {session.data?.nombre || "Usuario"}</span>
+              <span className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6B7A8D] font-medium"><User size={15} strokeWidth={1.5}/> Hola, {session.data?.nombre ||"Usuario"}</span>
               <button onClick={onLogout} className="text-sm text-red-500 hover:text-red-600 font-medium">Salir</button>
             </div>
           )}
@@ -129,7 +129,7 @@ function Hero() {
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-bold tracking-widest uppercase mb-6">
           <Zap size={12} className="fill-blue-600" /> Nuevo Ecosistema Flux
         </div>
-        <h1 className="text-5xl md:text-7xl font-extrabold text-[#0B1929] leading-[1.05] mb-6 tracking-tight" style={{ fontFamily: "DM Sans, sans-serif" }}>
+        <h1 className="text-5xl md:text-7xl font-extrabold text-[#0B1929] leading-[1.05] mb-6 tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>
           Revoluciona tu <span className="text-[#1A6FD4] bg-clip-text">entrenamiento</span>
         </h1>
         <p className="text-[#6B7A8D] text-lg md:text-xl mb-10 leading-relaxed max-w-lg">
@@ -212,7 +212,7 @@ function SupplementsSection({ supplements }) {
         <div className="flex items-end justify-between mb-12">
           <div>
             <p className="text-xs font-semibold tracking-widest text-[#1A6FD4] uppercase mb-2">Suplementación</p>
-            <h2 className="text-4xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>Suplementos Flux</h2>
+            <h2 className="text-4xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans, sans-serif" }}>Suplementos Flux</h2>
             <p className="text-[#6B7A8D] mt-2 text-sm">Formulados con tu nutriólogo. Respaldados por ciencia.</p>
           </div>
         </div>
@@ -251,10 +251,10 @@ function SupplementsSection({ supplements }) {
                     ))}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>${s.price || 0} <span className="text-xs font-normal text-[#6B7A8D]">MXN</span></span>
+                    <span className="text-xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans, sans-serif" }}>${s.price || 0} <span className="text-xs font-normal text-[#6B7A8D]">MXN</span></span>
                     <button
                       onClick={() => setCart(inCart ? cart.filter((x) => x !== s.id) : [...cart, s.id])}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${inCart ? "bg-green-50 text-green-600 border border-green-200" : "bg-[#1A6FD4] text-white hover:bg-blue-600"}`}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${inCart ?"bg-green-50 text-green-600 border border-green-200" :"bg-[#1A6FD4] text-white hover:bg-blue-600"}`}
                     >
                       {inCart ? <><CheckCircle size={13} /> Agregado</> : <><ShoppingCart size={13} /> Agregar</>}
                     </button>
@@ -280,7 +280,7 @@ function ApparelSection({ apparel }) {
         <div className="flex items-end justify-between mb-12">
           <div>
             <p className="text-xs font-semibold tracking-widest text-[#1A6FD4] uppercase mb-2">Ropa Deportiva</p>
-            <h2 className="text-4xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>Colección Flux</h2>
+            <h2 className="text-4xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans, sans-serif" }}>Colección Flux</h2>
             <p className="text-[#6B7A8D] mt-2 text-sm">Diseñado para rendir. Hecho para durar.</p>
           </div>
         </div>
@@ -314,9 +314,9 @@ function ApparelSection({ apparel }) {
                     <span className="text-lg font-bold text-[#0B1929]">${a.price}</span>
                     <button
                       onClick={() => setCart(inCart ? cart.filter((x) => x !== a.id) : [...cart, a.id])}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${inCart ? "bg-green-50 text-green-600 border border-green-200" : "bg-[#0B1929] text-white hover:bg-[#1A2D45]"}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${inCart ?"bg-green-50 text-green-600 border border-green-200" :"bg-[#0B1929] text-white hover:bg-[#1A2D45]"}`}
                     >
-                      {inCart ? "Agregado" : "Agregar"}
+                      {inCart ?"Agregado" :"Agregar"}
                     </button>
                   </div>
                 </div>
@@ -344,7 +344,7 @@ function NutritionistsSection({ nutritionists }) {
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-12">
           <p className="text-xs font-semibold tracking-widest text-[#1A6FD4] uppercase mb-2">Red Flux</p>
-          <h2 className="text-4xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans, sans-serif" }}>Nutriólogos certificados</h2>
+          <h2 className="text-4xl font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans, sans-serif" }}>Nutriólogos certificados</h2>
           <div className="flex gap-3 mt-4">
             <div className="flex items-center gap-2 flex-1 max-w-sm bg-[#F7F9FC] rounded-xl border border-[#E2E5EA] px-4 h-11 focus-within:border-[#1A6FD4] transition-colors">
               <Search size={15} className="text-[#6B7A8D] flex-shrink-0" strokeWidth={1.5} />
@@ -371,7 +371,7 @@ function NutritionistsSection({ nutritionists }) {
                     alt={n.name}
                     className="w-14 h-14 rounded-2xl object-cover bg-[#E8ECF2]"
                   />
-                  <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${n.available ? "bg-green-400" : "bg-[#CBD5E1]"}`} />
+                  <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${n.available ?"bg-green-400" :"bg-[#CBD5E1]"}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -437,10 +437,10 @@ function MapSection({ mapPins }) {
                 <div
                   key={i}
                   className="absolute pointer-events-auto cursor-pointer"
-                  style={{ top: pin.top || '50%', left: pin.left || '50%', transform: "translate(-50%,-50%)" }}
+                  style={{ top: pin.top || '50%', left: pin.left || '50%', transform:"translate(-50%,-50%)" }}
                   onClick={() => setActivePin(activePin === i ? null : i)}
                 >
-                  <div className={`w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 ${pin.available ? "bg-[#1A6FD4]" : "bg-[#9BA5B0]"}`}>
+                  <div className={`w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 ${pin.available ?"bg-[#1A6FD4]" :"bg-[#9BA5B0]"}`}>
                     <MapPin size={14} strokeWidth={2} className="text-white" />
                   </div>
                   {activePin === i && (
@@ -462,7 +462,7 @@ function Downloads() {
   return (
     <section className="py-24 bg-white border-t border-[#E2E5EA]">
       <div className="max-w-4xl mx-auto px-6 text-center">
-        <h2 className="text-4xl font-bold text-[#0B1929] mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>Lleva Flux contigo</h2>
+        <h2 className="text-4xl font-bold text-[#0B1929] mb-4" style={{ fontFamily:"DM Sans, sans-serif" }}>Lleva Flux contigo</h2>
         <p className="text-[#6B7A8D] text-lg mb-10 max-w-xl mx-auto">
           Gestiona tus entrenamientos, dieta y consultas desde nuestra app nativa o plataforma de escritorio.
         </p>
@@ -478,7 +478,7 @@ function Footer() {
         <div className="col-span-2 md:col-span-1">
           <div className="flex items-center gap-2.5 mb-6">
             <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover grayscale brightness-200" />
-            <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily: "DM Sans, sans-serif" }}>FLUX</span>
+            <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</span>
           </div>
         </div>
       </div>

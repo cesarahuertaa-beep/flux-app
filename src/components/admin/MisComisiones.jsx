@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { dbGet, dbPatch } from "../../lib/supabase";
-import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from "lucide-react";
+import React, { useState, useEffect, useMemo } from"react";
+import { dbGet, dbPatch } from"../../lib/supabase";
+import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
 
 export default function MisComisiones({ myId, setMsg }) {
   const [myName, setMyName] = useState(null);
@@ -16,7 +16,7 @@ export default function MisComisiones({ myId, setMsg }) {
     try {
       // Obtener el nombre propio del colaborador
       const me = await dbGet(`profiles?id=eq.${myId}&select=nombre`);
-      const nombre = me[0]?.nombre || "";
+      const nombre = me[0]?.nombre ||"";
       setMyName(nombre);
       if (!nombre) { setLoading(false); return; }
 
@@ -38,7 +38,7 @@ export default function MisComisiones({ myId, setMsg }) {
       setNominas(dataNominas || []);
     } catch (e) {
       console.error(e);
-      setMsg("❌ Error cargando comisiones: " + e.message);
+      setMsg("❌ Error cargando comisiones:" + e.message);
     }
     setLoading(false);
   };
@@ -55,13 +55,13 @@ export default function MisComisiones({ myId, setMsg }) {
   }, [recibos]);
 
   useEffect(() => {
-    if (mesesDisponibles.length > 0 && filtroMes === "todos") {
+    if (mesesDisponibles.length > 0 && filtroMes ==="todos") {
       setFiltroMes(mesesDisponibles[0]);
     }
   }, [mesesDisponibles, filtroMes]);
 
   const filtrados = useMemo(() => {
-    if (filtroMes === "todos") return recibos;
+    if (filtroMes ==="todos") return recibos;
     return recibos.filter(r => r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
   }, [recibos, filtroMes]);
 
@@ -90,7 +90,7 @@ export default function MisComisiones({ myId, setMsg }) {
       setMsg("✓ Pago confirmado exitosamente");
       loadData();
     } catch (e) {
-      setMsg("❌ Error al confirmar: " + e.message);
+      setMsg("❌ Error al confirmar:" + e.message);
     }
   };
 
@@ -156,9 +156,9 @@ export default function MisComisiones({ myId, setMsg }) {
                     <h3 className="font-bold text-[#0B1929]">Estado de la transferencia</h3>
                     <p className="text-xs text-[#6B7A8D]">
                       {!nominaActual?.transferido_por_admin 
-                        ? "En proceso de cálculo y liberación por el administrador."
+                        ?"En proceso de cálculo y liberación por el administrador."
                         : !nominaActual?.confirmado_por_colaborador
-                        ? "El administrador ha marcado el pago como transferido. Por favor confirma de recibido."
+                        ?"El administrador ha marcado el pago como transferido. Por favor confirma de recibido."
                         : `Recibido y confirmado el ${new Date(nominaActual.fecha_confirmacion).toLocaleDateString()}`}
                     </p>
                   </div>

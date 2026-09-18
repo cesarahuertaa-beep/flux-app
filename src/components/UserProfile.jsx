@@ -1,27 +1,27 @@
-import { useState, useEffect } from "react";
-import { dbPatch, dbGet } from "../lib/supabase";
-import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
-import DatosPersonalesCard from "./admin/DatosPersonalesCard";
-import { syncPersonalData } from "../lib/supabase";
-import RoleSwitcher from "./RoleSwitcher";
+import { useState, useEffect } from"react";
+import { dbPatch, dbGet } from"../lib/supabase";
+import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone } from"lucide-react";
+import { Capacitor } from"@capacitor/core";
+import DatosPersonalesCard from"./admin/DatosPersonalesCard";
+import { syncPersonalData } from"../lib/supabase";
+import RoleSwitcher from"./RoleSwitcher";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const user = session?.data || session; // Cliente o Admin
-  const isCliente = session?.role === "cliente" || session?.role === "civil";
+  const isCliente = session?.role ==="cliente" || session?.role ==="civil";
   
   const [form, setForm] = useState({
-    nombre: user?.nombre || "",
-    telefono: user?.telefono || "",
-    email: user?.email || "",
-    avatar_url: user?.avatar_url || "",
-    fecha_nacimiento: user?.fecha_nacimiento || "",
-    genero: user?.genero || "",
-    pais: user?.pais || "México",
-    estado_provincia: user?.estado_provincia || ""
+    nombre: user?.nombre ||"",
+    telefono: user?.telefono ||"",
+    email: user?.email ||"",
+    avatar_url: user?.avatar_url ||"",
+    fecha_nacimiento: user?.fecha_nacimiento ||"",
+    genero: user?.genero ||"",
+    pais: user?.pais ||"México",
+    estado_provincia: user?.estado_provincia ||""
   });
   
-  const [objetivo, setObjetivo] = useState(user?.objetivo || "");
+  const [objetivo, setObjetivo] = useState(user?.objetivo ||"");
   const [isSaving, setIsSaving] = useState(false);
   const [miNutriologo, setMiNutriologo] = useState(null);
 
@@ -48,7 +48,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       }
     } catch (e) {
       console.error("Error saving profile", e);
-      alert("Error guardando: " + e.message);
+      alert("Error guardando:" + e.message);
     }
     setIsSaving(false);
   };
@@ -67,14 +67,14 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
     const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform() || isStandalone;
     if (isAppMode) {
-      window.open("https://www.flux-sport.com", "_blank"); 
+      window.open("https://www.flux-sport.com","_blank"); 
     } else {
-      window.location.href = "/";
+      window.location.href ="/";
     }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto w-full animate-in fade-in slide-in-from-bottom-4 bg-[#F7F9FC]">
+    <div className="flex-1 overflow-y-auto w-full  bg-[#F7F9FC]">
       <div className="max-w-4xl mx-auto w-full pb-32 px-6 md:px-8 pt-6 md:pt-8 overflow-x-hidden">
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
@@ -151,7 +151,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
                   <div className="flex items-start gap-2 text-sm text-[#6B7A8D]">
                     <MapPin size={16} className="shrink-0 mt-0.5" /> 
                     <span className="text-[#0B1929]">
-                      {miNutriologo.ubicacion_texto ? miNutriologo.ubicacion_texto : [miNutriologo.estado, miNutriologo.pais].filter(Boolean).join(", ")}
+                      {miNutriologo.ubicacion_texto ? miNutriologo.ubicacion_texto : [miNutriologo.estado, miNutriologo.pais].filter(Boolean).join(",")}
                     </span>
                   </div>
                 )}

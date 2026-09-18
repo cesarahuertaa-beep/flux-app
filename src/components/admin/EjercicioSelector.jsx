@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { GRUPOS } from "../../lib/constants";
-import { Search, Image as ImageIcon } from "lucide-react";
+import { useState } from"react";
+import { GRUPOS } from"../../lib/constants";
+import { Search, Image as ImageIcon } from"lucide-react";
 
 export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   const [busqueda, setBusqueda] = useState("");
@@ -9,7 +9,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   const filtrados = biblioteca.filter(e => {
     const yaEsta = selected.find(s => s.biblioteca_id === e.id);
     if (yaEsta) return false;
-    const matchG = filtroGrupo === "Todos" || e.grupo_muscular === filtroGrupo;
+    const matchG = filtroGrupo ==="Todos" || e.grupo_muscular === filtroGrupo;
     const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
     return matchG && matchB;
   });
