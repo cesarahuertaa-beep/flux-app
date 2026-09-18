@@ -474,11 +474,21 @@ function Downloads() {
 function Footer() {
   return (
     <footer className="bg-[#04080F] text-[#9BA5B0] py-16 border-t border-[#1E293B]">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-10">
-        <div className="col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2.5 mb-6">
-            <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover grayscale brightness-200" />
-            <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</span>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2.5 mb-6">
+              <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover grayscale brightness-200" />
+              <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</span>
+            </div>
+            <p className="text-sm">La plataforma definitiva para profesionales y atletas.</p>
+          </div>
+        </div>
+        
+        <div className="mt-12 pt-8 border-t border-[#1E293B] flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+          <p>&copy; {new Date().getFullYear()} Flux Sports. Todos los derechos reservados.</p>
+          <div className="flex items-center gap-6">
+            <Link to="/privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
           </div>
         </div>
       </div>
