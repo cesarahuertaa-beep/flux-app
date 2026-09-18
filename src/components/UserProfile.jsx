@@ -35,6 +35,29 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     }
   }, [isCliente, user?.nutriologo_id]);
 
+  // Refrescar datos frescos desde la BD al montar, para no depender del caché del localStorage
+  useEffect(() => {
+    const email = user?.email;
+    if (!email) return;
+    const table = isCliente ? `clientes?email=ilike.${email}` : `profiles?email=ilike.${email}`;
+    dbGet(table).then(rows => {
+      if (rows && rows.length > 0) {
+        const p = rows[0];
+        setForm(prev => ({
+          ...prev,
+          nombre: p.nombre || prev.nombre,
+          telefono: p.telefono || prev.telefono,
+          avatar_url: p.avatar_url || prev.avatar_url,
+          fecha_nacimiento: p.fecha_nacimiento || "",
+          genero: p.genero || "",
+          pais: p.pais || prev.pais || "México",
+          estado_provincia: p.estado_provincia || "",
+        }));
+        if (isCliente && p.objetivo) setObjetivo(p.objetivo);
+      }
+    }).catch(() => {});
+  }, [user?.email]);
+
   const handleSavePersonal = async (formData) => {
     setIsSaving(true);
     try {

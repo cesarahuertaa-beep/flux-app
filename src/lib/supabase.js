@@ -352,7 +352,7 @@ export const dbPostMinimal = (p,b) => q(p, { method:"POST", body:JSON.stringify(
 export const syncPersonalData = async (email, data) => {
   if (!email) return;
   
-  const profileFields = ["nombre", "telefono", "email", "avatar_url", "firma_url"];
+  const profileFields = ["nombre", "telefono", "email", "avatar_url", "firma_url", "fecha_nacimiento", "genero", "pais", "estado_provincia"];
   const clienteFields = ["nombre", "telefono", "email", "avatar_url", "fecha_nacimiento", "genero", "pais", "estado_provincia", "objetivo"];
   
   const dataForProfile = {};
