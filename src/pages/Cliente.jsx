@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { enqueue, getAll } from "../lib/offlineQueue";
@@ -127,26 +127,36 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     };
   }, [cliente.id]);
 
-  const handleProgressChange = async (ejId, wi, si, tipo, val, variante_id = "original") => {
+  const timeoutRefs = useRef({});
+
+  const handleProgressChange = (ejId, wi, si, tipo, val, variante_id = "original") => {
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
-    try {
-      setSyncStatus("saving");
-      await offlineAwareUpsert({ 
-        ejercicio_id: ejId, 
-        cliente_id: cliente.id, 
-        semana: parseInt(wi), 
-        serie: parseInt(si), 
-        tipo, 
-        valor: val,
-        variante_id,
-        updated_at: new Date().toISOString() 
-      });
-      setSyncStatus(navigator.onLine ? "synced" : "local");
-    } catch(e) {
-      console.error("Error guardando progreso:", e);
-      setSyncStatus("local");
+    
+    if (timeoutRefs.current[key]) {
+      clearTimeout(timeoutRefs.current[key]);
     }
+    
+    setSyncStatus("saving");
+    
+    timeoutRefs.current[key] = setTimeout(async () => {
+      try {
+        await offlineAwareUpsert({ 
+          ejercicio_id: ejId, 
+          cliente_id: cliente.id, 
+          semana: parseInt(wi), 
+          serie: parseInt(si), 
+          tipo, 
+          valor: val,
+          variante_id,
+          updated_at: new Date().toISOString() 
+        });
+        setSyncStatus(navigator.onLine ? "synced" : "local");
+      } catch(e) {
+        console.error("Error guardando progreso:", e);
+        setSyncStatus("local");
+      }
+    }, 800); // 800ms debounce
   };
 
     // Ocultar pestaña de citas si es usuario civil (no tiene nutriólogo)
