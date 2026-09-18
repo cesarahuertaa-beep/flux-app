@@ -361,7 +361,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
 
         {view === 'metricas' && (
-          COMP_KEYS.length > 0 ? (
+          <>
+          {COMP_KEYS.length > 0 ? (
             <>
               {/* KPI GRID */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -545,11 +546,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
         </div>
         </>
-        ) : (
-          <div className="bg-white rounded-2xl p-8 text-center text-[#6B7A8D] shadow-sm border border-[#E2E8F0]">
-            No hay evaluaciones registradas.
-          </div>
-        ))}
+        )}
 
         {view === 'galeria' && (
           <div className="space-y-12">
