@@ -109,7 +109,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const loadCitas = useCallback(async () => {
     try {
       const rows = await dbGet(
-        `citas?nutriologo_id=eq.${myId}&order=fecha_hora.asc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`
+        `citas?nutriologo_id=eq.${myId}&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`
       );
       
       const now = new Date();
