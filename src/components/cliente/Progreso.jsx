@@ -37,16 +37,16 @@ const normalizeGroup = (g) => {
 };
 
 const RANKS = [
-  { name: "Clase G", min: 0, color: "#64748B", level: 1 }, 
-  { name: "Clase F", min: 100, color: "#9BA5B0", level: 1 }, 
-  { name: "Clase E", min: 300, color: "#10B981", level: 2 }, 
-  { name: "Clase D", min: 600, color: "#10B981", level: 2 }, 
-  { name: "Clase C", min: 1000, color: "#3B82F6", level: 3 }, 
-  { name: "Clase B", min: 1500, color: "#3B82F6", level: 3 }, 
-  { name: "Clase A", min: 2100, color: "#8B5CF6", level: 4 }, 
-  { name: "Clase S", min: 2800, color: "#F59E0B", level: 5 }, 
-  { name: "Clase SS", min: 3600, color: "#F59E0B", level: 5 },
-  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 }
+  { name: "Clase G", min: 0, color: "#94A3B8", level: 1 }, // Gris claro
+  { name: "Clase F", min: 100, color: "#64748B", level: 1 }, // Gris oscuro
+  { name: "Clase E", min: 300, color: "#4ADE80", level: 2 }, // Verde claro
+  { name: "Clase D", min: 600, color: "#16A34A", level: 2 }, // Verde oscuro
+  { name: "Clase C", min: 1000, color: "#60A5FA", level: 3 }, // Azul claro
+  { name: "Clase B", min: 1500, color: "#2563EB", level: 3 }, // Azul oscuro
+  { name: "Clase A", min: 2100, color: "#A855F7", level: 4 }, // Morado
+  { name: "Clase S", min: 2800, color: "#FBBF24", level: 5 }, // Amarillo
+  { name: "Clase SS", min: 3600, color: "#F97316", level: 5 }, // Naranja
+  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 } // Rojo
 ];
 
 const getRank = (xp) => {
@@ -444,12 +444,24 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <div className="mt-8 pt-6 border-t border-[#E2E8F0]">
             <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest text-center mb-4">ESCALA DE EVOLUCIÓN</p>
             <div className="flex flex-wrap justify-center gap-3">
-              {RANKS.slice(1).map(r => (
+              {[...RANKS].slice(1).reverse().map(r => (
                 <div key={r.name} className="flex items-center gap-1.5 bg-[#F8FAFC] px-3 py-1.5 rounded-full border border-[#E2E8F0]">
                   <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
                   <span className="text-[10px] font-bold text-[#0B1929] uppercase">{r.name}</span>
                 </div>
               ))}
+            </div>
+            
+            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-4 md:p-5 flex gap-3 text-left max-w-2xl mx-auto">
+              <div className="text-blue-500 shrink-0">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[#0B1929] mb-1">¿Cómo ganar puntos de experiencia (XP)?</h4>
+                <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                  Tu XP sube al registrar entrenamientos. Se calcula automáticamente con base en el <strong>volumen de entrenamiento</strong> de cada grupo muscular (repeticiones × peso). ¡Levantar más peso o hacer más repeticiones suma puntos directamente a los músculos que trabajaste!
+                </p>
+              </div>
             </div>
           </div>
         </div>
