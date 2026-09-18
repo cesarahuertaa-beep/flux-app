@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from"react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
 import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle } from"lucide-react";
 import { useBrand } from"../BrandContext";

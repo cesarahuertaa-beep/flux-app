@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from"react";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, User } from"lucide-react";
 import { useBrand } from"../BrandContext";
 import { Capacitor } from"@capacitor/core";
@@ -17,6 +18,7 @@ import { Capacitor } from"@capacitor/core";
  * @param {Object}   session  - Objeto de sesión (para nombre/rol)
  */
 export function AppLayout({ children, nav, active, setActive, session }) {
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const brand = useBrand();
 

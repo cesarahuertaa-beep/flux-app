@@ -1,4 +1,5 @@
-import { useState, useEffect } from"react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { dbPatch, dbGet } from"../lib/supabase";
 import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone } from"lucide-react";
 import { Capacitor } from"@capacitor/core";
