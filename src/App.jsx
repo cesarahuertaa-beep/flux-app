@@ -8,6 +8,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ClienteView from "./pages/Cliente";
+import Privacidad from "./pages/Privacidad";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 
@@ -241,6 +242,7 @@ export default function App() {
       <AppUpdater />
       <Router>
         <Routes>
+          <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/" element={
             isAppMode
               ? <Navigate to={session ? "/app" : "/login"} replace />
