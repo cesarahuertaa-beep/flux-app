@@ -277,15 +277,47 @@ export default function Training({
   };
 
   const parseDisplayWeight = (dbVal, unit) => {
+    if (typeof dbVal === 'string' && dbVal.startsWith("LB:")) return dbVal.replace("LB:", "");
     if (!dbVal || dbVal === "-" || isNaN(dbVal)) return dbVal;
-    return unit === 'lb' ? Math.round(parseFloat(dbVal) * 2.20462) : dbVal;
+    
+    // If unit is lb, convert stored kg back to lb
+    if (unit === 'lb') {
+      const num = parseFloat(dbVal);
+      // Return 1 decimal place if it has decimals, else no decimals
+      const lb = num * 2.20462;
+      return lb % 1 === 0 ? lb.toString() : lb.toFixed(1);
+    }
+    return dbVal; // for kg, keep exactly as typed/stored
   };
 
   const parseDBWeight = (inputVal, unit) => {
     if (!inputVal || inputVal === "-") return inputVal;
-    const p = parseFloat(inputVal);
-    if (isNaN(p)) return inputVal;
-    return unit === 'lb' ? (p * 0.453592).toFixed(1) : p.toString();
+    
+    if (unit === 'lb') {
+      // If user types something like "12." or "12.0", we must handle it carefully.
+      // But since DB stores kg, we have to convert.
+      // We will allow trailing dots by keeping them in the string temporarily.
+      // Wait, if we return a string ending in '.' as kg, it will be stored as such.
+      // The DB is text, so we can technically store "12.5 (lb)" in the DB? 
+      // No, we must store kg.
+      // A trick is to append a special marker for lb if it ends with dot, but that's messy.
+      const p = parseFloat(inputVal);
+      if (isNaN(p)) return inputVal;
+      
+      // If they are literally typing a decimal point, we just don't convert until they type a number after it.
+      // Actually, if we just use inputVal directly and assume all DB logic handles kg, what if we just store the lb value and convert it later?
+      // No, we must store kg.
+      if (inputVal.endsWith('.')) {
+        // We will store the kg equivalent but append a '.' so parseDisplayWeight could theoretically reconstruct it? No.
+        // Let's just return the lb value temporarily in the DB state. It will be overwritten when they finish typing.
+        // The DB is text, so we can store "LB:12." to preserve it!
+        return `LB:${inputVal}`;
+      }
+      return (p * 0.453592).toFixed(1);
+    }
+    
+    // For kg, just return exactly what they typed so we don't eat decimals
+    return inputVal;
   };
 
   // ── 1RM Estimado (Fórmula Epley) ──────────────────────────────
