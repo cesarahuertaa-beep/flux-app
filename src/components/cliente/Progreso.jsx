@@ -459,7 +459,10 @@ export default function Progreso({ cliente, isSelfManaged }) {
               <div>
                 <h4 className="text-sm font-bold text-[#0B1929] mb-1">¿Cómo ganar puntos de experiencia (XP)?</h4>
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
-                  Tu XP sube al registrar entrenamientos. Se calcula automáticamente con base en el <strong>volumen de entrenamiento</strong> de cada grupo muscular (repeticiones × peso). ¡Levantar más peso o hacer más repeticiones suma puntos directamente a los músculos que trabajaste!
+                  Tu XP sube de dos maneras:<br/>
+                  <strong className="text-[#0B1929]">1. Consistencia:</strong> Ganas <strong>+10 XP</strong> por cada semana que entrenes un músculo.<br/>
+                  <strong className="text-[#0B1929]">2. Sobrecarga Progresiva:</strong> Ganas XP extra equivalente al <strong>% de fuerza estimada (1RM)</strong> que hayas mejorado respecto a tu mejor marca.<br/>
+                  <span className="text-amber-600 font-bold mt-1 block">¡Pero cuidado! Si dejas de entrenar un músculo durante una semana, perderás -15 XP en esa zona.</span>
                 </p>
               </div>
             </div>
