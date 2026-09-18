@@ -175,9 +175,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </div>
       )}
 
+      <RoleSwitcher currentRole={role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
+
       <DatosPersonalesCard form={personalForm} setForm={setPersonalForm} onSave={handleSavePersonal} loading={loading} isSaving={savingPersonal} />
       <IdentidadEmpresarialCard form={businessForm} setForm={setBusinessForm} onSave={handleSaveBusiness} loading={loading} isSaving={savingBusiness} />
-      <RoleSwitcher currentRole={role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <div className="mt-10 flex flex-col sm:flex-row gap-4">
         <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
