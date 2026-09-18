@@ -48,16 +48,33 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
           }
 
           let label = 'Administrativo';
+          let subtitle = r.data?.nombre_clinica || r.data?.nombre || 'Usuario';
+
           if (r.role === 'cliente') {
-             label = r.data?.nutriologo_id ? 'Paciente en Consultorio' : 'Atleta Independiente';
+             if (r.data?.nutriologo_id) {
+               // Compatibility fallback for users who haven't logged out
+               const isOldFormat = !r.data.nutriologo_nombre;
+               const clinic = isOldFormat ? 'Consultorio' : (r.data.nombre_clinica || 'Consultorio');
+               const nutName = isOldFormat ? (r.data.nombre_clinica || 'Especialista') : r.data.nutriologo_nombre;
+               
+               label = `Paciente de ${clinic}`;
+               subtitle = `Nutriólogo: ${nutName}`;
+             } else {
+               label = 'Atleta Independiente';
+               subtitle = r.data?.nombre || 'Usuario';
+             }
           } else if (r.role === 'nutriologo') {
              label = 'Nutriólogo';
+             subtitle = r.data?.nombre_marca || r.data?.nombre || 'Usuario';
           } else if (r.role === 'nutriologo_estudiante') {
              label = 'Estudiante';
+             subtitle = r.data?.nombre_marca || r.data?.nombre || 'Usuario';
           } else if (r.role === 'staff') {
              label = 'Staff';
+             subtitle = r.data?.nombre || 'Usuario';
           } else if (r.role === 'superadmin') {
              label = 'Superadmin';
+             subtitle = r.data?.nombre || 'Usuario';
           }
 
           const isSwitching = switchingTo === r;
@@ -74,7 +91,7 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
                   {label}
                 </p>
                 <p className={`text-xs mt-0.5 opacity-80 truncate ${isActive ? 'text-[var(--brand-primary)]' : 'text-[#6B7A8D]'}`}>
-                  {r.data?.nombre_clinica || r.data?.nombre || 'Usuario'}
+                  {subtitle}
                 </p>
               </div>
               <div className="shrink-0 flex items-center justify-center w-6 h-6">

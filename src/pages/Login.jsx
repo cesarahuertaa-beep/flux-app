@@ -86,12 +86,13 @@ export default function Login({ onLogin }) {
       const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}`);
       for (const clientData of clientRows) {
         if (clientData.nutriologo_id) {
-          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre`);
+          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre,nombre_marca`);
           if (nut.length) {
             if (nut[0].activo === false) {
               continue; // Suspended clinic, skip this client profile
             }
-            clientData.nombre_clinica = nut[0].nombre;
+            clientData.nombre_clinica = nut[0].nombre_marca || "Consultorio";
+            clientData.nutriologo_nombre = nut[0].nombre;
           }
         }
         availableRoles.push({
