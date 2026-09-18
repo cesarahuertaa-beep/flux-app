@@ -81,6 +81,8 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
       </div>
 
+      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} />
+
       <DatosPersonalesCard 
         form={form} 
         setForm={setForm} 
@@ -165,8 +167,6 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
           </div>
         </div>
       )}
-
-      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <button 
