@@ -448,6 +448,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 <div key={r.name} className="flex items-center gap-1.5 bg-[#F8FAFC] px-3 py-1.5 rounded-full border border-[#E2E8F0]">
                   <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
                   <span className="text-[10px] font-bold text-[#0B1929] uppercase">{r.name}</span>
+                  <span className="text-[10px] font-semibold text-[#9BA5B0]">{r.min} XP</span>
                 </div>
               ))}
             </div>
