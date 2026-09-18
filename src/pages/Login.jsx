@@ -4,16 +4,16 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } f
 import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from"../lib/supabase";
 
 export default function Login({ onLogin }) {
-  const [mode, setMode]           = useState("login");
-  const [nombre, setNombre]       = useState("");
-  const [email, setEmail]         = useState("");
+  const [mode, setMode] = useState(() => sessionStorage.getItem('flux_login_mode') || "login");
+  const [nombre, setNombre] = useState(() => sessionStorage.getItem('flux_login_nombre') || "");
+  const [email, setEmail] = useState(() => sessionStorage.getItem('flux_login_email') || "");
   const [pass, setPass]           = useState("");
   const [newPass, setNewPass]     = useState("");
   const [confirmPass, setConfirmPass] = useState("");
-  const [signupType, setSignupType] = useState("civil");
+  const [signupType, setSignupType] = useState(() => sessionStorage.getItem('flux_signupType') || "civil");
   const [nombreMarca, setNombreMarca] = useState("");
   const [mapaUrl, setMapaUrl] = useState("");
-  const [cedula, setCedula] = useState("");
+  const [cedula, setCedula] = useState(() => sessionStorage.getItem('flux_login_cedula') || "");
   const [err, setErr]             = useState("");
   const [info, setInfo]           = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,17 @@ export default function Login({ onLogin }) {
   const [accessToken, setAccessToken] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [fadeSplash, setFadeSplash] = useState(false);
-  const [avisoAceptado, setAvisoAceptado] = useState(false);
+  const [avisoAceptado, setAvisoAceptado] = useState(() => sessionStorage.getItem('flux_aviso') === 'true');
+
+  useEffect(() => {
+    sessionStorage.setItem('flux_login_mode', mode);
+    sessionStorage.setItem('flux_signupType', signupType);
+    sessionStorage.setItem('flux_login_nombre', nombre);
+    sessionStorage.setItem('flux_login_email', email);
+    sessionStorage.setItem('flux_login_cedula', cedula);
+    sessionStorage.setItem('flux_aviso', avisoAceptado ? 'true' : 'false');
+  }, [mode, signupType, nombre, email, cedula, avisoAceptado]);
+
 
   useEffect(() => {
     const timer1 = setTimeout(() => setFadeSplash(true), 2000);
@@ -438,7 +448,7 @@ export default function Login({ onLogin }) {
           <div className="mb-4 flex items-start gap-2">
             <input type="checkbox" id="aviso_civil" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[#2e5cb8]" />
             <label htmlFor="aviso_civil" className="text-xs text-[#6B7A8D] leading-tight cursor-pointer">
-              He leído y acepto el <Link to="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
+              He leído y acepto el <Link to="/privacidad" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
             </label>
           </div>
           <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
@@ -492,7 +502,7 @@ export default function Login({ onLogin }) {
           <div className="mb-4 flex items-start gap-2">
             <input type="checkbox" id="aviso_pro" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[#10B981]" />
             <label htmlFor="aviso_pro" className="text-xs text-[#6B7A8D] leading-tight cursor-pointer">
-              He leído y acepto el <Link to="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
+              He leído y acepto el <Link to="/privacidad" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
             </label>
           </div>
           <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>

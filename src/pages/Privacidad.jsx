@@ -9,7 +9,7 @@ export default function Privacidad() {
     <div className="min-h-screen bg-[#F7F9FC] text-[#0B1929] font-['Inter',sans-serif] selection:bg-[#1A6FD4] selection:text-white">
       <div className="max-w-4xl mx-auto px-6 py-12 md:py-20">
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-[#6B7A8D] font-bold mb-8 hover:text-[#0B1929] transition-colors"
         >
           <ArrowLeft size={16} /> Volver

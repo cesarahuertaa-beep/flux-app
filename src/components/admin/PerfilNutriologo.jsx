@@ -8,6 +8,7 @@ import RoleSwitcher from"../RoleSwitcher";
 import { syncPersonalData } from"../../lib/supabase";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
+  const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
@@ -142,7 +143,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     return () => clearTimeout(timeoutId);
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
-  const handleStore = () => window.open('https://flux-sport.mitiendanube.com/', '_blank');
+  const handleStore = () => navigate("/tienda");
 
   return (
     <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">

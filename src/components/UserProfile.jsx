@@ -7,6 +7,7 @@ import { syncPersonalData } from"../lib/supabase";
 import RoleSwitcher from"./RoleSwitcher";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
+  const navigate = useNavigate();
   const user = session?.data || session; // Cliente o Admin
   const isCliente = session?.role ==="cliente" || session?.role ==="civil";
   
@@ -63,15 +64,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     }
   };
 
-  const handleStore = () => {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
-    const isAppMode = window.location.protocol === 'app:' || window.location.protocol === 'file:' || Capacitor.isNativePlatform() || isStandalone;
-    if (isAppMode) {
-      window.open("https://www.flux-sport.com","_blank"); 
-    } else {
-      window.location.href ="/";
-    }
-  };
+  const handleStore = () => navigate("/tienda");
 
   return (
     <div className="flex-1 overflow-y-auto w-full  bg-[#F7F9FC]">
