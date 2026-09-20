@@ -862,12 +862,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               <div className="flex flex-col min-w-0">
                                 <div className="flex items-center flex-wrap gap-1.5 leading-tight">
                                   {tab !== 'S/D' && (
-                                    <span className="font-semibold px-2 py-0.5 bg-gray-100 rounded text-[11px] text-[#6B7A8D] shrink-0">{tab}</span>
+                                    <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
                                   )}
                                   <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title ||"Sin título"}</span>
                                 </div>
                                 <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
-                                  <span className="font-medium bg-[#F0F4FA] px-1.5 rounded">{d.comidas.length} comidas</span>
+                                  <span className="font-medium">{d.comidas.length} comidas</span>
                                   <span className="opacity-70">&middot;</span>
                                   <span>{d.comidas.reduce((s,c) => s + (Number(c.calorias)||0), 0)} kcal</span>
                                   <span>{d.comidas.reduce((s,c) => s + (Number(c.proteina)||0), 0)}g P</span>
