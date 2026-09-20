@@ -493,7 +493,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setRutinaForm({ 
       diasSeleccionados: dSel,
       tituloPersonalizado: tPers,
-      ejercicios:r.ejercicios.map(e=>({...e, _dndId: String(e.id || Math.random().toString(36).slice(2,9))})) 
+      ejercicios: r.ejercicios.map(e => {
+        // La BD siempre guarda en kg. Si la unidad es lb, reconvertimos para que el input muestre el valor correcto.
+        let pesoDisplay = e.peso_sugerido;
+        if ((e.unidad || 'kg') === 'lb' && pesoDisplay && !isNaN(pesoDisplay)) {
+          const lb = parseFloat(pesoDisplay) * 2.20462;
+          pesoDisplay = lb % 1 === 0 ? lb.toString() : lb.toFixed(1);
+        }
+        return { ...e, peso_sugerido: pesoDisplay, _dndId: String(e.id || Math.random().toString(36).slice(2,9)) };
+      })
     }); 
     setShowRutinaModal(true); 
   };
