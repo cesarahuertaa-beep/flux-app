@@ -498,6 +498,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
         }
         
+        const toKg = (val, unit) => {
+          if (!val && val !== 0) return null;
+          const n = parseFloat(val);
+          if (isNaN(n)) return null;
+          return unit === 'lb' ? parseFloat((n * 0.453592).toFixed(1)) : n;
+        };
+
         const promises = rutinaForm.ejercicios.map((e, i) => {
           const data = { 
             rutina_id:rid, 
@@ -508,7 +515,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             tipo_movimiento:e.tipo_movimiento||"", 
             num_series:+e.num_series||4, 
             reps_sugeridas:+e.reps_sugeridas||10,
-            peso_sugerido:e.peso_sugerido||null,
+            peso_sugerido:toKg(e.peso_sugerido, e.unidad||"kg"),
             unidad:e.unidad||"kg",
             alternativas:e.alternativas||[],
             orden:i 
@@ -542,7 +549,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             tipo_movimiento:e.tipo_movimiento||"", 
             num_series:+e.num_series||4, 
             reps_sugeridas:+e.reps_sugeridas||10,
-            peso_sugerido:e.peso_sugerido||null,
+            peso_sugerido:toKg(e.peso_sugerido, e.unidad||"kg"),
             unidad:e.unidad||"kg",
             alternativas:e.alternativas||[],
             orden:i 
