@@ -526,7 +526,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             cliente_id: selected.id,
             ciclo_id: activeCiclo?.id || null,
             nombre: finalName,
-            semanas: +rutinaForm.semanas || 4,
+            semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+rutinaForm.semanas || 4),
             fecha_inicio: rutinaForm.fecha_inicio || null,
             orden: rutinas.length + idx
           });
