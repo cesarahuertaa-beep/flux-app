@@ -78,18 +78,18 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`);
       if (ns.length) {
         setNutri(ns[0]);
-        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`);
-        setDias(await Promise.all(ds.map(async d => ({ 
+        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
+        setDias(ds.map(d => ({ 
           ...d, 
-          comidas: await dbGet(`comidas?dia_id=eq.${d.id}&order=orden.asc`) 
-        }))));
-      }
+          comidas: (d.comidas || []).sort((a, b) => a.orden - b.orden) 
+        })));
+      } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
 
-      const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&order=orden.asc`);
-      const rsFull = await Promise.all(rs.map(async r => ({ 
+      const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
+      const rsFull = rs.map(r => ({ 
         ...r, 
-        ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`) 
-      })));
+        ejercicios: (r.ejercicios || []).sort((a, b) => a.orden - b.orden) 
+      }));
       setRutinas(rsFull);
 
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
