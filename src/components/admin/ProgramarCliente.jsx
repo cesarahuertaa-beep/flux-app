@@ -361,25 +361,34 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         await Promise.all(promises);
       } else { 
-        // Creación masiva (Múltiples días) o normal
+        // Creación masiva optimizada (Bulk Insert)
         const dSeleccionados = diaForm.diasSeleccionados || [];
         const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
         let orderCounter = diaForm.orden;
 
-        for (const dayCode of creationDays) {
+        // 1. Bulk insert de todos los días
+        const diasData = creationDays.map(dayCode => {
           const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
+          const d = { nutricion_id: currentNutri.id, dia: finalName, orden: orderCounter };
+          orderCounter++;
+          return d;
+        });
+        
+        const creados = await dbPost("nutricion_dias", diasData);
 
-          const r = await dbPost("nutricion_dias", { nutricion_id:currentNutri.id, dia:finalName, orden:orderCounter }); 
-          const newDiaId = r[0].id; 
-          
-          for (let i=0; i<diaForm.comidas.length; i++) {
-            const c = diaForm.comidas[i];
-            const data = { ...c, dia_id:newDiaId, orden:i, calorias:+c.calorias||0, proteina:+c.proteina||0, carbohidratos:+c.carbohidratos||0, grasas:+c.grasas||0 };
+        // 2. Bulk insert de todas las comidas para todos los días creados
+        const comidasData = [];
+        creados.forEach(nuevoDia => {
+          diaForm.comidas.forEach((c, i) => {
+            const data = { ...c, dia_id: nuevoDia.id, orden: i, calorias: +c.calorias||0, proteina: +c.proteina||0, carbohidratos: +c.carbohidratos||0, grasas: +c.grasas||0 };
             delete data.id;
             delete data._dndId;
-            await dbPost("comidas", data);
-          }
-          orderCounter++;
+            comidasData.push(data);
+          });
+        });
+
+        if (comidasData.length > 0) {
+          await dbPost("comidas", comidasData);
         }
       }
       setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
@@ -525,37 +534,47 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         await Promise.all(promises);
       } else {
+        // Creación masiva optimizada (Bulk Insert)
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
-        for (let idx=0; idx<diasToCreate.length; idx++) {
-          const d = diasToCreate[idx];
+        
+        // 1. Bulk insert de todas las rutinas
+        const rutinasData = diasToCreate.map((d, idx) => {
           const finalName = d ==="S/D" ? rutinaForm.tituloPersonalizado : `${d}|${rutinaForm.tituloPersonalizado}`;
-          const r = await dbPost("rutinas", {
+          return {
             cliente_id: selected.id,
             ciclo_id: activeCiclo?.id || null,
             nombre: finalName,
             semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+rutinaForm.semanas || 4),
             fecha_inicio: rutinaForm.fecha_inicio || null,
             orden: rutinas.length + idx
-          });
-          const rid = r[0].id;
-          for (let i=0; i<rutinaForm.ejercicios.length; i++) {
-            const e = rutinaForm.ejercicios[i];
-            const data = { 
-            rutina_id:rid, 
-            biblioteca_id:e.biblioteca_id||null, 
-            nombre:e.nombre, 
-            gif_url:e.gif_url||"", 
-            grupo_muscular:e.grupo_muscular||"", 
-            tipo_movimiento:e.tipo_movimiento||"", 
-            num_series:+e.num_series||4, 
-            reps_sugeridas:+e.reps_sugeridas||10,
-            peso_sugerido:toKg(e.peso_sugerido, e.unidad||"kg"),
-            unidad:e.unidad||"kg",
-            alternativas:e.alternativas||[],
-            orden:i 
           };
-            await dbPost("ejercicios", data);
-          }
+        });
+        
+        const creadas = await dbPost("rutinas", rutinasData);
+        
+        // 2. Bulk insert de todos los ejercicios para todas las rutinas creadas
+        const ejerciciosData = [];
+        creadas.forEach(nuevaRutina => {
+          rutinaForm.ejercicios.forEach((e, i) => {
+            ejerciciosData.push({ 
+              rutina_id: nuevaRutina.id, 
+              biblioteca_id: e.biblioteca_id||null, 
+              nombre: e.nombre, 
+              gif_url: e.gif_url||"", 
+              grupo_muscular: e.grupo_muscular||"", 
+              tipo_movimiento: e.tipo_movimiento||"", 
+              num_series: +e.num_series||4, 
+              reps_sugeridas: +e.reps_sugeridas||10,
+              peso_sugerido: toKg(e.peso_sugerido, e.unidad||"kg"),
+              unidad: e.unidad||"kg",
+              alternativas: e.alternativas||[],
+              orden: i 
+            });
+          });
+        });
+
+        if (ejerciciosData.length > 0) {
+          await dbPost("ejercicios", ejerciciosData);
         }
       }
       
