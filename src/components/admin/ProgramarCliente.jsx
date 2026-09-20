@@ -19,7 +19,7 @@ import { SortableItem } from"../SortableItem";
 import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from"lucide-react";
 import { EjercicioSelector } from"./EjercicioSelector";
 import { generateNutriPDF } from"../../utils/pdf";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
+import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { ProgresoCliente } from"./ProgresoCliente";
 
@@ -349,17 +349,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await dbDel(`comidas?id=in.(${toDelete.join(",")})`);
         }
 
-        const promises = diaForm.comidas.map((c, i) => {
+        const toUpdate = [];
+        const toInsert = [];
+
+        diaForm.comidas.forEach((c, i) => {
           const data = { 
             dia_id: diaId, hora: c.hora||"", nombre: c.nombre||"", 
             opcion1: c.opcion1||"", opcion2: c.opcion2||"", 
             calorias: +c.calorias||null, proteina: +c.proteina||null, carbohidratos: +c.carbohidratos||null, grasas: +c.grasas||null,
             foto_url: c.foto_url||"", orden: i 
           };
-          if (c.id) return dbPatch(`comidas?id=eq.${c.id}`, data);
-          return dbPost("comidas", data);
+          if (c.id) {
+            data.id = c.id;
+            toUpdate.push(data);
+          } else {
+            toInsert.push(data);
+          }
         });
-        await Promise.all(promises);
+
+        if (toUpdate.length > 0) await dbUpsert("comidas", toUpdate);
+        if (toInsert.length > 0) await dbPost("comidas", toInsert);
       } else { 
         // Creación masiva optimizada (Bulk Insert)
         const dSeleccionados = diaForm.diasSeleccionados || [];
@@ -514,7 +523,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           return unit === 'lb' ? parseFloat((n * 0.453592).toFixed(1)) : n;
         };
 
-        const promises = rutinaForm.ejercicios.map((e, i) => {
+        const toUpdate = [];
+        const toInsert = [];
+
+        rutinaForm.ejercicios.forEach((e, i) => {
           const data = { 
             rutina_id:rid, 
             biblioteca_id:e.biblioteca_id||null, 
@@ -529,10 +541,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             alternativas:e.alternativas||[],
             orden:i 
           };
-          if (e.id) return dbPatch(`ejercicios?id=eq.${e.id}`, data);
-          return dbPost("ejercicios", data);
+          if (e.id) {
+            data.id = e.id;
+            toUpdate.push(data);
+          } else {
+            toInsert.push(data);
+          }
         });
-        await Promise.all(promises);
+
+        if (toUpdate.length > 0) await dbUpsert("ejercicios", toUpdate);
+        if (toInsert.length > 0) await dbPost("ejercicios", toInsert);
       } else {
         // Creación masiva optimizada (Bulk Insert)
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
