@@ -39,11 +39,16 @@ export function BrandProvider({ children, session }) {
           if (res.length > 0) {
             const p = res[0];
             setBrand({
-              nombre_marca: p.nombre_marca ||"FLUX",
-              color_primario: p.color_primario ||"#1A6FD4",
-              logo_url: p.logo_url ||"/flux_logo.jpeg"
+              nombre_marca: p.nombre_marca || "FLUX",
+              color_primario: p.color_primario || "#1A6FD4",
+              logo_url: p.logo_url || "/flux_logo.jpeg"
             });
+          } else {
+            setBrand(FLUX_DEFAULT);
           }
+        } else {
+          // Rol sin marca propia (civil, atleta independiente, staff, etc.) → restaurar FLUX
+          setBrand(FLUX_DEFAULT);
         }
       } catch (e) {
         console.error("Error cargando branding", e);
