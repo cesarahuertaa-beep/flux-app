@@ -148,6 +148,12 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
   return (
     <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">
+      {/* Header estandarizado igual que UserProfile */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
+        <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
+      </div>
+
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 
