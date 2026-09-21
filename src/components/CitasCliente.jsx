@@ -391,7 +391,7 @@ export function CitasCliente({ cliente }) {
           <div className="w-full sm:w-[480px] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-8">
             
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl sm:rounded-2xl">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl sm:rounded-2xl shrink-0">
               <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
                 Agendar nueva cita
               </h3>
@@ -404,7 +404,7 @@ export function CitasCliente({ cliente }) {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
               
               {/* Días Disponibles Info */}
               <div className="bg-[#F0F4FA] rounded-xl p-3.5 border border-[#E2E8F0] flex gap-3 items-start">
@@ -504,7 +504,7 @@ export function CitasCliente({ cliente }) {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-[#E2E8F0] bg-white rounded-b-2xl sm:rounded-b-2xl flex flex-col sm:flex-row gap-3">
+            <div className="p-4 border-t border-[#E2E8F0] bg-white rounded-b-2xl sm:rounded-b-2xl flex flex-col sm:flex-row gap-3 shrink-0">
               <button 
                 onClick={() => { setShowModal(false); setSelectedDate(""); setSelectedSlot(null); }}
                 className="w-full sm:flex-1 py-3 rounded-xl font-semibold text-sm border border-[#E2E8F0] text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
