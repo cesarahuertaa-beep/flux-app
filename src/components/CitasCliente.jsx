@@ -190,8 +190,8 @@ export function CitasCliente({ cliente }) {
       setSelectedSlot(null);
       await loadData();
     } catch (e) {
-      console.error(e);
-      setErrorReq("Ocurrió un error al agendar la cita. Es posible que el horario ya se haya llenado o no tengas conexión.");
+      console.error("Error detallado:", e);
+      setErrorReq("Ocurrió un error al agendar la cita: " + (e.message || e.toString()));
     }
     setSaving(false);
   };
