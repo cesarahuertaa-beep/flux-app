@@ -157,6 +157,7 @@ export function CitasCliente({ cliente }) {
       setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario:"" });
     } catch (e) {
       console.error("Error al calificar cita", e);
+      alert("Error al guardar: " + (e.message || "desconocido"));
     }
     setSaving(false);
   };
