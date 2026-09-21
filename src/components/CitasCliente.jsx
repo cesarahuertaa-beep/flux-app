@@ -174,15 +174,20 @@ export function CitasCliente({ cliente }) {
         estado:"pendiente"
       });
 
-      // Notify nutritionist
-      await dbPost("notificaciones", {
-        profile_id: nutriologoId,
-        titulo:"Nueva Solicitud de Cita",
-        mensaje: `Un paciente ha solicitado una cita para el ${new Date(selectedSlot.iso).toLocaleDateString('es-ES')}.`,
-        tipo:"plan",
-        link_url:"agenda",
-        entidad_id: cRes[0]?.id
-      });
+      try {
+        // Notify nutritionist (fire and forget)
+        const citaId = Array.isArray(cRes) && cRes.length > 0 ? cRes[0].id : (cRes && cRes.id ? cRes.id : null);
+        await dbPost("notificaciones", {
+          profile_id: nutriologoId,
+          titulo:"Nueva Solicitud de Cita",
+          mensaje: `Un paciente ha solicitado una cita para el ${new Date(selectedSlot.iso).toLocaleDateString('es-ES')}.`,
+          tipo:"plan",
+          link_url:"agenda",
+          entidad_id: citaId
+        });
+      } catch (notifErr) {
+        console.warn("No se pudo enviar la notificación", notifErr);
+      }
 
       setExito(true);
       setShowModal(false);
