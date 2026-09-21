@@ -91,8 +91,8 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   const handleStore = () => navigate("/tienda");
 
   return (
-    <div className="flex-1 overflow-y-auto w-full  bg-[#F7F9FC]">
-      <div className="max-w-4xl mx-auto w-full pb-32 px-6 md:px-8 pt-6 md:pt-8 overflow-x-hidden">
+    <div className="w-full bg-[#F7F9FC] flex flex-col">
+      <div className="max-w-4xl mx-auto w-full pb-32 px-6 md:px-8 pt-6 md:pt-8">
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
         <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
