@@ -208,10 +208,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`);
       const ruts   = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`);
       if (nutris.length > 0 || ruts.length > 0) {
-        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-yellow-500" /> No puedes borrar un ciclo que tiene planes o rutinas. Primero elimina su contenido.</div>);
-        return;
+        const conf = confirm(`¡CUIDADO!\n\nEste ciclo contiene ${ruts.length} rutina(s) y ${nutris.length} plan(es) de nutrición.\n\nSi continúas, se DESTRUIRÁ TODO su contenido permanentemente.\n\n¿Estás 100% seguro de eliminarlo en cascada?`);
+        if (!conf) return;
+        
+        // Borrar en cascada manualmente para máxima seguridad
+        for (const n of nutris) await dbDel(`nutricion?id=eq.${n.id}`);
+        for (const r of ruts) await dbDel(`rutinas?id=eq.${r.id}`);
+      } else {
+        if (!confirm(`¿Eliminar el ciclo "${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
       }
-      if (!confirm(`¿Eliminar el ciclo"${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
 
       // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
       if (ciclo.activo) {
