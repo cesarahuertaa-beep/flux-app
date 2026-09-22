@@ -88,10 +88,25 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     }
   };
 
-  const handleStore = () => {
+  const handleStore = async () => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (isStandalone) {
-      window.open(window.location.origin + "/", "_blank");
+    const targetUrl = window.location.origin + "/";
+    
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        await CapApp.openUrl({ url: targetUrl });
+      } catch (e) {
+        window.open(targetUrl, "_blank");
+      }
+    } else if (isStandalone) {
+      const a = document.createElement('a');
+      a.href = targetUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       window.location.href = "/";
     }

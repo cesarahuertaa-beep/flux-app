@@ -109,8 +109,20 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 onClick={() => {
                   if (id ==="tienda_link") {
                     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-                    if (isStandalone) {
-                      window.open(window.location.origin + "/", "_blank");
+                    const targetUrl = window.location.origin + "/";
+                    
+                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                      import('@capacitor/app').then(({ App: CapApp }) => {
+                        CapApp.openUrl({ url: targetUrl }).catch(() => window.open(targetUrl, "_blank"));
+                      }).catch(() => window.open(targetUrl, "_blank"));
+                    } else if (isStandalone) {
+                      const a = document.createElement('a');
+                      a.href = targetUrl;
+                      a.target = '_blank';
+                      a.rel = 'noopener noreferrer';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
                     } else {
                       window.location.href = "/";
                     }
@@ -226,8 +238,20 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 onClick={() => {
                   if (id ==="tienda_link") {
                     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-                    if (isStandalone) {
-                      window.open(window.location.origin + "/", "_blank");
+                    const targetUrl = window.location.origin + "/";
+                    
+                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                      import('@capacitor/app').then(({ App: CapApp }) => {
+                        CapApp.openUrl({ url: targetUrl }).catch(() => window.open(targetUrl, "_blank"));
+                      }).catch(() => window.open(targetUrl, "_blank"));
+                    } else if (isStandalone) {
+                      const a = document.createElement('a');
+                      a.href = targetUrl;
+                      a.target = '_blank';
+                      a.rel = 'noopener noreferrer';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
                     } else {
                       window.location.href = "/";
                     }
