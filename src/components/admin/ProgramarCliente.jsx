@@ -1234,16 +1234,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                   <div className="text-[13px] font-medium leading-tight">{e.nombre}<br/><span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular}</span></div>
                                   
                                   <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                    <div className="flex items-center gap-2 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">SERIES</span>
+                                    <div className="flex flex-col gap-0.5 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">SERIES</span>
                                       <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.num_series} onChange={ev=>updEj(i,"num_series",ev.target.value)} placeholder="4" />
                                     </div>
-                                    <div className="flex items-center gap-2 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
+                                    <div className="flex flex-col gap-0.5 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                       <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.reps_sugeridas} onChange={ev=>updEj(i,"reps_sugeridas",ev.target.value)} placeholder="10" />
                                     </div>
-                                    <div className="flex items-center gap-2 sm:block">
-                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
+                                    <div className="flex flex-col gap-0.5 sm:block">
+                                      <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
                                       <div className="relative w-full">
                                         <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.peso_sugerido||""} onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)} placeholder="-" />
                                         <button onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{e.unidad || 'KG'}</button>
@@ -1283,12 +1283,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                     </div>
                                     
                                     <div className="col-span-3 sm:col-span-2 sm:col-start-3 sm:row-start-1 grid grid-cols-2 gap-2 sm:grid-cols-[65px_80px] sm:gap-1.5 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">
-                                      <div className="flex items-center gap-2 sm:block">
-                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">REPS</span>
+                                      <div className="flex flex-col gap-0.5 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">REPS</span>
                                         <input type="number" className="w-full px-2 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.reps_sugeridas} onChange={ev=>updAlt(i,altIdx,"reps_sugeridas",ev.target.value)} placeholder="10" />
                                       </div>
-                                      <div className="flex items-center gap-2 sm:block">
-                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
+                                      <div className="flex flex-col gap-0.5 sm:block">
+                                        <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden text-center w-full">PESO</span>
                                         <div className="relative w-full">
                                           <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
                                           <button onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{alt.unidad || 'KG'}</button>
