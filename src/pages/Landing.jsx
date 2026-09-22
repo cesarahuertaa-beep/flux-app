@@ -345,74 +345,84 @@ function NutritionistsSection({ nutritionists }) {
         <div className="mb-12">
           <p className="text-xs font-semibold tracking-widest text-[#1A6FD4] uppercase mb-2">Red Flux</p>
           <h2 className="text-4xl font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans, sans-serif" }}>Nutriólogos certificados</h2>
-          <div className="flex gap-3 mt-4">
-            <div className="flex items-center gap-2 flex-1 max-w-sm bg-[#F7F9FC] rounded-xl border border-[#E2E5EA] px-4 h-11 focus-within:border-[#1A6FD4] transition-colors">
-              <Search size={15} className="text-[#6B7A8D] flex-shrink-0" strokeWidth={1.5} />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, especialidad o zona..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent border-none outline-none text-sm text-[#0B1929]"
-              />
+          {safeNutris.length > 0 && (
+            <div className="flex gap-3 mt-4">
+              <div className="flex items-center gap-2 flex-1 max-w-sm bg-[#F7F9FC] rounded-xl border border-[#E2E5EA] px-4 h-11 focus-within:border-[#1A6FD4] transition-colors">
+                <Search size={15} className="text-[#6B7A8D] flex-shrink-0" strokeWidth={1.5} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, especialidad o zona..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-transparent border-none outline-none text-sm text-[#0B1929]"
+                />
+              </div>
+              <button className="h-11 px-4 rounded-xl border border-[#E2E5EA] text-[#0B1929] flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                <Filter size={15} /> <span className="hidden sm:inline text-sm font-medium">Filtros</span>
+              </button>
             </div>
-            <button className="h-11 px-4 rounded-xl border border-[#E2E5EA] text-[#0B1929] flex items-center gap-2 hover:bg-gray-50 transition-colors">
-              <Filter size={15} /> <span className="hidden sm:inline text-sm font-medium">Filtros</span>
-            </button>
+          )}
+        </div>
+
+        {safeNutris.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-[#F7F9FC] rounded-3xl border border-[#E2E5EA] text-center w-full">
+            <h3 className="text-2xl font-bold text-[#0B1929] mb-2">Próximamente</h3>
+            <p className="text-[#6B7A8D] max-w-md">Nuestro directorio de nutriólogos FLUX certificados estará disponible muy pronto. ¡Mantente atento a las novedades!</p>
           </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((n) => (
-            <div key={n.id} className="bg-white rounded-2xl border border-[#E2E5EA] p-5 hover:shadow-md hover:border-[#1A6FD4]/30 transition-all">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="relative flex-shrink-0">
-                  <img
-                    src={n.img && n.img.startsWith('photo-') ? `https://images.unsplash.com/${n.img}?w=80&h=80&fit=crop&auto=format&face` : (n.img || '')}
-                    alt={n.name}
-                    className="w-14 h-14 rounded-2xl object-cover bg-[#E8ECF2]"
-                  />
-                  <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${n.available ?"bg-green-400" :"bg-[#CBD5E1]"}`} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map((n) => (
+              <div key={n.id} className="bg-white rounded-2xl border border-[#E2E5EA] p-5 hover:shadow-md hover:border-[#1A6FD4]/30 transition-all">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={n.img && n.img.startsWith('photo-') ? `https://images.unsplash.com/${n.img}?w=80&h=80&fit=crop&auto=format&face` : (n.img || '')}
+                      alt={n.name}
+                      className="w-14 h-14 rounded-2xl object-cover bg-[#E8ECF2]"
+                    />
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${n.available ?"bg-green-400" :"bg-[#CBD5E1]"}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="text-sm font-semibold text-[#0B1929] leading-tight">{n.name}</h3>
+                      {n.verified && <CheckCircle size={13} className="text-[#1A6FD4] flex-shrink-0" />}
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] mt-1 line-clamp-1">{n.specialty}</p>
+                    <p className="text-[11px] font-mono text-[#9BA5B0] mt-1 flex items-center gap-1"><MapPin size={10} /> {n.location}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="text-sm font-semibold text-[#0B1929] leading-tight">{n.name}</h3>
-                    {n.verified && <CheckCircle size={13} className="text-[#1A6FD4] flex-shrink-0" />}
-                  </div>
-                  <p className="text-xs text-[#6B7A8D] mt-1 line-clamp-1">{n.specialty}</p>
-                  <p className="text-[11px] font-mono text-[#9BA5B0] mt-1 flex items-center gap-1"><MapPin size={10} /> {n.location}</p>
+                <div className="flex items-center gap-4 text-xs font-medium text-[#6B7A8D] bg-[#F0F4FB] p-2.5 rounded-xl">
+                  {n.reviewCount > 0 ? (
+                    <div className="flex items-center gap-1">
+                      <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating.toFixed(1)} ({n.reviewCount} reseñas)
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 italic text-xs text-[#9BA5B0]">
+                      Sin calificaciones
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 mt-4">
+                  {n.mapa_url && (
+                    <a href={n.mapa_url} target="_blank" rel="noopener noreferrer" className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center">
+                      Ver en mapa
+                    </a>
+                  )}
+                  {n.telefono && (
+                    <a href={`https://wa.me/${n.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/20 h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                      <MessageCircle size={16} /> WhatsApp
+                    </a>
+                  )}
+                  {!n.telefono && n.email && (
+                    <a href={`mailto:${n.email}`} className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                      <Mail size={16} /> Enviar correo
+                    </a>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs font-medium text-[#6B7A8D] bg-[#F0F4FB] p-2.5 rounded-xl">
-                {n.reviewCount > 0 ? (
-                  <div className="flex items-center gap-1">
-                    <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating.toFixed(1)} ({n.reviewCount} reseñas)
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 italic text-xs text-[#9BA5B0]">
-                    Sin calificaciones
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 mt-4">
-                {n.mapa_url && (
-                  <a href={n.mapa_url} target="_blank" rel="noopener noreferrer" className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center">
-                    Ver en mapa
-                  </a>
-                )}
-                {n.telefono && (
-                  <a href={`https://wa.me/${n.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/20 h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
-                    <MessageCircle size={16} /> WhatsApp
-                  </a>
-                )}
-                {!n.telefono && n.email && (
-                  <a href={`mailto:${n.email}`} className="w-full bg-white border border-[#E2E5EA] text-[#0B1929] hover:border-[#1A6FD4] hover:text-[#1A6FD4] h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
-                    <Mail size={16} /> Enviar correo
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -569,7 +579,7 @@ export default function Landing({ session, onLogout }) {
 
   const activeSupplements = dbSupplements;
   const activeApparel = dbApparel;
-  const activeNutritionists = dbNutritionists.length > 0 ? dbNutritionists : MOCK_NUTRITIONISTS;
+  const activeNutritionists = dbNutritionists;
   const activeMapPins = dbMapPins.length > 0 ? dbMapPins : MOCK_MAPPINS;
 
   return (
