@@ -488,7 +488,7 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-6">
-              <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover grayscale brightness-200" />
+              <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover" />
               <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</span>
             </div>
             <p className="text-sm mb-6">La plataforma definitiva para profesionales y atletas.</p>
