@@ -200,6 +200,8 @@ export default function Training({
   const [previewEx, setPreviewEx] = useState(null);
   const [unitPrefs,       setUnitPrefs]       = useState({}); // { [exId_variantId]: 'kg' | 'lb' }
   const [focusedInput,    setFocusedInput]    = useState(null); // { exId, wi, si }
+  // Local raw text while user is typing — prevents React from overwriting mid-keystroke
+  const [localWeightInputs, setLocalWeightInputs] = useState({}); // { [kgKey]: string }
 
   if (!rutinas || rutinas.length === 0) {
     return (
@@ -291,32 +293,15 @@ export default function Training({
   };
 
   const parseDBWeight = (inputVal, unit) => {
-    if (!inputVal || inputVal ==="-") return inputVal;
-    
+    if (!inputVal || inputVal === "-") return inputVal;
+    // Allow trailing dot or trailing zero after dot — don't convert yet
+    if (inputVal.endsWith('.') || inputVal.endsWith('.0')) return inputVal;
     if (unit === 'lb') {
-      // If user types something like"12." or"12.0", we must handle it carefully.
-      // But since DB stores kg, we have to convert.
-      // We will allow trailing dots by keeping them in the string temporarily.
-      // Wait, if we return a string ending in '.' as kg, it will be stored as such.
-      // The DB is text, so we can technically store"12.5 (lb)" in the DB? 
-      // No, we must store kg.
-      // A trick is to append a special marker for lb if it ends with dot, but that's messy.
       const p = parseFloat(inputVal);
       if (isNaN(p)) return inputVal;
-      
-      // If they are literally typing a decimal point, we just don't convert until they type a number after it.
-      // Actually, if we just use inputVal directly and assume all DB logic handles kg, what if we just store the lb value and convert it later?
-      // No, we must store kg.
-      if (inputVal.endsWith('.')) {
-        // We will store the kg equivalent but append a '.' so parseDisplayWeight could theoretically reconstruct it? No.
-        // Let's just return the lb value temporarily in the DB state. It will be overwritten when they finish typing.
-        // The DB is text, so we can store"LB:12." to preserve it!
-        return `LB:${inputVal}`;
-      }
-      return (p * 0.453592).toFixed(1);
+      return (p * 0.453592).toFixed(3);
     }
-    
-    // For kg, just return exactly what they typed so we don't eat decimals
+    // For kg, return exactly what they typed
     return inputVal;
   };
 
@@ -668,13 +653,39 @@ export default function Training({
                                 type="text"
                                 inputMode="decimal"
                                 placeholder={displayPrevKg}
-                                value={displayKgVal}
+                                value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
                                 disabled={isLocked}
-                                onFocus={() => setFocusedInput({ exId: ex.id, wi, si })}
-                                onBlur={() => setTimeout(() => setFocusedInput(null), 150)}
+                                onFocus={() => {
+                                  setFocusedInput({ exId: ex.id, wi, si });
+                                  // Seed local state with current display value so user starts from what they see
+                                  setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => setFocusedInput(null), 150);
+                                  const raw = localWeightInputs[kgKey];
+                                  if (raw !== undefined) {
+                                    // On blur, commit final conversion to progreso
+                                    const dbVal = parseDBWeight(raw, prefUnit);
+                                    onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                                    // Clear local state so value is driven by progreso again
+                                    setLocalWeightInputs(prev => {
+                                      const next = { ...prev };
+                                      delete next[kgKey];
+                                      return next;
+                                    });
+                                  }
+                                }}
                                 onChange={(e) => {
-                                  const dbVal = parseDBWeight(e.target.value, prefUnit);
-                                  onProgressChange(ex.id, wi, si,"peso", dbVal, activeVarId);
+                                  const raw = e.target.value;
+                                  // Only allow digits, dot, and minus
+                                  if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
+                                  // Update local display immediately — no conversion during typing
+                                  setLocalWeightInputs(prev => ({ ...prev, [kgKey]: raw }));
+                                  // Also save to progreso so debounce works (skip conversion for partial values)
+                                  if (!raw.endsWith('.')) {
+                                    const dbVal = parseDBWeight(raw, prefUnit);
+                                    onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                                  }
                                 }}
                                 className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 pr-6 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
                               />

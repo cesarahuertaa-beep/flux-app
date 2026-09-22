@@ -1245,7 +1245,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                     <div className="flex items-center gap-2 sm:block">
                                       <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
                                       <div className="relative w-full">
-                                        <input type="number" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.peso_sugerido||""} onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                        <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={e.peso_sugerido||""} onChange={ev=>updEj(i,"peso_sugerido",ev.target.value)} placeholder="-" />
                                         <button onClick={() => toggleUnidad(i)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{e.unidad || 'KG'}</button>
                                       </div>
                                     </div>
@@ -1290,7 +1290,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                                       <div className="flex items-center gap-2 sm:block">
                                         <span className="text-[10px] font-semibold text-[#6B7A8D] sm:hidden w-12 text-right">PESO</span>
                                         <div className="relative w-full">
-                                          <input type="number" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
+                                          <input type="text" inputMode="decimal" className="w-full pl-2 pr-6 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[13px] text-center" value={alt.peso_sugerido||""} onChange={ev=>updAlt(i,altIdx,"peso_sugerido",ev.target.value)} placeholder="-" />
                                           <button onClick={() => toggleUnidadAlt(i, altIdx)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[#0B1929]">{alt.unidad || 'KG'}</button>
                                         </div>
                                       </div>
