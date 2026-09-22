@@ -88,30 +88,6 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     }
   };
 
-  const handleStore = async () => {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    const targetUrl = window.location.origin + "/";
-    
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-      try {
-        const { App: CapApp } = await import('@capacitor/app');
-        await CapApp.openUrl({ url: targetUrl });
-      } catch (e) {
-        window.open(targetUrl, "_blank");
-      }
-    } else if (isStandalone) {
-      const a = document.createElement('a');
-      a.href = targetUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      window.location.href = "/";
-    }
-  };
-
   return (
     <div className="w-full bg-[#F7F9FC] flex flex-col">
       <div className="max-w-4xl mx-auto w-full pb-32 px-6 md:px-8 pt-6 md:pt-8">
@@ -208,13 +184,6 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       )}
 
       <div className="flex flex-col sm:flex-row gap-4">
-        <button 
-          onClick={handleStore}
-          className="w-full min-w-0 sm:w-auto px-6 py-3.5 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-all shadow-sm border border-[#E2E8F0]"
-        >
-          <ShoppingBag size={18} /> Ir a la tienda FLUX
-        </button>
-
         {onLogout && (
           <button 
             onClick={onLogout}

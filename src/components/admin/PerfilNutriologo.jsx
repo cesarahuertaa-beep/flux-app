@@ -144,30 +144,6 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     return () => clearTimeout(timeoutId);
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
-  const handleStore = async () => {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    const targetUrl = window.location.origin + "/";
-    
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-      try {
-        const { App: CapApp } = await import('@capacitor/app');
-        await CapApp.openUrl({ url: targetUrl });
-      } catch (e) {
-        window.open(targetUrl, "_blank");
-      }
-    } else if (isStandalone) {
-      const a = document.createElement('a');
-      a.href = targetUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      window.location.href = "/";
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">
       {/* Header estandarizado igual que UserProfile */}
@@ -211,9 +187,6 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       <IdentidadEmpresarialCard form={businessForm} setForm={setBusinessForm} onSave={handleSaveBusiness} loading={loading} isSaving={savingBusiness} />
 
       <div className="mt-10 flex flex-col sm:flex-row gap-4">
-        <button onClick={handleStore} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
-          <ShoppingBag size={18} /> Ir a la tienda FLUX
-        </button>
         <button onClick={onLogout} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 flex items-center justify-center gap-2 transition-all">
           <LogOut size={18} /> Salir
         </button>

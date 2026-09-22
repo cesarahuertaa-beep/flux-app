@@ -107,28 +107,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               <button
                 key={id}
                 onClick={() => {
-                  if (id ==="tienda_link") {
-                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-                    const targetUrl = window.location.origin + "/";
-                    
-                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                      import('@capacitor/app').then(({ App: CapApp }) => {
-                        CapApp.openUrl({ url: targetUrl }).catch(() => window.open(targetUrl, "_blank"));
-                      }).catch(() => window.open(targetUrl, "_blank"));
-                    } else if (isStandalone) {
-                      const a = document.createElement('a');
-                      a.href = targetUrl;
-                      a.target = '_blank';
-                      a.rel = 'noopener noreferrer';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    } else {
-                      window.location.href = "/";
-                    }
-                  } else {
-                    setActive(id);
-                  }
+                  setActive(id);
                 }}
                 title={collapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
@@ -236,28 +215,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               )}
               <button
                 onClick={() => {
-                  if (id ==="tienda_link") {
-                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-                    const targetUrl = window.location.origin + "/";
-                    
-                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                      import('@capacitor/app').then(({ App: CapApp }) => {
-                        CapApp.openUrl({ url: targetUrl }).catch(() => window.open(targetUrl, "_blank"));
-                      }).catch(() => window.open(targetUrl, "_blank"));
-                    } else if (isStandalone) {
-                      const a = document.createElement('a');
-                      a.href = targetUrl;
-                      a.target = '_blank';
-                      a.rel = 'noopener noreferrer';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    } else {
-                      window.location.href = "/";
-                    }
-                  } else {
-                    setActive(id);
-                  }
+                  setActive(id);
                 }}
                 className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
               >
