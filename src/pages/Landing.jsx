@@ -503,8 +503,8 @@ function Footer() {
             <h4 className="text-white font-bold mb-4">Plataforma</h4>
             <ul className="space-y-2 text-sm">
               <li><Link to="/app" className="hover:text-white transition-colors">Descargar App (PWA)</Link></li>
-              <li><Link to="/login" className="hover:text-white transition-colors">Iniciar Sesión</Link></li>
-              <li><Link to="/login" className="hover:text-white transition-colors">Crear Cuenta</Link></li>
+              <li><Link to="/login" onClick={() => sessionStorage.setItem('flux_login_mode', 'login')} className="hover:text-white transition-colors">Iniciar Sesión</Link></li>
+              <li><Link to="/login" onClick={() => sessionStorage.setItem('flux_login_mode', 'signup_type')} className="hover:text-white transition-colors">Crear Cuenta</Link></li>
             </ul>
           </div>
           
