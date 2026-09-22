@@ -187,6 +187,11 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       <IdentidadEmpresarialCard form={businessForm} setForm={setBusinessForm} onSave={handleSaveBusiness} loading={loading} isSaving={savingBusiness} />
 
       <div className="mt-10 flex flex-col sm:flex-row gap-4">
+        {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
+          <button onClick={() => window.location.href = "/"} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
+            <ShoppingBag size={18} /> Ir a la tienda FLUX
+          </button>
+        )}
         <button onClick={onLogout} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 flex items-center justify-center gap-2 transition-all">
           <LogOut size={18} /> Salir
         </button>
