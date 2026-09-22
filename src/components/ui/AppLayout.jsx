@@ -108,7 +108,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
                 key={id}
                 onClick={() => {
                   if (id ==="tienda_link") {
-                    navigate("/tienda");
+                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+                    if (isStandalone) {
+                      window.open(window.location.origin + "/", "_blank");
+                    } else {
+                      window.location.href = "/";
+                    }
                   } else {
                     setActive(id);
                   }
@@ -220,7 +225,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
               <button
                 onClick={() => {
                   if (id ==="tienda_link") {
-                    navigate("/tienda");
+                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+                    if (isStandalone) {
+                      window.open(window.location.origin + "/", "_blank");
+                    } else {
+                      window.location.href = "/";
+                    }
                   } else {
                     setActive(id);
                   }

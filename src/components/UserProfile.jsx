@@ -88,7 +88,14 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
     }
   };
 
-  const handleStore = () => navigate("/tienda");
+  const handleStore = () => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      window.open(window.location.origin + "/", "_blank");
+    } else {
+      window.location.href = "/";
+    }
+  };
 
   return (
     <div className="w-full bg-[#F7F9FC] flex flex-col">

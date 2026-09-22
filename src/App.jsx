@@ -243,7 +243,6 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/privacidad" element={<Privacidad />} />
-          <Route path="/tienda" element={<Landing session={session} onLogout={handleLogout} />} />
           <Route path="/" element={
             isAppMode
               ? <Navigate to={session ?"/app" :"/login"} replace />

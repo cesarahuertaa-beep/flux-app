@@ -144,7 +144,14 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     return () => clearTimeout(timeoutId);
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
-  const handleStore = () => navigate("/tienda");
+  const handleStore = () => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      window.open(window.location.origin + "/", "_blank");
+    } else {
+      window.location.href = "/";
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">
