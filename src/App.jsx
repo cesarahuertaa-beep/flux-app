@@ -5,11 +5,12 @@ import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSession
 import { dbUpsert } from"./lib/supabase";
 import { syncQueue } from"./lib/offlineQueue";
 import Landing from"./pages/Landing";
-import Login from"./pages/Login";
-import Admin from"./pages/Admin";
-import ClienteView from"./pages/Cliente";
-import Privacidad from"./pages/Privacidad";
-import { BrandProvider } from"./components/BrandContext";
+import Login from "./pages/Login";
+import Admin from "./pages/Admin";
+import ClienteView from "./pages/Cliente";
+import Privacidad from "./pages/Privacidad";
+import Terminos from "./pages/Terminos";
+import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from"./components/ui/AppUpdater";
 
 const saveSessionMeta = (s) => {
@@ -243,6 +244,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/terminos" element={<Terminos />} />
           <Route path="/" element={
             isAppMode
               ? <Navigate to={session ?"/app" :"/login"} replace />

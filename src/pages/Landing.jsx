@@ -491,7 +491,38 @@ function Footer() {
               <img src="/flux_logo.jpeg" alt="Flux" className="w-8 h-8 rounded-xl object-cover grayscale brightness-200" />
               <span className="font-bold text-white text-lg tracking-tight" style={{ fontFamily:"DM Sans, sans-serif" }}>FLUX</span>
             </div>
-            <p className="text-sm">La plataforma definitiva para profesionales y atletas.</p>
+            <p className="text-sm mb-6">La plataforma definitiva para profesionales y atletas.</p>
+            <div className="flex items-center gap-4">
+              <a href="#" className="hover:text-white transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+              <a href="#" className="hover:text-white transition-colors"><MessageCircle size={20} /></a>
+              <a href="mailto:soporte@flux-sport.com" className="hover:text-white transition-colors"><Mail size={20} /></a>
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="text-white font-bold mb-4">Plataforma</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link to="/app" className="hover:text-white transition-colors">Descargar App (PWA)</Link></li>
+              <li><Link to="/login" className="hover:text-white transition-colors">Iniciar Sesión</Link></li>
+              <li><Link to="/login" className="hover:text-white transition-colors">Crear Cuenta</Link></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="text-white font-bold mb-4">Ecosistema</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#suplementos" className="hover:text-white transition-colors">Suplementos</a></li>
+              <li><a href="#ropa" className="hover:text-white transition-colors">Ropa Deportiva</a></li>
+              <li><a href="#nutriólogos" className="hover:text-white transition-colors">Encuentra un Nutriólogo</a></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="text-white font-bold mb-4">Soporte</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="mailto:soporte@flux-sport.com" className="hover:text-white transition-colors">Contacto</a></li>
+              <li><a href="mailto:soporte@flux-sport.com" className="hover:text-white transition-colors">Preguntas Frecuentes</a></li>
+            </ul>
           </div>
         </div>
         
@@ -499,6 +530,7 @@ function Footer() {
           <p>&copy; {new Date().getFullYear()} Flux Sports. Todos los derechos reservados.</p>
           <div className="flex items-center gap-6">
             <Link to="/privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
+            <Link to="/terminos" className="hover:text-white transition-colors">Términos y Condiciones</Link>
           </div>
         </div>
       </div>
