@@ -127,36 +127,46 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     };
   }, [cliente.id]);
 
-  const timeoutRefs = useRef({});
+  const pendingSavesRef = useRef({});
+  const globalSaveTimerRef = useRef(null);
 
   const handleProgressChange = (ejId, wi, si, tipo, val, variante_id ="original") => {
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
     setProgreso(p => ({ ...p, [key]: val }));
     
-    if (timeoutRefs.current[key]) {
-      clearTimeout(timeoutRefs.current[key]);
-    }
+    pendingSavesRef.current[key] = {
+      ejercicio_id: ejId, 
+      cliente_id: cliente.id, 
+      semana: parseInt(wi), 
+      serie: parseInt(si), 
+      tipo, 
+      valor: val,
+      variante_id,
+      updated_at: new Date().toISOString() 
+    };
     
     setSyncStatus("saving");
     
-    timeoutRefs.current[key] = setTimeout(async () => {
+    if (globalSaveTimerRef.current) {
+      clearTimeout(globalSaveTimerRef.current);
+    }
+    
+    globalSaveTimerRef.current = setTimeout(async () => {
+      const recordsToSave = Object.values(pendingSavesRef.current);
+      if (recordsToSave.length === 0) return;
+      
+      // Limpiar cola para el próximo lote
+      pendingSavesRef.current = {};
+      
       try {
-        await offlineAwareUpsert({ 
-          ejercicio_id: ejId, 
-          cliente_id: cliente.id, 
-          semana: parseInt(wi), 
-          serie: parseInt(si), 
-          tipo, 
-          valor: val,
-          variante_id,
-          updated_at: new Date().toISOString() 
-        });
+        // Enviar todo el paquete en una sola petición
+        await offlineAwareUpsert(recordsToSave);
         setSyncStatus(navigator.onLine ?"synced" :"local");
       } catch(e) {
-        console.error("Error guardando progreso:", e);
+        console.error("Error guardando progreso en lote:", e);
         setSyncStatus("local");
       }
-    }, 800); // 800ms debounce
+    }, 1000); // 1 segundo global debounce
   };
 
     // Ocultar pestaña de citas si es usuario civil (no tiene nutriólogo)
