@@ -497,8 +497,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         // La BD siempre guarda en kg. Si la unidad es lb, reconvertimos para que el input muestre el valor correcto.
         let pesoDisplay = e.peso_sugerido;
         if ((e.unidad || 'kg') === 'lb' && pesoDisplay && !isNaN(pesoDisplay)) {
-          const lb = parseFloat(pesoDisplay) * 2.20462;
-          pesoDisplay = lb % 1 === 0 ? lb.toString() : lb.toFixed(1);
+          const lb = parseFloat(pesoDisplay) * 2.20462262;
+          pesoDisplay = Number(lb.toFixed(1)).toString();
         }
         return { ...e, peso_sugerido: pesoDisplay, _dndId: String(e.id || Math.random().toString(36).slice(2,9)) };
       })
@@ -528,7 +528,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           if (!val && val !== 0) return null;
           const n = parseFloat(val);
           if (isNaN(n)) return null;
-          return unit === 'lb' ? parseFloat((n * 0.453592).toFixed(1)) : n;
+          return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
         };
 
         const toUpdate = [];

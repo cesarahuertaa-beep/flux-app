@@ -285,9 +285,8 @@ export default function Training({
     // If unit is lb, convert stored kg back to lb
     if (unit === 'lb') {
       const num = parseFloat(dbVal);
-      // Return 1 decimal place if it has decimals, else no decimals
-      const lb = num * 2.20462;
-      return lb % 1 === 0 ? lb.toString() : lb.toFixed(1);
+      const lb = num * 2.20462262;
+      return Number(lb.toFixed(1)).toString();
     }
     return dbVal; // for kg, keep exactly as typed/stored
   };
@@ -299,7 +298,7 @@ export default function Training({
     if (unit === 'lb') {
       const p = parseFloat(inputVal);
       if (isNaN(p)) return inputVal;
-      return (p * 0.453592).toFixed(3);
+      return (p * 0.45359237).toFixed(4);
     }
     // For kg, return exactly what they typed
     return inputVal;
