@@ -537,8 +537,9 @@ export default function Landing({ session, onLogout }) {
       } catch (e) { console.error('Error cargando productos', e); }
 
       try {
-        const nutris = await dbGet('profiles?activo=eq.true&role=in.(nutriologo,superadmin,admin)&select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
-        const allRatings = await dbGet('citas_ratings?select=nutriologo_id,puntuacion') || [];
+          // Cambiamos 'profiles' por la nueva vista 'directorio_nutriologos_publicos'
+          const nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
+          const allRatings = await dbGet('citas_ratings?select=nutriologo_id,puntuacion') || [];
         
         const ratingsMap = {};
         allRatings.forEach(r => {
