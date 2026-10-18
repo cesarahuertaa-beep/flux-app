@@ -209,14 +209,36 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       const [r, allNutris, me] = await Promise.all([
         dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)),
         dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`),
-        dbGet(`profiles?id=eq.${myId}&select=email`)
+        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`)
       ]);
       _allNutris = allNutris;
       _me = me;
       updateState(r, allNutris, me);
+
+      if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0) {
+        const myEmail = me[0].email;
+        const existingClone = r.find(c => c.email === myEmail);
+        if (!existingClone) {
+          try {
+            const created = await dbPost("clientes", {
+              nombre: me[0].nombre,
+              email: me[0].email,
+              objetivo: "Mi entrenamiento personal",
+              nutriologo_id: myId,
+              activo: true,
+              plan_tipo: "premium"
+            });
+            if (created && created.length > 0) {
+              setMyShadowClient(created[0]);
+            }
+          } catch (err) {
+            console.error("Error auto-creando perfil atleta:", err);
+          }
+        }
+      }
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
-  }, [clientesFilter, myId]);
+  }, [clientesFilter, myId, isCivil, role]);
 
   const loadBiblioteca = useCallback(async () => {
     try { 
@@ -451,6 +473,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       : [
           { id:"clientes",   label: isSuperadmin ?"Directorio" :"Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
           { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
+          { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+          { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+          { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
           ...(isSuperadmin ? [
             { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
             { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
@@ -661,45 +686,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {(role ==="superadmin" || role ==="staff") && tab ==="biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/></SubComponentWrapper>}
       
       {tab ==="mi_entrenamiento" && (
-        <SubComponentWrapper 
-          title="Mi Plan"
-          action={
-            myShadowClient ? (
-              <button
-                onClick={activarModoAtleta}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-[var(--brand-primary)] hover:bg-[#F0F4FA] transition-colors shadow-sm"
-              >
-                <Activity size={14} />
-                <span>Modo Atleta</span>
-              </button>
-            ) : null
-          }
-        >
+        <SubComponentWrapper title="Mi Plan">
           {myShadowClient ? (
             <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white rounded-2xl m-4 md:m-8 shadow-sm border border-[#E2E8F0]">
-              <Activity className="w-16 h-16 text-[#9BA5B0] mb-4" />
-              <h2 className="text-xl font-bold text-[#0B1929] mb-2">Activa tu perfil de atleta</h2>
-              <p className="text-sm text-[#6B7A8D] max-w-md mb-6">Para poder configurarte dietas y rutinas, necesitas activar tu perfil interno. Solo toma un segundo.</p>
-              <button onClick={async () => {
-                setLoading(true);
-                try {
-                  const profiles = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`);
-                  if (profiles.length) {
-                    await dbPost("clientes", {
-                      nombre: profiles[0].nombre, email: profiles[0].email,
-                      objetivo:"Mi entrenamiento personal",
-                      nutriologo_id: myId, activo: true
-                    });
-                    await loadClientes();
-                  }
-                } catch(e) { setMsg("❌ Error:" + e.message); }
-                setLoading(false);
-              }} className="bg-[var(--brand-primary)] text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:opacity-90">
-                Activar Mi Perfil
-              </button>
-            </div>
+            <div className="flex items-center justify-center h-full p-8 text-[#6B7A8D]">Cargando...</div>
           )}
         </SubComponentWrapper>
       )}
@@ -942,9 +933,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {/* ════════════ END CIVIL PREMIUM TABS ════════════ */}
 
     
-      {isCivil && (tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') && clienteData && (
+      {(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') && (isCivil ? clienteData : myShadowClient) && (
         <ClienteView 
-          session={{ role:'cliente', data:clienteData, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
+          session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
           isAtletaMode={false}
           isEmbedded={true}
           embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}

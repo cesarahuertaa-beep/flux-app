@@ -240,14 +240,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                 ¡Felicidades, terminaste!
               </h3>
               <p className="text-[#6B7A8D] text-sm max-w-[280px]">
-                {cliente?.nutriologo_id === null ?"Has completado exitosamente todas las semanas de este ciclo. ¡Es momento de ir al editor y diseñar tu próximo plan!" :"Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan."}
+                {cliente?.nutriologo_id === null || isEmbedded ?"Has completado exitosamente todas las semanas de este ciclo. ¡Es momento de ir al editor y diseñar tu próximo plan!" :"Has completado exitosamente todas las semanas de este ciclo. Contacta a tu nutriólogo para agendar tu próxima evaluación y recibir tu nuevo plan."}
               </p>
             </div>
           ) : (
             <>
               
               {tab ==="nutricion" && (
-                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
+                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
               )}
 
               {tab ==="deporte" && (
@@ -262,14 +262,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                   syncStatus={syncStatus}
                   isLocked={isFuture}
                   ultimoPeso={ultimoPeso}
-                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode}
+                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
                 />
               )}
             </>
           )}
 
           {tab ==="progreso" && (
-            <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode} />
+            <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
           )}
 
           {tab ==="citas" && (
