@@ -1,6 +1,6 @@
 import { useBrand } from"../BrandContext";
 import { useState, useEffect, useCallback } from"react";
-import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed } from"lucide-react";
+import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2 } from"lucide-react";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../../lib/supabase";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
@@ -16,6 +16,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   const [form, setForm]             = useState({ nombre:"", email:"", telefono:"" });
   const [editUser, setEditUser]     = useState(null);
   const [editForm, setEditForm]     = useState({ nombre:"", telefono:"" });
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
   
   // Interceptor State
   const [conflictUser, setConflictUser] = useState(null);
@@ -142,8 +144,35 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       await dbPatch(`profiles?id=eq.${editUser.id}`, { nombre: editForm.nombre, telefono: editForm.telefono });
       setMsg("✅ Colaborador actualizado");
       setEditUser(null);
+      setShowConfirmDelete(false);
+      setConfirmDeleteText("");
       load();
     } catch (e) { setMsg("❌" + e.message); }
+    setSaving(false);
+  };
+
+  const deleteCollaborator = async () => {
+    if (confirmDeleteText !== "ELIMINAR" || !editUser) return;
+    setSaving(true);
+    try {
+      try {
+        await dbPost("rpc/eliminar_colaborador_definitivo", { p_profile_id: editUser.id });
+      } catch (rpcErr) {
+        // Fallback inmediato si aún no se ha corrido el RPC en Supabase: revocar rol y desvincular
+        await dbPatch(`profiles?id=eq.${editUser.id}`, {
+          role: "cliente",
+          nutriologo_id: null,
+          activo: true
+        });
+      }
+      setMsg("✅ Colaborador eliminado permanentemente del equipo.");
+      setEditUser(null);
+      setShowConfirmDelete(false);
+      setConfirmDeleteText("");
+      load();
+    } catch (e) {
+      setMsg("❌ Error eliminando colaborador: " + e.message);
+    }
     setSaving(false);
   };
 
@@ -409,7 +438,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 truncate">
                 <Edit2 className="w-5 h-5 text-[var(--brand-primary)]" /> Editar colaborador
               </h3>
-              <button onClick={() => setEditUser(null)} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors shrink-0">
+              <button onClick={() => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }} className="text-[#94A3B8] hover:text-[#0B1929] transition-colors shrink-0">
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
@@ -435,21 +464,50 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all placeholder-[#94A3B8]"
                 />
               </div>
-              <div className="flex gap-2 justify-end mt-2">
-                <button 
-                  onClick={() => setEditUser(null)}
-                  className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={saveEdit} 
-                  disabled={saving}
-                  className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saving ?"Guardando…" :"Guardar cambios"}
-                </button>
+
+              <div className="pt-3 border-t border-[#E2E8F0] mt-2">
+                {showConfirmDelete ? (
+                  <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+                    <p className="text-red-700 text-xs font-bold mb-2">
+                      Esta acción eliminará su acceso como colaborador de forma permanente. Si tiene otros roles (como paciente o atleta independiente), esos se conservarán intactos.
+                      Escribe la palabra <strong>ELIMINAR</strong> para confirmar.
+                    </p>
+                    <input 
+                      value={confirmDeleteText}
+                      onChange={e => setConfirmDeleteText(e.target.value)}
+                      placeholder="ELIMINAR"
+                      className="w-full bg-white border border-red-200 text-red-900 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-red-500 mb-2"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => { setShowConfirmDelete(false); setConfirmDeleteText(""); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7A8D] hover:bg-white transition-colors">Cancelar</button>
+                      <button onClick={deleteCollaborator} disabled={confirmDeleteText !== "ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                        {saving ? "Eliminando..." : "Eliminar Definitivamente"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => setShowConfirmDelete(true)} className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                      <Trash2 size={14} /> Borrar Colaborador
+                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }}
+                        className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        onClick={saveEdit} 
+                        disabled={saving}
+                        className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {saving ? "Guardando…" : "Guardar cambios"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
