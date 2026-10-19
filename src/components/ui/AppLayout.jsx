@@ -166,7 +166,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         </div>
 
         {/* Área de contenido que hace scroll */}
-        <div className="flex-1 overflow-y-auto pb-20 md:pb-0 flex flex-col">
+        <div className="flex-1 overflow-y-auto pb-28 md:pb-0 flex flex-col" style={{ scrollPaddingBottom: "7rem" }}>
           {children}
         </div>
       </main>

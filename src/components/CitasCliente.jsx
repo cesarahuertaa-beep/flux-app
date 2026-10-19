@@ -263,7 +263,7 @@ export function CitasCliente({ cliente }) {
       )}
 
       {/* ── Main Content ── */}
-      <div className="px-6 md:px-8 flex-1 pb-8">
+      <div className="px-6 md:px-8 flex-1 pb-32 md:pb-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-[#6B7A8D]">
             <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />
@@ -390,6 +390,8 @@ export function CitasCliente({ cliente }) {
             )}
           </>
         )}
+        {/* Espaciador inferior para navegación móvil */}
+        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* ── Modal Agendar Cita ── */}

@@ -422,7 +422,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
       </div>
 
-      <div className="px-6 md:px-8 py-6 md:py-8 pb-12 max-w-5xl w-full mx-auto space-y-8">
+      <div className="px-6 md:px-8 py-6 md:py-8 pb-32 md:pb-12 max-w-5xl w-full mx-auto space-y-8">
         {view === 'metricas' && (
           <>
           {COMP_KEYS.length > 0 ? (
@@ -731,7 +731,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
             
           </div>
         )}
-
+        {/* Espaciador inferior para navegación móvil */}
+        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* Full Image Modal */}

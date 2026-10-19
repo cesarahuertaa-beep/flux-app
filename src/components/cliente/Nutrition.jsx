@@ -199,7 +199,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
       </div>
 
       {/* ── Day Content (Habits & Adherence + Meals) — scrolls smoothly with page ── */}
-      <div className="px-4 sm:px-6 md:px-8 flex-1 space-y-3 pb-12 min-h-0">
+      <div className="px-4 sm:px-6 md:px-8 flex-1 space-y-3 pb-32 md:pb-12 min-h-0">
         {/* Habits & Adherence Widget */}
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}
@@ -428,6 +428,9 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             </div>
           );
         })}
+
+        {/* Espaciador inferior para garantizar visibilidad completa en móviles sobre la barra de navegación */}
+        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* ── Modal de Lista de Compras del Súper ── */}
