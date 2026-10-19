@@ -113,47 +113,62 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 shrink-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
-              Plan de Alimentación
-            </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
-              Nutrición Semanal
-            </h1>
-            {isSelfManaged ? (
-              <p className="text-sm text-[#6B7A8D] mt-1">
-                Tu plan de alimentación activo — Semana {semanaActualCiclo}
+      <div className="px-4 sm:px-6 md:px-8 pt-5 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-0.5 sm:mb-1">
+                Plan de Alimentación
               </p>
-            ) : clienteNombre ? (
-              <p className="text-sm text-[#6B7A8D] mt-1">
-                Paciente: <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
+              <h1 className="text-xl sm:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+                Nutrición Semanal
+              </h1>
+              {isSelfManaged ? (
+                <p className="text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
+                  Tu plan de alimentación activo — Semana {semanaActualCiclo}
+                </p>
+              ) : clienteNombre ? (
+                <p className="text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
+                  Paciente: <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
+                </p>
+              ) : null}
+            </div>
+
+            {/* Total Día pill (en mobile va en la fila superior con el título para ahorrar espacio vertical) */}
+            <div className="sm:hidden bg-[#E8F1FB] rounded-xl px-3 py-1.5 flex flex-col items-end shrink-0 border border-[#D0E2F7]">
+              <p className="text-[9px] text-[#6B7A8D] font-mono font-semibold uppercase tracking-wider">Total Día</p>
+              <p className="flex items-center gap-1 text-base font-bold text-[var(--brand-primary)] font-mono leading-none mt-0.5">
+                <Flame size={15} className="text-[var(--brand-primary)]" />
+                {totalKcal} <span className="text-[10px] text-[var(--brand-primary)]/70 font-sans">kcal</span>
               </p>
-            ) : null}
+            </div>
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+
+          {/* Action buttons + Total Día desktop */}
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={() => setShowGrocery(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-3 rounded-xl text-sm font-semibold shadow-sm hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
             >
-              <ShoppingBag size={18} className="text-[var(--brand-primary)]" />
-              Lista del Súper
+              <ShoppingBag size={15} className="text-[var(--brand-primary)] shrink-0" />
+              <span>Lista del Súper</span>
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-3 rounded-xl text-sm font-semibold shadow-sm hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
             >
-              <FileText size={18} />
-              Descargar PDF
+              <FileText size={15} className="shrink-0" />
+              <span>Descargar PDF</span>
             </button>
-            <div className="bg-[#E8F1FB] rounded-xl px-4 py-2 flex-shrink-0 flex items-center gap-4">
-              <div className="text-center sm:text-left">
+            
+            {/* Total Día badge (en desktop) */}
+            <div className="hidden sm:flex bg-[#E8F1FB] rounded-xl px-4 py-2 flex-shrink-0 items-center gap-4 border border-[#D0E2F7]">
+              <div className="text-left">
                 <p className="text-[10px] text-[#6B7A8D] font-mono font-semibold uppercase tracking-wider">Total Día</p>
-                <p className="flex items-center justify-center sm:justify-start gap-1 text-xl sm:text-2xl font-bold text-[var(--brand-primary)] font-mono leading-none mt-1">
-                    <Flame size={20} className="text-[var(--brand-primary)]" />
-                    {totalKcal} <span className="text-xs text-[var(--brand-primary)]/70 font-sans tracking-normal hidden sm:inline">kcal</span>
-                  </p>
+                <p className="flex items-center gap-1 text-xl sm:text-2xl font-bold text-[var(--brand-primary)] font-mono leading-none mt-1">
+                  <Flame size={20} className="text-[var(--brand-primary)]" />
+                  {totalKcal} <span className="text-xs text-[var(--brand-primary)]/70 font-sans tracking-normal">kcal</span>
+                </p>
               </div>
             </div>
           </div>
@@ -161,7 +176,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
       </div>
 
       {/* ── Day tabs ── */}
-      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-6 md:px-8 py-2.5 mb-4 border-b border-[#E2E8F0]/60 shrink-0">
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-4 sm:px-6 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
         <div className="flex gap-2 overflow-x-auto scroll-hide">
           {dias.map((d, i) => {
             // El nombre del día viene en d.dia o d.nombre
@@ -183,10 +198,10 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
         </div>
       </div>
 
-      {/* ── Habits & Adherence Widget ── */}
-      <div className="px-6 md:px-8 mb-4 shrink-0">
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          
+      {/* ── Day Content (Habits & Adherence + Meals) — scrolls smoothly with page ── */}
+      <div className="px-4 sm:px-6 md:px-8 flex-1 space-y-3 pb-12 min-h-0">
+        {/* Habits & Adherence Widget */}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs">
@@ -267,13 +282,13 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             })()}
           </div>
         </div>
-      </div>
 
-      {/* ── Meals list ── */}
-      <div className="px-6 md:px-8 flex-1 overflow-y-auto space-y-3 pb-8">
-        <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-4">
-          {getDayFull(diaActual?.dia || diaActual?.nombre, activeDay)}
-        </p>
+        {/* Subtítulo del día activo */}
+        <div className="pt-1">
+          <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
+            {getDayFull(diaActual?.dia || diaActual?.nombre, activeDay)}
+          </p>
+        </div>
 
         {comidas.length === 0 && (
           <p className="text-sm text-[#6B7A8D] italic">No hay comidas registradas para este día.</p>
