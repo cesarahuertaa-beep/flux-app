@@ -65,6 +65,99 @@ function normalizeStr(str) {
     .trim();
 }
 
+// Extractor inteligente de cantidad y alimento
+function extractQuantityAndFood(rawLine) {
+  let cleaned = rawLine.trim();
+  if (!cleaned || cleaned.length < 2) return null;
+
+  // Quitar viñetas, guiones al inicio o numeraciones como "1. " o "1) "
+  cleaned = cleaned.replace(/^[-*•]\s*/, "").replace(/^\d+[\.\)]\s+/, "").trim();
+  if (!cleaned) return null;
+
+  let cantidadNum = 0;
+  let unidad = "";
+  let itemNombre = cleaned;
+
+  const parseNumberStr = (str) => {
+    if (!str) return 0;
+    str = str.trim().replace(",", ".");
+    if (str.includes(" ") && str.includes("/")) {
+      const parts = str.split(" ");
+      const whole = parseFloat(parts[0]) || 0;
+      const fracParts = parts[1].split("/");
+      return whole + (parseFloat(fracParts[0]) / (parseFloat(fracParts[1]) || 1));
+    }
+    if (str.includes("/")) {
+      const fracParts = str.split("/");
+      return parseFloat(fracParts[0]) / (parseFloat(fracParts[1]) || 1);
+    }
+    return parseFloat(str) || 0;
+  };
+
+  const UNIDADES_LIST = "g|gr|grs|gramos|kg|kilo|kilos|ml|l|lt|lts|litros|taza|tazas|cda|cdas|cucharada|cucharadas|cdita|cditas|cucharadita|cucharaditas|pza|pzas|pieza|piezas|rebanada|rebanadas|scoop|scoops|lata|latas|sobre|sobres|vaso|vasos|paquete|paquetes";
+
+  // ESTRATEGIA 1: Cantidad en paréntesis, ej. "Pechuga de pollo (150g)" o "Arroz (1 taza)"
+  const parenMatch = cleaned.match(new RegExp(`\\((?:aprox\\.?\\s*)?(\\d+(?:[.,]\\d+)?|\\d+\\/\\d+|\\d+\\s+\\d+\\/\\d+)\\s*(${UNIDADES_LIST})?\\)`, "i"));
+  if (parenMatch) {
+    cantidadNum = parseNumberStr(parenMatch[1]);
+    unidad = (parenMatch[2] || "g").toLowerCase();
+    itemNombre = cleaned.replace(parenMatch[0], "").trim();
+  } else {
+    // ESTRATEGIA 2: Cantidad al final, ej. "Pechuga de pollo 150g", "Avena 40 gr", "Pan 2 rebanadas"
+    const endMatch = cleaned.match(new RegExp(`(?:[-–—:]\\s*)?(\\d+(?:[.,]\\d+)?|\\d+\\/\\d+|\\d+\\s+\\d+\\/\\d+)\\s*(${UNIDADES_LIST})\\.?$`, "i"));
+    if (endMatch) {
+      cantidadNum = parseNumberStr(endMatch[1]);
+      unidad = endMatch[2].toLowerCase();
+      itemNombre = cleaned.slice(0, endMatch.index).trim();
+    } else {
+      // ESTRATEGIA 3: Cantidad al inicio con unidad explícita, ej. "150g de pechuga", "1 taza de avena", "2 rebanadas de pan"
+      const startUnitMatch = cleaned.match(new RegExp(`^(\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)\\s*(${UNIDADES_LIST})\\b(?:\\s+de|\\s+del)?\\s*(.*)$`, "i"));
+      if (startUnitMatch) {
+        cantidadNum = parseNumberStr(startUnitMatch[1]);
+        unidad = startUnitMatch[2].toLowerCase();
+        itemNombre = (startUnitMatch[3] || "").trim();
+      } else {
+        // ESTRATEGIA 4: Número o fracción al inicio sin unidad explícita, ej. "1/2 aguacate", "2 huevos", "3 claras", "1 manzana"
+        const countMatch = cleaned.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*(?:de\s+)?(.*)$/i);
+        if (countMatch && countMatch[2] && countMatch[2].trim().length > 1) {
+          cantidadNum = parseNumberStr(countMatch[1]);
+          unidad = "pzas";
+          itemNombre = countMatch[2].trim();
+        }
+      }
+    }
+  }
+
+  // Limpiar nombre del ingrediente
+  itemNombre = itemNombre
+    .replace(/^[-–—:,]\s*/, "")
+    .replace(/[-–—:,]\s*$/, "")
+    .replace(/^(de|del|en)\s+/i, "")
+    .trim();
+
+  if (!itemNombre) itemNombre = cleaned;
+
+  // Normalizar unidad
+  if (["gr", "grs", "gramos"].includes(unidad)) unidad = "g";
+  if (["kilo", "kilos"].includes(unidad)) unidad = "kg";
+  if (["lt", "lts", "litros"].includes(unidad)) unidad = "L";
+  if (["pieza", "piezas", "pza"].includes(unidad)) unidad = "pzas";
+  if (["tazas"].includes(unidad)) unidad = "taza";
+  if (["rebanadas"].includes(unidad)) unidad = "rebanada";
+  if (["cdas", "cucharada", "cucharadas"].includes(unidad)) unidad = "cda";
+  if (["cditas", "cucharadita", "cucharaditas"].includes(unidad)) unidad = "cdita";
+  if (["scoops"].includes(unidad)) unidad = "scoop";
+  if (["latas"].includes(unidad)) unidad = "lata";
+  if (["sobres"].includes(unidad)) unidad = "sobre";
+  if (["vasos"].includes(unidad)) unidad = "vaso";
+
+  return {
+    itemNombre,
+    cantidadNum: cantidadNum > 0 ? cantidadNum : null,
+    unidad: cantidadNum > 0 ? (unidad || "pzas") : ""
+  };
+}
+
 // Analizador de ingredientes
 function parseDietIngredients(dias, incluirAlternativas = false) {
   const map = new Map();
@@ -83,57 +176,10 @@ function parseDietIngredients(dias, incluirAlternativas = false) {
         const rawLines = fullText.split(/[\n,;+]|\s+y\s+|\s+con\s+/i);
 
         rawLines.forEach((line) => {
-          let cleaned = line.trim();
-          if (!cleaned || cleaned.length < 2) return;
-          // Quitar viñetas, guiones al inicio o asteriscos
-          cleaned = cleaned.replace(/^[-*•\d\.\)]+\s*/, "").trim();
-          if (!cleaned) return;
+          const parsed = extractQuantityAndFood(line);
+          if (!parsed) return;
 
-          // Extraer cantidades y unidades (ej. 150g, 1.5 tazas, 2 pzas, 1/2)
-          let cantidadNum = 0;
-          let unidad = "";
-          let itemNombre = cleaned;
-
-          // Fracciones comunes: 1/2, 1/4, 3/4
-          const fracMatch = cleaned.match(/^(\d+)?\s*(\d+)\/(\d+)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?\s*(?:de\s+)?(.*)$/i);
-          if (fracMatch) {
-            const whole = parseInt(fracMatch[1] || "0", 10);
-            const num = parseInt(fracMatch[2], 10);
-            const den = parseInt(fracMatch[3], 10);
-            cantidadNum = whole + (den ? num / den : 0);
-            unidad = (fracMatch[4] || "").toLowerCase();
-            itemNombre = (fracMatch[5] || "").trim();
-          } else {
-            // Número decimal o entero con unidad opcional
-            const match = cleaned.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?\s*(?:de\s+)?(.*)$/i);
-            if (match) {
-              cantidadNum = parseFloat(match[1].replace(",", "."));
-              const possibleUnit = (match[2] || "").toLowerCase();
-              const knownUnits = ["g", "gr", "grs", "gramos", "kg", "kilos", "ml", "l", "litros", "taza", "tazas", "cda", "cdas", "cdita", "cditas", "pza", "pzas", "piezas", "rebanada", "rebanadas", "scoop", "scoops", "lata", "latas", "sobre", "sobres"];
-              
-              if (knownUnits.includes(possibleUnit)) {
-                unidad = possibleUnit;
-                itemNombre = (match[3] || "").trim();
-              } else if (!match[3]) {
-                itemNombre = match[2] || "";
-              } else {
-                itemNombre = `${possibleUnit} ${match[3]}`.trim();
-              }
-            }
-          }
-
-          if (!itemNombre) itemNombre = cleaned;
-          // Limpiar prefijos residuales
-          itemNombre = itemNombre.replace(/^(de|del|en)\s+/i, "").trim();
-          if (!itemNombre) return;
-
-          // Normalizar unidad
-          if (["gr", "grs", "gramos"].includes(unidad)) unidad = "g";
-          if (["pza", "piezas"].includes(unidad)) unidad = "pzas";
-          if (["tazas"].includes(unidad)) unidad = "taza";
-          if (["rebanadas"].includes(unidad)) unidad = "rebanada";
-          if (["cdas"].includes(unidad)) unidad = "cda";
-          if (["cditas"].includes(unidad)) unidad = "cdita";
+          const { itemNombre, cantidadNum, unidad } = parsed;
 
           // Identificar categoría según diccionario
           const normalizedItem = normalizeStr(itemNombre);
@@ -448,12 +494,12 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
 
                   {item.cantidadNum ? (
                     <div className="shrink-0 text-right">
-                      <span className="inline-block px-2.5 py-1 rounded-lg bg-gray-100 text-[#0B1929] font-mono font-bold text-xs">
+                      <span className="inline-block px-3 py-1 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/20 font-mono font-bold text-xs shadow-xs">
                         {Math.round(item.cantidadNum * 10) / 10} {item.unidad}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-[#94A3B8] italic shrink-0">Al gusto</span>
+                    <span className="text-xs text-[#94A3B8] italic shrink-0 px-2">Al gusto</span>
                   )}
                 </div>
               );
