@@ -24,8 +24,8 @@ export default function MisComisiones({ myId, setMsg }) {
       setMyName(nombre);
       if (!nombre) { setLoading(false); return; }
 
-      // Obtener los nutriólogos que este colaborador invitó
-      const profiles = await dbGet(`profiles?role=eq.nutriologo&creado_por_nombre=eq.${encodeURIComponent(nombre)}&select=id,nombre`);
+      // Obtener los nutriólogos y estudiantes que este colaborador invitó
+      const profiles = await dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante)&creado_por_nombre=eq.${encodeURIComponent(nombre)}&select=id,nombre`);
       
       let dataRecibos = [];
       if (profiles.length > 0) {

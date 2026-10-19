@@ -128,21 +128,62 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           return; // Fin lógica civiles
         }
 
-        // ── LOGICA PARA NUTRIÓLOGOS (Fija los días 10) ──
+        let firstClientDate = null;
+        if (myId) {
+          const firstClient = await dbGet(`clientes?nutriologo_id=eq.${myId}&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1`);
+          if (firstClient && firstClient.length > 0) {
+            firstClientDate = new Date(firstClient[0].created_at);
+          }
+        }
+
+        // ── LOGICA PARA NUTRIÓLOGO ESTUDIANTE (Suscripción rolling de 30 días + 2 de gracia) ──
+        if (role === "nutriologo_estudiante") {
+          const recibosEst = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&order=created_at.desc`);
+          const tienePendiente = recibosEst?.some(r => r.estado === "pendiente");
+          const lastApproved = recibosEst?.find(r => r.estado === "aprobado");
+
+          if (tienePendiente || (!firstClientDate && !lastApproved)) {
+            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
+            setBloqueado(false);
+            setDiasGracia(false);
+            return;
+          }
+
+          let expirationDate;
+          if (lastApproved) {
+            expirationDate = new Date(lastApproved.fecha_corte_mes + "T23:59:59");
+          } else {
+            expirationDate = new Date(firstClientDate);
+            expirationDate.setDate(expirationDate.getDate() + 30);
+            expirationDate.setHours(23, 59, 59, 999);
+          }
+
+          const blockDate = new Date(expirationDate);
+          blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
+
+          if (today > blockDate) {
+            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
+            setBloqueado(true);
+            setDiasGracia(false);
+          } else if (today > expirationDate && today <= blockDate) {
+            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
+            setDiasGracia(true);
+            setBloqueado(false);
+          } else {
+            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
+            setBloqueado(false);
+            setDiasGracia(false);
+          }
+          return;
+        }
+
+        // ── LOGICA PARA NUTRIÓLOGOS REGULARES (Fija los días 10) ──
         const diaCorte = 10;
         const DIA_BLOQUEO = 13;
 
         let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
         if (today.getDate() < diaCorte) {
           lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
-        }
-        
-        let firstClientDate = null;
-        if (myId) {
-          const firstClient = await dbGet(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc&limit=1`);
-          if (firstClient && firstClient.length > 0) {
-            firstClientDate = new Date(firstClient[0].created_at);
-          }
         }
 
         // Si no tiene pacientes, no debe nada. O si su primer paciente entró después del último corte, tampoco.

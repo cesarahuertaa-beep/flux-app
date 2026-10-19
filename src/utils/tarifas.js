@@ -8,6 +8,7 @@ export const DEFAULT_RATES = {
   nutri_tier1: 50,
   nutri_tier2: 45,
   nutri_tier3: 40,
+  nutri_estudiante: 300,
   civil_premium: 75,
   comision_pct: 35,
   effective_from: "2020-01-01"
@@ -48,6 +49,7 @@ export function parseTarifasHistory(cfgRow) {
           nutri_tier1: Number(item.nutri_tier1 ?? DEFAULT_RATES.nutri_tier1),
           nutri_tier2: Number(item.nutri_tier2 ?? DEFAULT_RATES.nutri_tier2),
           nutri_tier3: Number(item.nutri_tier3 ?? DEFAULT_RATES.nutri_tier3),
+          nutri_estudiante: Number(item.nutri_estudiante ?? DEFAULT_RATES.nutri_estudiante),
           civil_premium: Number(item.civil_premium ?? DEFAULT_RATES.civil_premium),
           comision_pct: Number(item.comision_pct ?? DEFAULT_RATES.comision_pct),
           effective_from: item.effective_from || "2020-01-01",

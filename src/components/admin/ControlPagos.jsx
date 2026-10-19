@@ -36,6 +36,7 @@ export default function ControlPagos({ setMsg }) {
     nutri_tier1: DEFAULT_RATES.nutri_tier1,
     nutri_tier2: DEFAULT_RATES.nutri_tier2,
     nutri_tier3: DEFAULT_RATES.nutri_tier3,
+    nutri_estudiante: DEFAULT_RATES.nutri_estudiante,
     civil_premium: DEFAULT_RATES.civil_premium,
     comision_pct: DEFAULT_RATES.comision_pct
   });
@@ -45,7 +46,7 @@ export default function ControlPagos({ setMsg }) {
     try {
       const [dataRecibos, profiles, dataNominas, cfg] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),
-        dbGet("profiles?role=eq.nutriologo&select=id,nombre,creado_por_nombre"),
+        dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre,role,creado_por_nombre"),
         dbGet("nomina_colaboradores"),
         dbGet("configuracion_plataforma?id=eq.1")
       ]);
@@ -56,12 +57,13 @@ export default function ControlPagos({ setMsg }) {
           nutri_tier1: latest.nutri_tier1,
           nutri_tier2: latest.nutri_tier2,
           nutri_tier3: latest.nutri_tier3,
+          nutri_estudiante: latest.nutri_estudiante,
           civil_premium: latest.civil_premium,
           comision_pct: latest.comision_pct
         });
       }
       const map = {};
-      profiles.forEach(p => { map[p.id] = { nombre: p.nombre, creado_por: p.creado_por_nombre || null }; });
+      profiles.forEach(p => { map[p.id] = { nombre: p.nombre, role: p.role, creado_por: p.creado_por_nombre || null }; });
       const mapNominas = {};
       if(dataNominas && dataNominas.length > 0) {
         dataNominas.forEach(n => { mapNominas[`${n.colaborador_nombre}|${n.mes_facturacion}`] = n; });
@@ -85,6 +87,7 @@ export default function ControlPagos({ setMsg }) {
         nutri_tier1: Number(ratesForm.nutri_tier1) || 0,
         nutri_tier2: Number(ratesForm.nutri_tier2) || 0,
         nutri_tier3: Number(ratesForm.nutri_tier3) || 0,
+        nutri_estudiante: Number(ratesForm.nutri_estudiante) || 0,
         civil_premium: Number(ratesForm.civil_premium) || 0,
         comision_pct: Number(ratesForm.comision_pct) || 0,
         effective_from: nextCutoffStr,
@@ -364,6 +367,23 @@ export default function ControlPagos({ setMsg }) {
                         min="0"
                         value={ratesForm.nutri_tier3}
                         onChange={e => setRatesForm(p => ({ ...p, nutri_tier3: e.target.value }))}
+                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                    </div>
+                  </div>
+                  <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-amber-600">Nutriólogo Estudiante</label>
+                      <span className="text-[10px] text-[#6B7A8D]">Mensualidad fija (30 días)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ratesForm.nutri_estudiante}
+                        onChange={e => setRatesForm(p => ({ ...p, nutri_estudiante: e.target.value }))}
                         className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
                       />
                       <span className="text-[11px] text-[#6B7A8D]">MXN</span>

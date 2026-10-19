@@ -43,9 +43,73 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     loadData();
   }, [profileId]);
 
+  const isEstudiante = perfil?.role === "nutriologo_estudiante";
+
   // Cálculos de fechas y periodos
-  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff, activeRates } = useMemo(() => {
+  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff, activeRates, expirationDate, diasRestantesText } = useMemo(() => {
     const today = new Date();
+
+    // ── MODO ESTUDIANTE: Mensualidad fija de 30 días (rolling) ──
+    if (isEstudiante) {
+      const lastValid = historial.find(r => r.estado === "aprobado" || r.estado === "pendiente");
+      let targetCutoff, expDate = null;
+
+      if (!lastValid) {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        targetCutoff = d;
+      } else {
+        const lastExp = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+        const blockDate = new Date(lastExp);
+        blockDate.setDate(blockDate.getDate() + 2);
+        expDate = lastExp;
+
+        if (today > blockDate) {
+          const d = new Date();
+          d.setDate(d.getDate() + 30);
+          targetCutoff = d;
+        } else {
+          const d = new Date(lastExp);
+          d.setDate(d.getDate() + 30);
+          targetCutoff = d;
+        }
+      }
+
+      const refDate = expDate && today >= expDate ? expDate : today;
+      const ratesForStudent = getRatesForCutoff(rawCfg, refDate);
+      const tarifaEstudiante = Number(ratesForStudent.nutri_estudiante ?? 300);
+
+      let remainingStr = null;
+      if (expDate) {
+        const target = new Date(expDate);
+        target.setHours(0, 0, 0, 0);
+        const now0 = new Date();
+        now0.setHours(0, 0, 0, 0);
+        const days = Math.round((target - now0) / (1000 * 60 * 60 * 24));
+        if (days > 1) remainingStr = `Expira en ${days} días`;
+        else if (days === 1) remainingStr = "Expira mañana";
+        else if (days === 0) remainingStr = "Expira hoy";
+        else remainingStr = `En días de gracia (venció hace ${Math.abs(days)} días)`;
+      }
+
+      const activePatientsCount = (clientes || []).filter(c => c.nutriologo_id === profileId && c.activo).length;
+      const strCorte = targetCutoff.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
+
+      return {
+        desglose: [],
+        activeCount: activePatientsCount,
+        currentTier: 1,
+        currentRate: tarifaEstudiante,
+        nextTierThreshold: null,
+        totalAmount: tarifaEstudiante,
+        fechaCorteText: strCorte,
+        nextCutoff: targetCutoff,
+        activeRates: ratesForStudent,
+        expirationDate: expDate,
+        diasRestantesText: remainingStr
+      };
+    }
+
     const diaCorte = 10; // Fijo global
 
     // 1. Determinar el último corte que YA PASÓ (o es hoy)
@@ -164,9 +228,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       totalAmount: total, 
       fechaCorteText: strCorte,
       nextCutoff,
-      activeRates: ratesForThisCutoff
+      activeRates: ratesForThisCutoff,
+      expirationDate: null,
+      diasRestantesText: null
     };
-  }, [clientes, perfil, loading, rawCfg, historial]);
+  }, [clientes, perfil, loading, rawCfg, historial, isEstudiante, profileId]);
 
   // Estado del componente
   const status ="active"; // active, pending, review
@@ -254,158 +320,204 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* Columna Izquierda: Termómetro y Gráfica */}
+          {/* Columna Izquierda: Termómetro/Plan Estudiante y Gráfica */}
           <div className="md:col-span-2 space-y-6">
-            
-            {/* Termómetro de Nivel */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
-              <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2 mb-6">
-                <BarChart3 size={20} className="text-[var(--brand-primary)]"/>
-                Nivel de Suscripción Actual
-              </h2>
-
-              {/* Termómetro: textos arriba, barra en el medio, precios abajo */}
-              <div className="mt-4 px-2">
-                {/* Fila de etiquetas superiores */}
-                <div className="flex justify-between mb-2">
-                  {[{label: 'Nivel 1', sub: '1 pac.'}, {label: 'Nivel 2', sub: '21 pac.'}, {label: 'Nivel 3', sub: '+50 pac.'}].map((t, i) => (
-                    <div key={i} className="text-center w-20">
-                      <span className="block text-xs font-bold text-[#0B1929]">{t.label}</span>
-                      <span className="block text-[10px] text-[#6B7A8D]">{t.sub}</span>
+            {isEstudiante ? (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                      <CreditCard size={20} className="text-amber-600" />
                     </div>
-                  ))}
-                </div>
-
-                {/* Barra con puntos superpuestos */}
-                <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-4">
-                  <div
-                    className="h-full bg-[var(--brand-primary)] rounded-full transition-all duration-1000"
-                    style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
-                  />
-                  {/* Puntos */}
-                  {[0, 0.39, 1].map((pct, i) => (
-                    <div
-                      key={i}
-                      className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 shadow-sm z-10 transition-colors ${activeCount >= [1,21,51][i] ? 'bg-[var(--brand-primary)] border-white' : 'bg-gray-200 border-white'}`}
-                      style={{ left: `calc(${pct * 100}% - 10px)` }}
-                    />
-                  ))}
-                </div>
-
-                {/* Fila de precios inferiores */}
-                <div className="flex justify-between mt-3">
-                  {[`$${activeRates.nutri_tier1} /pac`, `$${activeRates.nutri_tier2} /pac`, `$${activeRates.nutri_tier3} /pac`].map((p, i) => (
-                    <div key={i} className="text-center w-20">
-                      <span className="block text-xs font-bold text-emerald-600">{p}</span>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#0B1929]">Plan Mensual — Nutriólogo Estudiante</h3>
+                      <p className="text-xs text-[#6B7A8D]">Tarifa preferencial fija por 30 días</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-12 bg-blue-50/50 rounded-xl p-4 border border-blue-100">
-                <p className="text-sm text-[#0B1929]">
-                  Actualmente tienes <strong>{activeCount} pacientes activos</strong>. 
-                  Tu tarifa actual es de <strong className="text-[var(--brand-primary)]">${Number(currentRate).toFixed(2)} MXN</strong> por paciente.
-                  {nextTierThreshold && (
-                    <span className="block text-[var(--brand-primary)] mt-1">
-                      ¡Agrega {nextTierThreshold - activeCount} pacientes más para desbloquear la tarifa de ${currentTier === 1 ? activeRates.nutri_tier2 : activeRates.nutri_tier3}!
+                  </div>
+                  {diasRestantesText && (
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      {diasRestantesText}
                     </span>
                   )}
-                </p>
-              </div>
-            </div>
-
-            {/* Estado de Cuenta */}
-            <div className="bg-white p-0 rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
-              <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
-                <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
-                  <FileText size={20} className="text-[var(--brand-primary)]"/>
-                  Desglose para Próximo Corte
-                </h2>
-                <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorteText}</span>
-              </div>
-              
-              {/* Tabla de Pacientes */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse hidden md:table">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-[#E2E8F0]">
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Alta</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Periodo Facturado</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días Facturados</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Costo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {desglose.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</td>
-                      </tr>
-                    ) : (
-                      desglose.map((c, i) => (
-                        <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
-                          <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
-                            {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
-                          </td>
-                          <td className="py-3 px-6 text-xs text-[#6B7A8D] text-center font-medium">
-                            {c.periodoStr}
-                          </td>
-                          <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
-                            {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
-                          </td>
-                          <td className="py-3 px-6 font-bold text-[var(--brand-primary)] text-right">${c.costoPaciente.toFixed(2)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-                
-                {/* Mobile View */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {desglose.length === 0 ? (
-                    <div className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</div>
-                  ) : (
-                    desglose.map((c, i) => (
-                      <div key={c.id || i} className="p-4 bg-white space-y-2">
-                        <div className="flex justify-between items-start">
-                          <span className="font-semibold text-[#0B1929]">{c.nombre}</span>
-                          <span className="font-bold text-[var(--brand-primary)]">${c.costoPaciente.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                          <span>Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}</span>
-                          <span>Días: {c.diasCobrar}/30</span>
-                        </div>
-                        <div className="text-xs text-[#6B7A8D] bg-gray-50 p-2 rounded text-center">
-                          {c.periodoStr}
-                        </div>
-                      </div>
-                    ))
-                  )}
                 </div>
-              </div>
 
-              {/* Total Summary */}
-              <div className="p-6 bg-gray-50/50 border-t border-[#E2E8F0]">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-bold text-[#6B7A8D]">Subtotal por volumen ({activeCount} pac. a ${currentRate})</p>
-                    <p className="font-bold text-[#0B1929]">${totalAmount.toFixed(2)}</p>
-                  </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-gray-200">
-                    <p className="text-sm font-bold text-[#6B7A8D] flex items-center gap-1">
-                      Ajuste por mes forzoso pendiente <Info size={14} className="text-gray-400"/>
+                <div className="my-6 p-5 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-4xl font-extrabold text-[#0B1929]">
+                      ${Number(currentRate).toFixed(2)} <span className="text-base font-bold text-[#6B7A8D]">MXN / mes</span>
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] mt-1">
+                      Mensualidad fija sin cobro adicional por paciente ({activeCount} paciente{activeCount !== 1 ? "s" : ""} activo{activeCount !== 1 ? "s" : ""}).
                     </p>
-                    <p className="font-bold text-gray-400">$0.00</p>
                   </div>
-                  <div className="flex justify-between items-center pt-2">
-                    <p className="text-xl font-extrabold text-[#0B1929]">Total a Pagar</p>
-                    <p className="text-2xl font-black text-[var(--brand-primary)]">${totalAmount.toFixed(2)} MXN</p>
+                  <div className="text-left sm:text-right">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B7A8D] block">Próximo Vencimiento</span>
+                    <span className="text-sm font-extrabold text-[var(--brand-primary)]">
+                      {expirationDate
+                        ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })
+                        : fechaCorteText}
+                    </span>
                   </div>
                 </div>
+
+                <div className="p-4 bg-gray-50/80 rounded-xl border border-[#E2E8F0] flex justify-between items-center">
+                  <span className="text-base font-bold text-[#0B1929]">Total a Pagar (30 días)</span>
+                  <span className="text-2xl font-black text-[var(--brand-primary)]">${totalAmount.toFixed(2)} MXN</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Termómetro de Nivel */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+                  <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2 mb-6">
+                    <BarChart3 size={20} className="text-[var(--brand-primary)]"/>
+                    Nivel de Suscripción Actual
+                  </h2>
+
+                  {/* Termómetro: textos arriba, barra en el medio, precios abajo */}
+                  <div className="mt-4 px-2">
+                    {/* Fila de etiquetas superiores */}
+                    <div className="flex justify-between mb-2">
+                      {[{label: 'Nivel 1', sub: '1 pac.'}, {label: 'Nivel 2', sub: '21 pac.'}, {label: 'Nivel 3', sub: '+50 pac.'}].map((t, i) => (
+                        <div key={i} className="text-center w-20">
+                          <span className="block text-xs font-bold text-[#0B1929]">{t.label}</span>
+                          <span className="block text-[10px] text-[#6B7A8D]">{t.sub}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Barra con puntos superpuestos */}
+                    <div className="relative h-3 bg-gray-100 rounded-full overflow-visible mx-4">
+                      <div
+                        className="h-full bg-[var(--brand-primary)] rounded-full transition-all duration-1000"
+                        style={{ width: `${Math.min((activeCount / 51) * 100, 100)}%` }}
+                      />
+                      {/* Puntos */}
+                      {[0, 0.39, 1].map((pct, i) => (
+                        <div
+                          key={i}
+                          className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 shadow-sm z-10 transition-colors ${activeCount >= [1,21,51][i] ? 'bg-[var(--brand-primary)] border-white' : 'bg-gray-200 border-white'}`}
+                          style={{ left: `calc(${pct * 100}% - 10px)` }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Fila de precios inferiores */}
+                    <div className="flex justify-between mt-3">
+                      {[`$${activeRates.nutri_tier1} /pac`, `$${activeRates.nutri_tier2} /pac`, `$${activeRates.nutri_tier3} /pac`].map((p, i) => (
+                        <div key={i} className="text-center w-20">
+                          <span className="block text-xs font-bold text-emerald-600">{p}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-12 bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+                    <p className="text-sm text-[#0B1929]">
+                      Actualmente tienes <strong>{activeCount} pacientes activos</strong>. 
+                      Tu tarifa actual es de <strong className="text-[var(--brand-primary)]">${Number(currentRate).toFixed(2)} MXN</strong> por paciente.
+                      {nextTierThreshold && (
+                        <span className="block text-[var(--brand-primary)] mt-1">
+                          ¡Agrega {nextTierThreshold - activeCount} pacientes más para desbloquear la tarifa de ${currentTier === 1 ? activeRates.nutri_tier2 : activeRates.nutri_tier3}!
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Estado de Cuenta */}
+                <div className="bg-white p-0 rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+                  <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
+                      <FileText size={20} className="text-[var(--brand-primary)]"/>
+                      Desglose para Próximo Corte
+                    </h2>
+                    <span className="text-sm font-bold text-[#6B7A8D]">{fechaCorteText}</span>
+                  </div>
+                  
+                  {/* Tabla de Pacientes */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse hidden md:table">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-[#E2E8F0]">
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Alta</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Periodo Facturado</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días Facturados</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Costo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {desglose.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</td>
+                          </tr>
+                        ) : (
+                          desglose.map((c, i) => (
+                            <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-3 px-6 font-semibold text-[#0B1929]">{c.nombre}</td>
+                              <td className="py-3 px-6 text-sm text-[#6B7A8D] text-center">
+                                {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}
+                              </td>
+                              <td className="py-3 px-6 text-xs text-[#6B7A8D] text-center font-medium">
+                                {c.periodoStr}
+                              </td>
+                              <td className="py-3 px-6 text-sm font-medium text-center text-[#0B1929]">
+                                {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
+                              </td>
+                              <td className="py-3 px-6 font-bold text-[var(--brand-primary)] text-right">${c.costoPaciente.toFixed(2)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                    
+                    {/* Mobile View */}
+                    <div className="md:hidden divide-y divide-gray-100">
+                      {desglose.length === 0 ? (
+                        <div className="py-8 text-center text-[#6B7A8D]">No tienes pacientes a facturar en este ciclo.</div>
+                      ) : (
+                        desglose.map((c, i) => (
+                          <div key={c.id || i} className="p-4 bg-white space-y-2">
+                            <div className="flex justify-between items-start">
+                              <span className="font-semibold text-[#0B1929]">{c.nombre}</span>
+                              <span className="font-bold text-[var(--brand-primary)]">${c.costoPaciente.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                              <span>Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}) : 'Reciente'}</span>
+                              <span>Días: {c.diasCobrar}/30</span>
+                            </div>
+                            <div className="text-xs text-[#6B7A8D] bg-gray-50 p-2 rounded text-center">
+                              {c.periodoStr}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total Summary */}
+                  <div className="p-6 bg-gray-50/50 border-t border-[#E2E8F0]">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm font-bold text-[#6B7A8D]">Subtotal por volumen ({activeCount} pac. a ${currentRate})</p>
+                        <p className="font-bold text-[#0B1929]">${totalAmount.toFixed(2)}</p>
+                      </div>
+                      <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+                        <p className="text-sm font-bold text-[#6B7A8D] flex items-center gap-1">
+                          Ajuste por mes forzoso pendiente <Info size={14} className="text-gray-400"/>
+                        </p>
+                        <p className="font-bold text-gray-400">$0.00</p>
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <p className="text-xl font-extrabold text-[#0B1929]">Total a Pagar</p>
+                        <p className="text-2xl font-black text-[var(--brand-primary)]">${totalAmount.toFixed(2)} MXN</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Columna Derecha: Pagos */}
@@ -464,24 +576,47 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <Info size={18} className="text-[#6B7A8D]" />
             Reglas y Fechas de Facturación
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Ciclo de Cobro</span>
-              <p className="text-sm text-[#0B1929]">Del <strong>10 al 10</strong> de cada mes.</p>
+          {isEstudiante ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Duración</span>
+                <p className="text-sm text-[#0B1929]"><strong>30 días</strong> a partir de tu pago.</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Vencimiento Actual</span>
+                <p className="text-sm font-bold text-[var(--brand-primary)]">
+                  {expirationDate ? expirationDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long' }) : 'Pendiente de pago'}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
+                <span className="block text-xs font-bold text-emerald-600 uppercase mb-1">Días de Gracia</span>
+                <p className="text-sm text-[#0B1929]"><strong>2 días</strong> tras el vencimiento.</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
+                <span className="block text-xs font-bold text-red-500 uppercase mb-1">Bloqueo</span>
+                <p className="text-sm text-[#0B1929]">Al <strong>3er día</strong> sin renovar.</p>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Límite de Pago</span>
-              <p className="text-sm text-[#0B1929]">Hasta el <strong>día 10</strong> del mes.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Ciclo de Cobro</span>
+                <p className="text-sm text-[#0B1929]">Del <strong>10 al 10</strong> de cada mes.</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Límite de Pago</span>
+                <p className="text-sm text-[#0B1929]">Hasta el <strong>día 10</strong> del mes.</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
+                <span className="block text-xs font-bold text-emerald-600 uppercase mb-1">Días de Gracia</span>
+                <p className="text-sm text-[#0B1929]">Días <strong>11 y 12</strong> (cuenta activa).</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
+                <span className="block text-xs font-bold text-red-500 uppercase mb-1">Bloqueo</span>
+                <p className="text-sm text-[#0B1929]">Día <strong>13</strong> (si no hay validación).</p>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm">
-              <span className="block text-xs font-bold text-emerald-600 uppercase mb-1">Días de Gracia</span>
-              <p className="text-sm text-[#0B1929]">Días <strong>11 y 12</strong> (cuenta activa).</p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
-              <span className="block text-xs font-bold text-red-500 uppercase mb-1">Bloqueo</span>
-              <p className="text-sm text-[#0B1929]">Día <strong>13</strong> (si no hay validación).</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Historial de Pagos */}
