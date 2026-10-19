@@ -653,22 +653,25 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Nombre de marca (opcional)">
             <input className={InputClass} value={formNutri.nombre_marca} onChange={e => setFormNutri(p=>({...p,nombre_marca:e.target.value}))}/>
           </Field>
-          <Field label="Logo de marca (opcional)">
-            <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} uploading={uploadingLogo}/>
-          </Field>
-          <Field label="Color principal de su marca">
-            <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
-              <input
-                type="color"
-                value={formNutri.color_primario || "#1A6FD4"}
-                onChange={e => setFormNutri(p => ({ ...p, color_primario: e.target.value }))}
-                className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
-              />
-              <span className="text-xs font-mono text-[#6B7A8D] px-2">
-                {(formNutri.color_primario || "#1A6FD4").toUpperCase()}
-              </span>
+          <div className="grid grid-cols-2 gap-4 items-start">
+            <Field label="Logo de marca (opcional)">
+              <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} uploading={uploadingLogo}/>
+            </Field>
+            <div className="flex flex-col items-end">
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>
+              <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
+                <span className="text-xs font-mono text-[#6B7A8D] px-2">
+                  {(formNutri.color_primario || "#1A6FD4").toUpperCase()}
+                </span>
+                <input
+                  type="color"
+                  value={formNutri.color_primario || "#1A6FD4"}
+                  onChange={e => setFormNutri(p => ({ ...p, color_primario: e.target.value }))}
+                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
+                />
+              </div>
             </div>
-          </Field>
+          </div>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowInviteNutri(false)}>Cancelar</Btn>
             <Btn grad onClick={inviteNutri} disabled={saving || uploadingLogo}>{saving ?"Enviando..." :"Invitar Nutriólogo"}</Btn>
@@ -687,22 +690,25 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Nombre de marca">
             <input className={InputClass} value={editFormNutri.nombre_marca} onChange={e => setEditFormNutri(p=>({...p,nombre_marca:e.target.value}))}/>
           </Field>
-          <Field label="Logo de marca">
-            <LogoPicker value={editFormNutri.logo_url} onChange={e => handleLogoChange(e, setEditFormNutri)} uploading={uploadingLogo}/>
-          </Field>
-          <Field label="Color de marca">
-            <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
-              <input
-                type="color"
-                value={editFormNutri.color_primario || "#1A6FD4"}
-                onChange={e => setEditFormNutri(p => ({ ...p, color_primario: e.target.value }))}
-                className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
-              />
-              <span className="text-xs font-mono text-[#6B7A8D] px-2">
-                {(editFormNutri.color_primario || "#1A6FD4").toUpperCase()}
-              </span>
+          <div className="grid grid-cols-2 gap-4 items-start">
+            <Field label="Logo de marca">
+              <LogoPicker value={editFormNutri.logo_url} onChange={e => handleLogoChange(e, setEditFormNutri)} uploading={uploadingLogo}/>
+            </Field>
+            <div className="flex flex-col items-end">
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>
+              <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
+                <span className="text-xs font-mono text-[#6B7A8D] px-2">
+                  {(editFormNutri.color_primario || "#1A6FD4").toUpperCase()}
+                </span>
+                <input
+                  type="color"
+                  value={editFormNutri.color_primario || "#1A6FD4"}
+                  onChange={e => setEditFormNutri(p => ({ ...p, color_primario: e.target.value }))}
+                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
+                />
+              </div>
             </div>
-          </Field>
+          </div>
 
           <div className="pt-4 border-t border-slate-100 mt-4">
             {showConfirmDeleteNutri && !showEditNutri.isSuperadmin ? (
