@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useMemo } from"react";
 import { dbGet, dbPatch } from"../../lib/supabase";
 import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
+import { getRatesForCutoff } from"../../utils/tarifas";
 
 export default function MisComisiones({ myId, setMsg }) {
   const [myName, setMyName] = useState(null);
   const [recibos, setRecibos] = useState([]);
   const [nominas, setNominas] = useState([]);
+  const [rawCfg, setRawCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filtroMes, setFiltroMes] = useState("todos");
-
-  const COMISION_PCT = 0.35;
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // Obtener el nombre propio del colaborador
-      const me = await dbGet(`profiles?id=eq.${myId}&select=nombre`);
+      // Obtener el nombre propio del colaborador y config de plataforma
+      const [me, cfg] = await Promise.all([
+        dbGet(`profiles?id=eq.${myId}&select=nombre`),
+        dbGet("configuracion_plataforma?id=eq.1")
+      ]);
+      if (cfg && cfg.length > 0) setRawCfg(cfg[0]);
       const nombre = me[0]?.nombre ||"";
       setMyName(nombre);
       if (!nombre) { setLoading(false); return; }
@@ -65,12 +69,21 @@ export default function MisComisiones({ myId, setMsg }) {
     return recibos.filter(r => r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
   }, [recibos, filtroMes]);
 
-  // Total acumulado (monto bruto generado por los nutriólogos)
-  const totalGenerado = filtrados.reduce((acc, r) => acc + (Number(r.monto) || 0), 0);
-  const miPago = totalGenerado * COMISION_PCT;
-
   // Buscar si hay registro de nómina para el mes actual
   const nominaActual = nominas.find(n => n.mes_facturacion === filtroMes);
+
+  // Total acumulado (monto bruto generado por los nutriólogos) y comisión por fecha de corte
+  const totalGenerado = filtrados.reduce((acc, r) => acc + (Number(r.monto) || 0), 0);
+  const miPago = useMemo(() => {
+    if (filtroMes !== "todos" && nominaActual?.transferido_por_admin && nominaActual?.monto != null) {
+      return Number(nominaActual.monto);
+    }
+    return filtrados.reduce((acc, r) => {
+      const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
+      const pct = (Number(rateForCut.comision_pct) || 35) / 100;
+      return acc + (Number(r.monto) || 0) * pct;
+    }, 0);
+  }, [filtrados, rawCfg, filtroMes, nominaActual]);
 
   const formatMes = (yyyyMm) => {
     if (yyyyMm === 'todos') return 'Todos los meses (Histórico)';

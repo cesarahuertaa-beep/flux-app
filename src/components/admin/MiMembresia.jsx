@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from"react";
 import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from"lucide-react";
+import { getRatesForCutoff } from"../../utils/tarifas";
 
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const [perfil, setPerfil] = useState(null);
   const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
+  const [rawCfg, setRawCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -21,11 +23,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         dbGet(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`)
       ]);
       if (data && data.length > 0) setPerfil(data[0]);
-      if (cfg && cfg.length > 0) setConfigPago({
-        clabe: cfg[0].clabe ||"",
-        banco: cfg[0].banco ||"",
-        beneficiario: cfg[0].beneficiario ||""
-      });
+      if (cfg && cfg.length > 0) {
+        setRawCfg(cfg[0]);
+        setConfigPago({
+          clabe: cfg[0].clabe ||"",
+          banco: cfg[0].banco ||"",
+          beneficiario: cfg[0].beneficiario ||""
+        });
+      }
       if (recibos) setHistorial(recibos);
     } catch (e) {
       console.error("Error cargando perfil:", e);
@@ -39,7 +44,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   }, [profileId]);
 
   // Cálculos de fechas y periodos
-  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff } = useMemo(() => {
+  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff, activeRates } = useMemo(() => {
     const today = new Date();
     const diaCorte = 10; // Fijo global
 
@@ -79,6 +84,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       nextCutoff = new Date(lastPassedCutoff.getFullYear(), lastPassedCutoff.getMonth() + 1, diaCorte);
       lastCutoff = lastPassedCutoff;
     }
+
+    // Resolver tarifas vigentes para la fecha exacta de este corte (Opción A: respeta tarifa anterior si es un corte vencido pendiente)
+    const ratesForThisCutoff = getRatesForCutoff(rawCfg, nextCutoff);
     
     // Contadores
     let activePatientsCount = 0;
@@ -128,14 +136,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       return { ...c, diasCobrar, periodoStr };
     }).filter(c => c.diasCobrar > 0);
 
-    // Calcular tarifa
+    // Calcular tarifa según los niveles configurados para este corte
     let tier = 1;
-    let rate = 50;
+    let rate = ratesForThisCutoff.nutri_tier1;
     let threshold = 21;
     if (activePatientsCount >= 21 && activePatientsCount <= 50) {
-      tier = 2; rate = 45; threshold = 51;
+      tier = 2; rate = ratesForThisCutoff.nutri_tier2; threshold = 51;
     } else if (activePatientsCount > 50) {
-      tier = 3; rate = 40; threshold = null;
+      tier = 3; rate = ratesForThisCutoff.nutri_tier3; threshold = null;
     }
 
     // Calcular costos
@@ -155,9 +163,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       nextTierThreshold: threshold, 
       totalAmount: total, 
       fechaCorteText: strCorte,
-      nextCutoff
+      nextCutoff,
+      activeRates: ratesForThisCutoff
     };
-  }, [clientes, perfil, loading]);
+  }, [clientes, perfil, loading, rawCfg, historial]);
 
   // Estado del componente
   const status ="active"; // active, pending, review
@@ -285,7 +294,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
                 {/* Fila de precios inferiores */}
                 <div className="flex justify-between mt-3">
-                  {['$50 /pac', '$45 /pac', '$40 /pac'].map((p, i) => (
+                  {[`$${activeRates.nutri_tier1} /pac`, `$${activeRates.nutri_tier2} /pac`, `$${activeRates.nutri_tier3} /pac`].map((p, i) => (
                     <div key={i} className="text-center w-20">
                       <span className="block text-xs font-bold text-emerald-600">{p}</span>
                     </div>
@@ -296,10 +305,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               <div className="mt-12 bg-blue-50/50 rounded-xl p-4 border border-blue-100">
                 <p className="text-sm text-[#0B1929]">
                   Actualmente tienes <strong>{activeCount} pacientes activos</strong>. 
-                  Tu tarifa actual es de <strong className="text-[var(--brand-primary)]">${currentRate}.00 MXN</strong> por paciente.
+                  Tu tarifa actual es de <strong className="text-[var(--brand-primary)]">${Number(currentRate).toFixed(2)} MXN</strong> por paciente.
                   {nextTierThreshold && (
                     <span className="block text-[var(--brand-primary)] mt-1">
-                      ¡Agrega {nextTierThreshold - activeCount} pacientes más para desbloquear la tarifa de ${currentTier === 1 ? 45 : 40}!
+                      ¡Agrega {nextTierThreshold - activeCount} pacientes más para desbloquear la tarifa de ${currentTier === 1 ? activeRates.nutri_tier2 : activeRates.nutri_tier3}!
                     </span>
                   )}
                 </p>

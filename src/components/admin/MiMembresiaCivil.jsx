@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from"react";
 import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
 import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from"lucide-react";
+import { getRatesForCutoff } from"../../utils/tarifas";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
- * Tarifa fija: $75 MXN/mes. Sin cálculos de prorrateo.
  * Reutiliza la estructura visual de MiMembresia.jsx.
  */
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
+  const [rawCfg, setRawCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
-
-  const TARIFA = 75;
 
   // Cálculos de fecha de vencimiento (Rolling 30 days)
   const { targetCutoff, expirationDate } = React.useMemo(() => {
@@ -49,6 +48,13 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     }
   }, [historial]);
 
+  // Si está en días de gracia renovando un corte vencido, respetamos la tarifa de su fecha de vencimiento
+  const TARIFA = React.useMemo(() => {
+    const referenceDate = expirationDate && new Date() >= expirationDate ? expirationDate : new Date();
+    const rates = getRatesForCutoff(rawCfg, referenceDate);
+    return rates.civil_premium;
+  }, [rawCfg, expirationDate]);
+
   const diasRestantesText = React.useMemo(() => {
     if (clienteData?.plan_tipo !== 'premium' || !expirationDate) return null;
     const target = new Date(expirationDate);
@@ -72,11 +78,14 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         dbGet("configuracion_plataforma?id=eq.1"),
         dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`)
       ]);
-      if (cfg && cfg.length > 0) setConfigPago({
-        clabe: cfg[0].clabe ||"",
-        banco: cfg[0].banco ||"",
-        beneficiario: cfg[0].beneficiario ||""
-      });
+      if (cfg && cfg.length > 0) {
+        setRawCfg(cfg[0]);
+        setConfigPago({
+          clabe: cfg[0].clabe ||"",
+          banco: cfg[0].banco ||"",
+          beneficiario: cfg[0].beneficiario ||""
+        });
+      }
       if (recibos) setHistorial(recibos);
     } catch (e) {
       console.error("Error cargando config de pago:", e);
@@ -195,7 +204,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             <h3 className="text-lg font-bold text-[#0B1929]">Plan Mensual</h3>
           </div>
           <div className="text-5xl font-extrabold text-[#0B1929] mb-1">
-            $75
+            ${TARIFA}
           </div>
           <div className="text-[#6B7A8D] text-sm mb-6">MXN / mes · Sin contrato</div>
           <ul className="space-y-3">
@@ -239,7 +248,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                 <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe ||"—"}</p>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-                Transfiere <strong>$75.00 MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
+                Transfiere <strong>${Number(TARIFA).toFixed(2)} MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
               </div>
             </div>
           )}

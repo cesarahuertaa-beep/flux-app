@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from"react";
 import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell } from"lucide-react";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save } from"lucide-react";
+import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
 const StatusBadge = ({ s }) => {
@@ -27,16 +28,38 @@ export default function ControlPagos({ setMsg }) {
   const [loadingCivil, setLoadingCivil] = useState(true);
   const [filtroEstadoCivil, setFiltroEstadoCivil] = useState("pendiente");
 
-  const COMISION_PCT = 0.35;
+  // ── Estado Configuración de Tarifas y Planes (Opción A) ─────────────────
+  const [rawCfg, setRawCfg] = useState(null);
+  const [showRatesPanel, setShowRatesPanel] = useState(false);
+  const [savingRates, setSavingRates] = useState(false);
+  const [ratesForm, setRatesForm] = useState({
+    nutri_tier1: DEFAULT_RATES.nutri_tier1,
+    nutri_tier2: DEFAULT_RATES.nutri_tier2,
+    nutri_tier3: DEFAULT_RATES.nutri_tier3,
+    civil_premium: DEFAULT_RATES.civil_premium,
+    comision_pct: DEFAULT_RATES.comision_pct
+  });
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [dataRecibos, profiles, dataNominas] = await Promise.all([
+      const [dataRecibos, profiles, dataNominas, cfg] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),
         dbGet("profiles?role=eq.nutriologo&select=id,nombre,creado_por_nombre"),
-        dbGet("nomina_colaboradores")
+        dbGet("nomina_colaboradores"),
+        dbGet("configuracion_plataforma?id=eq.1")
       ]);
+      if (cfg && cfg.length > 0) {
+        setRawCfg(cfg[0]);
+        const latest = getLatestConfiguredRates(cfg[0]);
+        setRatesForm({
+          nutri_tier1: latest.nutri_tier1,
+          nutri_tier2: latest.nutri_tier2,
+          nutri_tier3: latest.nutri_tier3,
+          civil_premium: latest.civil_premium,
+          comision_pct: latest.comision_pct
+        });
+      }
       const map = {};
       profiles.forEach(p => { map[p.id] = { nombre: p.nombre, creado_por: p.creado_por_nombre || null }; });
       const mapNominas = {};
@@ -51,6 +74,43 @@ export default function ControlPagos({ setMsg }) {
       setMsg("❌ Error cargando pagos:" + e.message);
     }
     setLoading(false);
+  };
+
+  const handleSaveRates = async () => {
+    setSavingRates(true);
+    try {
+      const history = parseTarifasHistory(rawCfg);
+      const nextCutoffStr = getNextCutoffDateStr(new Date());
+      const newEntry = {
+        nutri_tier1: Number(ratesForm.nutri_tier1) || 0,
+        nutri_tier2: Number(ratesForm.nutri_tier2) || 0,
+        nutri_tier3: Number(ratesForm.nutri_tier3) || 0,
+        civil_premium: Number(ratesForm.civil_premium) || 0,
+        comision_pct: Number(ratesForm.comision_pct) || 0,
+        effective_from: nextCutoffStr,
+        updated_at: new Date().toISOString()
+      };
+
+      // Si ya existía una entrada programada para ese mismo próximo corte, la actualizamos; si no, la agregamos al historial
+      const filteredHistory = history.filter(h => h.effective_from !== nextCutoffStr);
+      const updatedHistory = [...filteredHistory, newEntry].sort((a, b) =>
+        (a.effective_from || "").localeCompare(b.effective_from || "")
+      );
+
+      const updatedRows = await dbPatch("configuracion_plataforma?id=eq.1", {
+        tarifas_config: updatedHistory
+      });
+      if (updatedRows && updatedRows.length > 0) {
+        setRawCfg(updatedRows[0]);
+      } else {
+        setRawCfg(prev => ({ ...(prev || {}), tarifas_config: updatedHistory }));
+      }
+      setMsg(`✓ Tarifas guardadas. Entrarán en vigor en el próximo corte (${nextCutoffStr}) respetando adeudos anteriores.`);
+      setShowRatesPanel(false);
+    } catch (e) {
+      setMsg("❌ Error guardando tarifas: " + e.message);
+    }
+    setSavingRates(false);
   };
 
   const loadDataCivil = async () => {
@@ -100,26 +160,39 @@ export default function ControlPagos({ setMsg }) {
     recibosCivil.filter(r => filtroEstadoCivil ==="todos" ? true : r.estado === filtroEstadoCivil),
   [recibosCivil, filtroEstadoCivil]);
 
-  // ── Comisiones colaboradores ────────────────────────────────────────────
+  // ── Comisiones colaboradores (Evaluadas por fecha de corte o nómina congelada) ──
   const comisiones = useMemo(() => {
     const map = {};
     filtrados.forEach(r => {
       const nutri = nutriologos[r.nutriologo_id];
       if (!nutri || !nutri.creado_por) return;
       const colab = nutri.creado_por;
-      if (!map[colab]) map[colab] = { totalGenerado: 0, nutriologos: new Set(), recibosCount: 0 };
-      map[colab].totalGenerado += Number(r.monto) || 0;
+      if (!map[colab]) map[colab] = { totalGenerado: 0, comisionAcumulada: 0, nutriologos: new Set(), recibosCount: 0 };
+      const montoRecibo = Number(r.monto) || 0;
+      const ratesForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
+      const pct = (Number(ratesForCut.comision_pct) || 35) / 100;
+      map[colab].totalGenerado += montoRecibo;
+      map[colab].comisionAcumulada += montoRecibo * pct;
       map[colab].nutriologos.add(nutri.nombre ||"Desconocido");
       map[colab].recibosCount++;
     });
     return Object.entries(map)
-      .map(([nombre, data]) => ({
-        nombre, totalGenerado: data.totalGenerado,
-        comision: data.totalGenerado * COMISION_PCT,
-        nutriologos: [...data.nutriologos], recibosCount: data.recibosCount
-      }))
+      .map(([nombre, data]) => {
+        const nominaKey = `${nombre}|${filtroMes}`;
+        const existingNomina = filtroMes !== "todos" ? nominasEstado[nominaKey] : null;
+        const comisionFinal = (existingNomina?.transferido_por_admin && existingNomina?.monto != null)
+          ? Number(existingNomina.monto)
+          : data.comisionAcumulada;
+        return {
+          nombre,
+          totalGenerado: data.totalGenerado,
+          comision: comisionFinal,
+          nutriologos: [...data.nutriologos],
+          recibosCount: data.recibosCount
+        };
+      })
       .sort((a, b) => b.comision - a.comision);
-  }, [filtrados, nutriologos]);
+  }, [filtrados, nutriologos, rawCfg, filtroMes, nominasEstado]);
 
   // ── Acciones ────────────────────────────────────────────────────────────
   const updateEstado = async (id, nuevoEstado, nutriologoId) => {
@@ -221,6 +294,158 @@ export default function ControlPagos({ setMsg }) {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
+
+      {/* ── PANEL DE CONFIGURACIÓN DE TARIFAS Y PLANES (OPCIÓN A) ────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+        <div className="p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
+              <Settings size={20} className="text-[var(--brand-primary)]" />
+              Costos por Perfil, Planes y Comisiones
+            </h2>
+            <p className="text-xs text-[#6B7A8D] mt-0.5">
+              Define los precios de suscripción para Nutriólogos, Atletas Independientes y el porcentaje de comisión de Staff.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowRatesPanel(prev => !prev)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-[#E2E8F0] text-[#0B1929] hover:bg-[#F8FAFC] transition-colors shrink-0"
+          >
+            <Settings size={15} className="text-[var(--brand-primary)]" />
+            {showRatesPanel ? "Ocultar Configuración" : "Configurar Tarifas y Planes"}
+          </button>
+        </div>
+
+        {showRatesPanel && (
+          <div className="px-5 md:px-6 pb-6 pt-4 border-t border-[#E2E8F0] bg-[#F8FAFC] space-y-6 animate-in fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              
+              {/* 1. Perfil Nutriólogo */}
+              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">1. Perfil Nutriólogo</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Costo / paciente</span>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 1 (1 – 20 pac.)</label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ratesForm.nutri_tier1}
+                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier1: e.target.value }))}
+                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 2 (21 – 50 pac.)</label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ratesForm.nutri_tier2}
+                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier2: e.target.value }))}
+                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 3 (51+ pac.)</label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ratesForm.nutri_tier3}
+                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier3: e.target.value }))}
+                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Perfil Atleta Independiente */}
+              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">2. Atleta Independiente</span>
+                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Planes</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-medium text-[#6B7A8D]">Plan Estándar (Freemium)</label>
+                      <span className="text-xs font-bold text-[#6B7A8D] bg-gray-100 px-2.5 py-1 rounded-lg">$0 MXN (Gratis)</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-medium text-[#6B7A8D]">Plan Premium (30 días)</label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ratesForm.civil_premium}
+                          onChange={e => setRatesForm(p => ({ ...p, civil_premium: e.target.value }))}
+                          className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Comisiones de Staff */}
+              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">3. Staff Corporativo</span>
+                    <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Comisión</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <label className="text-xs font-medium text-[#6B7A8D]">Comisión por nutriólogo invitado</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={ratesForm.comision_pct}
+                        onChange={e => setRatesForm(p => ({ ...p, comision_pct: e.target.value }))}
+                        className="w-20 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-xs font-bold text-[#6B7A8D]">%</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  Las nóminas ya transferidas o de cortes anteriores mantienen su porcentaje original congelado.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-[#E2E8F0]">
+              <p className="text-xs text-[#6B7A8D]">
+                🔒 <strong>Protección Histórica Activa:</strong> Al guardar cambios, entrarán en vigor para el <strong>próximo corte ({getNextCutoffDateStr()})</strong>. Los adeudos pendientes de cortes pasados conservarán su costo anterior.
+              </p>
+              <button
+                onClick={handleSaveRates}
+                disabled={savingRates}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm shrink-0"
+              >
+                <Save size={15} />
+                {savingRates ? "Guardando..." : "Guardar Tarifas"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── SECCIÓN NUTRIÓLOGOS ─────────────────────────────────────────── */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-6">
@@ -378,7 +603,7 @@ export default function ControlPagos({ setMsg }) {
                         <p className="font-semibold text-[#0B1929] text-sm">${c.totalGenerado.toFixed(2)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Tu pago (35%)</p>
+                        <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Tu pago ({ratesForm.comision_pct}%)</p>
                         <p className="font-black text-indigo-600 text-lg">${c.comision.toFixed(2)}</p>
                       </div>
                       {filtroMes !== 'todos' && (
@@ -422,7 +647,7 @@ export default function ControlPagos({ setMsg }) {
             <Dumbbell className="text-[var(--brand-primary)]" size={22} />
             Pagos — Atletas Independientes
           </h2>
-          <p className="text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium ($75 MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
+          <p className="text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium (${ratesForm.civil_premium} MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
         </div>
         <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full shrink-0">
           {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
