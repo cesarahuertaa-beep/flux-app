@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from"react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from"lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from"recharts";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 function TimerCard({ brandColor }) {
   const [seconds, setSeconds] = useState(90);
@@ -203,7 +203,14 @@ export default function Training({
   // Local raw text while user is typing — prevents React from overwriting mid-keystroke
   const [localWeightInputs, setLocalWeightInputs] = useState({}); // { [kgKey]: string }
 
-  if (!rutinas || rutinas.length === 0) {
+  // Rutinas activas válidas (filtrar rutinas vacías sin ejercicios si existen otras con ejercicios)
+  const rutinasValidas = useMemo(() => {
+    if (!rutinas || rutinas.length === 0) return [];
+    const conEjercicios = rutinas.filter(r => (r.ejercicios || []).length > 0);
+    return conEjercicios.length > 0 ? conEjercicios : rutinas;
+  }, [rutinas]);
+
+  if (!rutinasValidas || rutinasValidas.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center">
         <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
@@ -219,7 +226,8 @@ export default function Training({
     );
   }
 
-  const rutinaActiva = rutinas[activeRutinaIdx];
+  const safeActiveIdx = activeRutinaIdx >= rutinasValidas.length ? 0 : activeRutinaIdx;
+  const rutinaActiva = rutinasValidas[safeActiveIdx];
   const ejercicios   = rutinaActiva?.ejercicios || [];
 
   const getVariantObj = (ex) => {
@@ -466,8 +474,8 @@ export default function Training({
       {/* ── Day tabs (las rutinas/días del cliente) ── */}
       <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-6 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
         <div className="flex gap-2 overflow-x-auto scroll-hide">
-          {rutinas.map((r, i) => {
-            const isActive = activeRutinaIdx === i;
+          {rutinasValidas.map((r, i) => {
+            const isActive = safeActiveIdx === i;
             
             let shortTab = `Día ${i + 1}`;
             if (r.nombre) {
@@ -477,8 +485,12 @@ export default function Training({
               } else if (/^d[íi]a\s*\d+/i.test(r.nombre.trim())) {
                 shortTab = r.nombre.trim();
               } else {
-                const firstWord = String(r.nombre).trim().split(' ')[0];
-                shortTab = firstWord.length <= 6 ? firstWord : firstWord.substring(0, 3).toUpperCase();
+                const firstWord = String(r.nombre).trim().split(' ')[0].toUpperCase();
+                const dayMap = {
+                  "LUNES": "LUN", "MARTES": "MAR", "MIERCOLES": "MIE", "MIÉRCOLES": "MIE",
+                  "JUEVES": "JUE", "VIERNES": "VIE", "SABADO": "SAB", "SÁBADO": "SAB", "DOMINGO": "DOM"
+                };
+                shortTab = dayMap[firstWord] || (firstWord.length <= 4 ? firstWord : firstWord.substring(0, 3));
               }
             }
 

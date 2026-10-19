@@ -44,8 +44,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [showPastCycles, setShowPastCycles] = useState(false);
   useEffect(() => { 
     if (cicloSel && !cicloSel.activo) setShowPastCycles(true); 
-    if (cicloSel) sessionStorage.setItem("flux_programar_ciclo", cicloSel.id);
-  }, [cicloSel]); // ciclo seleccionado para ver/editar
+    if (cicloSel && selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cicloSel.id);
+  }, [cicloSel, selected?.id]); // ciclo seleccionado para ver/editar
 
   // ── Datos del ciclo seleccionado ──
   const [nutri, setNutri] = useState(null);
@@ -156,32 +156,59 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   // ── Cargar ciclos del cliente ──
-  const loadCiclos = useCallback(async () => {
-    if (!selected) return;
+  const loadCiclos = useCallback(async (preferCycleId = null) => {
+    if (!selected) return null;
     try {
       const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`);
       setCiclos(cs);
-      // Seleccionar el ciclo guardado en sesión, o el activo por defecto
+      
+      const activeCycle = cs.find(c => c.activo);
       let chosen = null;
-      const savedCycleId = sessionStorage.getItem("flux_programar_ciclo");
-      if (savedCycleId) {
-        chosen = cs.find(c => c.id === savedCycleId);
+
+      // 1. Si se pasa un ciclo preferido explícitamente (ej: recién creado o recién aplicado)
+      if (preferCycleId) {
+        chosen = cs.find(c => c.id === preferCycleId);
       }
+
+      // 2. Si no, en "Mi Plan", SIEMPRE priorizar el ciclo activo
+      if (!chosen && isMiPlan && activeCycle) {
+        chosen = activeCycle;
+      }
+
+      // 3. Si no, revisar si había un ciclo guardado para este cliente específico
       if (!chosen) {
-        chosen = cs.find(c => c.activo) || cs[0] || null;
+        const savedCycleId = sessionStorage.getItem(`flux_programar_ciclo_${selected.id}`);
+        if (savedCycleId) {
+          const found = cs.find(c => c.id === savedCycleId);
+          // Si el cliente tiene ciclo activo pero el guardado es inactivo, preferir el activo
+          if (found && (found.activo || !activeCycle)) {
+            chosen = found;
+          }
+        }
       }
+
+      // 4. Fallback al ciclo activo o al más reciente
+      if (!chosen) {
+        chosen = activeCycle || cs[0] || null;
+      }
+
       setCicloSel(chosen);
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
-  }, [selected]);
+      return chosen;
+    } catch(e) { 
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+      return null;
+    }
+  }, [selected, isMiPlan]);
 
   // ── Cargar datos del ciclo seleccionado ──
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (targetCiclo = cicloSel) => {
     if (!selected) return;
     setLoading(true);
     try {
       // Filtrar por ciclo si hay uno seleccionado, si no mostrar planes sin ciclo
-      const cicloFilter = cicloSel
-        ? `ciclo_id=eq.${cicloSel.id}`
+      const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
+      const cicloFilter = currentCiclo
+        ? `ciclo_id=eq.${currentCiclo.id}`
         : `ciclo_id=is.null`;
 
       const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`);
@@ -260,8 +287,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
       }
       const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: finalName, fecha_inicio: planForm.fecha_inicio, activo: true });
-      await loadCiclos();
+      await loadCiclos(cRes[0].id);
       setCicloSel(cRes[0]);
+      if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cRes[0].id);
+      await loadData(cRes[0]);
       setShowPlanModal(false);
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
       
@@ -292,6 +321,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     try {
       let activeCiclo = cicloSel;
+      if (!activeCiclo || (!activeCiclo.activo && ciclos.some((c) => c.activo))) {
+        activeCiclo = ciclos.find((c) => c.activo) || activeCiclo;
+      }
       if (!activeCiclo) {
         const start = new Date(planForm.fecha_inicio + "T12:00:00");
         const end = new Date(start);
@@ -311,9 +343,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           activo: true
         });
         activeCiclo = cRes[0];
-        await loadCiclos();
-        setCicloSel(activeCiclo);
+        await loadCiclos(activeCiclo.id);
       }
+
+      setCicloSel(activeCiclo);
+      if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, activeCiclo.id);
 
       let currentNutri = nutri;
       if (!currentNutri) {
@@ -359,7 +393,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
 
-      await loadData();
+      await loadData(activeCiclo);
       setMsg(
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
@@ -380,6 +414,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     try {
       let activeCiclo = cicloSel;
+      if (!activeCiclo || (!activeCiclo.activo && ciclos.some((c) => c.activo))) {
+        activeCiclo = ciclos.find((c) => c.activo) || activeCiclo;
+      }
       if (!activeCiclo) {
         const start = new Date(planForm.fecha_inicio + "T12:00:00");
         const end = new Date(start);
@@ -399,18 +436,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           activo: true
         });
         activeCiclo = cRes[0];
-        await loadCiclos();
-        setCicloSel(activeCiclo);
+        await loadCiclos(activeCiclo.id);
       }
+
+      // Limpiar rutinas fantasma vacías (0 ejercicios) en este ciclo si existían
+      const existingEmpty = rutinas.filter(r => (r.ejercicios || []).length === 0 && r.ciclo_id === activeCiclo.id);
+      for (const er of existingEmpty) {
+        try { await dbDel(`rutinas?id=eq.${er.id}`); } catch(_) {}
+      }
+
+      const currentValidCount = rutinas.filter(r => (r.ejercicios || []).length > 0 && r.ciclo_id === activeCiclo.id).length;
 
       for (let i = 0; i < (tpl.rutinas || []).length; i++) {
         const r = tpl.rutinas[i];
         const rRes = await dbPost("rutinas", {
           cliente_id: selected.id,
           ciclo_id: activeCiclo.id,
-          nombre: r.nombre || `Rutina ${rutinas.length + i + 1}`,
+          nombre: r.nombre || `Rutina ${currentValidCount + i + 1}`,
           semanas: r.semanas || 4,
-          orden: rutinas.length + i
+          orden: currentValidCount + i
         });
         const newRutina = rRes[0];
         if (newRutina && r.ejercicios?.length > 0) {
@@ -435,7 +479,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
 
-      await loadData();
+      setCicloSel(activeCiclo);
+      if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, activeCiclo.id);
+      await loadData(activeCiclo);
       setMsg(
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
