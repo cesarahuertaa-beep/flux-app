@@ -44,10 +44,23 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       const rows = await dbGet(`profiles?id=eq.${profileId}`);
       if (rows.length > 0) {
         const p = rows[0];
+        let resolvedEmail = p.email || "";
+        if (!resolvedEmail) {
+          try {
+            const tok = localStorage.getItem("flux_token");
+            if (tok) {
+              const payload = JSON.parse(atob(tok.split(".")[1]));
+              if (payload.email) {
+                resolvedEmail = payload.email.trim();
+                dbPatch(`profiles?id=eq.${profileId}`, { email: resolvedEmail }).catch(() => {});
+              }
+            }
+          } catch {}
+        }
         setPersonalForm({
           nombre: p.nombre ||"",
           telefono: p.telefono ||"",
-          email: p.email ||"",
+          email: resolvedEmail,
           avatar_url: p.avatar_url ||"",
           fecha_nacimiento: p.fecha_nacimiento ||"",
           genero: p.genero ||"",

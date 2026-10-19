@@ -192,6 +192,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     setSaving(true);
     try {
       const payload = { ...editFormNutri };
+      delete payload.email;
       if (showEditNutri?.isSuperadmin) delete payload.role;
       await updateProfile(showEditNutri.id, payload);
       setShowEditNutri(null);

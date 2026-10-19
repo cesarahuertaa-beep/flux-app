@@ -20,7 +20,7 @@ import ControlPagos from"../components/admin/ControlPagos";
 import MisComisiones from"../components/admin/MisComisiones";
 import BloqueadoNutriologo from"../components/BloqueadoNutriologo";
 import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
-import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../lib/supabase";
+import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../lib/supabase";
 import { useBrand } from"../components/BrandContext";
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
@@ -239,15 +239,54 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     setLoading(true);
     let _allNutris = [];
     let _me = [];
-    
-    const updateState = (r, allNutris, me) => {
-      const nutriEmails = new Set(allNutris.map(n => n.email));
-      if (me.length > 0) {
-        const myEmail = me[0].email;
-        const clone = r.find(c => c.email === myEmail);
-        if (clone) setMyShadowClient(clone);
+
+    const getJwtEmail = () => {
+      try {
+        const tok = session?.token || localStorage.getItem("flux_token");
+        if (!tok) return "";
+        const payload = JSON.parse(atob(tok.split(".")[1]));
+        return (payload.email || "").trim();
+      } catch {
+        return "";
       }
-      setClientes(r.filter(c => !nutriEmails.has(c.email)));
+    };
+
+    const findShadowCandidates = (list, myEmailNorm) => {
+      return list.filter(c =>
+        (c.nutriologo_id === myId && c.objetivo === "Mi entrenamiento personal") ||
+        (c.auth_id && c.auth_id === myId && c.nutriologo_id === myId) ||
+        (myEmailNorm && (c.email || "").trim().toLowerCase() === myEmailNorm && c.nutriologo_id === myId)
+      );
+    };
+
+    const updateState = (r, allNutris, me) => {
+      const jwtEmail = getJwtEmail();
+      const rawEmail = (me.length > 0 && me[0].email) ? me[0].email : jwtEmail;
+      const myEmailNorm = (rawEmail || "").trim().toLowerCase();
+
+      const nutriEmails = new Set(
+        allNutris
+          .map(n => (n.email || "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+      if (myEmailNorm) nutriEmails.add(myEmailNorm);
+
+      const candidates = findShadowCandidates(r, myEmailNorm);
+      if (candidates.length > 0) {
+        // Priorizar el expediente original (r ya viene en orden created_at.asc)
+        setMyShadowClient(candidates[0]);
+      }
+
+      const shadowIds = new Set(candidates.map(c => c.id));
+      setClientes(
+        r.filter(c => {
+          if (shadowIds.has(c.id)) return false;
+          if (c.objetivo === "Mi entrenamiento personal") return false;
+          const cEmail = (c.email || "").trim().toLowerCase();
+          if (cEmail && nutriEmails.has(cEmail)) return false;
+          return true;
+        })
+      );
     };
 
     try { 
@@ -261,13 +300,23 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       updateState(r, allNutris, me);
 
       if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0) {
-        const myEmail = me[0].email;
-        const existingClone = r.find(c => c.email === myEmail);
-        if (!existingClone) {
+        const jwtEmail = getJwtEmail();
+        const trueEmail = (me[0].email || jwtEmail || "").trim();
+        const myEmailNorm = trueEmail.toLowerCase();
+
+        // 1. Auto-sanar profiles.email si estaba vacío o null
+        if (!me[0].email && trueEmail) {
+          dbPatch(`profiles?id=eq.${myId}`, { email: trueEmail }).catch(() => {});
+        }
+
+        const candidates = findShadowCandidates(r, myEmailNorm);
+
+        if (candidates.length === 0) {
           try {
             const created = await dbPost("clientes", {
               nombre: me[0].nombre,
-              email: me[0].email,
+              email: trueEmail,
+              auth_id: myId,
               objetivo: "Mi entrenamiento personal",
               nutriologo_id: myId,
               activo: true,
@@ -279,11 +328,59 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           } catch (err) {
             console.error("Error auto-creando perfil atleta:", err);
           }
+        } else {
+          // Si hay más de un candidato (ej. el original con datos + un clon vacío reciente),
+          // verificamos cuál tiene datos y limpiamos los duplicados vacíos.
+          let primaryClone = candidates[0];
+          if (candidates.length > 1) {
+            const candidateChecks = await Promise.all(
+              candidates.map(async (cand) => {
+                try {
+                  const [cics, ruts, mets] = await Promise.all([
+                    dbGet(`ciclos?cliente_id=eq.${cand.id}&select=id&limit=1`),
+                    dbGet(`rutinas?cliente_id=eq.${cand.id}&select=id&limit=1`),
+                    dbGet(`metricas_progreso?cliente_id=eq.${cand.id}&select=id&limit=1`)
+                  ]);
+                  const hasData = (cics?.length > 0) || (ruts?.length > 0) || (mets?.length > 0);
+                  return { cand, hasData };
+                } catch {
+                  return { cand, hasData: true };
+                }
+              })
+            );
+
+            const withData = candidateChecks.find(x => x.hasData);
+            if (withData) primaryClone = withData.cand;
+
+            // Eliminar clones duplicados que estén completamente vacíos
+            for (const item of candidateChecks) {
+              if (item.cand.id !== primaryClone.id && !item.hasData && item.cand.objetivo === "Mi entrenamiento personal") {
+                dbDel(`clientes?id=eq.${item.cand.id}`).catch(() => {});
+              }
+            }
+          }
+
+          // 2. Auto-sanar el expediente original para que tenga email real, auth_id y plan_tipo premium
+          const patchPayload = {};
+          if (trueEmail && primaryClone.email !== trueEmail) patchPayload.email = trueEmail;
+          if (myId && primaryClone.auth_id !== myId) patchPayload.auth_id = myId;
+          if (primaryClone.plan_tipo !== "premium") patchPayload.plan_tipo = "premium";
+
+          if (Object.keys(patchPayload).length > 0) {
+            try {
+              const updated = await dbPatch(`clientes?id=eq.${primaryClone.id}`, patchPayload);
+              primaryClone = (updated && updated.length > 0) ? updated[0] : { ...primaryClone, ...patchPayload };
+            } catch (patchErr) {
+              console.error("Error actualizando perfil atleta original:", patchErr);
+            }
+          }
+
+          setMyShadowClient(primaryClone);
         }
       }
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
-  }, [clientesFilter, myId, isCivil, role]);
+  }, [clientesFilter, myId, isCivil, role, session?.token]);
 
   const loadBiblioteca = useCallback(async () => {
     try { 
