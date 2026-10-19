@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from"react";
+import { createPortal } from "react-dom";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
@@ -96,7 +97,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [myProfile, setMyProfile]           = useState(null);
   const [retentionData, setRetentionData]   = useState({ activeCiclos: [], lastActivityMap: {} });
   const [filtroRetencion, setFiltroRetencion] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
-  const [openWaMenuId, setOpenWaMenuId]     = useState(null);
+  const [selectedWaClient, setSelectedWaClient] = useState(null);
 
   const [myShadowClient, setMyShadowClient] = useState(null);
   const [bloqueado, setBloqueado] = useState(false);
@@ -1011,123 +1012,47 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                             {c.objetivo || "Sin objetivo definido"}
                           </div>
 
-                          {/* Botón WhatsApp Inteligente a 1 Clic con Plantillas */}
+                          {/* Botón WhatsApp Inteligente a 1 Clic */}
                           {c.telefono ? (
-                            <div className="relative inline-block" onClick={e => e.stopPropagation()}>
-                              <div className="inline-flex items-center rounded-lg shadow-sm">
-                                <a 
-                                  href={getWhatsAppUrl(
-                                    c.telefono,
-                                    buildWhatsAppMessage(
-                                      c, 
-                                      ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento"))
-                                    )
-                                  )} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-2.5 py-1.5 rounded-l-lg transition-colors shadow-sm ${
-                                    ret.isVenciendo 
-                                      ? 'bg-amber-600 hover:bg-amber-700' 
-                                      : ret.isInactivo 
-                                      ? 'bg-rose-600 hover:bg-rose-700' 
-                                      : 'bg-[#25D366] hover:bg-[#20bd5a]'
-                                  }`}
-                                  title="Enviar mensaje por WhatsApp a 1 clic"
-                                >
-                                  <MessageCircle size={14} className="fill-white" />
-                                  {ret.isVenciendo ? (
-                                    <span>Recordar Renovación</span>
-                                  ) : ret.isInactivo ? (
-                                    <span>Check-in Adherencia</span>
-                                  ) : (
-                                    <span>WhatsApp</span>
-                                  )}
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => setOpenWaMenuId(openWaMenuId === c.id ? null : c.id)}
-                                  className={`px-1.5 py-1.5 rounded-r-lg border-l border-white/20 transition-colors flex items-center justify-center text-white ${
-                                    ret.isVenciendo 
-                                      ? 'bg-amber-700 hover:bg-amber-800' 
-                                      : ret.isInactivo 
-                                      ? 'bg-rose-700 hover:bg-rose-800' 
-                                      : 'bg-[#20bd5a] hover:bg-[#1caa50]'
-                                  }`}
-                                  title="Ver otras plantillas de WhatsApp"
-                                >
-                                  <ChevronDown size={14} />
-                                </button>
-                              </div>
-
-                              {openWaMenuId === c.id && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-30" 
-                                    onClick={() => setOpenWaMenuId(null)} 
-                                  />
-                                  <div className="absolute left-0 bottom-full mb-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-2 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95">
-                                    <div className="text-[10px] font-bold text-[#6B7A8D] px-2 py-1 uppercase tracking-wider">
-                                      Plantillas para {c.nombre?.split(" ")[0]}
-                                    </div>
-
-                                    <a
-                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "inactividad"))}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaMenuId(null)}
-                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
-                                        ⚠️ Check-in Adherencia
-                                      </span>
-                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
-                                        "Llevas unos días sin registrar..."
-                                      </span>
-                                    </a>
-
-                                    <a
-                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "renovacion"))}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaMenuId(null)}
-                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
-                                        ⏳ Renovación de Plan
-                                      </span>
-                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
-                                        "Tu plan está por concluir..."
-                                      </span>
-                                    </a>
-
-                                    <a
-                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "seguimiento"))}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaMenuId(null)}
-                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
-                                        👋 Saludo / Seguimiento
-                                      </span>
-                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
-                                        "¿Cómo vas con tu plan esta semana?..."
-                                      </span>
-                                    </a>
-
-                                    <a
-                                      href={getWhatsAppUrl(c.telefono, "")}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaMenuId(null)}
-                                      className="p-2 border-t border-[#F0F4FA] font-medium text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
-                                    >
-                                      <span>Abrir chat sin mensaje</span>
-                                      <MessageCircle size={12} />
-                                    </a>
-                                  </div>
-                                </>
-                              )}
+                            <div className="inline-flex items-stretch h-9 rounded-xl overflow-hidden shadow-sm" onClick={e => e.stopPropagation()}>
+                              <a 
+                                href={getWhatsAppUrl(
+                                  c.telefono,
+                                  buildWhatsAppMessage(
+                                    c, 
+                                    ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento"))
+                                  )
+                                )} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 transition-colors ${
+                                  ret.isVenciendo 
+                                    ? 'bg-amber-600 hover:bg-amber-700' 
+                                    : ret.isInactivo 
+                                    ? 'bg-rose-600 hover:bg-rose-700' 
+                                    : 'bg-[#25D366] hover:bg-[#20bd5a]'
+                                }`}
+                                title="Enviar mensaje por WhatsApp a 1 clic"
+                              >
+                                <MessageCircle size={14} className="fill-white shrink-0" />
+                                <span>
+                                  {ret.isVenciendo ? "Recordar Renovación" : ret.isInactivo ? "Check-in Adherencia" : "WhatsApp"}
+                                </span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWaClient(c)}
+                                className={`w-9 flex items-center justify-center border-l border-white/20 transition-colors text-white shrink-0 ${
+                                  ret.isVenciendo 
+                                    ? 'bg-amber-700 hover:bg-amber-800' 
+                                    : ret.isInactivo 
+                                    ? 'bg-rose-700 hover:bg-rose-800' 
+                                    : 'bg-[#20bd5a] hover:bg-[#1caa50]'
+                                }`}
+                                title="Ver todas las plantillas de mensaje"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
                             </div>
                           ) : (
                             <span className="text-xs text-[#9BA5B0] italic">Sin teléfono registrado</span>
@@ -1404,6 +1329,166 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </div>
           </div>
         </div>
+      )}
+
+      {/* Modal / Action Sheet de Plantillas WhatsApp */}
+      {selectedWaClient && createPortal(
+        <div 
+          className="fixed inset-0 bg-[#0B1929]/50 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedWaClient(null)}
+        >
+          <div 
+            className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[#F0F4FA] flex items-center justify-between bg-white shrink-0">
+              <div>
+                <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2" style={{ fontFamily: "DM Sans" }}>
+                  <MessageCircle className="w-5 h-5 text-[#25D366] fill-[#25D366]" />
+                  Plantillas para {selectedWaClient.nombre}
+                </h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                  {selectedWaClient.telefono ? `WhatsApp: ${selectedWaClient.telefono}` : "Sin teléfono"}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedWaClient(null)} 
+                className="w-8 h-8 rounded-full bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929] flex items-center justify-center transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body con plantillas interactivas */}
+            <div className="p-5 overflow-y-auto space-y-3 bg-[#F8FAFC]">
+              {/* Template 1: Check-in Adherencia */}
+              {(() => {
+                const ret = getPatientRetention(selectedWaClient);
+                const isRec = ret.isInactivo;
+                return (
+                  <a
+                    href={getWhatsAppUrl(selectedWaClient.telefono, buildWhatsAppMessage(selectedWaClient, "inactividad"))}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setSelectedWaClient(null)}
+                    className={`block p-4 rounded-xl border transition-all text-left group bg-white ${
+                      isRec 
+                        ? 'border-rose-300 ring-2 ring-rose-500/20 shadow-sm' 
+                        : 'border-[#E2E8F0] hover:border-[#25D366] hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-sm text-[#0B1929] flex items-center gap-1.5 group-hover:text-rose-600 transition-colors">
+                        <AlertCircle size={16} className="text-rose-500" />
+                        Check-in de Adherencia
+                      </span>
+                      {isRec && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                          Sugerido ({ret.daysInactive ? `${ret.daysInactive}d inactivo` : 'Inactivo'})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                      "{buildWhatsAppMessage(selectedWaClient, "inactividad")}"
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-rose-600">
+                      <span>Enviar por WhatsApp</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </a>
+                );
+              })()}
+
+              {/* Template 2: Renovación de Plan */}
+              {(() => {
+                const ret = getPatientRetention(selectedWaClient);
+                const isRec = ret.isVenciendo;
+                return (
+                  <a
+                    href={getWhatsAppUrl(selectedWaClient.telefono, buildWhatsAppMessage(selectedWaClient, "renovacion"))}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setSelectedWaClient(null)}
+                    className={`block p-4 rounded-xl border transition-all text-left group bg-white ${
+                      isRec 
+                        ? 'border-amber-300 ring-2 ring-amber-500/20 shadow-sm' 
+                        : 'border-[#E2E8F0] hover:border-[#25D366] hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-sm text-[#0B1929] flex items-center gap-1.5 group-hover:text-amber-600 transition-colors">
+                        <Clock size={16} className="text-amber-500" />
+                        Renovación de Plan / Ciclo
+                      </span>
+                      {isRec && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          {ret.isVencido ? 'Plan finalizado' : `Vence en ${ret.daysToExpire}d`}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                      "{buildWhatsAppMessage(selectedWaClient, "renovacion")}"
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                      <span>Enviar por WhatsApp</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </a>
+                );
+              })()}
+
+              {/* Template 3: Saludo / Seguimiento Semanal */}
+              <a
+                href={getWhatsAppUrl(selectedWaClient.telefono, buildWhatsAppMessage(selectedWaClient, "seguimiento"))}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setSelectedWaClient(null)}
+                className="block p-4 rounded-xl border border-[#E2E8F0] hover:border-[#25D366] hover:shadow-sm transition-all text-left group bg-white"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-sm text-[#0B1929] flex items-center gap-1.5 group-hover:text-emerald-600 transition-colors">
+                    <Sparkles size={16} className="text-emerald-500" />
+                    Saludo / Seguimiento Semanal
+                  </span>
+                </div>
+                <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                  "{buildWhatsAppMessage(selectedWaClient, "seguimiento")}"
+                </p>
+                <div className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                  <span>Enviar por WhatsApp</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+              </a>
+
+              {/* Template 4: Chat Libre */}
+              <a
+                href={getWhatsAppUrl(selectedWaClient.telefono, "")}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setSelectedWaClient(null)}
+                className="flex items-center justify-between p-3.5 rounded-xl border border-dashed border-[#CBD5E1] hover:border-[#25D366] hover:bg-emerald-50/50 transition-colors text-slate-600 hover:text-emerald-700 font-medium text-xs bg-white"
+              >
+                <span className="flex items-center gap-2">
+                  <MessageCircle size={15} />
+                  Abrir conversación en blanco (sin texto previo)
+                </span>
+                <span className="font-bold">Abrir chat →</span>
+              </a>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-white border-t border-[#F0F4FA] flex justify-end shrink-0">
+              <button
+                onClick={() => setSelectedWaClient(null)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {!isCivil && tab ==="perfil" && (

@@ -16,7 +16,8 @@ import {
   MessageCircle,
   Plus,
   ChevronDown,
-  MapPin
+  MapPin,
+  X
 } from"lucide-react";
 
 // ── UI Components (Tailwind Light Theme) ──────────────────────────────────────
@@ -127,7 +128,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [showHorario, setShowHorario]       = useState(false);
   const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
   const [myProfile, setMyProfile]           = useState(null);
-  const [openWaCitaId, setOpenWaCitaId]     = useState(null);
+  const [selectedWaCita, setSelectedWaCita] = useState(null);
 
   const myId = profileId || getProfileId();
 
@@ -406,90 +407,33 @@ export function AgendaAdmin({ setMsg, profileId }) {
                             {cita.modalidad ==="virtual" ? <><Monitor className="w-3.5 h-3.5" /> Virtual</> : <><Building className="w-3.5 h-3.5" /> Presencial</>}
                           </Tag>
                           {tel && (
-                            <div className="relative inline-block" onClick={e => e.stopPropagation()}>
-                              <div className="inline-flex items-center rounded-lg shadow-sm">
-                                <a
-                                  href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(
-                                    buildCitaWhatsAppMessage(cita, cita.estado === "pendiente" ? "confirmacion" : "recordatorio")
-                                  )}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-2.5 py-1 rounded-l-lg transition-colors shadow-sm ${
-                                    cita.estado === "pendiente"
-                                      ? "bg-[#25D366] hover:bg-[#20bd5a]"
-                                      : "bg-emerald-600 hover:bg-emerald-700"
-                                  }`}
-                                  title="Enviar mensaje por WhatsApp a 1 clic"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5 fill-white" />
-                                  <span>{cita.estado === "pendiente" ? "Confirmar WhatsApp" : "Recordatorio WhatsApp"}</span>
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => setOpenWaCitaId(openWaCitaId === cita.id ? null : cita.id)}
-                                  className={`text-white px-1.5 py-1 rounded-r-lg border-l border-white/20 transition-colors flex items-center justify-center ${
-                                    cita.estado === "pendiente" ? "bg-[#20bd5a] hover:bg-[#1caa50]" : "bg-emerald-700 hover:bg-emerald-800"
-                                  }`}
-                                  title="Opciones de plantilla WhatsApp"
-                                >
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              {openWaCitaId === cita.id && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-30" 
-                                    onClick={() => setOpenWaCitaId(null)} 
-                                  />
-                                  <div className="absolute left-0 bottom-full mb-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-2 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95">
-                                    <div className="text-[10px] font-bold text-[#6B7A8D] px-2 py-1 uppercase tracking-wider">
-                                      Mensajes para {clienteNombre(cita.cliente_id)?.split(" ")[0]}
-                                    </div>
-
-                                    <a
-                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(buildCitaWhatsAppMessage(cita, "confirmacion"))}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaCitaId(null)}
-                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
-                                        ✅ Confirmación de Cita
-                                      </span>
-                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
-                                        {cita.modalidad === "virtual" ? "Con aviso de videollamada..." : "Con dirección y Google Maps..."}
-                                      </span>
-                                    </a>
-
-                                    <a
-                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(buildCitaWhatsAppMessage(cita, "recordatorio"))}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaCitaId(null)}
-                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
-                                    >
-                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
-                                        ⏰ Recordatorio de Cita
-                                      </span>
-                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
-                                        "Te recordamos tu cita hoy/mañana..."
-                                      </span>
-                                    </a>
-
-                                    <a
-                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={() => setOpenWaCitaId(null)}
-                                      className="p-2 border-t border-[#F0F4FA] font-medium text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
-                                    >
-                                      <span>Abrir chat sin mensaje</span>
-                                      <MessageCircle size={12} />
-                                    </a>
-                                  </div>
-                                </>
-                              )}
+                            <div className="inline-flex items-stretch h-9 rounded-xl overflow-hidden shadow-sm" onClick={e => e.stopPropagation()}>
+                              <a
+                                href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(
+                                  buildCitaWhatsAppMessage(cita, cita.estado === "pendiente" ? "confirmacion" : "recordatorio")
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 transition-colors ${
+                                  cita.estado === "pendiente"
+                                    ? "bg-[#25D366] hover:bg-[#20bd5a]"
+                                    : "bg-emerald-600 hover:bg-emerald-700"
+                                }`}
+                                title="Enviar mensaje por WhatsApp a 1 clic"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 fill-white shrink-0" />
+                                <span>{cita.estado === "pendiente" ? "Confirmar WhatsApp" : "Recordatorio WhatsApp"}</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWaCita(cita)}
+                                className={`w-9 flex items-center justify-center border-l border-white/20 transition-colors text-white shrink-0 ${
+                                  cita.estado === "pendiente" ? "bg-[#20bd5a] hover:bg-[#1caa50]" : "bg-emerald-700 hover:bg-emerald-800"
+                                }`}
+                                title="Opciones de plantilla WhatsApp"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -635,6 +579,150 @@ export function AgendaAdmin({ setMsg, profileId }) {
             <Btn grad onClick={agregarHorario}>Guardar horario</Btn>
           </div>
         </Modal>
+      )}
+
+      {/* Modal / Action Sheet de Plantillas WhatsApp para Citas */}
+      {selectedWaCita && createPortal(
+        <div 
+          className="fixed inset-0 bg-[#0B1929]/50 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedWaCita(null)}
+        >
+          <div 
+            className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[#F0F4FA] flex items-center justify-between bg-white shrink-0">
+              <div>
+                <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2" style={{ fontFamily: "DM Sans" }}>
+                  <MessageCircle className="w-5 h-5 text-[#25D366] fill-[#25D366]" />
+                  Mensajes de Cita — {clienteNombre(selectedWaCita.cliente_id)?.split(" ")[0]}
+                </h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                  {fmtFechaHora(selectedWaCita.fecha_hora)} • {selectedWaCita.modalidad === "virtual" ? "Virtual" : "Presencial"} • {clienteTelefono(selectedWaCita.cliente_id) ? `WhatsApp: ${clienteTelefono(selectedWaCita.cliente_id)}` : "Sin teléfono"}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedWaCita(null)} 
+                className="w-8 h-8 rounded-full bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929] flex items-center justify-center transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body con plantillas interactivas */}
+            <div className="p-5 overflow-y-auto space-y-3 bg-[#F8FAFC]">
+              {/* Template 1: Confirmación Oficial */}
+              {(() => {
+                const tel = clienteTelefono(selectedWaCita.cliente_id);
+                const isRec = selectedWaCita.estado === "pendiente";
+                const msg = buildCitaWhatsAppMessage(selectedWaCita, "confirmacion");
+                return (
+                  <a
+                    href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(msg)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setSelectedWaCita(null)}
+                    className={`block p-4 rounded-xl border transition-all text-left group bg-white ${
+                      isRec 
+                        ? 'border-[#25D366] ring-2 ring-[#25D366]/20 shadow-sm' 
+                        : 'border-[#E2E8F0] hover:border-[#25D366] hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-sm text-[#0B1929] flex items-center gap-1.5 group-hover:text-emerald-600 transition-colors">
+                        <CheckCircle2 size={16} className="text-[#25D366]" />
+                        Confirmación Oficial de Cita
+                      </span>
+                      {isRec && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Sugerido ahora
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] leading-relaxed whitespace-pre-line">
+                      "{msg}"
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                      <span>Enviar por WhatsApp</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </a>
+                );
+              })()}
+
+              {/* Template 2: Recordatorio de Cita */}
+              {(() => {
+                const tel = clienteTelefono(selectedWaCita.cliente_id);
+                const isRec = selectedWaCita.estado === "confirmada";
+                const msg = buildCitaWhatsAppMessage(selectedWaCita, "recordatorio");
+                return (
+                  <a
+                    href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(msg)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setSelectedWaCita(null)}
+                    className={`block p-4 rounded-xl border transition-all text-left group bg-white ${
+                      isRec 
+                        ? 'border-amber-300 ring-2 ring-amber-500/20 shadow-sm' 
+                        : 'border-[#E2E8F0] hover:border-[#25D366] hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-sm text-[#0B1929] flex items-center gap-1.5 group-hover:text-amber-600 transition-colors">
+                        <Clock size={16} className="text-amber-500" />
+                        Recordatorio de Cita
+                      </span>
+                      {isRec && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          Sugerido previo a cita
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#6B7A8D] leading-relaxed whitespace-pre-line">
+                      "{msg}"
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                      <span>Enviar por WhatsApp</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </a>
+                );
+              })()}
+
+              {/* Template 3: Chat Libre */}
+              {(() => {
+                const tel = clienteTelefono(selectedWaCita.cliente_id);
+                return (
+                  <a
+                    href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setSelectedWaCita(null)}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-dashed border-[#CBD5E1] hover:border-[#25D366] hover:bg-emerald-50/50 transition-colors text-slate-600 hover:text-emerald-700 font-medium text-xs bg-white"
+                  >
+                    <span className="flex items-center gap-2">
+                      <MessageCircle size={15} />
+                      Abrir conversación en blanco (sin texto previo)
+                    </span>
+                    <span className="font-bold">Abrir chat →</span>
+                  </a>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-white border-t border-[#F0F4FA] flex justify-end shrink-0">
+              <button
+                onClick={() => setSelectedWaCita(null)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
