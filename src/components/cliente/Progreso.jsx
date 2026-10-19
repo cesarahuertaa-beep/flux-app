@@ -90,14 +90,32 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setMetricas(ms);
 
       // 2. Calcular progreso muscular
-      const [rutinas, progs] = await Promise.all([
-        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ejercicios(id,grupo_muscular)`),
+      const [ciclosActivos, rutinas, progs] = await Promise.all([
+        dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`),
+        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`),
         dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`)
       ]);
 
       const ejMap = {};
       rutinas.forEach(r => {
         r.ejercicios?.forEach(e => { ejMap[e.id] = e.grupo_muscular; });
+      });
+
+      // Identificar qué grupos musculares existen realmente en la rutina semanal activa del usuario
+      const cicloActivoId = ciclosActivos?.[0]?.id || null;
+      const activeRutinas = cicloActivoId
+        ? rutinas.filter(r => r.ciclo_id === cicloActivoId)
+        : rutinas;
+      const sourceRutinas = activeRutinas.length > 0 ? activeRutinas : rutinas;
+
+      const routineMuscleGroups = new Set();
+      sourceRutinas.forEach(r => {
+        r.ejercicios?.forEach(e => {
+          const norm = normalizeGroup(e.grupo_muscular);
+          if (EXACT_GROUPS.includes(norm)) {
+            routineMuscleGroups.add(norm);
+          }
+        });
       });
 
       const byEj = {};
@@ -108,7 +126,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
         byEj[p.ejercicio_id][p.semana][p.serie][p.tipo] = p.valor;
       });
 
-            const muscleXP = {}; EXACT_GROUPS.forEach(g => muscleXP[g] = 0);
+      const muscleXP = {};
+      EXACT_GROUPS.forEach(g => { muscleXP[g] = 0; });
 
       const allWeeks = new Set();
       for (const ejId in byEj) {
@@ -118,7 +137,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
       const minWeek = sortedWeeks[0] || 1;
       const maxWeek = sortedWeeks[sortedWeeks.length - 1] || 1;
 
-      const muscleStarted = {}; EXACT_GROUPS.forEach(g => muscleStarted[g] = false);
+      const muscleStarted = {};
+      EXACT_GROUPS.forEach(g => { muscleStarted[g] = false; });
       const last1RM = {}; 
 
       for (let w = minWeek; w <= maxWeek; w++) {
@@ -159,7 +179,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
          }
       }
 
-      setGroupAvg(muscleXP);
+      // Filtrar inteligentemente: solo mostrar grupos que estén en la rutina semanal (o que ya tengan XP > 0)
+      const filteredMuscleXP = {};
+      EXACT_GROUPS.forEach(g => {
+        if (routineMuscleGroups.has(g) || muscleXP[g] > 0) {
+          filteredMuscleXP[g] = muscleXP[g];
+        }
+      });
+
+      setGroupAvg(filteredMuscleXP);
 
     } catch (e) {
       console.error(e);
@@ -276,6 +304,28 @@ export default function Progreso({ cliente, isSelfManaged }) {
     { key:"pantorrilla", label:"PANTORRILLA", unit:"cm" },
   ].filter(k => current[k.key] != null && current[k.key] !==""); // Solo mostrar los que tienen datos
 
+  const GROUP_LABELS = {
+    pecho: "Pecho",
+    abdomen: "Abdomen",
+    oblicuos: "Oblicuos",
+    deltoide_anterior: "Deltoide Ant.",
+    deltoide_posterior: "Deltoide Post.",
+    trapecio: "Trapecio",
+    dorsal: "Dorsal",
+    lumbar: "Lumbar",
+    biceps: "Bíceps",
+    triceps: "Tríceps",
+    antebrazo: "Antebrazo",
+    gluteo: "Glúteo",
+    cuadriceps: "Cuádriceps",
+    isquiotibial: "Isquiotibial",
+    pantorrilla: "Pantorrilla",
+    aductor: "Aductor",
+    abductor: "Abductor",
+    soleo: "Sóleo",
+    cuello: "Cuello"
+  };
+
   const getBodyData = (groups) => {
     const data = [];
     
@@ -305,11 +355,6 @@ export default function Progreso({ cliente, isSelfManaged }) {
     if (groups.soleo) data.push({ name: 'Sóleo', muscles: ['left-soleus', 'right-soleus'], frequency: getFrequency(groups.soleo) });
     if (groups.cuello) data.push({ name: 'Cuello', muscles: ['neck'], frequency: getFrequency(groups.cuello) });
 
-    const hasMax = data.some(d => d.frequency === 6);
-    if (!hasMax && data.length > 0) {
-      data.push({ name: 'Anchor', muscles: ['head'], frequency: 6 }); 
-    }
-    
     return data;
   };
 
@@ -454,14 +499,14 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <h2 className="text-lg font-bold text-[#0B1929] mb-2 relative z-10">Desarrollo Muscular</h2>
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
           
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 relative z-10">
-            <div className="flex flex-row justify-center drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] w-full">
-              <div className="flex justify-center gap-2 md:gap-4 w-full max-w-[400px] mx-auto">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-10 relative z-10">
+            <div className="flex flex-row justify-center drop-shadow-[0_0_15px_rgba(59,130,246,0.25)] w-full lg:w-[340px] shrink-0">
+              <div className="flex justify-center gap-2 md:gap-4 w-full max-w-[340px] mx-auto">
                   <div className="w-1/2 flex justify-center">
                     <Model 
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
-                      style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
+                      style={{ width: '100%', maxWidth: '10.5rem', padding: '0.25rem' }} 
                       highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="anterior"
                     />
@@ -470,7 +515,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <Model 
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
-                      style={{ width: '100%', maxWidth: '12rem', padding: '0.5rem' }} 
+                      style={{ width: '100%', maxWidth: '10.5rem', padding: '0.25rem' }} 
                       highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="posterior"
                     />
@@ -478,28 +523,33 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 </div>
             </div>
 
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 w-full md:w-64">
-              <p className="text-xs font-bold text-[#6B7A8D] tracking-widest mb-4">RANGOS ALCANZADOS</p>
-              <div className="space-y-3">
-                {Object.entries(groupAvg).sort((a,b)=>b[1]-a[1]).map(([g, pct]) => {
-                  const rank = getRank(pct);
-                  return (
-                    <div key={g} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.3)]" style={{ background: rank.color }} />
-                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g, " ")}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
-                        <p className="text-[10px] text-[#6B7A8D]">{pct} XP</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {Object.keys(groupAvg).length === 0 && (
-                  <p className="text-sm text-[#6B7A8D] text-center py-4">Aún no hay suficiente historial para calcular avances.</p>
-                )}
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 md:p-5 w-full flex-1">
+              <div className="flex items-center justify-between mb-3.5">
+                <p className="text-[11px] font-bold text-[#6B7A8D] tracking-widest uppercase">RANGOS ALCANZADOS</p>
+                <span className="text-[10px] font-semibold text-[#9BA5B0]">Segun tu rutina activa</span>
               </div>
+              {Object.keys(groupAvg).length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {Object.entries(groupAvg).sort((a,b)=>b[1]-a[1]).map(([g, pct]) => {
+                    const rank = getRank(pct);
+                    const label = GROUP_LABELS[g] || g.replace(/_/g, " ");
+                    return (
+                      <div key={g} className="bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2 shadow-[0_1px_2px_rgba(11,25,41,0.02)]">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: rank.color }} />
+                          <span className="text-xs md:text-sm font-semibold text-[#0B1929] truncate capitalize">{label}</span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold whitespace-nowrap leading-tight" style={{ color: rank.color }}>{rank.name}</p>
+                          <p className="text-[10px] font-mono text-[#6B7A8D] leading-tight mt-0.5">{pct} XP</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-[#6B7A8D] text-center py-4">Aún no hay suficiente historial para calcular avances.</p>
+              )}
             </div>
           </div>
 
