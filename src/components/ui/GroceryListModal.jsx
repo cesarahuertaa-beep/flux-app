@@ -266,11 +266,38 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
     return ingredients.filter((it) => !!checkedItems[it.id]).length;
   }, [ingredients, checkedItems]);
 
+  const targetItems = useMemo(() => {
+    return filteredIngredients.length > 0 ? filteredIngredients : ingredients;
+  }, [filteredIngredients, ingredients]);
+
+  const allTargetSelected = useMemo(() => {
+    if (targetItems.length === 0) return false;
+    return targetItems.every((it) => !!checkedItems[it.id]);
+  }, [targetItems, checkedItems]);
+
   const toggleCheck = (id) => {
     setCheckedItems((prev) => ({
       ...prev,
       [id]: !prev[id]
     }));
+  };
+
+  const handleToggleSelectAll = () => {
+    if (allTargetSelected) {
+      // Si todos están seleccionados, desmarcar los ítems del objetivo
+      const nextChecked = { ...checkedItems };
+      targetItems.forEach((it) => {
+        delete nextChecked[it.id];
+      });
+      setCheckedItems(nextChecked);
+    } else {
+      // Marcar todos los ítems del objetivo como comprados
+      const nextChecked = { ...checkedItems };
+      targetItems.forEach((it) => {
+        nextChecked[it.id] = true;
+      });
+      setCheckedItems(nextChecked);
+    }
   };
 
   const handleClearAll = () => {
@@ -379,17 +406,44 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
           </div>
 
           {/* Middle Row: Progress indicator & Alternatives toggle */}
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs text-[#6B7A8D]">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-[#0B1929]">
-                {completedCount} de {totalCount} comprados
-              </span>
-              <div className="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
-                />
+          <div className="flex items-center justify-between flex-wrap gap-2.5 pt-1 text-xs text-[#6B7A8D]">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[#0B1929]">
+                  {completedCount} de {totalCount} comprados
+                </span>
+                <div className="w-20 sm:w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
+
+              {/* Botón Seleccionar / Desmarcar Todo */}
+              {totalCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleToggleSelectAll}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                    allTargetSelected
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                      : "bg-white text-[#0B1929] border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] shadow-2xs"
+                  }`}
+                >
+                  {allTargetSelected ? (
+                    <>
+                      <CheckCheck size={14} className="text-emerald-600" />
+                      <span>Desmarcar todo</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} className="text-[var(--brand-primary)]" />
+                      <span>Seleccionar todo</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer select-none">
