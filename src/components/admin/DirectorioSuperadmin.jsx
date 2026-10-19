@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from"react";
 import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from"../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell } from"lucide-react";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from"lucide-react";
 
 const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
 
@@ -72,6 +72,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [showInviteNutri, setShowInviteNutri] = useState(false);
   const [showEditNutri, setShowEditNutri] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
+  const [showConfirmDeleteNutri, setShowConfirmDeleteNutri] = useState(false);
+  const [confirmDeleteNutriText, setConfirmDeleteNutriText] = useState("");
   
   const [conflictUser, setConflictUser] = useState(null);
   const [conflictType, setConflictType] = useState(null);
@@ -205,6 +207,40 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     } catch(e) {
       setMsg("❌ Error:" + e.message);
     }
+  };
+
+  const deleteNutriologo = async () => {
+    if (confirmDeleteNutriText !== "ELIMINAR" || !showEditNutri || showEditNutri.isSuperadmin) return;
+    setSaving(true);
+    try {
+      const { storageListFolder, storageRemoveMany } = await import("../../lib/supabase");
+      // 1. Limpiar fotos de progreso en Storage de todos los pacientes asignados a este nutriólogo
+      const nutriClients = await dbGet(`clientes?nutriologo_id=eq.${showEditNutri.id}&select=id`);
+      for (const c of nutriClients) {
+        try {
+          const files = await storageListFolder("progress-photos", c.id);
+          if (files && files.length > 0) {
+            const paths = files.map(f => `${c.id}/${f.name}`);
+            await storageRemoveMany("progress-photos", paths);
+          }
+        } catch (storageErr) {
+          console.error("Error limpiando fotos del paciente:", storageErr);
+        }
+      }
+
+      // 2. Ejecutar borrado en cascada en BD vía RPC
+      await dbPost("rpc/eliminar_nutriologo_definitivo", { p_nutriologo_id: showEditNutri.id });
+
+      setMsg("✅ Nutriólogo y sus expedientes eliminados permanentemente.");
+      setShowEditNutri(null);
+      setShowConfirmDeleteNutri(false);
+      setConfirmDeleteNutriText("");
+      await loadNutriologos();
+      await loadClientes();
+    } catch (e) {
+      setMsg("❌ Error eliminando nutriólogo: " + e.message);
+    }
+    setSaving(false);
   };
 
   const createClient = async () => {
@@ -635,7 +671,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       )}
 
       {showEditNutri && (
-        <Modal title={<><Pencil size={20} className="text-blue-500"/> Editar {showEditNutri.nombre}</>} onClose={() => setShowEditNutri(null)}>
+        <Modal title={<><Pencil size={20} className="text-blue-500"/> Editar {showEditNutri.nombre}</>} onClose={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>
           <Field label="Nombre completo">
             <input className={InputClass} value={editFormNutri.nombre} onChange={e => setEditFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
@@ -655,9 +691,40 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               ))}
             </div>
           </Field>
-          <div className="flex gap-2.5 justify-end mt-4">
-            <Btn outline onClick={() => setShowEditNutri(null)}>Cancelar</Btn>
-            <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ?"Guardando..." :"Guardar cambios"}</Btn>
+
+          <div className="pt-4 border-t border-slate-100 mt-4">
+            {showConfirmDeleteNutri && !showEditNutri.isSuperadmin ? (
+              <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+                <p className="text-red-700 text-xs font-bold mb-2">
+                  Esta acción es irreversible. Se eliminará al nutriólogo y todos los expedientes clínicos de sus pacientes (si algún paciente tiene cuenta independiente, su cuenta independiente se conservará).
+                  Escribe la palabra <strong>ELIMINAR</strong> para confirmar.
+                </p>
+                <input 
+                  value={confirmDeleteNutriText}
+                  onChange={e => setConfirmDeleteNutriText(e.target.value)}
+                  placeholder="ELIMINAR"
+                  className="w-full bg-white border border-red-200 text-red-900 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-red-500 mb-2"
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => { setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:bg-white transition-colors">Cancelar</button>
+                  <button onClick={deleteNutriologo} disabled={confirmDeleteNutriText !== "ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                    {saving ? "Eliminando..." : "Eliminar Definitivamente"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                {!showEditNutri.isSuperadmin ? (
+                  <button onClick={() => setShowConfirmDeleteNutri(true)} className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                    <Trash2 size={14} /> Borrar Nutriólogo
+                  </button>
+                ) : <div />}
+                <div className="flex gap-2.5">
+                  <Btn outline onClick={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>Cancelar</Btn>
+                  <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ?"Guardando..." :"Guardar cambios"}</Btn>
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}
