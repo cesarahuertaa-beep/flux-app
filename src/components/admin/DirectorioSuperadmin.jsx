@@ -12,18 +12,18 @@ const uploadLogo = async (file) => {
 
 const Btn = ({ children, onClick, disabled, small, outline, grad, className ="" }) => {
   let baseClass ="inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-  if (small) baseClass +="px-3 py-1.5 text-xs";
-  else baseClass +="px-4 py-2 text-sm";
+  if (small) baseClass +=" px-3 py-1.5 text-xs";
+  else baseClass +=" px-4 py-2 text-sm";
   
-  if (grad) baseClass +="bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500";
-  else if (outline) baseClass +="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200";
-  else baseClass +="bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500";
+  if (grad) baseClass +=" bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500";
+  else if (outline) baseClass +=" border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200";
+  else baseClass +=" bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500";
   
   if (outline && className.includes("text-red-500")) {
     baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50","text-red-600 hover:bg-red-50 border-red-200");
   }
   
-  return <button onClick={onClick} disabled={disabled} className={baseClass + className}>{children}</button>;
+  return <button onClick={onClick} disabled={disabled} className={`${baseClass} ${className}`}>{children}</button>;
 };
 
 const Modal = ({ title, onClose, children }) => (
