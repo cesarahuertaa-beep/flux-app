@@ -1,15 +1,74 @@
-import { useState } from"react";
-import { Flame, ChevronRight, Apple, FileText } from"lucide-react";
-import { useBrand } from"../BrandContext";
-import { generateNutriPDF } from"../../utils/pdf";
+import { useState, useEffect, useMemo } from "react";
+import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
+import { useBrand } from "../BrandContext";
+import { generateNutriPDF } from "../../utils/pdf";
+import GroceryListModal from "../ui/GroceryListModal";
 
 const DAY_SHORT = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const DAY_FULL  = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 
 export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1, isSelfManaged }) {
-  const [activeDay, setActiveDay]     = useState(0);
+  const [activeDay, setActiveDay]       = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
+  const [showGrocery, setShowGrocery]   = useState(false);
   const brand = useBrand();
+
+  // ── Hábitos diarios: Hidratación y Comidas Realizadas ──
+  const habitStorageKey = `flux_nutri_habits_${cliente?.id || "user"}_s${semanaActualCiclo}_d${activeDay}`;
+  const [habitsData, setHabitsData] = useState(() => {
+    try {
+      const saved = localStorage.getItem(habitStorageKey);
+      return saved ? JSON.parse(saved) : { agua: 0, comidasDone: {} };
+    } catch {
+      return { agua: 0, comidasDone: {} };
+    }
+  });
+
+  // Al cambiar de día o semana, recargar los hábitos correspondientes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(habitStorageKey);
+      setHabitsData(saved ? JSON.parse(saved) : { agua: 0, comidasDone: {} });
+    } catch {
+      setHabitsData({ agua: 0, comidasDone: {} });
+    }
+  }, [habitStorageKey]);
+
+  // Persistir cambios
+  const updateHabits = (updater) => {
+    setHabitsData((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try {
+        localStorage.setItem(habitStorageKey, JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  const pesoKg = parseFloat(cliente?.peso || nutri?.peso || 0);
+  const metaAguaMl = pesoKg > 0 ? Math.round(pesoKg * 35 / 50) * 50 : 2500;
+  const aguaActual = habitsData?.agua || 0;
+  const pctAgua = Math.min(100, Math.round((aguaActual / metaAguaMl) * 100));
+
+  const addAgua = (ml) => {
+    updateHabits((prev) => ({
+      ...prev,
+      agua: Math.max(0, (prev.agua || 0) + ml)
+    }));
+  };
+
+  const toggleComidaDone = (mealId, e) => {
+    if (e) e.stopPropagation();
+    updateHabits((prev) => ({
+      ...prev,
+      comidasDone: {
+        ...(prev.comidasDone || {}),
+        [mealId]: !prev.comidasDone?.[mealId]
+      }
+    }));
+  };
 
   if (!dias || dias.length === 0) {
     return (
@@ -73,7 +132,14 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
               </p>
             ) : null}
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+            <button
+              onClick={() => setShowGrocery(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-3 rounded-xl text-sm font-semibold shadow-sm hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
+            >
+              <ShoppingBag size={18} className="text-[var(--brand-primary)]" />
+              Lista del Súper
+            </button>
             <button
               onClick={handleDownloadPDF}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-3 rounded-xl text-sm font-semibold shadow-sm hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
@@ -115,6 +181,92 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
         })}
       </div>
 
+      {/* ── Habits & Adherence Widget ── */}
+      <div className="px-6 md:px-8 mb-4">
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          
+          {/* Hidratación (Agua) */}
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-[#0B1929]">
+                <Droplets size={16} className="text-cyan-500 fill-cyan-500" />
+                <span>Hidratación del Día</span>
+              </div>
+              <span className="font-mono text-cyan-600 font-bold text-xs">
+                {aguaActual} / {metaAguaMl} ml ({pctAgua}%)
+              </span>
+            </div>
+
+            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full rounded-full transition-all duration-300"
+                style={{ width: `${pctAgua}%` }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-0.5">
+              <button
+                type="button"
+                onClick={() => addAgua(250)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 font-semibold text-xs border border-cyan-200 transition-colors cursor-pointer"
+              >
+                <Plus size={13} />
+                <span>250 ml (1 vaso)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => addAgua(500)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs border border-blue-200 transition-colors cursor-pointer"
+              >
+                <Plus size={13} />
+                <span>500 ml (1 botella)</span>
+              </button>
+              {aguaActual > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addAgua(-250)}
+                  className="p-1 rounded-lg bg-gray-100 text-[#6B7A8D] hover:bg-gray-200 text-xs transition-colors cursor-pointer"
+                  title="Restar 250 ml"
+                >
+                  <Minus size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="hidden md:block w-px h-12 bg-[#E2E8F0]" />
+
+          {/* Adherencia de Comidas del Día */}
+          <div className="w-full md:w-64 flex flex-col gap-2">
+            {(() => {
+              const realizadasCount = comidas.filter((_, idx) => !!habitsData?.comidasDone?.[idx]).length;
+              const pctComidas = comidas.length > 0 ? Math.round((realizadasCount / comidas.length) * 100) : 0;
+              return (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-[#0B1929]">Adherencia del Día</span>
+                    <span className="font-mono text-emerald-600 font-bold text-xs">
+                      {realizadasCount} / {comidas.length} comidas ({pctComidas}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${pctComidas}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#6B7A8D]">
+                    {pctComidas === 100
+                      ? "🎉 ¡Excelente! Cumpliste todas las comidas hoy."
+                      : "Marca cada comida cumplida con el botón ✓."}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
+
       {/* ── Meals list ── */}
       <div className="px-6 md:px-8 flex-1 overflow-y-auto space-y-3 pb-8">
         <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-4">
@@ -127,9 +279,10 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
 
         {comidas.map((meal, idx) => {
           const isExpanded = expandedMeal === idx;
+          const isDone = !!habitsData?.comidasDone?.[idx];
           // Etiqueta visual: usamos meal.nombre como label principal
           const label = meal.nombre || `Comida ${idx + 1}`;
-          const hora  = meal.hora ||"";
+          const hora  = meal.hora || "";
           // Extracto de texto para mostrar en el acordeón cerrado
           const preview = meal.opcion1
             ? meal.opcion1.split(",")[0].substring(0, 50)
@@ -139,48 +292,65 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             <div
               key={meal.id || idx}
               className={`bg-white rounded-xl border overflow-hidden transition-all ${
-                isExpanded ?"border-[var(--brand-primary)] shadow-sm" :"border-[#E2E8F0]"
+                isDone
+                  ? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+                  : isExpanded
+                  ? "border-[var(--brand-primary)] shadow-sm"
+                  : "border-[#E2E8F0]"
               }`}
             >
               {/* ── Row header ── */}
-              <button
-                className="w-full flex items-center gap-4 px-5 py-4 text-left"
-                onClick={() => setExpandedMeal(isExpanded ? null : idx)}
-              >
-                <div
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    isExpanded ?"bg-[var(--brand-primary)]" :"bg-[#CBD5E1]"
+              <div className="w-full flex items-center gap-3 px-5 py-4">
+                {/* Botón de Check de Comida Realizada */}
+                <button
+                  type="button"
+                  onClick={(e) => toggleComidaDone(idx, e)}
+                  title={isDone ? "Comida cumplida (clic para desmarcar)" : "Marcar como comida realizada"}
+                  className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    isDone
+                      ? "bg-emerald-500 border-emerald-500 text-white shadow-xs"
+                      : "border-gray-300 bg-white hover:border-emerald-400 text-gray-400 hover:text-emerald-500"
                   }`}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {hora && (
-                      <>
-                        <span className="text-xs font-mono text-[#6B7A8D]">{hora}</span>
-                        <span className="w-1 h-1 rounded-full bg-[#CBD5E1]" />
-                      </>
-                    )}
-                    <span className="text-xs font-semibold text-[var(--brand-primary)] uppercase tracking-wide">
-                      {label}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-[#0B1929] mt-0.5 truncate">{preview}</p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {meal.calorias > 0 && (
-                    <div className="flex items-center gap-1 bg-[#FFF7ED] px-2 py-1 rounded-lg">
-                      <Flame size={12} className="text-orange-400" />
-                      <span className="text-xs font-mono font-semibold text-orange-500">
-                        {meal.calorias}
+                >
+                  <Check size={14} className="stroke-[3]" />
+                </button>
+
+                <button
+                  className="flex-1 flex items-center gap-3 text-left min-w-0"
+                  onClick={() => setExpandedMeal(isExpanded ? null : idx)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hora && (
+                        <>
+                          <span className="text-xs font-mono text-[#6B7A8D]">{hora}</span>
+                          <span className="w-1 h-1 rounded-full bg-[#CBD5E1]" />
+                        </>
+                      )}
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${isDone ? "text-emerald-600" : "text-[var(--brand-primary)]"}`}>
+                        {label} {isDone && "✓"}
                       </span>
                     </div>
-                  )}
-                  <ChevronRight
-                    size={16}
-                    className={`text-[#CBD5E1] transition-transform ${isExpanded ?"rotate-90 text-[var(--brand-primary)]" :""}`}
-                  />
-                </div>
-              </button>
+                    <p className={`text-sm font-medium mt-0.5 truncate ${isDone ? "text-gray-500" : "text-[#0B1929]"}`}>
+                      {preview}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {meal.calorias > 0 && (
+                      <div className="flex items-center gap-1 bg-[#FFF7ED] px-2 py-1 rounded-lg">
+                        <Flame size={12} className="text-orange-400" />
+                        <span className="text-xs font-mono font-semibold text-orange-500">
+                          {meal.calorias}
+                        </span>
+                      </div>
+                    )}
+                    <ChevronRight
+                      size={16}
+                      className={`text-[#CBD5E1] transition-transform ${isExpanded ? "rotate-90 text-[var(--brand-primary)]" : ""}`}
+                    />
+                  </div>
+                </button>
+              </div>
 
               {/* ── Expanded content: diseño vertical optimizado para móviles ── */}
               {isExpanded && (
@@ -242,6 +412,16 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
           );
         })}
       </div>
+
+      {/* ── Modal de Lista de Compras del Súper ── */}
+      {showGrocery && (
+        <GroceryListModal
+          dias={dias}
+          onClose={() => setShowGrocery(false)}
+          clienteNombre={clienteNombre}
+          semanaActualCiclo={semanaActualCiclo}
+        />
+      )}
     </div>
   );
 }

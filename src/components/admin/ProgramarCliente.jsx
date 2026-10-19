@@ -17,12 +17,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { ProgresoCliente } from "./ProgresoCliente";
+import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
@@ -62,6 +63,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [editRutina, setEditRutina] = useState(null);
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
   const [activeAltSlot, setActiveAltSlot] = useState(null);
+  const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
 
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
@@ -277,6 +279,167 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       }
     } catch(e) { 
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+    }
+    setSaving(false);
+  };
+
+  const handleApplyNutriTemplate = async (tpl) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      let activeCiclo = cicloSel;
+      if (!activeCiclo) {
+        const start = new Date(planForm.fecha_inicio + "T12:00:00");
+        const end = new Date(start);
+        end.setDate(end.getDate() + 27);
+        const options = { day: "numeric", month: "short" };
+        const rangeStr = `${start.toLocaleDateString("es-ES", options)} - ${end.toLocaleDateString("es-ES", options)}`;
+        const idx = ciclos.length;
+        const ordinal = ORDINALES[idx] || `${idx + 1}º`;
+        const finalName = `${ordinal} Plan (${rangeStr})|4`;
+        if (ciclos.some((c) => c.activo)) {
+          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+        }
+        const cRes = await dbPost("ciclos", {
+          cliente_id: selected.id,
+          nombre: finalName,
+          fecha_inicio: planForm.fecha_inicio,
+          activo: true
+        });
+        activeCiclo = cRes[0];
+        await loadCiclos();
+        setCicloSel(activeCiclo);
+      }
+
+      let currentNutri = nutri;
+      if (!currentNutri) {
+        const payload = {
+          cliente_id: selected.id,
+          calorias: tpl.macros?.calorias || 0,
+          proteina: tpl.macros?.proteina || 0,
+          carbohidratos: tpl.macros?.carbohidratos || 0,
+          grasas: tpl.macros?.grasas || 0,
+          ciclo_id: activeCiclo.id
+        };
+        const res = await dbPost("nutricion", payload);
+        currentNutri = res[0];
+        setNutri(currentNutri);
+      } else if (tpl.macros) {
+        await dbPatch(`nutricion?id=eq.${currentNutri.id}`, tpl.macros);
+        setMacros(tpl.macros);
+      }
+
+      for (let i = 0; i < (tpl.dias || []).length; i++) {
+        const d = tpl.dias[i];
+        const dRes = await dbPost("nutricion_dias", {
+          nutricion_id: currentNutri.id,
+          dia: d.dia || `Día ${dias.length + i + 1}`,
+          orden: dias.length + i
+        });
+        const newDia = dRes[0];
+        if (newDia && d.comidas?.length > 0) {
+          const comsData = d.comidas.map((c, cIdx) => ({
+            dia_id: newDia.id,
+            hora: c.hora || "",
+            nombre: c.nombre || `Comida ${cIdx + 1}`,
+            opcion1: c.opcion1 || "",
+            opcion2: c.opcion2 || "",
+            calorias: +c.calorias || 0,
+            proteina: +c.proteina || 0,
+            carbohidratos: +c.carbohidratos || 0,
+            grasas: +c.grasas || 0,
+            foto_url: c.foto_url || "",
+            orden: cIdx
+          }));
+          await dbPost("comidas", comsData);
+        }
+      }
+
+      await loadData();
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
+        </div>
+      );
+    } catch (e) {
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="w-4 h-4 text-red-500" /> Error aplicando plantilla: {e.message}
+        </div>
+      );
+    }
+    setSaving(false);
+  };
+
+  const handleApplyRutinaTemplate = async (tpl) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      let activeCiclo = cicloSel;
+      if (!activeCiclo) {
+        const start = new Date(planForm.fecha_inicio + "T12:00:00");
+        const end = new Date(start);
+        end.setDate(end.getDate() + 27);
+        const options = { day: "numeric", month: "short" };
+        const rangeStr = `${start.toLocaleDateString("es-ES", options)} - ${end.toLocaleDateString("es-ES", options)}`;
+        const idx = ciclos.length;
+        const ordinal = ORDINALES[idx] || `${idx + 1}º`;
+        const finalName = `${ordinal} Plan (${rangeStr})|4`;
+        if (ciclos.some((c) => c.activo)) {
+          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+        }
+        const cRes = await dbPost("ciclos", {
+          cliente_id: selected.id,
+          nombre: finalName,
+          fecha_inicio: planForm.fecha_inicio,
+          activo: true
+        });
+        activeCiclo = cRes[0];
+        await loadCiclos();
+        setCicloSel(activeCiclo);
+      }
+
+      for (let i = 0; i < (tpl.rutinas || []).length; i++) {
+        const r = tpl.rutinas[i];
+        const rRes = await dbPost("rutinas", {
+          cliente_id: selected.id,
+          ciclo_id: activeCiclo.id,
+          nombre: r.nombre || `Rutina ${rutinas.length + i + 1}`,
+          semanas: r.semanas || 4,
+          orden: rutinas.length + i
+        });
+        const newRutina = rRes[0];
+        if (newRutina && r.ejercicios?.length > 0) {
+          const ejsData = r.ejercicios.map((e, eIdx) => ({
+            rutina_id: newRutina.id,
+            biblioteca_id: e.biblioteca_id || null,
+            nombre: e.nombre,
+            gif_url: e.gif_url || "",
+            grupo_muscular: e.grupo_muscular || "",
+            tipo_movimiento: e.tipo_movimiento || "",
+            num_series: +e.num_series || 4,
+            reps_sugeridas: +e.reps_sugeridas || 10,
+            peso_sugerido: e.peso_sugerido || "",
+            unidad: e.unidad || "kg",
+            alternativas: e.alternativas || [],
+            orden: eIdx
+          }));
+          await dbPost("ejercicios", ejsData);
+        }
+      }
+
+      await loadData();
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
+        </div>
+      );
+    } catch (e) {
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="w-4 h-4 text-red-500" /> Error aplicando plantilla: {e.message}
+        </div>
+      );
     }
     setSaving(false);
   };
@@ -945,6 +1108,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     <span className="sm:hidden">PDF</span>
                   </button>
                 )}
+                {!isReadOnly && (
+                  <button
+                    onClick={() => setTemplateModal("nutri")}
+                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] font-semibold shadow-sm transition-colors cursor-pointer"
+                    title="Biblioteca de Plantillas de Nutrición"
+                  >
+                    <Bookmark className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                    <span>Plantillas</span>
+                  </button>
+                )}
                 {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewDia}><Plus className="w-3.5 h-3.5" /> Día</button>}
               </div>
             </div>
@@ -1001,7 +1174,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           <div>
             <div className="flex justify-between items-center mb-3">
               <span className="font-semibold">Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span></span>
-              {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewRutina}><Plus className="w-3.5 h-3.5" /> Rutina</button>}
+              <div className="flex items-center gap-2">
+                {!isReadOnly && (
+                  <button
+                    onClick={() => setTemplateModal("rutina")}
+                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] font-semibold shadow-sm transition-colors cursor-pointer"
+                    title="Biblioteca de Plantillas de Rutinas"
+                  >
+                    <Bookmark className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                    <span>Plantillas</span>
+                  </button>
+                )}
+                {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewRutina}><Plus className="w-3.5 h-3.5" /> Rutina</button>}
+              </div>
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
@@ -1425,6 +1610,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal de Plantillas Maestro (Nutrición y Rutinas) ── */}
+      {templateModal && (
+        <TemplatesManagerModal
+          type={templateModal}
+          currentData={
+            templateModal === "nutri"
+              ? { macros, dias }
+              : { rutinas, semanas: planForm?.semanas || 4 }
+          }
+          clientes={clientes}
+          onApplyTemplate={
+            templateModal === "nutri"
+              ? handleApplyNutriTemplate
+              : handleApplyRutinaTemplate
+          }
+          onClose={() => setTemplateModal(null)}
+          setMsg={setMsg}
+        />
       )}
     </div>
   );

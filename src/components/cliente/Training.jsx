@@ -195,7 +195,6 @@ export default function Training({
 
   const [activeRutinaIdx, setActiveRutinaIdx] = useState(0);
   const [expandedEx,      setExpandedEx]      = useState(0); // Primer ejercicio abierto por defecto
-  const [showProgress,    setShowProgress]    = useState(false);
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
   const [previewEx, setPreviewEx] = useState(null);
   const [showResumen,     setShowResumen]     = useState(false);
@@ -230,11 +229,7 @@ export default function Training({
     return { obj: (ex.alternativas || [])[altIdx] || ex, variantId };
   };
 
-    const targetExIndex = expandedEx !== null ? expandedEx : 0;
-  const targetEx = ejercicios[targetExIndex];
-  const targetExObj = targetEx ? getVariantObj(targetEx).obj : null;
   const totalSemanas = rutinaActiva?.semanas || 4;
-  const numSeries = targetExObj ? parseInt(targetExObj.num_series) || 4 : 4;
 
   const calcular1RMForGraph = (peso, reps) => {
     const p = parseFloat(peso), r = parseFloat(reps);
@@ -243,30 +238,31 @@ export default function Training({
     return p * (1 + r / 30);
   };
 
-    let graficaDataRaw = targetExObj
-    ? Array.from({ length: totalSemanas }, (_, w) => {
-        const dataPoint = { week: `Sem ${w + 1}` };
-        let hasData = false;
-        for (let s = 0; s < numSeries; s++) {
-          const variantId = activeVariant[targetEx.id] || 'original';
-          const p = parseFloat(progreso[`${targetEx.id}-${w}-${s}-peso-${variantId}`]);
-          const rVal = progreso[`${targetEx.id}-${w}-${s}-reps-${variantId}`];
-          const r = rVal ==="Falta" ? 0 : parseFloat(rVal);
-          
-          if (!isNaN(p) && !isNaN(r) && p > 0 && r > 0) {
-            const e1rm = calcular1RMForGraph(p, r);
-            if (e1rm) {
-              dataPoint[`serie_${s}`] = Math.round(e1rm * 10) / 10;
-              hasData = true;
-            }
+  const getExerciseGraphData = (ex, activeObj, variantId) => {
+    if (!ex || !activeObj) return [];
+    const nSeries = parseInt(activeObj.num_series || ex.num_series) || 4;
+    const raw = Array.from({ length: totalSemanas }, (_, w) => {
+      const dataPoint = { week: `Sem ${w + 1}` };
+      let hasData = false;
+      for (let s = 0; s < nSeries; s++) {
+        const p = parseFloat(progreso[`${ex.id}-${w}-${s}-peso-${variantId}`]);
+        const rVal = progreso[`${ex.id}-${w}-${s}-reps-${variantId}`];
+        const r = rVal === "Falta" ? 0 : parseFloat(rVal);
+
+        if (!isNaN(p) && !isNaN(r) && p > 0 && r > 0) {
+          const e1rm = calcular1RMForGraph(p, r);
+          if (e1rm) {
+            dataPoint[`serie_${s}`] = Math.round(e1rm * 10) / 10;
+            hasData = true;
           }
         }
-        return { dataPoint, hasData };
-      })
-    : [];
+      }
+      return { dataPoint, hasData };
+    });
 
-  const lastDataIndex = graficaDataRaw.reduce((lastIdx, item, idx) => item.hasData ? idx : lastIdx, -1);
-  const graficaData = lastDataIndex === -1 ? [] : graficaDataRaw.slice(0, lastDataIndex + 1).map(i => i.dataPoint);
+    const lastDataIndex = raw.reduce((lastIdx, item, idx) => (item.hasData ? idx : lastIdx), -1);
+    return lastDataIndex === -1 ? [] : raw.slice(0, lastDataIndex + 1).map(i => i.dataPoint);
+  };
 
   const getPrevVal = (exId, variantId, exObj, si, tipo) => {
     if (wi === 0) {
@@ -464,112 +460,8 @@ export default function Training({
               </p>
             ) : null}
           </div>
-          <button
-            onClick={() => setShowProgress(s => !s)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
-              showProgress
-                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                : "bg-white text-[var(--brand-primary)] border-[#E2E8F0] hover:border-[var(--brand-primary)]"
-            }`}
-          >
-            <TrendingUp size={15} />
-            Progreso
-          </button>
         </div>
       </div>
-
-      {/* ── Gráfica de progresión (opcional) ── */}
-      {showProgress && graficaData.length > 0 && (
-        <div className="px-6 md:px-8 mb-5">
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
-            <h3 className="text-sm font-semibold text-[#0B1929] mb-4">
-              Progresión de 1RM — {targetExObj?.nombre}
-            </h3>
-            <ResponsiveContainer width="100%" height={150}>
-              <LineChart data={graficaData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily:"JetBrains Mono", fill:"#6B7A8D" }} />
-                <YAxis tick={{ fontSize: 10, fontFamily:"JetBrains Mono", fill:"#6B7A8D" }} />
-                <Tooltip
-                  contentStyle={{
-                    fontFamily:"JetBrains Mono",
-                    fontSize: 11,
-                    border:"1px solid #E2E8F0",
-                    borderRadius: 8,
-                  }}
-                  formatter={(value, name) => [`${value} kg`, name]}
-                />
-                {numSeries > 0 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_0"
-                    stroke="#0ea5e9"
-                    strokeWidth={2}
-                    dot={{ fill:"#0ea5e9", r: 3 }}
-                    name="Serie 1"
-                    connectNulls={false}
-                  />
-                )}
-                {numSeries > 1 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_1"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={{ fill:"#10b981", r: 3 }}
-                    name="Serie 2"
-                    connectNulls={false}
-                  />
-                )}
-                {numSeries > 2 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_2"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    dot={{ fill:"#f59e0b", r: 3 }}
-                    name="Serie 3"
-                    connectNulls={false}
-                  />
-                )}
-                {numSeries > 3 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_3"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={{ fill:"#8b5cf6", r: 3 }}
-                    name="Serie 4"
-                    connectNulls={false}
-                  />
-                )}
-                {numSeries > 4 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_4"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    dot={{ fill:"#ef4444", r: 3 }}
-                    name="Serie 5"
-                    connectNulls={false}
-                  />
-                )}
-                {numSeries > 5 && (
-                  <Line
-                    type="monotone"
-                    dataKey="serie_5"
-                    stroke="#14b8a6"
-                    strokeWidth={2}
-                    dot={{ fill:"#14b8a6", r: 3 }}
-                    name="Serie 6"
-                    connectNulls={false}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
 
       {/* ── Day tabs (las rutinas/días del cliente) ── */}
       <div className="px-6 md:px-8 flex gap-2 mb-4 overflow-x-auto scroll-hide">
@@ -915,6 +807,55 @@ export default function Training({
                       );
                     })}
                   </div>
+
+                  {(() => {
+                    const exGraphData = getExerciseGraphData(ex, activeObj, activeVarId);
+                    if (!exGraphData || exGraphData.length === 0) return null;
+                    const exNumSeries = parseInt(activeObj?.num_series || ex.num_series) || 4;
+                    const seriesColors = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#14b8a6"];
+                    return (
+                      <div className="mt-4 pt-4 border-t border-[#F0F4FA]">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B1929]">
+                            <TrendingUp size={14} className="text-[var(--brand-primary)]" />
+                            <span>Progresión de 1RM Estimado</span>
+                          </div>
+                          <span className="text-[10px] text-[#6B7A8D] font-mono">Por serie (kg)</span>
+                        </div>
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <ResponsiveContainer width="100%" height={140}>
+                            <LineChart data={exGraphData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                              <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={false} tickLine={false} />
+                              <Tooltip
+                                contentStyle={{
+                                  fontFamily: "JetBrains Mono",
+                                  fontSize: 11,
+                                  border: "1px solid #E2E8F0",
+                                  borderRadius: 8,
+                                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+                                }}
+                                formatter={(value, name) => [`${value} kg`, name]}
+                              />
+                              {Array.from({ length: exNumSeries }).map((_, s) => (
+                                <Line
+                                  key={s}
+                                  type="monotone"
+                                  dataKey={`serie_${s}`}
+                                  stroke={seriesColors[s % seriesColors.length]}
+                                  strokeWidth={2}
+                                  dot={{ fill: seriesColors[s % seriesColors.length], r: 3 }}
+                                  name={`Serie ${s + 1}`}
+                                  connectNulls={false}
+                                />
+                              ))}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex items-center justify-end gap-1.5 mt-4 text-[11px] font-medium text-[#6B7A8D]">
                     {syncStatus ==="saving" && <RotateCcw size={14} className="animate-spin text-[var(--brand-primary)]" />}
