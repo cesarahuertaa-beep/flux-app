@@ -527,7 +527,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(dias.length)) return;
     setEditDia(null); 
-    setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"" }] }); 
+    setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }); 
     setShowDiaModal(true); 
   };
   const openEditDia = (d) => { 
@@ -611,10 +611,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         const comidasData = [];
         creados.forEach(nuevoDia => {
           diaForm.comidas.forEach((c, i) => {
-            const data = { ...c, dia_id: nuevoDia.id, orden: i, calorias: +c.calorias||0, proteina: +c.proteina||0, carbohidratos: +c.carbohidratos||0, grasas: +c.grasas||0 };
-            delete data.id;
-            delete data._dndId;
-            comidasData.push(data);
+            comidasData.push({
+              dia_id: nuevoDia.id,
+              hora: c.hora || "",
+              nombre: c.nombre || `Comida ${i + 1}`,
+              opcion1: c.opcion1 || "",
+              opcion2: c.opcion2 || "",
+              calorias: +c.calorias || 0,
+              proteina: +c.proteina || 0,
+              carbohidratos: +c.carbohidratos || 0,
+              grasas: +c.grasas || 0,
+              foto_url: c.foto_url || "",
+              orden: i
+            });
           });
         });
 

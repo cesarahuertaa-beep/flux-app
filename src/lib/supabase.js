@@ -197,12 +197,32 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
   return fetchNetwork();
 };
 
+// ── Normalizar llaves en inserciones masivas para evitar error PGRST102 (All object keys must match) ──
+const normalizeBatchKeys = (data) => {
+  if (!Array.isArray(data) || data.length <= 1) return data;
+  const allKeys = new Set();
+  for (const item of data) {
+    if (item && typeof item === "object") {
+      Object.keys(item).forEach((k) => allKeys.add(k));
+    }
+  }
+  return data.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const normalized = {};
+    for (const key of allKeys) {
+      normalized[key] = item[key] !== undefined ? item[key] : null;
+    }
+    return normalized;
+  });
+};
+
 // ── Operaciones de base de datos ──
 export const dbGet    = (p, onBgUpdate) => q(p, {}, onBgUpdate);
-export const dbPost   = (p,b) => q(p, { method:"POST", body:JSON.stringify(b) });
-export const dbPatch  = (p,b) => q(p, { method:"PATCH", body:JSON.stringify(b), headers:{Prefer:"return=representation"} });
-export const dbDel    = (p)   => q(p, { method:"DELETE" });
+export const dbPost   = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
+export const dbPatch  = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b), headers: { Prefer: "return=representation" } });
+export const dbDel    = (p)   => q(p, { method: "DELETE" });
 export const dbUpsert = async (p, b) => {
+  const normalizedBody = normalizeBatchKeys(b);
   invalidateCache(p.split('?')[0]); // Invalidar caché en upsert
   const r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
     method: "POST",
@@ -212,7 +232,7 @@ export const dbUpsert = async (p, b) => {
       "Content-Type": "application/json",
       "Prefer": "resolution=merge-duplicates,return=representation"
     },
-    body: JSON.stringify(b)
+    body: JSON.stringify(normalizedBody)
   });
   // Interceptar 401 en upsert — renovar token silenciosamente
   if (r.status === 401 && _authToken) {
@@ -223,7 +243,7 @@ export const dbUpsert = async (p, b) => {
       throw new Error("Sesión expirada — inicia sesión de nuevo");
     }
     // Reintentar con token nuevo
-    return dbUpsert(p, b);
+    return dbUpsert(p, normalizedBody);
   }
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
   const t = await r.text(); return t ? JSON.parse(t) : [];
@@ -346,7 +366,7 @@ export const authUpdatePassword = async (token, password) => {
   if (!r.ok) throw new Error("Error al actualizar contraseña");
 };
 
-export const dbPostMinimal = (p,b) => q(p, { method:"POST", body:JSON.stringify(b), headers: { Prefer: "return=minimal" } });
+export const dbPostMinimal = (p, b) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), headers: { Prefer: "return=minimal" } });
 
 /** Sincroniza datos personales universales en todas las identidades del usuario */
 export const syncPersonalData = async (email, data) => {
