@@ -14,7 +14,9 @@ import {
   Monitor,
   Building,
   MessageCircle,
-  Plus
+  Plus,
+  ChevronDown,
+  MapPin
 } from"lucide-react";
 
 // ── UI Components (Tailwind Light Theme) ──────────────────────────────────────
@@ -83,6 +85,25 @@ const fmtFechaHora = (iso) => {
     + " • " + d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
 };
 
+const sanitizeWhatsAppPhone = (phone) => {
+  if (!phone) return "";
+  let clean = String(phone).replace(/\D/g, "");
+  if (clean.length === 10) clean = "52" + clean;
+  return clean;
+};
+
+const fmtCitaDia = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+};
+
+const fmtCitaHora = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+};
+
 const ESTADO_COLOR = {
   pendiente:  { bg:"bg-yellow-50",  border:"border-yellow-200",  text:"text-yellow-700", bar:"bg-yellow-400", label:"Pendiente", Icon: Clock },
   confirmada: { bg:"bg-green-50",   border:"border-green-200",   text:"text-green-700", bar:"bg-green-400", label:"Confirmada", Icon: CheckCircle2 },
@@ -105,10 +126,19 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
   const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
+  const [myProfile, setMyProfile]           = useState(null);
+  const [openWaCitaId, setOpenWaCitaId]     = useState(null);
 
   const myId = profileId || getProfileId();
 
   // ── Carga de datos ──
+  const loadProfile = useCallback(async () => {
+    try {
+      const rows = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url`);
+      if (rows && rows.length > 0) setMyProfile(rows[0]);
+    } catch {}
+  }, [myId]);
+
   const loadCitas = useCallback(async () => {
     try {
       const rows = await dbGet(
@@ -149,9 +179,9 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadCitas(), loadDisponibilidad(), loadClientes()]);
+    await Promise.all([loadCitas(), loadDisponibilidad(), loadClientes(), loadProfile()]);
     setLoading(false);
-  }, [loadCitas, loadDisponibilidad, loadClientes]);
+  }, [loadCitas, loadDisponibilidad, loadClientes, loadProfile]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -178,7 +208,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
         }
       }
 
-      setMsg("Cita confirmada");
+      setMsg("✓ Cita confirmada. Puedes enviar la confirmación con ubicación por WhatsApp.");
       loadCitas();
     } catch (e) { setMsg(e.message); }
     setSaving(false);
@@ -255,6 +285,38 @@ export function AgendaAdmin({ setMsg, profileId }) {
   // ── Helpers de render ──
   const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre ||"Cliente";
   const clienteTelefono = (id) => clientes.find(c => c.id === id)?.telefono;
+
+  const buildCitaWhatsAppMessage = useCallback((cita, tipo = "confirmacion") => {
+    const cName = clienteNombre(cita.cliente_id);
+    const primerNombre = (cName || "campeón").trim().split(" ")[0];
+    const remitente = myProfile?.nombre_marca || myProfile?.nombre || "tu especialista";
+    const dia = fmtCitaDia(cita.fecha_hora);
+    const hora = fmtCitaHora(cita.fecha_hora);
+    const isVirtual = cita.modalidad === "virtual";
+
+    if (tipo === "confirmacion") {
+      if (isVirtual) {
+        return `¡Hola ${primerNombre}! 👋 Te confirmo tu cita virtual con ${remitente} para el ${dia} a las ${hora}.\n💻 La sesión será por videollamada; te compartiré el enlace previo a la consulta.\nPor favor ten a la mano tus dudas o notas. ¡Nos vemos pronto!`;
+      } else {
+        const ubicacion = myProfile?.ubicacion_texto || "Consultorio";
+        const mapaUrl = myProfile?.mapa_url;
+        return `¡Hola ${primerNombre}! 👋 Te confirmo tu cita presencial con ${remitente} para el ${dia} a las ${hora}.\n📍 Ubicación: ${ubicacion}\n${mapaUrl ? `🗺️ Ver en Google Maps: ${mapaUrl}\n` : ''}Por favor llega 5 minutos antes. Si necesitas reprogramar, avísame con anticipación. ¡Te esperamos con gusto!`;
+      }
+    }
+
+    if (tipo === "recordatorio") {
+      const d = new Date(cita.fecha_hora);
+      const now = new Date();
+      const esHoy = d.toDateString() === now.toDateString();
+      const diaTexto = esHoy ? "HOY" : `el ${dia}`;
+      const modTexto = isVirtual ? "Virtual" : "Presencial";
+      const mapaUrl = !isVirtual ? myProfile?.mapa_url : null;
+
+      return `¡Hola ${primerNombre}! 👋 Te recordamos tu cita de nutrición ${diaTexto} a las ${hora} (${modTexto}).\n${mapaUrl ? `📍 Ubicación: ${mapaUrl}\n` : ''}Por favor confírmanos respondiendo a este mensaje si todo sigue en pie. ¡Saludos!`;
+    }
+
+    return `¡Hola ${primerNombre}! 👋 Te saluda ${remitente}. Paso a saludarte respecto a tu cita del ${dia} a las ${hora}. Quedo atento a tus comentarios.`;
+  }, [clientes, myProfile]);
 
   const citasFiltradas = filtro === "todos" ? citas : citas.filter(c => c.estado === filtro);
 
@@ -344,13 +406,91 @@ export function AgendaAdmin({ setMsg, profileId }) {
                             {cita.modalidad ==="virtual" ? <><Monitor className="w-3.5 h-3.5" /> Virtual</> : <><Building className="w-3.5 h-3.5" /> Presencial</>}
                           </Tag>
                           {tel && (
-                            <a
-                              href={`https://wa.me/${tel.replace(/\D/g,"")}?text=Hola+${clienteNombre(cita.cliente_id)}%2C+sobre+tu+cita+el+${encodeURIComponent(fmtFechaHora(cita.fecha_hora))}`}
-                              target="_blank" rel="noreferrer"
-                              className="text-green-600 text-xs font-bold no-underline inline-flex items-center gap-1 hover:text-green-700 transition-colors bg-green-50 px-2 py-1 rounded-md border border-green-200"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                            </a>
+                            <div className="relative inline-block" onClick={e => e.stopPropagation()}>
+                              <div className="inline-flex items-center rounded-lg shadow-sm">
+                                <a
+                                  href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(
+                                    buildCitaWhatsAppMessage(cita, cita.estado === "pendiente" ? "confirmacion" : "recordatorio")
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-2.5 py-1 rounded-l-lg transition-colors shadow-sm ${
+                                    cita.estado === "pendiente"
+                                      ? "bg-[#25D366] hover:bg-[#20bd5a]"
+                                      : "bg-emerald-600 hover:bg-emerald-700"
+                                  }`}
+                                  title="Enviar mensaje por WhatsApp a 1 clic"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                                  <span>{cita.estado === "pendiente" ? "Confirmar WhatsApp" : "Recordatorio WhatsApp"}</span>
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenWaCitaId(openWaCitaId === cita.id ? null : cita.id)}
+                                  className={`text-white px-1.5 py-1 rounded-r-lg border-l border-white/20 transition-colors flex items-center justify-center ${
+                                    cita.estado === "pendiente" ? "bg-[#20bd5a] hover:bg-[#1caa50]" : "bg-emerald-700 hover:bg-emerald-800"
+                                  }`}
+                                  title="Opciones de plantilla WhatsApp"
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {openWaCitaId === cita.id && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-30" 
+                                    onClick={() => setOpenWaCitaId(null)} 
+                                  />
+                                  <div className="absolute left-0 bottom-full mb-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-2 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95">
+                                    <div className="text-[10px] font-bold text-[#6B7A8D] px-2 py-1 uppercase tracking-wider">
+                                      Mensajes para {clienteNombre(cita.cliente_id)?.split(" ")[0]}
+                                    </div>
+
+                                    <a
+                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(buildCitaWhatsAppMessage(cita, "confirmacion"))}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaCitaId(null)}
+                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    >
+                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        ✅ Confirmación de Cita
+                                      </span>
+                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
+                                        {cita.modalidad === "virtual" ? "Con aviso de videollamada..." : "Con dirección y Google Maps..."}
+                                      </span>
+                                    </a>
+
+                                    <a
+                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}?text=${encodeURIComponent(buildCitaWhatsAppMessage(cita, "recordatorio"))}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaCitaId(null)}
+                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    >
+                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        ⏰ Recordatorio de Cita
+                                      </span>
+                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
+                                        "Te recordamos tu cita hoy/mañana..."
+                                      </span>
+                                    </a>
+
+                                    <a
+                                      href={`https://wa.me/${sanitizeWhatsAppPhone(tel)}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaCitaId(null)}
+                                      className="p-2 border-t border-[#F0F4FA] font-medium text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
+                                    >
+                                      <span>Abrir chat sin mensaje</span>
+                                      <MessageCircle size={12} />
+                                    </a>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
                         {cita.motivo_rechazo && (

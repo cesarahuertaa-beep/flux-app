@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from"react";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2} from"lucide-react";
+, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2,
+  Clock, Sparkles, ChevronDown
+} from "lucide-react";
 import { AppLayout } from"../components/ui/AppLayout";
 import { Biblioteca } from"../components/admin/Biblioteca";
 import { ProgramarCliente } from"../components/admin/ProgramarCliente";
@@ -23,6 +25,13 @@ import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../lib/supabase";
 import { useBrand } from"../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
+
+const sanitizeWhatsAppPhone = (phone) => {
+  if (!phone) return "";
+  let clean = String(phone).replace(/\D/g, "");
+  if (clean.length === 10) clean = "52" + clean;
+  return clean;
+};
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929]">
@@ -83,6 +92,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [searchClientes, setSearchClientes] = useState("");
 
   const myId = profileId || getProfileId();
+
+  const [myProfile, setMyProfile]           = useState(null);
+  const [retentionData, setRetentionData]   = useState({ activeCiclos: [], lastActivityMap: {} });
+  const [filtroRetencion, setFiltroRetencion] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
+  const [openWaMenuId, setOpenWaMenuId]     = useState(null);
 
   const [myShadowClient, setMyShadowClient] = useState(null);
   const [bloqueado, setBloqueado] = useState(false);
@@ -291,14 +305,49 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     };
 
     try { 
-      const [r, allNutris, me] = await Promise.all([
+      const [r, allNutris, me, activeCiclosRes, recentProgRes, recentMetricasRes] = await Promise.all([
         dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)),
         dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`),
-        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`)
+        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`),
+        dbGet(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
+        dbGet(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`).catch(() => []),
+        dbGet(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`).catch(() => [])
       ]);
       _allNutris = allNutris;
       _me = me;
+      if (me && me.length > 0) {
+        setMyProfile(me[0]);
+      }
       updateState(r, allNutris, me);
+
+      const activityMap = {};
+      if (Array.isArray(recentMetricasRes)) {
+        for (const m of recentMetricasRes) {
+          if (!m.cliente_id) continue;
+          const dateStr = m.fecha || m.created_at;
+          if (!dateStr) continue;
+          const time = new Date(dateStr).getTime();
+          if (!isNaN(time) && (!activityMap[m.cliente_id] || time > activityMap[m.cliente_id])) {
+            activityMap[m.cliente_id] = time;
+          }
+        }
+      }
+      if (Array.isArray(recentProgRes)) {
+        for (const p of recentProgRes) {
+          if (!p.cliente_id) continue;
+          const dateStr = p.updated_at;
+          if (!dateStr) continue;
+          const time = new Date(dateStr).getTime();
+          if (!isNaN(time) && (!activityMap[p.cliente_id] || time > activityMap[p.cliente_id])) {
+            activityMap[p.cliente_id] = time;
+          }
+        }
+      }
+
+      setRetentionData({
+        activeCiclos: Array.isArray(activeCiclosRes) ? activeCiclosRes : [],
+        lastActivityMap: activityMap
+      });
 
       if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0) {
         const jwtEmail = getJwtEmail();
@@ -583,11 +632,115 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     }
   };
 
-  const activeCount = clientes.filter(c=>c.activo).length;
-  const filteredClientes = clientes.filter(c =>
-    c.nombre?.toLowerCase().includes(searchClientes.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchClientes.toLowerCase())
-  );
+  const getPatientRetention = useCallback((c) => {
+    if (!c) return { isInactivo: false, isVenciendo: false, isVencido: false, daysInactive: null, daysToExpire: null, activeCycle: null, isAlDia: false, isNuevo: false };
+    const now = new Date();
+    
+    // 1. Ciclo Activo
+    const activeCycle = retentionData.activeCiclos?.find(ac => ac.cliente_id === c.id);
+    let daysToExpire = null;
+    let isVenciendo = false;
+    let isVencido = false;
+    
+    if (activeCycle) {
+      let semanas = 4;
+      if (activeCycle.nombre && activeCycle.nombre.includes("|")) {
+        const parsed = parseInt(activeCycle.nombre.split("|")[1], 10);
+        if (!isNaN(parsed) && parsed > 0) semanas = parsed;
+      }
+      const startDate = new Date(activeCycle.fecha_inicio + "T12:00:00");
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + (semanas * 7));
+      const diffMs = endDate.getTime() - now.getTime();
+      daysToExpire = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      isVenciendo = daysToExpire <= 3;
+      isVencido = daysToExpire <= 0;
+    }
+    
+    // 2. Inactividad
+    const lastTime = retentionData.lastActivityMap?.[c.id];
+    let daysInactive = null;
+    let isInactivo = false;
+    let isNuevo = false;
+    
+    if (lastTime) {
+      const diffMs = now.getTime() - lastTime;
+      daysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      isInactivo = daysInactive >= 5;
+    } else if (c.created_at) {
+      const regTime = new Date(c.created_at).getTime();
+      const diffMs = now.getTime() - regTime;
+      const daysSinceReg = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (daysSinceReg < 5) {
+        isNuevo = true;
+      } else {
+        daysInactive = daysSinceReg;
+        isInactivo = true;
+      }
+    }
+
+    const isAlDia = !isInactivo && !isVenciendo && c.activo;
+
+    return {
+      activeCycle,
+      daysToExpire,
+      isVenciendo,
+      isVencido,
+      daysInactive,
+      isInactivo,
+      isNuevo,
+      isAlDia
+    };
+  }, [retentionData]);
+
+  const buildWhatsAppMessage = useCallback((c, templateType) => {
+    const ret = getPatientRetention(c);
+    const primerNombre = (c.nombre || "campeón").trim().split(" ")[0];
+    const remitente = myProfile?.nombre_marca || myProfile?.nombre || "tu especialista";
+
+    if (templateType === "inactividad") {
+      const diasTxt = ret.daysInactive ? `llevas ${ret.daysInactive} días` : "llevas unos días";
+      return `¡Hola ${primerNombre}! 👋 Te escribe ${remitente}. Noté que ${diasTxt} sin registrar tus comidas o entrenamientos en tu app FLUX. ¿Cómo te has sentido? ¿Se te ha complicado algún ejercicio o comida? Recuerda que estoy aquí para apoyarte y podemos hacer cualquier ajuste que necesites 💪`;
+    }
+
+    if (templateType === "renovacion") {
+      const estadoCiclo = ret.isVencido 
+        ? "ha finalizado" 
+        : (ret.daysToExpire === 0 ? "finaliza hoy" : `está por concluir (le quedan ${ret.daysToExpire} día${ret.daysToExpire > 1 ? 's' : ''})`);
+      return `¡Hola ${primerNombre}! 🎯 Te escribe ${remitente}. Tu plan actual de entrenamiento y nutrición ${estadoCiclo}. ¡Muchas felicidades por el esfuerzo y constancia en el proceso! 🚀 ¿Cuándo tienes un espacio para agendar tu cita de valoración y preparar tu siguiente ciclo con nuevos objetivos?`;
+    }
+
+    if (templateType === "bienvenida") {
+      return `¡Hola ${primerNombre}! 🎉 ¡Te damos la bienvenida a FLUX! Ya tienes activo tu plan. Recuerda entrar a tu app para consultar tus rutinas de entrenamiento y nutrición. Cualquier duda que tengas sobre cómo registrar tus avances, aquí estoy para ayudarte 🙌`;
+    }
+
+    // templateType === "seguimiento" o default
+    return `¡Hola ${primerNombre}! 👋 Te saluda ${remitente}. Paso a saludarte y ver cómo vas con tu plan esta semana. ¿Tienes alguna duda con tus entrenamientos o tu alimentación? ¡A seguir con toda la motivación! 💥`;
+  }, [getPatientRetention, myProfile]);
+
+  const getWhatsAppUrl = (phone, text) => {
+    const cleanPhone = sanitizeWhatsAppPhone(phone);
+    if (!cleanPhone) return "";
+    if (!text) return `https://wa.me/${cleanPhone}`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  };
+
+  const activeCount = clientes.filter(c => c.activo).length;
+  const inactivosCount = clientes.filter(c => c.activo && getPatientRetention(c).isInactivo).length;
+  const venciendoCount = clientes.filter(c => c.activo && getPatientRetention(c).isVenciendo).length;
+  const alDiaCount = clientes.filter(c => c.activo && getPatientRetention(c).isAlDia).length;
+
+  const filteredClientes = clientes.filter(c => {
+    const matchesSearch = 
+      c.nombre?.toLowerCase().includes(searchClientes.toLowerCase()) ||
+      c.email?.toLowerCase().includes(searchClientes.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (filtroRetencion === "inactivos") return c.activo && getPatientRetention(c).isInactivo;
+    if (filtroRetencion === "venciendo") return c.activo && getPatientRetention(c).isVenciendo;
+    if (filtroRetencion === "al_dia") return c.activo && getPatientRetention(c).isAlDia;
+    return true;
+  });
 
   const SIDEBAR_ITEMS = isCivil ? [
     { id:"mi_plan",         label:"Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
@@ -721,6 +874,53 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <span>Nuevo Paciente</span>
               </button>
             </div>
+
+            {/* Píldoras de filtro por Retención y Estado */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#F0F4FA]">
+              <button
+                onClick={() => setFiltroRetencion("todos")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtroRetencion === "todos"
+                    ? "bg-[#0B1929] text-white shadow-sm"
+                    : "bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-200"
+                }`}
+              >
+                Todos ({clientes.length})
+              </button>
+              <button
+                onClick={() => setFiltroRetencion("inactivos")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtroRetencion === "inactivos"
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                }`}
+              >
+                <AlertCircle size={13} />
+                <span>Inactivos &gt;5d ({inactivosCount})</span>
+              </button>
+              <button
+                onClick={() => setFiltroRetencion("venciendo")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtroRetencion === "venciendo"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                }`}
+              >
+                <Clock size={13} />
+                <span>Por Vencer ({venciendoCount})</span>
+              </button>
+              <button
+                onClick={() => setFiltroRetencion("al_dia")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtroRetencion === "al_dia"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                }`}
+              >
+                <CheckCircle2 size={13} />
+                <span>Al Día ({alDiaCount})</span>
+              </button>
+            </div>
           </div>
 
           {/* Lista de Clientes */}
@@ -739,52 +939,207 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredClientes.map((c) => (
-                  <div 
-                    key={c.id} 
-                    className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden flex flex-col hover:border-[var(--brand-primary)] transition-colors shadow-sm"
-                  >
-                    <div className="p-5 flex-1 relative">
-                      <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
-                      
-                      <div className="pl-2">
-                        <div className="flex items-start justify-between mb-1">
-                          <h3 className="font-bold text-[#0B1929] text-lg leading-tight truncate pr-2">
-                            {c.nombre}
-                          </h3>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                            c.activo 
-                              ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
-                              : 'bg-red-50 text-red-500'
-                          }`}>
-                            {c.activo ?"Activo" :"Inactivo"}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
+                {filteredClientes.map((c) => {
+                  const ret = getPatientRetention(c);
+                  const barColor = !c.activo 
+                    ? 'bg-slate-300' 
+                    : ret.isVenciendo 
+                    ? 'bg-amber-400' 
+                    : ret.isInactivo 
+                    ? 'bg-rose-500' 
+                    : 'bg-[var(--brand-primary)]';
+
+                  return (
+                    <div 
+                      key={c.id} 
+                      className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden flex flex-col hover:border-[var(--brand-primary)] transition-colors shadow-sm"
+                    >
+                      <div className="p-5 flex-1 relative">
+                        <div className={`absolute top-0 left-0 w-1.5 h-full ${barColor}`} />
                         
-                        <div className="text-sm text-[#4A5568] mb-4 line-clamp-2 min-h-[40px]">
-                          {c.objetivo ||"Sin objetivo definido"}
-                        </div>
-
-                        {c.telefono && (
-                          <a 
-                            href={`https://wa.me/${c.telefono.replace(/\D/g,'')}`} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            onClick={e => e.stopPropagation()} 
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-600 hover:text-green-700 bg-green-50 px-2.5 py-1 rounded-lg transition-colors"
-                          >
-                            <MessageCircle size={14} /> WhatsApp
-                          </a>
-                        )}
-
-                        {isSuperadmin && c.nutriologo_id && (
-                          <div className="text-[10px] text-[#6B7A8D] mt-3 font-medium flex items-center gap-1">
-                            <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] ||"Nutriólogo desconocido"}
+                        <div className="pl-2">
+                          <div className="flex items-start justify-between mb-1">
+                            <h3 className="font-bold text-[#0B1929] text-lg leading-tight truncate pr-2">
+                              {c.nombre}
+                            </h3>
                           </div>
-                        )}
+
+                          {/* Badges de Estado y Retención */}
+                          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                              c.activo 
+                                ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {c.activo ? "Activo" : "Inactivo"}
+                            </span>
+
+                            {c.activo && ret.isVenciendo && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                <Clock size={11} />
+                                {ret.isVencido 
+                                  ? `Plan vencido (${Math.abs(ret.daysToExpire)}d)` 
+                                  : (ret.daysToExpire === 0 ? "Vence hoy" : `Vence en ${ret.daysToExpire}d`)}
+                              </span>
+                            )}
+
+                            {c.activo && ret.isInactivo && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                                <AlertCircle size={11} />
+                                {ret.daysInactive ? `Inactivo (${ret.daysInactive}d)` : "Inactivo"}
+                              </span>
+                            )}
+
+                            {c.activo && ret.isAlDia && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 size={11} />
+                                Al día
+                              </span>
+                            )}
+
+                            {c.activo && ret.isNuevo && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                <Sparkles size={11} />
+                                Nuevo
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
+                          
+                          <div className="text-sm text-[#4A5568] mb-4 line-clamp-2 min-h-[40px]">
+                            {c.objetivo || "Sin objetivo definido"}
+                          </div>
+
+                          {/* Botón WhatsApp Inteligente a 1 Clic con Plantillas */}
+                          {c.telefono ? (
+                            <div className="relative inline-block" onClick={e => e.stopPropagation()}>
+                              <div className="inline-flex items-center rounded-lg shadow-sm">
+                                <a 
+                                  href={getWhatsAppUrl(
+                                    c.telefono,
+                                    buildWhatsAppMessage(
+                                      c, 
+                                      ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento"))
+                                    )
+                                  )} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-2.5 py-1.5 rounded-l-lg transition-colors shadow-sm ${
+                                    ret.isVenciendo 
+                                      ? 'bg-amber-600 hover:bg-amber-700' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-600 hover:bg-rose-700' 
+                                      : 'bg-[#25D366] hover:bg-[#20bd5a]'
+                                  }`}
+                                  title="Enviar mensaje por WhatsApp a 1 clic"
+                                >
+                                  <MessageCircle size={14} className="fill-white" />
+                                  {ret.isVenciendo ? (
+                                    <span>Recordar Renovación</span>
+                                  ) : ret.isInactivo ? (
+                                    <span>Check-in Adherencia</span>
+                                  ) : (
+                                    <span>WhatsApp</span>
+                                  )}
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenWaMenuId(openWaMenuId === c.id ? null : c.id)}
+                                  className={`px-1.5 py-1.5 rounded-r-lg border-l border-white/20 transition-colors flex items-center justify-center text-white ${
+                                    ret.isVenciendo 
+                                      ? 'bg-amber-700 hover:bg-amber-800' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-700 hover:bg-rose-800' 
+                                      : 'bg-[#20bd5a] hover:bg-[#1caa50]'
+                                  }`}
+                                  title="Ver otras plantillas de WhatsApp"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                              </div>
+
+                              {openWaMenuId === c.id && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-30" 
+                                    onClick={() => setOpenWaMenuId(null)} 
+                                  />
+                                  <div className="absolute left-0 bottom-full mb-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-2 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95">
+                                    <div className="text-[10px] font-bold text-[#6B7A8D] px-2 py-1 uppercase tracking-wider">
+                                      Plantillas para {c.nombre?.split(" ")[0]}
+                                    </div>
+
+                                    <a
+                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "inactividad"))}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaMenuId(null)}
+                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    >
+                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        ⚠️ Check-in Adherencia
+                                      </span>
+                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
+                                        "Llevas unos días sin registrar..."
+                                      </span>
+                                    </a>
+
+                                    <a
+                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "renovacion"))}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaMenuId(null)}
+                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    >
+                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        ⏳ Renovación de Plan
+                                      </span>
+                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
+                                        "Tu plan está por concluir..."
+                                      </span>
+                                    </a>
+
+                                    <a
+                                      href={getWhatsAppUrl(c.telefono, buildWhatsAppMessage(c, "seguimiento"))}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaMenuId(null)}
+                                      className="flex flex-col p-2 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    >
+                                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        👋 Saludo / Seguimiento
+                                      </span>
+                                      <span className="text-[11px] text-[#6B7A8D] line-clamp-1">
+                                        "¿Cómo vas con tu plan esta semana?..."
+                                      </span>
+                                    </a>
+
+                                    <a
+                                      href={getWhatsAppUrl(c.telefono, "")}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={() => setOpenWaMenuId(null)}
+                                      className="p-2 border-t border-[#F0F4FA] font-medium text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
+                                    >
+                                      <span>Abrir chat sin mensaje</span>
+                                      <MessageCircle size={12} />
+                                    </a>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[#9BA5B0] italic">Sin teléfono registrado</span>
+                          )}
+
+                          {isSuperadmin && c.nutriologo_id && (
+                            <div className="text-[10px] text-[#6B7A8D] mt-3 font-medium flex items-center gap-1">
+                              <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
                     
                     <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-3 flex items-center gap-2">
                       {role !=="administrativo" && (
@@ -816,7 +1171,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>

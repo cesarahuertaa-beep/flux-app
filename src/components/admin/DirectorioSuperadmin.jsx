@@ -390,7 +390,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 <div className="flex items-center gap-2">
                   <span>{n.nombre}</span>
                   {n.telefono && (
-                    <a href={`https://wa.me/${n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
+                    <a href={`https://wa.me/${n.telefono.replace(/\D/g,'').length === 10 ? '52' + n.telefono.replace(/\D/g,'') : n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
                       <MessageCircle size={12} /> WhatsApp
                     </a>
                   )}

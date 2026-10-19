@@ -409,7 +409,7 @@ function NutritionistsSection({ nutritionists }) {
                     </a>
                   )}
                   {n.telefono && (
-                    <a href={`https://wa.me/${n.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/20 h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                    <a href={`https://wa.me/${n.telefono.replace(/\D/g, '').length === 10 ? '52' + n.telefono.replace(/\D/g, '') : n.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/20 h-10 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
                       <MessageCircle size={16} /> WhatsApp
                     </a>
                   )}
