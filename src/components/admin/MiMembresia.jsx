@@ -286,7 +286,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       loadData();
     } catch (error) {
       console.error(error);
-      setMsg("❌ Error al subir:" + error.message);
+      setMsg("❌ Error al subir: " + error.message);
     } finally {
       setUploading(false);
       e.target.value =""; // Limpiar input

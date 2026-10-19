@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from"react";
-import ReactCrop, { centerCrop, makeAspectCrop } from"react-image-crop";
-import"react-image-crop/dist/ReactCrop.css";
+import { useState, useEffect, useCallback, useRef } from "react";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import {
   DndContext,
   closestCenter,
@@ -8,26 +8,26 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-} from"@dnd-kit/core";
+} from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from"@dnd-kit/sortable";
-import { SortableItem } from"../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from"lucide-react";
-import { EjercicioSelector } from"./EjercicioSelector";
-import { generateNutriPDF } from"../../utils/pdf";
-import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from"../../lib/supabase";
-import { useBrand } from"../BrandContext";
-import { ProgresoCliente } from"./ProgresoCliente";
+} from "@dnd-kit/sortable";
+import { SortableItem } from "../SortableItem";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon } from "lucide-react";
+import { EjercicioSelector } from "./EjercicioSelector";
+import { generateNutriPDF } from "../../utils/pdf";
+import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
+import { ProgresoCliente } from "./ProgresoCliente";
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState(() => {
     const s = sessionStorage.getItem("flux_programar_subtab");
-    return s ? s :"nutri";
+    return s ? s : "nutri";
   });
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
   const isReadOnly = cicloSel && !cicloSel.activo;
-  const isEstandar = selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium';
+  const isEstandar = localStorage.getItem("flux_role") === "civil" && selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium' && selected.objetivo !== 'Mi entrenamiento personal';
 
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
@@ -721,7 +721,50 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const fmtFecha = (f) => f ? new Date(f+"T12:00:00").toLocaleDateString("es-MX",{month:"short",year:"numeric"}) :"";
 
   // ── Sin cliente seleccionado ──
-  if (!selected) return null;
+  if (!selected) {
+    const filteredClientes = (clientes || []).filter(c =>
+      c.objetivo !== 'Mi entrenamiento personal' &&
+      ((c.nombre || "").toLowerCase().includes(searchProg.toLowerCase()) ||
+       (c.email || "").toLowerCase().includes(searchProg.toLowerCase()))
+    );
+    return (
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm max-w-2xl">
+        <h3 className="text-base font-bold text-[#0B1929] mb-1">Selecciona un paciente para programar</h3>
+        <p className="text-xs text-[#6B7A8D] mb-4">Elige a quién deseas asignarle o editarle su plan de alimentación, rutina o evaluación corporal.</p>
+        <div className="relative mb-4">
+          <Search className="w-4 h-4 text-[#6B7A8D] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchProg}
+            onChange={e => setSearchProg(e.target.value)}
+            placeholder="Buscar paciente por nombre o correo..."
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+          />
+        </div>
+        {filteredClientes.length === 0 ? (
+          <div className="text-center py-8 text-sm text-[#6B7A8D]">No se encontraron pacientes.</div>
+        ) : (
+          <div className="flex flex-col divide-y divide-[#F0F4FA] max-h-80 overflow-y-auto">
+            {filteredClientes.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelected(c)}
+                className="flex items-center justify-between py-3 px-3 hover:bg-[#F8FAFC] rounded-xl transition-colors text-left"
+              >
+                <div>
+                  <div className="font-bold text-sm text-[#0B1929]">{c.nombre}</div>
+                  <div className="text-xs text-[#6B7A8D]">{c.email}</div>
+                </div>
+                <span className="text-xs font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-3 py-1 rounded-lg">
+                  Seleccionar
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="pb-[100px]">
@@ -758,7 +801,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── Selector de Ciclos ── */}
       <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">Planes del Paciente</span>
+          <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">{isMiPlan ? "Mis Planes" : "Planes del Paciente"}</span>
           <div className="flex items-center gap-2">
             {ciclos.filter(c => !c.activo).length > 0 && (
               <button
@@ -909,7 +952,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 {dias.map(d => {
                   const parts = (d.dia ||"").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
-                  const title = parts.length > 1 ? parts[1] : parts[0];
+                  const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
                   return (
                       <SortableItem key={d.id} id={d.id}>
                         {({ dragHandle, isDragging }) => (
@@ -1132,7 +1175,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               {c.foto_url && (
                                 <img src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
                               )}
-                              <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[#1A6FD4] rounded-xl text-[#1A6FD4] text-xs font-bold cursor-pointer hover:bg-blue-50 transition-colors w-full sm:w-auto">
+                              <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors w-full sm:w-auto">
                                 <ImageIcon className="w-4 h-4" />
                                 <span>{c.foto_url ?"Cambiar foto" :"Subir foto"}</span>
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />

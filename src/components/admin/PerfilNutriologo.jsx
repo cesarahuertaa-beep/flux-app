@@ -145,13 +145,21 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
   return (
-    <div className="max-w-4xl mx-auto w-full pb-10 px-4 sm:px-6 md:px-8 pt-4 overflow-x-hidden">
-      {/* Header estandarizado igual que UserProfile */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
-        <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
+    <div className="w-full bg-[#F7F9FC] flex flex-col">
+      {/* Header estandarizado */}
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+        <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+          Mi Cuenta
+        </p>
+        <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+          Mi Perfil
+        </h1>
+        <p className="text-sm text-[#6B7A8D] mt-1">
+          Gestiona tu información personal e identidad en la plataforma.
+        </p>
       </div>
 
+      <div className="max-w-4xl mx-auto w-full pb-16 px-4 sm:px-6 md:px-8 pt-6 overflow-x-hidden">
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 
@@ -211,7 +219,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             </div>
           </div>
           <p className="text-xs text-[#6B7A8D] mb-5">
-            {isSuperadmin ? 'Esta información aparecerá en el panel de"Mi Membresía" de cada nutriólogo.' : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
+            {isSuperadmin ? 'Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo.' : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -229,6 +237,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

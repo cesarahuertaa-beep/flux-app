@@ -216,9 +216,9 @@ export default function ControlPagos({ setMsg }) {
         });
       }
 
-      setMsg("✓ Recibo" + nuevoEstado);
+      setMsg("✓ Recibo " + nuevoEstado);
       loadData();
-    } catch (e) { setMsg("❌ Error al actualizar:" + e.message); }
+    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
   };
 
   const updateEstadoCivil = async (id, nuevoEstado, clienteId) => {
@@ -268,9 +268,9 @@ export default function ControlPagos({ setMsg }) {
         }
       }
 
-      setMsg("✓ Pago de atleta" + nuevoEstado);
+      setMsg("✓ Pago de atleta " + nuevoEstado);
       loadDataCivil();
-    } catch (e) { setMsg("❌ Error al actualizar:" + e.message); }
+    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
   };
 
   const handleMarcarTransferido = async (colaboradorNombre, monto) => {
@@ -286,7 +286,7 @@ export default function ControlPagos({ setMsg }) {
       }
       setMsg("✓ Marcado como transferido");
       loadData();
-    } catch (e) { setMsg("❌ Error:" + e.message); }
+    } catch (e) { setMsg("❌ Error: " + e.message); }
   };
 
   const formatMes = (yyyyMm) => {
@@ -593,7 +593,7 @@ export default function ControlPagos({ setMsg }) {
             <UserCheck className="text-indigo-500" size={22} />
             <div>
               <h3 className="text-lg font-bold text-[#0B1929]">Comisiones de Colaboradores</h3>
-              <p className="text-[#6B7A8D] text-sm mt-0.5">35% del total generado · <strong>{filtroMes === 'todos' ? 'Acumulado histórico' : <span className="capitalize">{formatMes(filtroMes)}</span>}</strong></p>
+              <p className="text-[#6B7A8D] text-sm mt-0.5">{ratesForm.comision_pct}% del total generado · <strong>{filtroMes === 'todos' ? 'Acumulado histórico' : <span className="capitalize">{formatMes(filtroMes)}</span>}</strong></p>
             </div>
           </div>
           <div className="divide-y divide-gray-100">

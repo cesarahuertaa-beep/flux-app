@@ -321,35 +321,39 @@ export default function Training({
   };
 
   return (
-    <div className="flex-1 flex flex-col relative">
+    <div className="flex-1 flex flex-col relative bg-[#F7F9FC] min-h-full">
       {isLocked && (
         <div className="bg-amber-100 text-amber-800 px-4 py-2 text-center text-[11px] md:text-xs font-semibold">
           Este plan arranca en el futuro. Puedes ver tu rutina, pero aún no puedes registrar progreso.
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Rutina Semanal
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
               Entrenamiento
             </h1>
-            {clienteNombre && (
+            {isSelfManaged ? (
               <p className="text-sm text-[#6B7A8D] mt-1">
-                Paciente:{""}
+                Tu rutina activa — Semana {semanaActualCiclo}
+              </p>
+            ) : clienteNombre ? (
+              <p className="text-sm text-[#6B7A8D] mt-1">
+                Paciente:{" "}
                 <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
               </p>
-            )}
+            ) : null}
           </div>
           <button
             onClick={() => setShowProgress(s => !s)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
               showProgress
-                ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                :"bg-white text-[var(--brand-primary)] border-[#E2E8F0] hover:border-[var(--brand-primary)]"
+                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                : "bg-white text-[var(--brand-primary)] border-[#E2E8F0] hover:border-[var(--brand-primary)]"
             }`}
           >
             <TrendingUp size={15} />
@@ -473,8 +477,8 @@ export default function Training({
               onClick={() => { setActiveRutinaIdx(i); setExpandedEx(0); }}
               className={`flex-1 min-w-[52px] py-2.5 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center ${
                 isActive
-                  ?"bg-[var(--brand-primary)] text-white shadow-md"
-                  :"bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
+                  ? "bg-[var(--brand-primary)] text-white shadow-md"
+                  : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
               }`}
             >
               <span className="uppercase">{shortTab}</span>
@@ -497,10 +501,10 @@ export default function Training({
         </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-6 md:px-8 flex-1 overflow-y-auto space-y-3 pb-8">
+      <div className="px-6 md:px-8 flex-1 space-y-3 pb-8">
 
         {/* Cronómetro inline, justo antes del primer ejercicio (igual que Figma) */}
-        <TimerCard />
+        <TimerCard brandColor="var(--brand-primary)" />
 
         {ejercicios.map((ex, i) => {
           const numSeries = ex.num_series || 3;

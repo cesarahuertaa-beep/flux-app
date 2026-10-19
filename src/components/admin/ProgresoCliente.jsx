@@ -116,7 +116,7 @@ const emptyForm = () => ({
 const fmtDate = (d) => new Date(d +"T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
-  const isCivil = selected?.nutriologo_id === null;
+  const isCivil = localStorage.getItem("flux_role") === "civil";
   const [metricas,     setMetricas]     = useState([]);
   const [rutinas,      setRutinas]      = useState([]);
   const [ciclos,       setCiclos]       = useState([]);
@@ -250,7 +250,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       }
       // Merge existing + new photos
       const allFotos = [...existingFotos, ...uploadedUrls];
-      if (allFotos.length) data.fotos = allFotos;
+      data.fotos = allFotos;
 
         if (editingId) {
           await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
@@ -260,7 +260,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
           setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
           
           // Send notification if patient is uploading their own progress
-          if (sessionStorage.getItem('flux_role') === 'cliente' && selected.nutriologo_id) {
+          if (localStorage.getItem('flux_role') === 'client' && selected.nutriologo_id) {
             await dbPost("notificaciones", {
               profile_id: selected.nutriologo_id,
               titulo:"Nuevo progreso registrado",
@@ -357,7 +357,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
           <BarChart2 className="w-4 h-4" /> Evaluaciones
         </button>
         <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
-          <Dumbbell className="w-4 h-4" /> Rutinas del cliente
+          <Dumbbell className="w-4 h-4" /> {(isMiPlan || isCivil) ? "Bitácora de Rutinas" : "Rutinas del cliente"}
         </button>
       </div>
 
@@ -381,7 +381,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             <div className="text-center py-16 text-[#6B7A8D]">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><BarChart2 className="w-12 h-12" /></div>
               <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones aún</div>
-              <div className="text-[13px]">Registra la primera evaluación corporal del cliente.</div>
+              <div className="text-[13px]">{(isMiPlan || isCivil) ? "Registra tu primera evaluación corporal." : "Registra la primera evaluación corporal del cliente."}</div>
             </div>
           ):metricas.map((m,idx)=>{
             const prev = metricas[idx+1];
@@ -666,7 +666,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             
             <div className="flex flex-col gap-1.5 mb-6">
               <label className="text-sm font-bold text-[#0B1929]">Notas</label>
-              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder="Observaciones del nutriólogo…" className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
+              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
             </div>
 
             {/* Fotos existentes cuando se edita */}

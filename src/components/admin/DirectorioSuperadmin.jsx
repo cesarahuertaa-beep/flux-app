@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from"react";
-import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from"../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from"lucide-react";
-
-const COLORS = ["#56CCF2","#2D9CDB","#BB86FC","#FF6B6B","#F7DC6F","#2ECC71","#E67E22","#E91E63"];
+import { useState, useEffect, useMemo, useRef } from "react";
+import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
+import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 
 const uploadLogo = async (file) => {
   const ext  = file.name.split(".").pop();
@@ -10,28 +8,28 @@ const uploadLogo = async (file) => {
   return await storageUpload("logos", fname, file);
 };
 
-const Btn = ({ children, onClick, disabled, small, outline, grad, className ="" }) => {
-  let baseClass ="inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-  if (small) baseClass +=" px-3 py-1.5 text-xs";
-  else baseClass +=" px-4 py-2 text-sm";
+const Btn = ({ children, onClick, disabled, small, outline, grad, className = "" }) => {
+  let baseClass = "inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  if (small) baseClass += " px-3 py-1.5 text-xs";
+  else baseClass += " px-4 py-2 text-sm";
   
-  if (grad) baseClass +=" bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 border-transparent shadow-sm focus:ring-blue-500";
-  else if (outline) baseClass +=" border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200";
-  else baseClass +=" bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-sm focus:ring-blue-500";
+  if (grad) baseClass += " bg-[var(--brand-primary)] text-white hover:opacity-90 border-transparent shadow-sm focus:ring-[var(--brand-primary)]";
+  else if (outline) baseClass += " border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-200";
+  else baseClass += " bg-[var(--brand-primary)] text-white hover:opacity-90 border-transparent shadow-sm focus:ring-[var(--brand-primary)]";
   
   if (outline && className.includes("text-red-500")) {
-    baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50","text-red-600 hover:bg-red-50 border-red-200");
+    baseClass = baseClass.replace("text-slate-700 hover:bg-slate-50", "text-red-600 hover:bg-red-50 border-red-200");
   }
   
   return <button onClick={onClick} disabled={disabled} className={`${baseClass} ${className}`}>{children}</button>;
 };
 
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-        <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">{title}</h3>
-        <button onClick={onClose} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X size={20} /></button>
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="bg-white rounded-2xl shadow-xl border border-[#E2E8F0] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+        <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">{title}</h3>
+        <button onClick={onClose} className="p-1 rounded-md text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-100 transition-colors"><X size={20} /></button>
       </div>
       <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">{children}</div>
     </div>
@@ -56,7 +54,7 @@ const LogoPicker = ({ value, onChange, uploading }) => {
       <div className="flex-1">
         <input type="file" accept="image/*" className="hidden" ref={fileRef} onChange={onChange}/>
         <Btn small outline onClick={() => fileRef.current?.click()} disabled={uploading}>
-          {uploading ?"Subiendo..." : value ?"Cambiar logo" :"Subir logo"}
+          {uploading ? "Subiendo..." : value ? "Cambiar logo" : "Subir logo"}
         </Btn>
       </div>
     </div>
@@ -84,39 +82,41 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [expandedNutri, setExpandedNutri] = useState(null);
 
   // Forms
-  const [formNutri, setFormNutri] = useState({ nombre:"", email:"", telefono:"", nombre_marca:"", logo_url:"", color_primario:"#56CCF2" });
-  const [editFormNutri, setEditFormNutri] = useState({ nombre:"", nombre_marca:"", color_primario:"", email:"", telefono:"", logo_url:"" });
-  const [formClient, setFormClient] = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
+  const [formNutri, setFormNutri] = useState({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
+  const [editFormNutri, setEditFormNutri] = useState({ nombre: "", nombre_marca: "", color_primario: "", email: "", telefono: "", logo_url: "", role: "nutriologo" });
+  const [formClient, setFormClient] = useState({ nombre: "", email: "", objetivo: "", telefono: "" });
 
   const [resolvedOwnerId, setResolvedOwnerId] = useState(myId);
   const [myName, setMyName] = useState("");
+  const [myRole, setMyRole] = useState("superadmin");
 
   const loadNutriologos = async () => {
     setLoading(true);
     try {
-      const data = await dbGet("profiles?role=eq.nutriologo&order=created_at.desc");
+      const data = await dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
       const currentUser = await dbGet(`profiles?id=eq.${myId}`);
       
       if (currentUser.length > 0) {
-        let owner = currentUser[0];
-        setMyName(owner.nombre ||"Staff");
-        
-        // Si es staff/administrativo, el"dueño" del directorio es su jefe (el superadmin)
-        if (owner.role ==="staff" || owner.role ==="administrativo") {
-          if (owner.nutriologo_id) {
-            const boss = await dbGet(`profiles?id=eq.${owner.nutriologo_id}`);
-            if (boss.length > 0) owner = boss[0];
+        const me = currentUser[0];
+        setMyName(me.nombre || "Staff");
+        setMyRole(me.role || "superadmin");
+
+        let owner = { ...me };
+        // Si es staff/administrativo, el "dueño" del directorio corporativo es su jefe (el superadmin)
+        if (me.role === "staff" || me.role === "administrativo") {
+          if (me.nutriologo_id) {
+            const boss = await dbGet(`profiles?id=eq.${me.nutriologo_id}`);
+            if (boss.length > 0) owner = { ...boss[0] };
           }
         }
 
         setResolvedOwnerId(owner.id);
-        
         owner.isSuperadmin = true;
         
-        if (currentUser[0].role !=="superadmin") {
-          owner.nombre_marca = owner.nombre_marca ||"Flux Sports";
+        if (me.role !== "superadmin") {
+          owner.nombre_marca = owner.nombre_marca || "Flux Sports";
         } else {
-          owner.nombre_marca = owner.nombre_marca ||"Flux Sports (Tú)";
+          owner.nombre_marca = owner.nombre_marca || "Flux Sports (Tú)";
         }
         
         setNutriologos([owner, ...data]);
@@ -137,16 +137,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     setUploadingLogo(true);
     try {
       const url = await uploadLogo(file);
-      setFnc(p => ({...p, logo_url: url}));
+      setFnc(p => ({ ...p, logo_url: url }));
       setMsg("✅ Logo subido");
     } catch(err) {
-      setMsg("❌ Error al subir logo:" + err.message);
+      setMsg("❌ Error al subir logo: " + err.message);
     }
     setUploadingLogo(false);
   };
 
   const inviteNutri = async () => {
-    if(!formNutri.email || !formNutri.nombre){ setMsg("❌ Nombre y email requeridos"); return; }
+    if (!formNutri.email || !formNutri.nombre) { setMsg("❌ Nombre y email requeridos"); return; }
     setSaving(true);
     try {
       const existingProfiles = await dbGet(`profiles?email=eq.${formNutri.email}`);
@@ -165,8 +165,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         return;
       }
 
-      const authUser = await authInvite(formNutri.email, { role:"nutriologo", nombre: formNutri.nombre });
+      const targetRole = formNutri.role || "nutriologo";
+      const authUser = await authInvite(formNutri.email, { role: targetRole, nombre: formNutri.nombre });
       await updateProfile(authUser.id, {
+        role: targetRole,
         nombre: formNutri.nombre,
         telefono: formNutri.telefono,
         nombre_marca: formNutri.nombre_marca,
@@ -176,12 +178,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         activo: true
       });
       setShowInviteNutri(false);
-      setFormNutri({ nombre:"", email:"", telefono:"", nombre_marca:"", logo_url:"", color_primario:"#56CCF2" });
+      setFormNutri({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
       loadNutriologos();
       setMsg("✅ Invitación enviada");
     } catch(e) {
       if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
-      else setMsg("❌" + e.message);
+      else setMsg("❌ " + e.message);
     }
     setSaving(false);
   };
@@ -189,12 +191,14 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const saveEditNutri = async () => {
     setSaving(true);
     try {
-      await updateProfile(showEditNutri.id, editFormNutri);
+      const payload = { ...editFormNutri };
+      if (showEditNutri?.isSuperadmin) delete payload.role;
+      await updateProfile(showEditNutri.id, payload);
       setShowEditNutri(null);
       loadNutriologos();
       setMsg("✅ Cambios guardados");
     } catch(e) {
-      setMsg("❌" + e.message);
+      setMsg("❌ " + e.message);
     }
     setSaving(false);
   };
@@ -203,9 +207,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     try {
       await updateProfile(n.id, { activo: n.activo === false ? true : false });
       loadNutriologos();
-      setMsg(`✅ Nutriólogo ${n.activo === false ?"activado" :"suspendido"}`);
+      setMsg(`✅ Nutriólogo ${n.activo === false ? "activado" : "suspendido"}`);
     } catch(e) {
-      setMsg("❌ Error:" + e.message);
+      setMsg("❌ Error: " + e.message);
     }
   };
 
@@ -312,10 +316,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
       const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
 
-      if (conflictType ==="nutri") {
+      if (conflictType === "nutri") {
+        const targetRole = conflictUser.typedData?.role || "nutriologo";
         if (p) {
           await dbPatch(`profiles?id=eq.${p.id}`, {
-            role:"nutriologo",
+            role: targetRole,
             nombre: finalNombre,
             telefono: finalTelefono,
             nombre_marca: useNewData ? conflictUser.typedData.nombre_marca : p.nombre_marca,
@@ -330,7 +335,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       } else {
         await dbPost("clientes", {
           nombre: finalNombre,
-          objetivo: conflictUser.typedData.objetivo ||"Mejorar salud",
+          objetivo: conflictUser.typedData.objetivo || "Mejorar salud",
           email: conflictUser.email,
           telefono: finalTelefono,
           nutriologo_id: resolvedOwnerId,
@@ -344,17 +349,17 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setMsg(`✅ Permisos otorgados exitosamente.`);
       setConflictUser(null);
       setConflictType(null);
-      setFormNutri({ nombre:"", email:"", telefono:"", nombre_marca:"", logo_url:"", color_primario:"#56CCF2" });
-      setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+      setFormNutri({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
+      setFormClient({ nombre: "", email: "", objetivo: "", telefono: "" });
     } catch (e) {
-      setMsg("❌ Error al resolver:" + e.message);
+      setMsg("❌ Error al resolver: " + e.message);
     }
     setSaving(false);
   };
 
   const filteredNutris = nutriologos.filter(n => {
     const term = search.toLowerCase();
-    return (n.nombre||"").toLowerCase().includes(term) || (n.nombre_marca||"").toLowerCase().includes(term);
+    return (n.nombre || "").toLowerCase().includes(term) || (n.nombre_marca || "").toLowerCase().includes(term);
   });
 
   const renderNutri = (n) => {
@@ -367,15 +372,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
-              {n.logo_url ? <img src={n.logo_url} className="w-full h-full object-cover"/> : <User className="text-slate-300" size={24}/>}
+              {n.logo_url ? <img src={n.logo_url} alt={n.nombre || "Logo"} className="w-full h-full object-cover"/> : <User className="text-slate-300" size={24}/>}
               {n.isSuperadmin && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-white"></div>}
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre ||"Sin nombre"}</h3>
-                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ?"TÚ" :"CORPORATIVO"}</span>}
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
+                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
+                {n.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">ESTUDIANTE</span>}
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                  {n.activo !== false ?"Activo" :"Suspendido"}
+                  {n.activo !== false ? "Activo" : "Suspendido"}
                 </span>
               </div>
               <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
@@ -399,7 +405,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
             <button 
               onClick={() => setExpandedNutri(isExpanded ? null : n.id)}
-              className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+              className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
             >
               <Users size={16} />
               <span>{nClients.length} Pacientes</span>
@@ -408,11 +414,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
               <Btn small outline onClick={() => {
                 setShowEditNutri(n);
-                setEditFormNutri({ nombre:n.nombre||"", nombre_marca:n.nombre_marca||"", color_primario:n.color_primario||"#56CCF2", email:n.email||"", telefono:n.telefono||"", logo_url:n.logo_url||"" });
+                setEditFormNutri({ nombre: n.nombre || "", nombre_marca: n.nombre_marca || "", color_primario: n.color_primario || "#1A6FD4", email: n.email || "", telefono: n.telefono || "", logo_url: n.logo_url || "", role: n.role || "nutriologo" });
               }}>Editar</Btn>
               {!n.isSuperadmin && (
-                <Btn small outline className={n.activo !== false ?"text-red-500" :""} onClick={() => toggleActivoNutri(n)}>
-                  {n.activo !== false ?"Suspender" :"Activar"}
+                <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
+                  {n.activo !== false ? "Suspender" : "Activar"}
                 </Btn>
               )}
             </div>
@@ -431,22 +437,22 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                     key={c.id} 
                     className="bg-white border border-slate-200 rounded-xl p-4 transition-all group relative overflow-hidden flex flex-col"
                   >
-                    <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[#1A6FD4]' : 'bg-red-400'}`} />
+                    <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
                     <div 
                       className="pl-2 cursor-pointer flex-1"
                       onClick={() => { setSelected(c); setTab("programar"); }}
                     >
-                      <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-blue-600 transition-colors">{c.nombre}</h4>
+                      <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-[var(--brand-primary)] transition-colors">{c.nombre}</h4>
                       <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                       <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
                         <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
-                        <span>{c.objetivo ||"Sin objetivo definido"}</span>
+                        <span>{c.objetivo || "Sin objetivo definido"}</span>
                       </div>
                     </div>
                     <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
-                      <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
-                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ?"text-red-500 hover:text-red-600" :"text-green-600 hover:text-green-700"}`}>
-                        {c.activo ?"Suspender" :"Activar"}
+                      <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-[var(--brand-primary)] transition-colors">Editar</button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
+                        {c.activo ? "Suspender" : "Activar"}
                       </button>
                     </div>
                   </div>
@@ -459,21 +465,23 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     );
   };
 
-  const InputClass ="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
+  const InputClass = "w-full bg-[#F0F4FA] border border-transparent rounded-xl px-3.5 py-2.5 text-sm text-[#0B1929] outline-none focus:bg-white focus:border-[var(--brand-primary)] transition-all";
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* Header */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Panel de Super Administrador</p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>Directorio</h1>
+            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+              {myRole === "staff" ? "Panel de Staff FLUX" : "Panel de Super Administrador"}
+            </p>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Directorio</h1>
             <p className="text-sm text-[#6B7A8D] mt-1">{clientes.length} pacientes y {nutriologos.length} nutriólogos en la plataforma</p>
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button onClick={() => setShowNewClient(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#1A6FD4] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-blue-600 transition-colors">
+            <button onClick={() => setShowNewClient(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
               <Plus size={16} /> Paciente
             </button>
             <button onClick={() => setShowInviteNutri(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors">
@@ -489,13 +497,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             placeholder="Buscar por nutriólogo o marca..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[#1A6FD4] transition-all placeholder:text-[#9BA5B0]"
+            className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
           />
         </div>
       </div>
 
       {/* Directorio List */}
-      <div className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <div className="flex-1 p-6 md:p-8">
         {loading ? (
           <div className="flex items-center justify-center h-40 text-[#6B7A8D]">Cargando directorio...</div>
         ) : (
@@ -504,7 +512,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
             {(() => {
               const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
-              const isExpanded = expandedNutri ==="__atletas__";
+              const isExpanded = expandedNutri === "__atletas__";
               return (
                 <div key="__atletas__" className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
                   {/* Header row */}
@@ -516,15 +524,15 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h3 className="font-bold text-[#0B1929] text-lg leading-tight">Atletas Independientes</h3>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 shrink-0">AUTODIRIGIDOS</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#E8F1FB] text-[var(--brand-primary)] shrink-0">AUTODIRIGIDOS</span>
                         </div>
                         <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
                       </div>
                     </div>
 
                     <button
-                      onClick={() => setExpandedNutri(isExpanded ? null :"__atletas__")}
-                      className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                      onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
+                      className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
                     >
                       <Users size={16} />
                       <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
@@ -549,7 +557,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                                   onClick={() => { setSelected(c); setTab("programar"); }}
                                 >
                                   <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-blue-600 transition-colors">{c.nombre ||"Sin nombre"}</h4>
+                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-[var(--brand-primary)] transition-colors">{c.nombre || "Sin nombre"}</h4>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
                                       plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                                     }`}>
@@ -559,14 +567,14 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                                   <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                      {c.activo ?"Activo" :"Inactivo"}
+                                      {c.activo ? "Activo" : "Inactivo"}
                                     </span>
                                   </div>
                                 </div>
                                 <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
-                                  <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">Editar</button>
-                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ?"text-red-500 hover:text-red-600" :"text-green-600 hover:text-green-700"}`}>
-                                    {c.activo ?"Suspender" :"Activar"}
+                                  <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-[var(--brand-primary)] transition-colors">Editar</button>
+                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
+                                    {c.activo ? "Suspender" : "Activar"}
                                   </button>
                                 </div>
                               </div>
@@ -598,8 +606,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               El correo <strong>{conflictUser.email}</strong> ya pertenece a otro usuario de la plataforma.
               <br/><br/>
               <strong>Datos Actuales:</strong><br/>
-              Nombre: {conflictUser.cliente?.nombre || conflictUser.profile?.nombre ||"Sin nombre"}<br/>
-              Teléfono: {conflictUser.cliente?.telefono || conflictUser.profile?.telefono ||"Sin teléfono"}
+              Nombre: {conflictUser.cliente?.nombre || conflictUser.profile?.nombre || "Sin nombre"}<br/>
+              Teléfono: {conflictUser.cliente?.telefono || conflictUser.profile?.telefono || "Sin teléfono"}
             </div>
 
             <p className="text-[#6B7A8D] text-sm mb-5">
@@ -610,9 +618,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               <button 
                 onClick={() => resolveConflict(false)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-blue-50 transition-colors flex items-start gap-3"
               >
-                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#3B82F6] flex items-center justify-center"><div className="w-2.5 h-2.5 bg-[#3B82F6] rounded-full"></div></div>
+                <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[var(--brand-primary)] flex items-center justify-center"><div className="w-2.5 h-2.5 bg-[var(--brand-primary)] rounded-full"></div></div>
                 <div>
                   <div className="font-bold text-[#0B1929] text-sm">Usar sus datos actuales</div>
                   <div className="text-xs text-[#6B7A8D] mt-1">Ignora lo que escribiste y vincúlalo usando el nombre y teléfono que ya tenía registrado.</div>
@@ -622,7 +630,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               <button 
                 onClick={() => resolveConflict(true)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[#3B82F6] hover:bg-blue-50 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-blue-50 transition-colors flex items-start gap-3"
               >
                 <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] flex items-center justify-center"></div>
                 <div>
@@ -640,7 +648,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       )}
 
       {showInviteNutri && (
-        <Modal title={<><User size={20} className="text-blue-500"/> Nuevo Nutriólogo</>} onClose={() => setShowInviteNutri(false)}>
+        <Modal title={<><User size={20} className="text-[var(--brand-primary)]"/> Nuevo Nutriólogo</>} onClose={() => setShowInviteNutri(false)}>
+          <Field label="Tipo de perfil">
+            <select className={InputClass} value={formNutri.role || "nutriologo"} onChange={e => setFormNutri(p => ({ ...p, role: e.target.value }))}>
+              <option value="nutriologo">Nutriólogo Titular (Cobro por paciente)</option>
+              <option value="nutriologo_estudiante">Nutriólogo Estudiante (Mensualidad fija)</option>
+            </select>
+          </Field>
           <Field label="Nombre completo">
             <input className={InputClass} value={formNutri.nombre} onChange={e => setFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
@@ -674,13 +688,21 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </div>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowInviteNutri(false)}>Cancelar</Btn>
-            <Btn grad onClick={inviteNutri} disabled={saving || uploadingLogo}>{saving ?"Enviando..." :"Invitar Nutriólogo"}</Btn>
+            <Btn grad onClick={inviteNutri} disabled={saving || uploadingLogo}>{saving ? "Enviando..." : "Invitar Nutriólogo"}</Btn>
           </div>
         </Modal>
       )}
 
       {showEditNutri && (
-        <Modal title={<><Pencil size={20} className="text-blue-500"/> Editar {showEditNutri.nombre}</>} onClose={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>
+        <Modal title={<><Pencil size={20} className="text-[var(--brand-primary)]"/> Editar {showEditNutri.nombre}</>} onClose={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>
+          {!showEditNutri.isSuperadmin && (
+            <Field label="Tipo de perfil">
+              <select className={InputClass} value={editFormNutri.role || "nutriologo"} onChange={e => setEditFormNutri(p => ({ ...p, role: e.target.value }))}>
+                <option value="nutriologo">Nutriólogo Titular (Cobro por paciente)</option>
+                <option value="nutriologo_estudiante">Nutriólogo Estudiante (Mensualidad fija)</option>
+              </select>
+            </Field>
+          )}
           <Field label="Nombre completo">
             <input className={InputClass} value={editFormNutri.nombre} onChange={e => setEditFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
@@ -739,7 +761,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 ) : <div />}
                 <div className="flex gap-2.5">
                   <Btn outline onClick={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>Cancelar</Btn>
-                  <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ?"Guardando..." :"Guardar cambios"}</Btn>
+                  <Btn grad onClick={saveEditNutri} disabled={saving || uploadingLogo}>{saving ? "Guardando..." : "Guardar cambios"}</Btn>
                 </div>
               </div>
             )}
@@ -748,9 +770,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       )}
 
       {showNewClient && (
-        <Modal title={<><Users size={20} className="text-blue-500"/> Nuevo Paciente</>} onClose={() => setShowNewClient(false)}>
+        <Modal title={<><Users size={20} className="text-[var(--brand-primary)]"/> Nuevo Paciente</>} onClose={() => setShowNewClient(false)}>
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 mb-4 flex items-start gap-2">
-            <CheckCircle2 size={16} className="text-blue-500 shrink-0 mt-0.5" />
+            <CheckCircle2 size={16} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
             <span>Este paciente quedará asignado directamente a tu cuenta (Flux Sports).</span>
           </div>
           <Field label="Nombre completo">
@@ -763,11 +785,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <input className={InputClass} type="tel" value={formClient.telefono} onChange={e => setFormClient(p=>({...p,telefono:e.target.value}))}/>
           </Field>
           <Field label="Objetivo principal">
-            <textarea className={InputClass +" min-h-[80px] resize-none"} value={formClient.objetivo} onChange={e => setFormClient(p=>({...p,objetivo:e.target.value}))} placeholder="Ej. Pérdida de grasa, hipertrofia..."/>
+            <textarea className={InputClass + " min-h-[80px] resize-none"} value={formClient.objetivo} onChange={e => setFormClient(p=>({...p,objetivo:e.target.value}))} placeholder="Ej. Pérdida de grasa, hipertrofia..."/>
           </Field>
           <div className="flex gap-2.5 justify-end mt-4">
             <Btn outline onClick={() => setShowNewClient(false)}>Cancelar</Btn>
-            <Btn grad onClick={createClient} disabled={saving}>{saving ?"Creando..." :"Crear paciente"}</Btn>
+            <Btn grad onClick={createClient} disabled={saving}>{saving ? "Creando..." : "Crear paciente"}</Btn>
           </div>
         </Modal>
       )}

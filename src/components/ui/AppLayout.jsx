@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, User } from"lucide-react";
-import { useBrand } from"../BrandContext";
-import { Capacitor } from"@capacitor/core";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
+import { useBrand } from "../BrandContext";
+import { Capacitor } from "@capacitor/core";
 
 
 /**
@@ -40,10 +40,17 @@ export function AppLayout({ children, nav, active, setActive, session }) {
     return () => window.removeEventListener("resize", checkScroll);
   }, [nav]);
 
-  const userName = session?.data?.nombre || session?.nombre ||"Usuario";
-  const subtitle = session?.role ==="civil" ?"Civil Premium" 
-                 : session?.role ==="cliente" ?"Vista Atleta" 
-                 :"Panel Admin";
+  const userName = session?.data?.nombre || session?.nombre || "Usuario";
+  const ROLE_LABELS = {
+    superadmin: "Superadmin",
+    nutriologo: "Nutriólogo",
+    nutriologo_estudiante: "Nutriólogo Estudiante",
+    staff: "Staff FLUX",
+    administrativo: "Administrativo",
+    civil: "Atleta Independiente",
+    cliente: "Paciente",
+  };
+  const subtitle = ROLE_LABELS[session?.role] || "Panel Admin";
 
   return (
     <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height:"100dvh", width:"100vw" }}>

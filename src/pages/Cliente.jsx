@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef } from"react";
-import { AppLayout } from"../components/ui/AppLayout";
-import { dbGet, dbUpsert } from"../lib/supabase";
-import { enqueue, getAll } from"../lib/offlineQueue";
-import { useBrand } from"../components/BrandContext";
-import { CitasCliente } from"../components/CitasCliente";
-import Nutrition from"../components/cliente/Nutrition";
-import Training from"../components/cliente/Training";
-import Progreso from"../components/cliente/Progreso";
-import UserProfile from"../components/UserProfile";
-import PerfilNutriologo from"../components/admin/PerfilNutriologo";
-import BloqueadoPaciente from"../components/BloqueadoPaciente";
-import { ProgramarCliente } from"../components/admin/ProgramarCliente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from"lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { AppLayout } from "../components/ui/AppLayout";
+import { dbGet, dbUpsert } from "../lib/supabase";
+import { enqueue, getAll } from "../lib/offlineQueue";
+import { useBrand } from "../components/BrandContext";
+import { CitasCliente } from "../components/CitasCliente";
+import Nutrition from "../components/cliente/Nutrition";
+import Training from "../components/cliente/Training";
+import Progreso from "../components/cliente/Progreso";
+import UserProfile from "../components/UserProfile";
+import PerfilNutriologo from "../components/admin/PerfilNutriologo";
+import BloqueadoPaciente from "../components/BloqueadoPaciente";
+import { ProgramarCliente } from "../components/admin/ProgramarCliente";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -28,7 +28,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   
   const [tabState, setTab] = useState(() => {
     const saved = sessionStorage.getItem("flux_cliente_tab");
-    return saved ? saved :"perfil";
+    return saved ? saved : "perfil";
   });
 
   const tab = isEmbedded ? embeddedTab : tabState;
@@ -83,7 +83,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           ...d, 
           comidas: (d.comidas || []).sort((a, b) => a.orden - b.orden) 
         })));
-      } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
+      } else {
+        setNutri(null);
+        setDias([]);
+      }
 
       const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
       const rsFull = rs.map(r => ({ 

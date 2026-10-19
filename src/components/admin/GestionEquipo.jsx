@@ -83,7 +83,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       if (e.message?.includes("already been registered")) {
         setMsg("❌ Este usuario ya tiene cuenta, pero está oculto en la bóveda. Búscalo en Authentication.");
       } else {
-        setMsg("❌" + e.message); 
+        setMsg("❌ " + e.message); 
       }
     }
     setSaving(false);
@@ -125,7 +125,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       setForm({ nombre:"", email:"", telefono:"" });
       load();
     } catch (e) {
-      setMsg("❌ Error al otorgar accesos:" + e.message);
+      setMsg("❌ Error al otorgar accesos: " + e.message);
     }
     setSaving(false);
   };
@@ -135,7 +135,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       await dbPatch(`profiles?id=eq.${p.id}`, { activo: !p.activo });
       setMsg(p.activo ?"🔴 Acceso suspendido" :"🟢 Acceso activado");
       load();
-    } catch (e) { setMsg("❌" + e.message); }
+    } catch (e) { setMsg("❌ " + e.message); }
   };
 
   const saveEdit = async () => {
@@ -147,7 +147,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       setShowConfirmDelete(false);
       setConfirmDeleteText("");
       load();
-    } catch (e) { setMsg("❌" + e.message); }
+    } catch (e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
@@ -178,19 +178,14 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
 
   return (
     <div>
-      {/* Header */}
+      {/* Top action bar */}
       <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-        <div>
-          <h2 className="font-['Rajdhani'] font-bold text-2xl text-[#0B1929] tracking-[0.5px] flex items-center gap-2">
-            <Users className="w-6 h-6 text-[var(--brand-primary)]" /> {isSuperadmin ?"Staff Corporativo" :"Equipo Administrativo"}
-          </h2>
-          <div className="text-sm text-[#6B7A8D] mt-0.5">
-            {equipo.length} colaborador{equipo.length !== 1 ?"es" :""} registrado{equipo.length !== 1 ?"s" :""}
-          </div>
+        <div className="text-sm text-[#6B7A8D] font-medium">
+          {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
         </div>
         <button 
           onClick={() => setShowInvite(true)}
-          className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+          className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-sm text-sm"
         >
           + Invitar colaborador
         </button>
@@ -200,10 +195,10 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
       <div className="bg-[#F8FAFC] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         {isSuperadmin 
-          ?"Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa." 
-          :"Tiene acceso únicamente a la lista de clientes y a la gestión de citas. No puede ver ni editar dietas, rutinas ni la biblioteca."
+          ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa. " 
+          : "Tiene acceso únicamente a la lista de clientes y a la gestión de citas. No puede ver ni editar dietas, rutinas ni la biblioteca. "
         }
-        {""}Puedes suspender su acceso en cualquier momento.
+        Puedes suspender su acceso en cualquier momento.
       </div>
 
       {/* Lista */}
@@ -220,7 +215,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           <div className="mt-5">
             <button 
               onClick={() => setShowInvite(true)}
-              className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity shadow-sm text-sm"
+              className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-sm text-sm"
             >
               + Invitar primer colaborador
             </button>
@@ -231,11 +226,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           {equipo.map((p, i) => (
             <div key={p.id} className="animate-in bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between flex-wrap gap-3 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
               {/* Barra lateral de estado */}
-              <div className={`absolute left-0 top-[15%] bottom-[15%] w-1 rounded-r-md ${p.activo !== false ? 'bg-gradient-to-b from-[#38bdf8] to-[#818cf8]' : 'bg-[#EF4444]'}`} />
+              <div className={`absolute left-0 top-[15%] bottom-[15%] w-1 rounded-r-md ${p.activo !== false ? 'bg-[var(--brand-primary)]' : 'bg-[#EF4444]'}`} />
 
               {/* Info */}
               <div className="pl-3.5">
-                <div className="font-bold text-[15px] text-[#0B1929] mb-1 font-['Space_Grotesk']">
+                <div className="font-bold text-[15px] text-[#0B1929] mb-1">
                   {p.nombre ||"—"}
                 </div>
                 <div className="text-xs text-[#6B7A8D] flex items-center gap-2.5 flex-wrap">
@@ -309,7 +304,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               <button 
                 onClick={() => resolveConflict(false)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]\/5 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors flex items-start gap-3"
               >
                 <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[var(--brand-primary)] flex items-center justify-center">
                   <div className="w-2.5 h-2.5 bg-[var(--brand-primary)] rounded-full"></div>
@@ -323,7 +318,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               <button 
                 onClick={() => resolveConflict(true)}
                 disabled={saving}
-                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]\/5 transition-colors flex items-start gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors flex items-start gap-3"
               >
                 <div className="w-5 h-5 mt-0.5 rounded-full border-2 border-[#E2E8F0] group-hover:border-[var(--brand-primary)] flex items-center justify-center">
                 </div>
@@ -397,12 +392,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                   El colaborador recibirá un email de invitación para crear su contraseña.
                   {isSuperadmin ? (
                     <>
-                      {""}Solo tendrá acceso a <strong className="text-[#0B1929]">Directorio</strong>,{""}
+                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Directorio</strong>,{" "}
                       <strong className="text-[#0B1929]">Biblioteca</strong> y <strong className="text-[#0B1929]">Tienda</strong>.
                     </>
                   ) : (
                     <>
-                      {""}Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{""}
+                      {" "}Solo tendrá acceso a <strong className="text-[#0B1929]">Clientes</strong> y{" "}
                       <strong className="text-[#0B1929]">Agenda</strong> — sin acceso a información clínica.
                     </>
                   )}

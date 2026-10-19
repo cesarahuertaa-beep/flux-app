@@ -23,17 +23,21 @@ import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../lib/supabase";
 import { useBrand } from"../components/BrandContext";
 
-// Contenedor temporal para los sub-componentes oscuros (legacy)
-// Ocupa al menos el 100% de la altura para que no se corte el fondo
-const SubComponentWrapper = ({ children, title, action }) => (
-  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] overflow-hidden">
+const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
+  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929]">
     {title && (
-      <div className="px-4 md:px-8 py-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between shadow-sm z-10 shrink-0 pr-12 md:pr-4">
-        <h1 className="text-lg font-bold tracking-tight text-[#0B1929]">{title}</h1>
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0 pr-12 md:pr-8">
+        <div>
+          <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            {eyebrow}
+          </p>
+          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>{title}</h1>
+          {subtitle && <p className="text-sm text-[#6B7A8D] mt-1">{subtitle}</p>}
+        </div>
         {action}
       </div>
     )}
-    <div className="flex-1 w-full relative p-4 md:p-8 overflow-y-auto">
+    <div className="flex-1 w-full relative p-4 md:p-8">
       {children}
     </div>
   </div>
@@ -249,7 +253,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     try { 
       const [r, allNutris, me] = await Promise.all([
         dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)),
-        dbGet(`profiles?role=in.(nutriologo,superadmin)&select=email`),
+        dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`),
         dbGet(`profiles?id=eq.${myId}&select=id,nombre,email`)
       ]);
       _allNutris = allNutris;
@@ -294,17 +298,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   }, [loadClientes, loadBiblioteca]);
 
   useEffect(() => {
-    if (tab ==="programar" && !selected) {
-      setTab("clientes");
-    }
-    if (tab ==="membresia" && isSuperadmin) {
+    if (tab === "membresia" && isSuperadmin) {
       setTab("pagos");
     }
-  }, [tab, selected, isSuperadmin]);
+  }, [tab, isSuperadmin]);
 
   useEffect(() => {
     if (!isSuperadmin) return;
-    dbGet("profiles?role=eq.nutriologo&select=id,nombre").then(rows => {
+    dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre").then(rows => {
       const map = {};
       rows.forEach(r => { map[r.id] = r.nombre; });
       setNutrioMap(map);
@@ -555,8 +556,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       session={session}
     >
       {diasGracia && !isCivil && (
-        <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0">
-          <AlertCircle className="w-4 h-4 shrink-0 text-yellow-600" /> Tu suscripción vence pronto. Sube tu comprobante en"Mi Membresía" antes de 48 horas para evitar la suspensión.
+        <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0 flex items-center justify-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-yellow-200" />
+          <span>Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.</span>
         </div>
       )}
       {/* Toast Notification (z-[110] para que siempre esté arriba) */}
@@ -723,11 +725,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {/* Legacy Dark Mode Sub-Components */}
-      {(role ==="superadmin" || role ==="staff") && tab ==="biblioteca" && <SubComponentWrapper><Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/></SubComponentWrapper>}
+      {/* Sub-Components */}
+      {(role === "superadmin" || role === "staff") && tab === "biblioteca" && (
+        <SubComponentWrapper title="Biblioteca de Ejercicios" subtitle="Colección global de ejercicios con demostración visual">
+          <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
+        </SubComponentWrapper>
+      )}
       
-      {tab ==="mi_entrenamiento" && (
-        <SubComponentWrapper title="Mi Plan">
+      {!isCivil && tab === "mi_entrenamiento" && (
+        <SubComponentWrapper title="Mi Plan Personal" subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones">
           {myShadowClient ? (
             <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
           ) : (
@@ -736,41 +742,59 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      <div className={tab ==="programar" ?"block" :"hidden"}>
-        <SubComponentWrapper title="Asignador de Dietas y Rutinas">
-          <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
-        </SubComponentWrapper>
-      </div>
-
-      {(role !=="administrativo" && role !=="staff") && (
-        <div className={tab ==="equipo" ?"block" :"hidden"}>
-          <SubComponentWrapper><GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/></SubComponentWrapper>
+      {!isCivil && role !== "administrativo" && (
+        <div className={tab === "programar" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Asignador de Dietas y Rutinas" subtitle="Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente">
+            <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
+          </SubComponentWrapper>
         </div>
       )}
 
-      <div className={tab ==="agenda" ?"block" :"hidden"}>
-        <SubComponentWrapper><AgendaAdmin setMsg={setMsg} profileId={myId}/></SubComponentWrapper>
-      </div>
+      {!isCivil && role !== "administrativo" && role !== "staff" && (
+        <div className={tab === "equipo" ? "block" : "hidden"}>
+          <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
+            <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/>
+          </SubComponentWrapper>
+        </div>
+      )}
 
-      <div className={tab ==="aprobaciones" && (isSuperadmin || role ==="staff") ?"block" :"hidden"}>
-        <SubComponentWrapper title="Aprobaciones"><Aprobaciones setMsg={setMsg} /></SubComponentWrapper>
-      </div>
+      {!isCivil && role !== "staff" && (
+        <div className={tab === "agenda" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
+            <AgendaAdmin setMsg={setMsg} profileId={myId}/>
+          </SubComponentWrapper>
+        </div>
+      )}
 
-      {!isCivil && (
-        <div className={tab ==="membresia" ?"block" :"hidden"}>
-          <SubComponentWrapper title="Mi Membresía"><MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} /></SubComponentWrapper>
+      {(isSuperadmin || role === "staff") && (
+        <div className={tab === "aprobaciones" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Aprobaciones" subtitle="Solicitudes de registro y verificación de especialistas">
+            <Aprobaciones setMsg={setMsg} />
+          </SubComponentWrapper>
+        </div>
+      )}
+
+      {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (
+        <div className={tab === "membresia" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Mi Membresía" subtitle="Consulta el estado de tu suscripción y sube tus comprobantes de pago">
+            <MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
+          </SubComponentWrapper>
         </div>
       )}
 
       {isSuperadmin && (
-        <div className={tab ==="pagos" ?"block" :"hidden"}>
-          <SubComponentWrapper title="Auditoría Financiera"><ControlPagos setMsg={setMsg} /></SubComponentWrapper>
+        <div className={tab === "pagos" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Auditoría Financiera" subtitle="Control de pagos, tarifas vigentes y comisiones de colaboradores">
+            <ControlPagos setMsg={setMsg} />
+          </SubComponentWrapper>
         </div>
       )}
 
-      {(role ==="staff" || role ==="administrativo") && (
-        <div className={tab ==="comisiones" ?"block" :"hidden"}>
-          <SubComponentWrapper title="Mis Comisiones"><MisComisiones myId={myId} setMsg={setMsg} /></SubComponentWrapper>
+      {(role === "staff" || role === "administrativo") && (
+        <div className={tab === "comisiones" ? "block" : "hidden"}>
+          <SubComponentWrapper title="Mis Comisiones" subtitle="Resumen de tus comisiones generadas y estado de pago">
+            <MisComisiones myId={myId} setMsg={setMsg} />
+          </SubComponentWrapper>
         </div>
       )}
 
@@ -932,15 +956,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
       )}
 
-      {tab ==="tienda" && (isSuperadmin || role ==="staff") && (
-        <SubComponentWrapper><GestorTienda setMsg={setMsg}/></SubComponentWrapper>
+      {tab === "tienda" && (isSuperadmin || role === "staff") && (
+        <SubComponentWrapper title="Gestor de Tienda FLUX" subtitle="Administra el catálogo de productos y suplementos de la tienda">
+          <GestorTienda setMsg={setMsg}/>
+        </SubComponentWrapper>
       )}
     
       {/* ════════════ CIVIL PREMIUM TABS ════════════ */}
-      {isCivil && tab ==="mi_plan" && (
+      {isCivil && tab === "mi_plan" && (
         <SubComponentWrapper
           title="Mi Plan"
-          
+          subtitle="Configura tus propios ciclos de alimentación, rutinas y evaluaciones"
+          eyebrow="Atleta Independiente"
         >
           {clienteData ? (
             <ProgramarCliente
@@ -957,8 +984,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      {isCivil && tab ==="membresia" && (
-        <SubComponentWrapper title="Mi Membresía">
+      {isCivil && tab === "membresia" && (
+        <SubComponentWrapper
+          title="Mi Membresía"
+          subtitle="Gestiona tu suscripción mensual y sube tus comprobantes de pago"
+          eyebrow="Atleta Independiente"
+        >
           <MiMembresiaCivil clienteData={clienteData} setMsg={setMsg} />
         </SubComponentWrapper>
       )}

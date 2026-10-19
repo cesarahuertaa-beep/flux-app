@@ -76,10 +76,10 @@ const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","S
 const HORAS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,"0")}:00`);
 
 const fmtFechaHora = (iso) => {
-  if (!iso) return"—";
+  if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleDateString("es-MX", { weekday:"short", day:"numeric", month:"short" })
-    +" •" + d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
+    + " • " + d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
 };
 
 const ESTADO_COLOR = {
@@ -96,8 +96,8 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [clientes, setClientes]             = useState([]);
   const [loading, setLoading]               = useState(true);
-  const [subTab, setSubTab]                 = useState("citas");   //"citas" |"horarios"
-  const [filtro, setFiltro]                 = useState("pendiente"); //"todos" |"pendiente" |"confirmada" |"rechazada"
+  const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
+  const [filtro, setFiltro]                 = useState("todos");   // "todos" | "pendiente" | "confirmada" | "rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
@@ -247,31 +247,26 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre ||"Cliente";
   const clienteTelefono = (id) => clientes.find(c => c.id === id)?.telefono;
 
-  const citasFiltradas = citas;
+  const citasFiltradas = filtro === "todos" ? citas : citas.filter(c => c.estado === filtro);
 
-  const pendientesCount = citas.filter(c => c.estado ==="pendiente").length;
+  const pendientesCount = citas.filter(c => c.estado === "pendiente").length;
 
   // ── Render ──
   return (
     <div className="w-full">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="font-bold text-2xl text-[#0B1929] tracking-tight">
-            Agenda
-          </h2>
-          <div className="text-sm text-[#6B7A8D] mt-1">
-            {pendientesCount > 0
-              ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ?"s" :""} pendiente{pendientesCount > 1 ?"s" :""} de confirmar</span>
-              :"Todo al día"}
-          </div>
+      {/* Top bar: status summary + Sub-tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="text-sm text-[#6B7A8D]">
+          {pendientesCount > 0
+            ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
+            : "Todo al día — sin citas pendientes por confirmar"}
         </div>
         {/* Sub-tabs */}
-        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl">
           {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
             <button key={k} onClick={() => setSubTab(k)} className={`
               px-4 py-1.5 rounded-lg text-sm font-semibold transition-all
-              ${subTab === k ?"bg-white text-[var(--brand-primary)] shadow-sm border border-slate-200" :"text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"}
+              ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-[#6B7A8D] hover:text-[#0B1929]"}
             `}>
               {lb}
             </button>
@@ -284,14 +279,35 @@ export function AgendaAdmin({ setMsg, profileId }) {
           <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-[var(--brand-primary)] animate-spin mx-auto mb-4" />
           Cargando agenda…
         </div>
-      ) : subTab ==="citas" ? (
+      ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
-          
+          {/* Filtros de estado */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {[
+              ["todos", `Todas (${citas.length})`],
+              ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
+              ["confirmada", `Confirmadas (${citas.filter(c => c.estado === "confirmada").length})`],
+              ["completada", `Completadas (${citas.filter(c => c.estado === "completada").length})`],
+              ["rechazada", `Rechazadas (${citas.filter(c => c.estado === "rechazada").length})`],
+            ].map(([k, lb]) => (
+              <button
+                key={k}
+                onClick={() => setFiltro(k)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                  filtro === k
+                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-slate-50"
+                }`}
+              >
+                {lb}
+              </button>
+            ))}
+          </div>
 
           {citasFiltradas.length === 0 ? (
             <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
-              <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay citas agendadas</div>
+              <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay citas en esta categoría</div>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -414,7 +430,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
       {modalRechazo && (
         <Modal title="Rechazar cita" onClose={() => setModalRechazo(null)}>
           <div className="text-sm text-[#6B7A8D] leading-relaxed">
-            Rechazando la cita de <strong className="text-[#0B1929]">{clienteNombre(modalRechazo.cliente_id)}</strong> el{""}
+            Rechazando la cita de <strong className="text-[#0B1929]">{clienteNombre(modalRechazo.cliente_id)}</strong> el{" "}
             <strong className="text-[#0B1929]">{fmtFechaHora(modalRechazo.fecha_hora)}</strong>.
             <br/>El cliente verá el motivo en su aplicación.
           </div>

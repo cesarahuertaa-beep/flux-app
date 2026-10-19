@@ -216,15 +216,15 @@ export function CitasCliente({ cliente }) {
   const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada","rechazada","completada"].includes(c.estado));
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Agenda
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
               Mis Citas
             </h1>
             {cliente?.nombre && (
@@ -263,7 +263,7 @@ export function CitasCliente({ cliente }) {
       )}
 
       {/* ── Main Content ── */}
-      <div className="px-6 md:px-8 flex-1 overflow-y-auto pb-8">
+      <div className="px-6 md:px-8 flex-1 pb-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-[#6B7A8D]">
             <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />
@@ -274,7 +274,7 @@ export function CitasCliente({ cliente }) {
             <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
               <CalendarDays size={32} className="text-[#6B7A8D]" />
             </div>
-            <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
+            <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
               Agenda no disponible
             </h3>
             <p className="text-sm text-[#6B7A8D] max-w-sm">
@@ -291,12 +291,13 @@ export function CitasCliente({ cliente }) {
                 </p>
                 <div className="space-y-4">
                   {citasProximas.map(cita => {
-                    const estado = ESTADOS[cita.estado];
+                    const estado = ESTADOS[cita.estado] || ESTADOS.pendiente;
                     const { dia, hora } = fmtFechaHora(cita.fecha_hora);
+                    const barColor = cita.estado === "confirmada" ? "bg-emerald-500" : cita.estado === "pendiente" ? "bg-amber-400" : "bg-red-500";
                     return (
                       <div key={cita.id} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden flex relative">
                         {/* Status color bar */}
-                        <div className={`w-1.5 flex-shrink-0 ${estado.bg} ${estado.border} border-l`} style={{ backgroundColor:"currentColor", color: `var(--brand-primary)` }} />
+                        <div className={`w-1.5 flex-shrink-0 ${barColor}`} />
                         
                         <div className="p-5 flex-1 min-w-0">
                           <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
@@ -306,7 +307,7 @@ export function CitasCliente({ cliente }) {
                             </div>
                             
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D] text-[11px] font-semibold">
-                              {cita.modalidad ==="virtual" ? <Video size={12}/> : <MapPin size={12}/>}
+                              {cita.modalidad === "virtual" ? <Video size={12}/> : <MapPin size={12}/>}
                               <span className="capitalize">{cita.modalidad}</span>
                             </div>
                           </div>
@@ -355,13 +356,13 @@ export function CitasCliente({ cliente }) {
                               {estado.label}
                             </span>
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-[#E2E8F0] bg-[#F7F9FC] text-[#6B7A8D]">
-                              {cita.modalidad ==="virtual" ?"Virtual" :"Presencial"}
+                              {cita.modalidad === "virtual" ? "Virtual" : "Presencial"}
                             </span>
-                            {cita.estado ==="completada" && (
+                            {cita.estado === "completada" && (
                               yaCalificado ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md ml-2 border border-amber-200"><Star size={14} className="fill-amber-500"/> {yaCalificado}.0</span>
                               ) : (
-                                <button onClick={() => setRatingModal({ open: true, citaId: cita.id, puntuacion: 5, comentario:"" })} className="text-xs font-semibold text-white bg-[var(--brand-primary)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm ml-2">
+                                <button onClick={() => setRatingModal({ open: true, citaId: cita.id, puntuacion: 5, comentario: "" })} className="text-xs font-semibold text-white bg-[var(--brand-primary)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-all flex items-center gap-1 shadow-sm ml-2">
                                   <Star size={12} className="fill-white"/> Calificar
                                 </button>
                               )
@@ -379,7 +380,7 @@ export function CitasCliente({ cliente }) {
                 <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
                   <Plus size={32} className="text-[#CBD5E1]" />
                 </div>
-                <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily:"DM Sans" }}>
+                <h3 className="text-lg font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
                   Sin citas agendadas
                 </h3>
                 <p className="text-sm text-[#6B7A8D] max-w-sm">
@@ -398,7 +399,7 @@ export function CitasCliente({ cliente }) {
             
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-              <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
+              <h3 className="text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
                 Agendar nueva cita
               </h3>
               <button 
@@ -417,7 +418,7 @@ export function CitasCliente({ cliente }) {
                 <CalendarDays size={18} className="text-[var(--brand-primary)] mt-0.5" />
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
                   Días que atiende el nutriólogo: <br />
-                  <strong className="text-[#0B1929]">{diasDisponibles.map(d => DIAS_FULL[d]).join(",")}</strong>
+                  <strong className="text-[#0B1929]">{diasDisponibles.map(d => DIAS_FULL[d]).join(", ")}</strong>
                 </p>
               </div>
 

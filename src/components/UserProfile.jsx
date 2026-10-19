@@ -90,11 +90,19 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
 
   return (
     <div className="w-full bg-[#F7F9FC] flex flex-col">
-      <div className="max-w-4xl mx-auto w-full pb-32 px-6 md:px-8 pt-6 md:pt-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-[#0B1929] tracking-tight font-['Space_Grotesk',sans-serif]">Mi Perfil</h1>
-        <p className="text-[#6B7A8D] mt-1">Gestiona tu información personal e identidad en la plataforma.</p>
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+        <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+          Mi Cuenta
+        </p>
+        <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+          Mi Perfil
+        </h1>
+        <p className="text-sm text-[#6B7A8D] mt-1">
+          Gestiona tu información personal e identidad en la plataforma.
+        </p>
       </div>
+
+      <div className="max-w-4xl mx-auto w-full pb-32 px-4 sm:px-6 md:px-8 pt-6">
 
       <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 
@@ -166,7 +174,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
                   <div className="flex items-start gap-2 text-sm text-[#6B7A8D]">
                     <MapPin size={16} className="shrink-0 mt-0.5" /> 
                     <span className="text-[#0B1929]">
-                      {miNutriologo.ubicacion_texto ? miNutriologo.ubicacion_texto : [miNutriologo.estado, miNutriologo.pais].filter(Boolean).join(",")}
+                      {miNutriologo.ubicacion_texto ? miNutriologo.ubicacion_texto : [miNutriologo.estado, miNutriologo.pais].filter(Boolean).join(", ")}
                     </span>
                   </div>
                 )}

@@ -1,19 +1,26 @@
-import { useState, useEffect, useCallback, useRef } from"react";
-import Model from"@phelian/react-body-highlighter";
-import { dbGet, storageUpload, storageListFolder, storageDelete } from"../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from"lucide-react";
-import { parseFotos } from"../../utils/helpers";
-import { useBrand } from"../BrandContext";
+import { useState, useEffect, useCallback, useRef } from "react";
+import Model from "@phelian/react-body-highlighter";
+import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
+import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from "lucide-react";
+import { parseFotos } from "../../utils/helpers";
+import { useBrand } from "../BrandContext";
+
+const EXACT_GROUPS = [
+  "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
+  "trapecio", "dorsal", "lumbar", "biceps", "triceps", "antebrazo",
+  "gluteo", "cuadriceps", "isquiotibial", "pantorrilla", "aductor",
+  "abductor", "soleo", "cuello"
+];
 
 // ── Helpers ──
 const fmtDate = (d) => {
-  if (!d) return"";
-  const date = new Date(d +"T12:00:00");
-  return date.toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
+  if (!d) return "";
+  const date = new Date(d + "T12:00:00");
+  return date.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 };
 
 const delta = (curr, prev, key) => {
-  if (curr[key] == null || prev[key] == null || curr[key] ==="" || prev[key] ==="") return null;
+  if (curr[key] == null || prev[key] == null || curr[key] === "" || prev[key] === "") return null;
   const d = parseFloat(curr[key]) - parseFloat(prev[key]);
   return d === 0 ? 0 : d;
 };
@@ -26,82 +33,38 @@ const calcular1RM = (peso, reps) => {
 };
 
 const normalizeGroup = (g) => {
-  if (!g) return"otro";
-  const str = g.toLowerCase();
-  if (str.includes("pecho") || str.includes("pectoral")) return"pecho";
-  if (str.includes("espalda") || str.includes("dorsal")) return"espalda";
-  if (str.includes("pierna") || str.includes("glúteo") || str.includes("cuádriceps") || str.includes("isquio") || str.includes("pantorrilla")) return"pierna";
-  if (str.includes("brazo") || str.includes("bíceps") || str.includes("tríceps") || str.includes("antebrazo")) return"brazo";
-  if (str.includes("hombro") || str.includes("deltoide")) return"hombro";
-  if (str.includes("abdomen") || str.includes("core")) return"abdomen";
-  return"otro";
+  if (!g) return "otro";
+  const str = g.toLowerCase().trim();
+  if (EXACT_GROUPS.includes(str)) return str;
+  if (str.includes("pecho") || str.includes("pectoral")) return "pecho";
+  if (str.includes("espalda") || str.includes("dorsal")) return "dorsal";
+  if (str.includes("pierna") || str.includes("cuádriceps") || str.includes("cuadriceps")) return "cuadriceps";
+  if (str.includes("glúteo") || str.includes("gluteo")) return "gluteo";
+  if (str.includes("isquio")) return "isquiotibial";
+  if (str.includes("pantorrilla")) return "pantorrilla";
+  if (str.includes("bíceps") || str.includes("biceps") || str.includes("brazo")) return "biceps";
+  if (str.includes("tríceps") || str.includes("triceps")) return "triceps";
+  if (str.includes("antebrazo")) return "antebrazo";
+  if (str.includes("hombro") || str.includes("deltoide")) return "deltoide_anterior";
+  if (str.includes("abdomen") || str.includes("core")) return "abdomen";
+  return "otro";
 };
 
 const RANKS = [
-  { name:"Clase G", min: 0, color:"#94A3B8", level: 1 }, // Gris claro
-  { name:"Clase F", min: 100, color:"#64748B", level: 1 }, // Gris oscuro
-  { name:"Clase E", min: 300, color:"#4ADE80", level: 2 }, // Verde claro
-  { name:"Clase D", min: 600, color:"#16A34A", level: 2 }, // Verde oscuro
-  { name:"Clase C", min: 1000, color:"#60A5FA", level: 3 }, // Azul claro
-  { name:"Clase B", min: 1500, color:"#2563EB", level: 3 }, // Azul oscuro
-  { name:"Clase A", min: 2100, color:"#A855F7", level: 4 }, // Morado
-  { name:"Clase S", min: 2800, color:"#FBBF24", level: 5 }, // Amarillo
-  { name:"Clase SS", min: 3600, color:"#F97316", level: 5 }, // Naranja
-  { name:"Clase SSS", min: 4500, color:"#EF4444", level: 6 } // Rojo
+  { name: "Clase G", min: 0, color: "#94A3B8", level: 1 }, // Gris claro
+  { name: "Clase F", min: 100, color: "#64748B", level: 1 }, // Gris oscuro
+  { name: "Clase E", min: 300, color: "#4ADE80", level: 2 }, // Verde claro
+  { name: "Clase D", min: 600, color: "#16A34A", level: 2 }, // Verde oscuro
+  { name: "Clase C", min: 1000, color: "#60A5FA", level: 3 }, // Azul claro
+  { name: "Clase B", min: 1500, color: "#2563EB", level: 3 }, // Azul oscuro
+  { name: "Clase A", min: 2100, color: "#A855F7", level: 4 }, // Morado
+  { name: "Clase S", min: 2800, color: "#FBBF24", level: 5 }, // Amarillo
+  { name: "Clase SS", min: 3600, color: "#F97316", level: 5 }, // Naranja
+  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 } // Rojo
 ];
 
 const getRank = (xp) => {
   return [...RANKS].reverse().find(r => xp >= r.min) || RANKS[0];
-};
-
-
-// ── SVGs de Figuras ──
-const SilhouetteSVG = () => (
-  <svg viewBox="0 0 100 220" className="w-full h-full drop-shadow-md">
-    <circle cx="50" cy="25" r="14" fill="#E2E8F0" />
-    <path d="M30,45 Q50,40 70,45 L75,80 Q50,85 25,80 Z" fill="#F1F5F9" />
-    <path d="M35,80 Q50,83 65,80 L60,115 Q50,120 40,115 Z" fill="#E2E8F0" />
-    <path d="M25,45 Q15,60 20,100 L28,95 Q25,60 30,45 Z" fill="#CBD5E1" />
-    <path d="M75,45 Q85,60 80,100 L72,95 Q75,60 70,45 Z" fill="#CBD5E1" />
-    <path d="M40,115 L40,200 L48,200 L48,130 L52,130 L52,200 L60,200 L60,115 Z" fill="#CBD5E1" />
-    {/* Glowing Dots */}
-    <circle cx="50" cy="25" r="3" fill="#3B82F6" />
-    <circle cx="50" cy="60" r="3" fill="#3B82F6" />
-    <circle cx="50" cy="100" r="3" fill="#10B981" />
-    <circle cx="44" cy="160" r="3" fill="#8B5CF6" />
-    <circle cx="56" cy="160" r="3" fill="#8B5CF6" />
-  </svg>
-);
-
-const MuscularSVG = ({ groups }) => {
-  const getColor = (g) => getRank(groups[g]).color;
-  return (
-    <svg viewBox="0 0 100 160" className="w-full h-full drop-shadow-xl">
-      <circle cx="50" cy="15" r="9" fill="#1E293B" />
-      <path d="M46,23 L54,23 L55,30 L45,30 Z" fill="#1E293B" />
-      {/* Hombros */}
-      <path d="M30,30 Q45,25 50,30 Q55,25 70,30 L74,42 Q50,35 26,42 Z" fill={getColor('hombro')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Pecho */}
-      <path d="M34,42 Q50,47 66,42 L64,56 Q50,60 36,56 Z" fill={getColor('pecho')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Abdomen */}
-      <path d="M36,56 Q50,52 64,56 L60,83 Q50,86 40,83 Z" fill={getColor('abdomen')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Espalda (Dorsales laterales) */}
-      <path d="M28,44 L34,42 L36,56 L31,68 Z" fill={getColor('espalda')} stroke="#0F172A" strokeWidth="0.5"/>
-      <path d="M72,44 L66,42 L64,56 L69,68 Z" fill={getColor('espalda')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Brazos */}
-      <path d="M25,43 Q18,58 22,73 L29,70 Q32,58 30,43 Z" fill={getColor('brazo')} stroke="#0F172A" strokeWidth="0.5"/>
-      <path d="M75,43 Q82,58 78,73 L71,70 Q68,58 70,43 Z" fill={getColor('brazo')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Antebrazos */}
-      <path d="M21,75 Q16,88 18,100 L24,98 Q27,88 27,73 Z" fill={getColor('brazo')} stroke="#0F172A" strokeWidth="0.5"/>
-      <path d="M79,75 Q84,88 82,100 L76,98 Q73,88 73,73 Z" fill={getColor('brazo')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Piernas */}
-      <path d="M39,85 Q32,105 34,120 L45,118 Q48,105 48,85 Z" fill={getColor('pierna')} stroke="#0F172A" strokeWidth="0.5"/>
-      <path d="M61,85 Q68,105 66,120 L55,118 Q52,105 52,85 Z" fill={getColor('pierna')} stroke="#0F172A" strokeWidth="0.5"/>
-      {/* Pantorrillas */}
-      <path d="M34,122 Q30,138 32,150 L41,150 Q44,138 43,120 Z" fill={getColor('pierna')} stroke="#0F172A" strokeWidth="0.5"/>
-      <path d="M66,122 Q70,138 68,150 L59,150 Q56,138 57,120 Z" fill={getColor('pierna')} stroke="#0F172A" strokeWidth="0.5"/>
-    </svg>
-  );
 };
 
 export default function Progreso({ cliente, isSelfManaged }) {
@@ -109,7 +72,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(true);
   const brand = useBrand();
-  const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium';
+  const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium' && cliente.objetivo !== 'Mi entrenamiento personal';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
   
   const [view, setView] = useState('metricas');
@@ -354,32 +317,38 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const nutriPhotos = metricas.flatMap(m => parseFotos(m.fotos)).filter(Boolean);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F7F9FC]">
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-12 max-w-5xl mx-auto space-y-8">
-        
-        {/* HEADER */}
+    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+      {/* HEADER ESTÁNDAR */}
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col sm:flex-row sm:items-end justify-between gap-4 pr-12 md:pr-8">
         <div>
-          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>Mis Resultados</h1>
+          <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            Mi Seguimiento
+          </p>
+          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            Mis Resultados
+          </h1>
           <p className="text-sm text-[#6B7A8D] mt-1">
-            {current.fecha ? `Última evaluación: ${fmtDate(current.fecha)}` :"Aún no hay evaluaciones registradas"}
+            {current.fecha ? `Última evaluación: ${fmtDate(current.fecha)}` : "Aún no hay evaluaciones registradas"}
           </p>
         </div>
 
-        <div className="flex bg-[#E2E8F0] p-1 rounded-xl w-max">
+        <div className="flex bg-[#F0F4FA] p-1 rounded-xl w-max">
           <button
             onClick={() => setView('metricas')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'metricas' ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'metricas' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
           >
             Métricas
           </button>
           <button
             onClick={() => setView('galeria')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'galeria' ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'galeria' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
           >
             Galería
           </button>
         </div>
+      </div>
 
+      <div className="px-6 md:px-8 py-6 md:py-8 pb-12 max-w-5xl w-full mx-auto space-y-8">
         {view === 'metricas' && (
           <>
           {COMP_KEYS.length > 0 ? (
@@ -390,21 +359,21 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 const val = current[k.key];
                 const hasPrev = metricas.length > 1;
                 const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
-                let colorClass ="text-[#6B7A8D]";
+                let colorClass = "text-[#6B7A8D]";
                 let Icon = Minus;
-                let sign ="";
+                let sign = "";
                 
                 if (d !== null) {
                     const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") || k.key.includes("cadera") || k.key.includes("icc") ? d < 0 : d > 0;
-                    colorClass = isImprovement ?"text-green-500" :"text-red-500";
+                    colorClass = isImprovement ? "text-green-500" : "text-red-500";
                   Icon = d > 0 ? TrendingUp : TrendingDown;
-                  sign = d > 0 ?"+" :"";
+                  sign = d > 0 ? "+" : "";
                 }
 
                 return (
                   <div key={k.key} className="bg-white rounded-2xl p-5 shadow-sm border border-[#E2E8F0] flex flex-col items-center text-center">
                     <p className="text-[10px] md:text-xs font-bold text-[#6B7A8D] tracking-widest">{k.label}</p>
-                    <div className="text-2xl md:text-3xl font-bold text-[#1A6FD4] mt-2 mb-1">
+                    <div className="text-2xl md:text-3xl font-bold text-[var(--brand-primary)] mt-2 mb-1">
                       {val} <span className="text-sm font-semibold text-[#9BA5B0]">{k.unit}</span>
                     </div>
                     {d !== null && (
@@ -427,10 +396,10 @@ export default function Progreso({ cliente, isSelfManaged }) {
               <div className="flex flex-row items-center justify-center gap-4 md:gap-16">
                 
                 <div className="flex flex-col gap-6 text-right flex-1">
-                  {current.peso != null && current.peso !=="" && (
+                  {current.peso != null && current.peso !== "" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">PESO</p>
-                      <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.peso} <span className="text-[10px] md:text-xs text-[#9BA5B0]">kg</span></p>
+                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.peso} <span className="text-[10px] md:text-xs text-[#9BA5B0]">kg</span></p>
                     </div>
                   )}
                 </div>
@@ -445,16 +414,16 @@ export default function Progreso({ cliente, isSelfManaged }) {
                 </div>
 
                 <div className="flex flex-col gap-6 text-left flex-1">
-                  {current.grasa_pct != null && current.grasa_pct !=="" && (
+                  {current.grasa_pct != null && current.grasa_pct !== "" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">GRASA</p>
-                      <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.grasa_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
+                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.grasa_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
                     </div>
                   )}
-                  {current.musculo_pct != null && current.musculo_pct !=="" && (
+                  {current.musculo_pct != null && current.musculo_pct !== "" && (
                     <div>
                       <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">MÚSCULO</p>
-                      <p className="text-xl md:text-2xl font-bold text-[#1A6FD4]">{current.musculo_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
+                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.musculo_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
                     </div>
                   )}
                 </div>
@@ -466,22 +435,21 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
             <Scale className="w-12 h-12 text-[#9BA5B0] mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">Sin métricas de composición</h3>
-            <p className="text-sm text-[#6B7A8D]">{isSelfManaged ?"Aún no has registrado ninguna evaluación física." :"Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
+            <p className="text-sm text-[#6B7A8D]">{isSelfManaged ? "Aún no has registrado ninguna evaluación física." : "Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
           </div>
         )}
 
         {/* EVALUACIÓN MUSCULAR (Simétrico) */}
         <div className="relative">
           {isEstandar && (
-            <div className="absolute inset-0 z-50 backdrop-blur-md bg-[#0B1929]/70 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#1E2D3D]">
+            <div className="absolute inset-0 z-50 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#1E2D3D]">
               <Lock size={48} className="text-amber-400 mb-4" />
-              <h3 className="text-xl font-bold text-[#0B1929] mb-2">Desarrollo Muscular Premium</h3>
-              <p className="text-[#9BA5B0] text-sm max-w-sm mb-6">Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.</p>
-              <div className="text-[11px] uppercase tracking-widest font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-lg">Adquiere Premium en Mi Membresía</div>
+              <h3 className="text-xl font-bold text-white mb-2">Desarrollo Muscular Premium</h3>
+              <p className="text-slate-200 text-sm max-w-sm mb-6">Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.</p>
+              <div className="text-[11px] uppercase tracking-widest font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-4 py-2 rounded-lg">Adquiere Premium en Mi Membresía</div>
             </div>
           )}
-          <div className={`bg-white rounded-3xl p-6 md:p-8 shadow-lg overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
-            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none" />
+          <div className={`bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
           
           <h2 className="text-lg font-bold text-[#0B1929] mb-2 relative z-10">Desarrollo Muscular</h2>
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
@@ -519,7 +487,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <div key={g} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.3)]" style={{ background: rank.color }} />
-                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g,"")}</span>
+                        <span className="text-sm font-semibold text-[#0B1929] capitalize">{g.replace(/_/g, " ")}</span>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold" style={{ color: rank.color }}>{rank.name}</p>
@@ -549,7 +517,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
             </div>
             
             <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-4 md:p-5 flex gap-3 text-left max-w-2xl mx-auto">
-              <div className="text-blue-500 shrink-0">
+              <div className="text-[var(--brand-primary)] shrink-0">
                 <TrendingUp size={20} />
               </div>
               <div>
@@ -571,14 +539,14 @@ export default function Progreso({ cliente, isSelfManaged }) {
         {view === 'galeria' && (
           <div className="space-y-12">
             
-            {/* Sección Nutriólogo */}
-            {(!isSelfManaged && nutriPhotos.length > 0) && (
+            {/* Sección Evaluaciones */}
+            {nutriPhotos.length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6 border-b border-[#E2E8F0] pb-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#1A6FD4' }}>
                     <ImageIcon size={18} />
                   </div>
-                  <h3 className="text-lg font-bold text-[#0B1929]">Fotos de tu Nutriólogo</h3>
+                  <h3 className="text-lg font-bold text-[#0B1929]">{isSelfManaged ? "Fotos de Evaluaciones" : "Fotos de tu Nutriólogo"}</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {nutriPhotos.map((url, i) => (
@@ -587,7 +555,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
                       className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
                       onClick={() => setFullImage(url)}
                     >
-                      <img src={url} alt={`Progreso nutriologo ${i}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <img src={url} alt={`Progreso evaluación ${i}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       <div className="absolute inset-0 bg-[#0B1929]/0 group-hover:bg-[#0B1929]/20 transition-colors" />
                     </div>
                   ))}

@@ -40,7 +40,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   const deleteEj = async (e) => {
-    if (!confirm(`¿Eliminar"${e.nombre}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar "${e.nombre}"? Esta acción no se puede deshacer.`)) return;
     await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
     setMsg(<div className='flex gap-2 items-center'><Trash2 className='w-4 h-4 text-red-500'/> Ejercicio eliminado</div>); onUpdate();
   };
@@ -60,18 +60,13 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   return (
     <div>
-      {/* ── Header row ── */}
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <div>
-          <h2 className="font-bold text-2xl text-[#0B1929] tracking-wide mb-1 font-['Space_Grotesk',sans-serif]">
-            Biblioteca de Ejercicios
-          </h2>
-          <p className="text-[13px] text-[#6B7A8D]">
-            {biblioteca.length} ejercicio{biblioteca.length !== 1 ?"s" :""} en la colección global
-          </p>
-        </div>
+      {/* ── Top actions & Filters ── */}
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <p className="text-[13px] text-[#6B7A8D] font-medium">
+          {biblioteca.length} ejercicio{biblioteca.length !== 1 ? "s" : ""} en la colección global
+        </p>
         {isSuperadmin && (
-          <button onClick={openNew} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-colors">
+          <button onClick={openNew} className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm flex items-center gap-2 transition-opacity">
             <Plus size={18} /> Nuevo ejercicio
           </button>
         )}
@@ -85,13 +80,13 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             placeholder="Buscar ejercicio…"
-            className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif]"
+            className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif]"
           />
         </div>
         <select
           value={filtroGrupo}
           onChange={e => setFiltroGrupo(e.target.value)}
-          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-['Inter',sans-serif] min-w-[130px]"
+          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif] min-w-[130px]"
         >
           <option>Todos</option>
           {GRUPOS.map(g => <option key={g}>{g}</option>)}
@@ -170,7 +165,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                   </div>
                   {isSuperadmin && (
                     <div className="flex gap-1.5 mt-1">
-                      <button onClick={() => openEdit(e)} className="flex-1 flex justify-center items-center gap-1 border border-blue-200 text-blue-600 hover:bg-blue-50 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
+                      <button onClick={() => openEdit(e)} className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
                         <Edit2 size={12} /> Editar
                       </button>
                       <button onClick={() => deleteEj(e)} className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
@@ -191,7 +186,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
-                {editEj ? <><Edit2 size={20} className="text-blue-600"/> Editar ejercicio</> : <><Plus size={20} className="text-blue-600"/> Nuevo ejercicio</>}
+                {editEj ? <><Edit2 size={20} className="text-[var(--brand-primary)]"/> Editar ejercicio</> : <><Plus size={20} className="text-[var(--brand-primary)]"/> Nuevo ejercicio</>}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
             </div>
@@ -199,13 +194,13 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             <div className="p-5 overflow-y-auto flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Nombre del ejercicio</label>
-                <input value={form.nombre} onChange={e => setForm(p => ({...p,nombre:e.target.value}))} placeholder="Ej. Press de banca inclinado" className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"/>
+                <input value={form.nombre} onChange={e => setForm(p => ({...p,nombre:e.target.value}))} placeholder="Ej. Press de banca inclinado" className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all"/>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Grupo muscular</label>
-                  <select value={form.grupo_muscular} onChange={e => setForm(p => ({...p,grupo_muscular:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                  <select value={form.grupo_muscular} onChange={e => setForm(p => ({...p,grupo_muscular:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all">
                     {GRUPOS.map(g => <option key={g}>{g}</option>)}
                   </select>
                 </div>
@@ -219,7 +214,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                     <div>
                       <img src={form.gif_url} alt="preview" className="max-h-[140px] rounded-lg mx-auto mb-3 shadow-sm"/>
                       <div>
-                        <button onClick={() => setForm(p => ({...p,gif_url:""}))} className="text-sm px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 bg-white rounded-lg font-semibold transition-colors">
+                        <button onClick={() => setForm(p => ({...p,gif_url:""}))} className="text-sm px-3 py-1.5 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg font-semibold transition-colors">
                           Cambiar
                         </button>
                       </div>
@@ -236,7 +231,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       />
                       <label
                         htmlFor="gif-upload"
-                        className="inline-block px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg font-semibold text-[12px] cursor-pointer transition-colors shadow-sm"
+                        className="inline-block px-4 py-2 bg-[var(--brand-primary)]/10 hover:bg-[var(--brand-primary)]/15 text-[var(--brand-primary)] border border-[var(--brand-primary)]/20 rounded-lg font-semibold text-[12px] cursor-pointer transition-colors shadow-sm"
                       >
                         {uploading ?"Subiendo..." :"Seleccionar archivo"}
                       </label>
@@ -250,7 +245,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[#6B7A8D] rounded-xl font-semibold text-sm transition-colors">
                 Cancelar
               </button>
-              <button onClick={save} disabled={saving || uploading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2">
+              <button onClick={save} disabled={saving || uploading} className="px-4 py-2 bg-[var(--brand-primary)] hover:opacity-90 text-white rounded-xl font-semibold text-sm shadow-sm transition-opacity disabled:opacity-50 flex items-center gap-2">
                 {saving ?"Guardando..." :"Guardar ejercicio"}
               </button>
             </div>

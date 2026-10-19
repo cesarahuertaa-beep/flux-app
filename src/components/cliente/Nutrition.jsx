@@ -43,7 +43,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   const getDayFull = (nombre, i) => {
     if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
     const parts = String(nombre).split('|');
-    const title = parts.length > 1 ? parts[1] : parts[0];
+    const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
     return `${title} — Semana ${semanaActualCiclo}`;
   };
 
@@ -52,22 +52,26 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white/50 border-b border-[#F0F4FA]">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Plan de Alimentación
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
+            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
               Nutrición Semanal
             </h1>
-            {clienteNombre && (
+            {isSelfManaged ? (
+              <p className="text-sm text-[#6B7A8D] mt-1">
+                Tu plan de alimentación activo — Semana {semanaActualCiclo}
+              </p>
+            ) : clienteNombre ? (
               <p className="text-sm text-[#6B7A8D] mt-1">
                 Paciente: <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
               </p>
-            )}
+            ) : null}
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from"react";
-import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
-import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from"lucide-react";
-import { getRatesForCutoff } from"../../utils/tarifas";
+import React, { useState, useEffect } from "react";
+import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
+import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from "lucide-react";
+import { getRatesForCutoff } from "../../utils/tarifas";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
@@ -22,7 +22,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     const lastValid = historial.find(r => r.estado === 'aprobado' || r.estado === 'pendiente');
 
     if (!lastValid) {
-      // Si nunca ha pagado o no hay recibo válido, su"vencimiento" esperado es HOY + 30 días
+      // Si nunca ha pagado o no hay recibo válido, su "vencimiento" esperado es HOY + 30 días
       const d = new Date();
       d.setDate(d.getDate() + 30);
       return { targetCutoff: d, expirationDate: null };
@@ -153,7 +153,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
       <input
         type="file"
         id="comprobanteUploadCivil"
@@ -225,7 +225,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         {/* Pago por SPEI */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
               <Upload size={20} className="text-[var(--brand-primary)]" />
             </div>
             <h3 className="text-lg font-bold text-[#0B1929]">Pago por SPEI</h3>
@@ -237,15 +237,21 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             <div className="space-y-3 text-sm mb-6">
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario ||"FLUX Sport S.A."}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario || "FLUX Sport S.A."}</p>
               </div>
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Banco</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco ||"—"}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco || "—"}</p>
               </div>
               <div className="bg-[#F0F4FA] rounded-xl p-3">
                 <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">CLABE</span>
-                <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe ||"—"}</p>
+                <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe || "—"}</p>
+              </div>
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
+                <p className="font-black text-base text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
+                  FLX-{clienteData?.id ? String(clienteData.id).substring(0,6).toUpperCase() : 'ATLETA'}
+                </p>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
                 Transfiere <strong>${Number(TARIFA).toFixed(2)} MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
@@ -255,11 +261,11 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
           <button
             onClick={handleUploadClick}
-            disabled={uploading || historial.some(r => r.estado === 'pendiente')}
-            className="w-full bg-[var(--brand-primary)] text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={uploading || loading}
+            className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Upload size={16} />
-            {uploading ?"Subiendo..." : historial.some(r => r.estado === 'pendiente') ?"Comprobante en Revisión" :"Subir Comprobante de Pago"}
+            {uploading ? "Subiendo..." : historial.some(r => r.estado === 'pendiente') ? "Subir Nuevo Comprobante" : "Subir Comprobante de Pago"}
           </button>
         </div>
       </div>
@@ -277,7 +283,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="block text-xs font-bold text-[#6B7A8D] uppercase mb-1">Vencimiento Actual</span>
-            <p className="text-sm text-[#0B1929] font-bold text-[var(--brand-primary)]">
+            <p className="text-sm font-bold text-[var(--brand-primary)]">
               {expirationDate ? expirationDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long' }) : 'Pendiente de pago'}
             </p>
           </div>
@@ -301,7 +307,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           <div className="text-sm text-[#6B7A8D] bg-slate-50 p-4 rounded-xl text-center border border-slate-100">No hay pagos registrados aún.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse hidden md:table">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha de Pago</th>
@@ -335,6 +341,28 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile View */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {historial.map(r => (
+                <div key={r.id} className="py-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="font-bold text-[#0B1929]">${Number(r.monto).toFixed(2)}</span>
+                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider ${
+                      r.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700' :
+                      r.estado === 'rechazado' ? 'bg-red-50 text-red-600' :
+                      'bg-amber-50 text-amber-700'
+                    }`}>
+                      {r.estado}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                    <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                    <span>Válido: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
