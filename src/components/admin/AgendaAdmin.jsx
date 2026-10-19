@@ -161,17 +161,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
     try {
       await dbPatch(`citas?id=eq.${cita.id}`, { estado:"confirmada" });
       
-      // Notify patient
+      // Notify patient (non-blocking)
       const cInfo = clientes.find(c => c.id === cita.cliente_id);
       if (cInfo && cInfo.auth_id) {
-        await dbPost("notificaciones", {
-          profile_id: cInfo.auth_id,
-          titulo:"Cita Confirmada",
-          mensaje: `Tu nutriólogo ha confirmado tu cita para el ${new Date(cita.fecha_hora).toLocaleDateString('es-ES')}.`,
-          tipo:"plan",
-          link_url:"agenda",
-          entidad_id: cita.id
-        });
+        try {
+          await dbPost("notificaciones", {
+            profile_id: cInfo.auth_id,
+            titulo:"Cita Confirmada",
+            mensaje: `Tu nutriólogo ha confirmado tu cita para el ${new Date(cita.fecha_hora).toLocaleDateString('es-ES')}.`,
+            tipo:"plan",
+            link_url:"agenda",
+            entidad_id: cita.id
+          }, { headers: { Prefer: "return=minimal" } });
+        } catch (notifErr) {
+          console.warn("No se pudo enviar notificación de cita:", notifErr);
+        }
       }
 
       setMsg("Cita confirmada");
@@ -196,17 +200,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
     try {
       await dbPatch(`citas?id=eq.${modalRechazo.id}`, { estado:"rechazada", motivo_rechazo: motivoRechazo });
       
-      // Notify patient
+      // Notify patient (non-blocking)
       const cInfo = clientes.find(c => c.id === modalRechazo.cliente_id);
       if (cInfo && cInfo.auth_id) {
-        await dbPost("notificaciones", {
-          profile_id: cInfo.auth_id,
-          titulo:"Cita Rechazada",
-          mensaje: `Tu cita ha sido rechazada: ${motivoRechazo}`,
-          tipo:"alerta",
-          link_url:"agenda",
-          entidad_id: modalRechazo.id
-        });
+        try {
+          await dbPost("notificaciones", {
+            profile_id: cInfo.auth_id,
+            titulo:"Cita Rechazada",
+            mensaje: `Tu cita ha sido rechazada: ${motivoRechazo}`,
+            tipo:"alerta",
+            link_url:"agenda",
+            entidad_id: modalRechazo.id
+          }, { headers: { Prefer: "return=minimal" } });
+        } catch (notifErr) {
+          console.warn("No se pudo enviar notificación de rechazo:", notifErr);
+        }
       }
 
       setMsg("Cita rechazada");

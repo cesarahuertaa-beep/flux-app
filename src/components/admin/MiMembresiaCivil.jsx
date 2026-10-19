@@ -133,7 +133,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             tipo:"pago",
             link_url:"pagos",
             entidad_id: reciboRes[0]?.id
-          });
+          }, { headers: { Prefer: "return=minimal" } });
         }
       } catch(e) {}
 

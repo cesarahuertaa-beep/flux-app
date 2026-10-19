@@ -262,16 +262,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
           await dbPost("metricas_progreso", data);
           setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
           
-          // Send notification if patient is uploading their own progress
+          // Send notification if patient is uploading their own progress (non-blocking)
           if (localStorage.getItem('flux_role') === 'client' && selected.nutriologo_id) {
-            await dbPost("notificaciones", {
-              profile_id: selected.nutriologo_id,
-              titulo:"Nuevo progreso registrado",
-              mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
-              tipo:"progreso",
-              link_url:"clientes", // Redirect to directory
-              entidad_id: selected.id
-            });
+            try {
+              await dbPost("notificaciones", {
+                profile_id: selected.nutriologo_id,
+                titulo:"Nuevo progreso registrado",
+                mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
+                tipo:"progreso",
+                link_url:"clientes", // Redirect to directory
+                entidad_id: selected.id
+              }, { headers: { Prefer: "return=minimal" } });
+            } catch (notifErr) {
+              console.warn("No se pudo enviar notificación de progreso:", notifErr);
+            }
           }
         }
         closeModal();

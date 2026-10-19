@@ -207,14 +207,18 @@ export default function ControlPagos({ setMsg }) {
       }
 
       if (nutriologoId) {
-        await dbPost("notificaciones", {
-          profile_id: nutriologoId,
-          titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
-          mensaje: nuevoEstado ==="aprobado" ?"Tu pago ha sido validado exitosamente. Ya tienes acceso." :"Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
-          tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
-          link_url:"membresia",
-          entidad_id: id
-        });
+        try {
+          await dbPost("notificaciones", {
+            profile_id: nutriologoId,
+            titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
+            mensaje: nuevoEstado ==="aprobado" ?"Tu pago ha sido validado exitosamente. Ya tienes acceso." :"Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
+            tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
+            link_url:"membresia",
+            entidad_id: id
+          }, { headers: { Prefer: "return=minimal" } });
+        } catch (notifErr) {
+          console.warn("No se pudo enviar notificación de pago:", notifErr);
+        }
       }
 
       setMsg("✓ Recibo " + nuevoEstado);
@@ -262,7 +266,7 @@ export default function ControlPagos({ setMsg }) {
               tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
               link_url:"membresia",
               entidad_id: id
-            });
+            }, { headers: { Prefer: "return=minimal" } });
           }
         } catch (err) {
           console.error("No se pudo notificar al atleta", err);

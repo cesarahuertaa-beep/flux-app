@@ -185,7 +185,7 @@ export function CitasCliente({ cliente }) {
           tipo:"plan",
           link_url:"agenda",
           entidad_id: citaId
-        });
+        }, { headers: { Prefer: "return=minimal" } });
       } catch (notifErr) {
         console.warn("No se pudo enviar la notificación", notifErr);
       }

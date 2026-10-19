@@ -275,7 +275,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           entidad_id: reciboRes[0]?.id
         }));
         for (const n of notifs) {
-          await dbPost("notificaciones", n);
+          await dbPost("notificaciones", n, { headers: { Prefer: "return=minimal" } });
         }
       } catch (err) {
         console.error("Error enviando notif", err);
