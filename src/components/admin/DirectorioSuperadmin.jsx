@@ -657,10 +657,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} uploading={uploadingLogo}/>
           </Field>
           <Field label="Color principal de su marca">
-            <div className="flex gap-2 flex-wrap mt-1">
-              {COLORS.map(col => (
-                <div key={col} onClick={() => setFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: formNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: formNutri.color_primario===col ? `0 0 0 2px ${col}` :"none" }}/>
-              ))}
+            <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
+              <input
+                type="color"
+                value={formNutri.color_primario || "#1A6FD4"}
+                onChange={e => setFormNutri(p => ({ ...p, color_primario: e.target.value }))}
+                className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
+              />
+              <span className="text-xs font-mono text-[#6B7A8D] px-2">
+                {(formNutri.color_primario || "#1A6FD4").toUpperCase()}
+              </span>
             </div>
           </Field>
           <div className="flex gap-2.5 justify-end mt-4">
@@ -685,10 +691,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <LogoPicker value={editFormNutri.logo_url} onChange={e => handleLogoChange(e, setEditFormNutri)} uploading={uploadingLogo}/>
           </Field>
           <Field label="Color de marca">
-            <div className="flex gap-2 flex-wrap mt-1">
-              {COLORS.map(col => (
-                <div key={col} onClick={() => setEditFormNutri(p=>({...p,color_primario:col}))} className="w-7 h-7 rounded-full cursor-pointer transition-all" style={{ background:col, border: editFormNutri.color_primario===col ? `2px solid white` : `2px solid transparent`, boxShadow: editFormNutri.color_primario===col ? `0 0 0 2px ${col}` :"none" }}/>
-              ))}
+            <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
+              <input
+                type="color"
+                value={editFormNutri.color_primario || "#1A6FD4"}
+                onChange={e => setEditFormNutri(p => ({ ...p, color_primario: e.target.value }))}
+                className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
+              />
+              <span className="text-xs font-mono text-[#6B7A8D] px-2">
+                {(editFormNutri.color_primario || "#1A6FD4").toUpperCase()}
+              </span>
             </div>
           </Field>
 
