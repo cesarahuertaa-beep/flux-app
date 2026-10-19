@@ -22,6 +22,7 @@ import BloqueadoNutriologo from"../components/BloqueadoNutriologo";
 import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
 import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../lib/supabase";
 import { useBrand } from"../components/BrandContext";
+import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929]">
@@ -725,7 +726,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           {/* Lista de Clientes */}
           <div className="flex-1 p-6 md:p-8">
             {loading ? (
-              <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando pacientes...</div>
+              <CardGridSkeleton count={6} />
             ) : filteredClientes.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
                 <div className="w-16 h-16 bg-[#E2E8F0] rounded-full flex items-center justify-center mb-4">
@@ -834,7 +835,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           {myShadowClient ? (
             <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
           ) : (
-            <div className="flex items-center justify-center h-full p-8 text-[#6B7A8D]">Cargando...</div>
+            <ListSkeleton rows={4} />
           )}
         </SubComponentWrapper>
       )}
@@ -1076,7 +1077,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               isMiPlan={true}
             />
           ) : (
-            <div className="flex items-center justify-center h-full p-8 text-[#6B7A8D]">Cargando...</div>
+            <ListSkeleton rows={4} />
           )}
         </SubComponentWrapper>
       )}

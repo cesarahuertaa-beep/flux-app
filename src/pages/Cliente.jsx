@@ -12,6 +12,7 @@ import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
+import { ListSkeleton } from "../components/ui/Skeleton";
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -231,7 +232,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         </div>
       )}
       {loading ? (
-        <div className="flex h-full items-center justify-center text-[#6B7A8D]">Cargando información...</div>
+        <div className="p-6 md:p-8 max-w-5xl w-full mx-auto">
+          <ListSkeleton rows={4} />
+        </div>
       ) : (
         <>
           {isFinished && (tab ==="nutricion" || tab ==="deporte") ? (

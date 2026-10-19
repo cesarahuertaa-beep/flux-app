@@ -4,6 +4,9 @@ import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../li
 import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from "lucide-react";
 import { parseFotos } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
+import { EvolutionCharts } from "../ui/EvolutionCharts";
+import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
+import { MetricsSkeleton } from "../ui/Skeleton";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -268,9 +271,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center text-[#6B7A8D]">
-        <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />
-        <p className="text-sm font-medium">Cargando progreso...</p>
+      <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+        <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+          <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Mi Seguimiento</p>
+          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Mis Resultados</h1>
+          <p className="text-sm text-[#6B7A8D] mt-1">Cargando tu historial de evolución...</p>
+        </div>
+        <div className="px-6 md:px-8 py-6 md:py-8 max-w-5xl w-full mx-auto">
+          <MetricsSkeleton />
+        </div>
       </div>
     );
   }
@@ -360,6 +369,26 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
 
   const nutriPhotos = metricas.flatMap(m => parseFotos(m.fotos)).filter(Boolean);
+  const allComparablePhotos = [
+    ...metricas.flatMap(m =>
+      parseFotos(m.fotos)
+        .filter(Boolean)
+        .map((url, idx) => ({
+          url,
+          fecha: m.fecha,
+          label: `Eval. ${fmtDate(m.fecha)}`,
+          peso: m.peso,
+          grasa_pct: m.grasa_pct,
+        }))
+    ),
+    ...personalPhotos.map((url, idx) => ({
+      url,
+      fecha: null,
+      label: `Personal #${personalPhotos.length - idx}`,
+      peso: null,
+      grasa_pct: null,
+    })),
+  ];
 
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
@@ -475,6 +504,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
               </div>
             </div>
+
+            {/* GRÁFICAS DE EVOLUCIÓN Y SOMATOCARTA */}
+            <EvolutionCharts
+              metricas={metricas}
+              isLocked={isEstandar}
+              brandColor={brand?.color_primario}
+            />
           </>
         ) : (
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
@@ -587,8 +623,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
         )}
 
         {view === 'galeria' && (
-          <div className="space-y-12">
-            
+          <div className="space-y-10">
+            {allComparablePhotos.length >= 2 && (
+              <BeforeAfterComparator
+                photos={allComparablePhotos}
+                brand={brand}
+                clienteNombre={cliente?.nombre}
+              />
+            )}
+
             {/* Sección Evaluaciones */}
             {nutriPhotos.length > 0 && (
               <div>

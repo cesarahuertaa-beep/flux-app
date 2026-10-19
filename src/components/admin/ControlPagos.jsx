@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from"react";
 import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
 import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save } from"lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
+import { ListSkeleton } from"../ui/Skeleton";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
 const StatusBadge = ({ s }) => {
@@ -493,7 +494,7 @@ export default function ControlPagos({ setMsg }) {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
-        {loading ? <div className="p-8 text-center text-[#6B7A8D]">Cargando recibos...</div> : (
+        {loading ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[700px] hidden md:table">
               <thead>
@@ -677,7 +678,7 @@ export default function ControlPagos({ setMsg }) {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
-        {loadingCivil ? <div className="p-8 text-center text-[#6B7A8D]">Cargando pagos de atletas...</div> : (
+        {loadingCivil ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[600px] hidden md:table">
               <thead>

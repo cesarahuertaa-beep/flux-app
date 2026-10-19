@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from"react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square } from"lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from"lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from"recharts";
 
 function TimerCard({ brandColor }) {
@@ -198,6 +198,7 @@ export default function Training({
   const [showProgress,    setShowProgress]    = useState(false);
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
   const [previewEx, setPreviewEx] = useState(null);
+  const [showResumen,     setShowResumen]     = useState(false);
   const [unitPrefs,       setUnitPrefs]       = useState({}); // { [exId_variantId]: 'kg' | 'lb' }
   const [focusedInput,    setFocusedInput]    = useState(null); // { exId, wi, si }
   // Local raw text while user is typing — prevents React from overwriting mid-keystroke
@@ -319,6 +320,121 @@ export default function Training({
     if (!e1RM_actual || !e1RM_prev) return null;
     return ((e1RM_actual - e1RM_prev) / e1RM_prev) * 100;
   };
+
+  // ── Detección de Récord Personal (PR 🏆) por ejercicio ──
+  const getExercisePRData = (ex, variantId, activeObj) => {
+    const nSeries = parseInt(activeObj?.num_series || ex.num_series) || 3;
+    let bestHistorical1RM = 0;
+
+    // Buscar el mejor 1RM en todas las semanas anteriores (0 .. wi - 1)
+    for (let w = 0; w < wi; w++) {
+      for (let s = 0; s < nSeries; s++) {
+        const pKey = `${ex.id}-${w}-${s}-peso-${variantId}`;
+        const rKey = `${ex.id}-${w}-${s}-reps-${variantId}`;
+        const p = progreso[pKey] ?? (w === wi - 1 ? progresoSemanaAnterior[pKey] : null);
+        const r = progreso[rKey] ?? (w === wi - 1 ? progresoSemanaAnterior[rKey] : null);
+        const e1rm = calcular1RM(p, r);
+        if (e1rm && e1rm > bestHistorical1RM) bestHistorical1RM = e1rm;
+      }
+    }
+
+    // Si estamos en semana 1 (wi === 0), usar peso/reps sugeridos como base si existen
+    if (bestHistorical1RM === 0 && activeObj?.peso_sugerido && activeObj?.reps_sugeridas) {
+      const base1RM = calcular1RM(activeObj.peso_sugerido, activeObj.reps_sugeridas);
+      if (base1RM) bestHistorical1RM = base1RM;
+    }
+
+    let bestCurrent1RM = 0;
+    let bestSetIdx = -1;
+    let bestWeight = 0;
+    let bestReps = 0;
+
+    for (let s = 0; s < nSeries; s++) {
+      const p = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
+      const r = progreso[`${ex.id}-${wi}-${s}-reps-${variantId}`];
+      const e1rm = calcular1RM(p, r);
+      if (e1rm && e1rm > bestCurrent1RM) {
+        bestCurrent1RM = e1rm;
+        bestSetIdx = s;
+        bestWeight = parseFloat(p);
+        bestReps = parseFloat(r);
+      }
+    }
+
+    const isPR =
+      bestCurrent1RM > 0 &&
+      bestHistorical1RM > 0 &&
+      bestCurrent1RM > bestHistorical1RM + 0.1;
+
+    const gainPct =
+      bestHistorical1RM > 0
+        ? ((bestCurrent1RM - bestHistorical1RM) / bestHistorical1RM) * 100
+        : 0;
+
+    return {
+      isPR,
+      bestHistorical1RM,
+      bestCurrent1RM,
+      gainPct,
+      bestSetIdx,
+      bestWeight,
+      bestReps,
+    };
+  };
+
+  // ── Métricas en vivo de la sesión del día ──
+  let totalSetsDay = 0;
+  let completedSetsDay = 0;
+  let totalVolumeKg = 0;
+  const sessionPRs = [];
+  const musclesTrainedMap = {};
+
+  ejercicios.forEach((ex) => {
+    const { obj: activeObj, variantId } = getVariantObj(ex);
+    const nSeries = parseInt(activeObj?.num_series || ex.num_series) || 3;
+    totalSetsDay += nSeries;
+
+    let exHasCompletedSet = false;
+    for (let s = 0; s < nSeries; s++) {
+      const rVal = progreso[`${ex.id}-${wi}-${s}-reps-${variantId}`];
+      const pVal = progreso[`${ex.id}-${wi}-${s}-peso-${variantId}`];
+      if (rVal !== undefined && rVal !== "") {
+        completedSetsDay++;
+        exHasCompletedSet = true;
+        const rNum = parseFloat(rVal);
+        const pNum = parseFloat(pVal);
+        if (!isNaN(rNum) && rNum > 0 && !isNaN(pNum) && pNum > 0) {
+          totalVolumeKg += rNum * pNum;
+        }
+      }
+    }
+
+    const prInfo = getExercisePRData(ex, variantId, activeObj);
+    if (prInfo.isPR) {
+      sessionPRs.push({
+        id: ex.id,
+        nombre: activeObj.nombre,
+        grupo: activeObj.grupo_muscular || ex.grupo_muscular || "General",
+        ...prInfo,
+      });
+    }
+
+    if (exHasCompletedSet) {
+      const grp = activeObj.grupo_muscular || ex.grupo_muscular || "General";
+      if (!musclesTrainedMap[grp]) {
+        musclesTrainedMap[grp] = { baseXP: 10, bonusXP: 0 };
+      }
+      if (prInfo.isPR && prInfo.gainPct > 0) {
+        musclesTrainedMap[grp].bonusXP = Math.max(
+          musclesTrainedMap[grp].bonusXP,
+          Math.round(prInfo.gainPct)
+        );
+      }
+    }
+  });
+
+  const completionPct =
+    totalSetsDay > 0 ? Math.min(100, Math.round((completedSetsDay / totalSetsDay) * 100)) : 0;
 
   return (
     <div className="flex-1 flex flex-col relative bg-[#F7F9FC] min-h-full">
@@ -501,7 +617,45 @@ export default function Training({
         </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-6 md:px-8 flex-1 space-y-3 pb-8">
+      <div className="px-6 md:px-8 flex-1 space-y-3 pb-10">
+
+        {/* Barra de Progreso de la Sesión del Día */}
+        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-3.5 flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#0B1929]">
+                Progreso del Día: {completedSetsDay}/{totalSetsDay} series
+              </span>
+              {totalVolumeKg > 0 && (
+                <span className="text-[11px] font-mono text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded-md">
+                  {Math.round(totalVolumeKg).toLocaleString("es-MX")} kg vol.
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {sessionPRs.length > 0 && (
+                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-bold">
+                  <Trophy size={11} className="text-amber-500" /> {sessionPRs.length} PR
+                </span>
+              )}
+              <span
+                className={`font-mono font-bold ${
+                  completionPct === 100 ? "text-emerald-600" : "text-[var(--brand-primary)]"
+                }`}
+              >
+                {completionPct}%
+              </span>
+            </div>
+          </div>
+          <div className="w-full h-2 bg-[#F0F4FA] rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${
+                completionPct === 100 ? "bg-emerald-500" : "bg-[var(--brand-primary)]"
+              }`}
+              style={{ width: `${completionPct}%` }}
+            />
+          </div>
+        </div>
 
         {/* Cronómetro inline, justo antes del primer ejercicio (igual que Figma) */}
         <TimerCard brandColor="var(--brand-primary)" />
@@ -513,6 +667,7 @@ export default function Training({
           const varData = getVariantObj(ex);
           const activeObj = varData.obj;
           const activeVarId = varData.variantId;
+          const exPR = getExercisePRData(ex, activeVarId, activeObj);
 
           const otherVariants = [];
           if (activeVarId !=="original") {
@@ -544,6 +699,11 @@ export default function Training({
                   <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
                   <p className="text-xs text-[#6B7A8D]">{activeObj.grupo_muscular || activeObj.musculo ||"General"}</p>
                 </div>
+                {exPR.isPR && (
+                  <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
+                    <Trophy size={12} className="text-amber-500" /> Nuevo PR
+                  </span>
+                )}
                 {isSaved && (
                   <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded font-medium border border-green-100 hidden md:block">
                     ✓ Guardado
@@ -609,7 +769,7 @@ export default function Training({
                       <div className="w-8 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
                       <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
                       <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Peso</div>
-                      <div className="w-12 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
+                      <div className="w-14 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
                     </div>
 
                     {Array.from({ length: numSeries }).map((_, si) => {
@@ -628,6 +788,7 @@ export default function Training({
 
                       // Avance por 1RM estimado: comparar (peso+reps actuales) vs (peso+reps prev)
                       const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
+                      const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
 
                       return (
                         <div key={si} className="flex flex-col mb-3">
@@ -700,8 +861,12 @@ export default function Training({
                               </button>
                             </div>
 
-                            <div className="w-12 flex justify-center items-center">
-                              {avancePct !== null ? (
+                            <div className="w-14 flex flex-col justify-center items-center">
+                              {isSetPR ? (
+                                <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                  <Trophy size={10} className="text-amber-500" /> PR
+                                </span>
+                              ) : avancePct !== null ? (
                                 <div className="flex items-center gap-0.5">
                                   {avancePct === 0
                                     ? <Minus size={12} className="text-[#9BA5B0]" />
@@ -764,7 +929,150 @@ export default function Training({
             </div>
           );
         })}
+
+        {/* Botón para abrir Resumen y Recompensas del Entrenamiento */}
+        {completedSetsDay > 0 && (
+          <div className="pt-3">
+            <button
+              onClick={() => setShowResumen(true)}
+              className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm text-white shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+              style={{
+                background:
+                  completionPct === 100
+                    ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+                    : "var(--brand-primary)",
+              }}
+            >
+              <Trophy size={18} />
+              <span>
+                {completionPct === 100
+                  ? "¡Entrenamiento Completado! Ver Resumen y Recompensas"
+                  : "Ver Resumen de Sesión y Récords (PR)"}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Modal de Recompensa al Terminar de Entrenar */}
+      {showResumen && (
+        <div
+          onClick={() => setShowResumen(false)}
+          className="fixed inset-0 bg-[#0B1929]/55 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 md:p-7 border border-[#E2E8F0] shadow-2xl relative max-h-[90vh] overflow-y-auto"
+          >
+            <button
+              onClick={() => setShowResumen(false)}
+              className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <Trophy size={32} />
+              </div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--brand-primary)] font-bold">
+                Semana {semanaActualCiclo} • Resumen de Sesión
+              </p>
+              <h2 className="text-2xl font-bold text-[#0B1929] mt-1" style={{ fontFamily: "DM Sans" }}>
+                {completionPct === 100 ? "¡Sesión Completada!" : "Avance de Entrenamiento"}
+              </h2>
+              <p className="text-xs text-[#6B7A8D] mt-1">
+                Cada serie registrada suma puntos de experiencia (XP) a tu mapa muscular.
+              </p>
+            </div>
+
+            {/* KPIs de la sesión */}
+            <div className="grid grid-cols-3 gap-2.5 mb-6">
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 text-center">
+                <p className="text-[10px] font-bold text-[#6B7A8D] uppercase">Series</p>
+                <p className="text-lg font-bold text-[#0B1929] mt-0.5">
+                  {completedSetsDay}/{totalSetsDay}
+                </p>
+              </div>
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 text-center">
+                <p className="text-[10px] font-bold text-[#6B7A8D] uppercase">Volumen</p>
+                <p className="text-lg font-bold text-[var(--brand-primary)] mt-0.5">
+                  {Math.round(totalVolumeKg).toLocaleString("es-MX")}{" "}
+                  <span className="text-[10px] text-[#6B7A8D]">kg</span>
+                </p>
+              </div>
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 text-center">
+                <p className="text-[10px] font-bold text-amber-700 uppercase">Nuevos PR</p>
+                <p className="text-lg font-bold text-amber-600 mt-0.5">{sessionPRs.length} 🏆</p>
+              </div>
+            </div>
+
+            {/* Nuevos Récords Personales */}
+            {sessionPRs.length > 0 && (
+              <div className="mb-6">
+                <p className="text-[11px] font-bold text-[#0B1929] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-500" /> Nuevos Récords Personales (1RM)
+                </p>
+                <div className="space-y-2">
+                  {sessionPRs.map((pr) => (
+                    <div
+                      key={pr.id}
+                      className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[#0B1929] truncate">{pr.nombre}</p>
+                        <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                          Mejor serie: <strong>{pr.bestWeight} kg × {pr.bestReps} reps</strong>
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="inline-block bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                          +{pr.gainPct.toFixed(1)}% 1RM
+                        </span>
+                        <p className="text-[10px] font-mono text-[#6B7A8D] mt-1">
+                          {pr.bestHistorical1RM.toFixed(1)} →{" "}
+                          <strong className="text-[#0B1929]">{pr.bestCurrent1RM.toFixed(1)} kg</strong>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recompensa XP por grupo muscular */}
+            {Object.keys(musclesTrainedMap).length > 0 && (
+              <div className="mb-6">
+                <p className="text-[11px] font-bold text-[#0B1929] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Flame size={14} className="text-[var(--brand-primary)]" /> XP Muscular Ganado Hoy
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(musclesTrainedMap).map(([grp, xp]) => (
+                    <div
+                      key={grp}
+                      className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 flex items-center gap-2"
+                    >
+                      <span className="text-xs font-semibold text-[#0B1929] capitalize">
+                        {grp.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-emerald-600">
+                        +{xp.baseXP + xp.bonusXP} XP
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowResumen(false)}
+              className="w-full py-3 rounded-xl bg-[#0B1929] text-white text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     
       {/* Modal preview */}
       {previewEx && (

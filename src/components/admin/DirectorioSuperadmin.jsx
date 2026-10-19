@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
+import { ListSkeleton } from "../ui/Skeleton";
 
 const uploadLogo = async (file) => {
   const ext  = file.name.split(".").pop();
@@ -506,7 +507,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       {/* Directorio List */}
       <div className="flex-1 p-6 md:p-8">
         {loading ? (
-          <div className="flex items-center justify-center h-40 text-[#6B7A8D]">Cargando directorio...</div>
+          <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
         ) : (
           <div className="flex flex-col gap-4 max-w-5xl mx-auto">
             {filteredNutris.filter(n => n.isSuperadmin).map(n => renderNutri(n))}

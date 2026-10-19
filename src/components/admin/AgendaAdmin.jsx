@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
+import { ListSkeleton } from "../ui/Skeleton";
 import {
   Clock,
   Clock3,
@@ -275,10 +276,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-[#6B7A8D]">
-          <div className="w-9 h-9 rounded-full border-4 border-[#E2E8F0] border-t-[var(--brand-primary)] animate-spin mx-auto mb-4" />
-          Cargando agenda…
-        </div>
+        <ListSkeleton rows={4} />
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>

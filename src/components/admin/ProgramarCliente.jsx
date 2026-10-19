@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import { ListSkeleton } from "../ui/Skeleton";
 import {
   DndContext,
   closestCenter,
@@ -925,7 +926,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         ))}
       </div>
 
-      {loading ? <div className="text-[#6B7A8D] text-center p-10">Cargando…</div> : <>
+      {loading ? <ListSkeleton rows={4} /> : <>
 
         {/* ── NUTRICIÓN ── */}
         {subtab ==="nutri" && (

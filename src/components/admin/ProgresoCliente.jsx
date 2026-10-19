@@ -9,6 +9,9 @@ import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock
 } from"lucide-react";
+import { EvolutionCharts } from "../ui/EvolutionCharts";
+import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
+import { ListSkeleton } from "../ui/Skeleton";
 
 const METRIC_GROUPS_MANUAL = [
   { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
@@ -347,7 +350,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     { key:"presion_arterial",   label:"Presión",   unit:"",      icon:<Heart className="w-3.5 h-3.5" /> },
   ];
 
-  if (loading) return <div className="text-[#6B7A8D] text-center p-10">Cargando…</div>;
+  if (loading) return <ListSkeleton rows={4} />;
+
+  const allClientPhotos = metricas.flatMap(m =>
+    parseFotos(m.fotos)
+      .filter(Boolean)
+      .map(url => ({
+        url,
+        fecha: m.fecha,
+        label: fmtDate(m.fecha),
+        peso: m.peso,
+        grasa_pct: m.grasa_pct,
+      }))
+  );
 
   return (
     <div className="pb-24">
@@ -377,6 +392,23 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               </button>
             </div>
           </div>
+
+          {metricas.length > 0 && (
+            <EvolutionCharts
+              metricas={metricas}
+              isLocked={isCivil && selected?.plan_tipo !== 'premium'}
+              brandColor={brand?.color_primario}
+            />
+          )}
+
+          {allClientPhotos.length >= 2 && !(isCivil && selected?.plan_tipo !== 'premium') && (
+            <BeforeAfterComparator
+              photos={allClientPhotos}
+              brand={brand}
+              clienteNombre={selected?.nombre}
+            />
+          )}
+
           {metricas.length===0?(
             <div className="text-center py-16 text-[#6B7A8D]">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><BarChart2 className="w-12 h-12" /></div>
