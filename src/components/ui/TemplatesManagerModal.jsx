@@ -68,31 +68,31 @@ const DEFAULT_RUTINA_TEMPLATES = [
       {
         nombre: "LUN|Push (Empuje: Pecho, Hombro, Tríceps)",
         ejercicios: [
-          { nombre: "Press de Banca Plano con Barra", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Press Inclinado con Mancuernas", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Press Militar de Hombro", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Elevaciones Laterales", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Extensión de Tríceps en Polea", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: "", unidad: "kg", alternativas: [] }
+          { nombre: "Press de Banca Plano con Barra", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Press Inclinado con Mancuernas", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Press Militar de Hombro", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Elevaciones Laterales", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Extensión de Tríceps en Polea", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] }
         ]
       },
       {
         nombre: "MIE|Pull (Jalón: Espalda, Bíceps)",
         ejercicios: [
-          { nombre: "Jalón al Pecho en Polea", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Remo con Barra o Mancuerna", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Face Pulls", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 15, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Curl de Bíceps con Barra Z", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Curl Martillo con Mancuernas", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: "", unidad: "kg", alternativas: [] }
+          { nombre: "Jalón al Pecho en Polea", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Remo con Barra o Mancuerna", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Face Pulls", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Curl de Bíceps con Barra Z", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Curl Martillo con Mancuernas", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] }
         ]
       },
       {
         nombre: "VIE|Legs (Pierna y Abdomen)",
         ejercicios: [
-          { nombre: "Sentadilla Libre con Barra", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Prensa de Piernas", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Curl Femoral Tumbado o Sentado", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Elevación de Talones (Pantorrilla)", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: "", unidad: "kg", alternativas: [] }
+          { nombre: "Sentadilla Libre con Barra", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Prensa de Piernas", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Curl Femoral Tumbado o Sentado", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Elevación de Talones (Pantorrilla)", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] }
         ]
       }
     ]
@@ -107,19 +107,19 @@ const DEFAULT_RUTINA_TEMPLATES = [
       {
         nombre: "LUN|Torso A (Pecho, Espalda, Hombro)",
         ejercicios: [
-          { nombre: "Press de Banca Plano", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 6, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Remo con Barra", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Press Militar Mancuernas", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Jalón al Pecho", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] }
+          { nombre: "Press de Banca Plano", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 6, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Remo con Barra", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Press Militar Mancuernas", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Jalón al Pecho", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] }
         ]
       },
       {
         nombre: "MAR|Pierna A (Cuádriceps, Isquios, Gemelos)",
         ejercicios: [
-          { nombre: "Sentadilla Trasera", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Extensiones de Cuádriceps", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: "", unidad: "kg", alternativas: [] },
-          { nombre: "Elevación de Talones en Máquina", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: "", unidad: "kg", alternativas: [] }
+          { nombre: "Sentadilla Trasera", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Extensiones de Cuádriceps", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] },
+          { nombre: "Elevación de Talones en Máquina", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] }
         ]
       }
     ]
@@ -235,9 +235,12 @@ export default function TemplatesManagerModal({
                 tipo_movimiento: e.tipo_movimiento || "",
                 num_series: e.num_series || 4,
                 reps_sugeridas: e.reps_sugeridas || 10,
-                peso_sugerido: e.peso_sugerido || "",
+                peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
                 unidad: e.unidad || "kg",
-                alternativas: e.alternativas || []
+                alternativas: (e.alternativas || []).map((alt) => ({
+                  ...alt,
+                  peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+                }))
               }))
             }))
           })
@@ -319,9 +322,12 @@ export default function TemplatesManagerModal({
             tipo_movimiento: e.tipo_movimiento || "",
             num_series: e.num_series || 4,
             reps_sugeridas: e.reps_sugeridas || 10,
-            peso_sugerido: e.peso_sugerido || "",
+            peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
             unidad: e.unidad || "kg",
-            alternativas: e.alternativas || []
+            alternativas: (e.alternativas || []).map((alt) => ({
+              ...alt,
+              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+            }))
           }))
         }));
 

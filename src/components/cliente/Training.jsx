@@ -440,7 +440,7 @@ export default function Training({
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-6">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-4 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -464,52 +464,56 @@ export default function Training({
       </div>
 
       {/* ── Day tabs (las rutinas/días del cliente) ── */}
-      <div className="px-6 md:px-8 flex gap-2 mb-4 overflow-x-auto scroll-hide">
-        {rutinas.map((r, i) => {
-          const isActive = activeRutinaIdx === i;
-          
-          let shortTab = `Día ${i + 1}`;
-          if (r.nombre) {
-            const parts = String(r.nombre).split('|');
-            if (parts.length > 1) {
-              shortTab = parts[0];
-            } else {
-              const firstWord = String(r.nombre).split(' ')[0];
-              shortTab = firstWord.length <= 5 ? firstWord : firstWord.substring(0, 3).toUpperCase();
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-6 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
+        <div className="flex gap-2 overflow-x-auto scroll-hide">
+          {rutinas.map((r, i) => {
+            const isActive = activeRutinaIdx === i;
+            
+            let shortTab = `Día ${i + 1}`;
+            if (r.nombre) {
+              const parts = String(r.nombre).split('|');
+              if (parts.length > 1) {
+                shortTab = parts[0];
+              } else if (/^d[íi]a\s*\d+/i.test(r.nombre.trim())) {
+                shortTab = r.nombre.trim();
+              } else {
+                const firstWord = String(r.nombre).trim().split(' ')[0];
+                shortTab = firstWord.length <= 6 ? firstWord : firstWord.substring(0, 3).toUpperCase();
+              }
             }
-          }
 
-          return (
-            <button
-              key={r.id || i}
-              onClick={() => { setActiveRutinaIdx(i); setExpandedEx(0); }}
-              className={`flex-1 min-w-[52px] py-2.5 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center ${
-                isActive
-                  ? "bg-[var(--brand-primary)] text-white shadow-md"
-                  : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
-              }`}
-            >
-              <span className="uppercase">{shortTab}</span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={r.id || i}
+                onClick={() => { setActiveRutinaIdx(i); setExpandedEx(0); }}
+                className={`flex-1 min-w-[58px] py-2 px-3 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center shrink-0 ${
+                  isActive
+                    ? "bg-[var(--brand-primary)] text-white shadow-sm"
+                    : "bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
+                }`}
+              >
+                <span className="uppercase">{shortTab}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-        {/* ✨ Subtítulo del día activo ✨ */}
-        <div className="px-6 md:px-8 mb-3">
-          <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
-            {(() => {
-              const nombre = rutinaActiva?.nombre;
-              if (!nombre) return `Rutina — Semana ${semanaActualCiclo}`;
-              const parts = String(nombre).split('|');
-              const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
-              return `${title} — Semana ${semanaActualCiclo}`;
-            })()}
-          </span>
-        </div>
+      {/* ✨ Subtítulo del día activo ✨ */}
+      <div className="px-6 md:px-8 mb-3 shrink-0">
+        <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
+          {(() => {
+            const nombre = rutinaActiva?.nombre;
+            if (!nombre) return `Rutina — Semana ${semanaActualCiclo}`;
+            const parts = String(nombre).split('|');
+            const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+            return `${title} — Semana ${semanaActualCiclo}`;
+          })()}
+        </span>
+      </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-6 md:px-8 flex-1 space-y-3 pb-10">
+      <div className="px-6 md:px-8 flex-1 space-y-3 pb-12 min-h-0">
 
         {/* Barra de Progreso de la Sesión del Día */}
         <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-3.5 flex flex-col gap-2">
@@ -822,8 +826,8 @@ export default function Training({
                           </div>
                           <span className="text-[10px] text-[#6B7A8D] font-mono">Por serie (kg)</span>
                         </div>
-                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
-                          <ResponsiveContainer width="100%" height={140}>
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] h-[160px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={exGraphData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                               <XAxis dataKey="week" tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "#6B7A8D" }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />

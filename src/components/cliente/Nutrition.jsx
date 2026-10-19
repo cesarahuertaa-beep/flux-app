@@ -113,7 +113,7 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 shrink-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -161,28 +161,30 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
       </div>
 
       {/* ── Day tabs ── */}
-      <div className="px-6 md:px-8 flex gap-2 mb-6 mt-6 overflow-x-auto scroll-hide">
-        {dias.map((d, i) => {
-          // El nombre del día viene en d.dia o d.nombre
-          const nombreDia = d.dia || d.nombre;
-          return (
-            <button
-              key={d.id || i}
-              onClick={() => { setActiveDay(i); setExpandedMeal(0); }}
-              className={`flex-1 min-w-[44px] py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeDay === i
-                  ?"bg-[var(--brand-primary)] text-white shadow-md"
-                  :"bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
-              }`}
-            >
-              {getDayShort(nombreDia, i)}
-            </button>
-          );
-        })}
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-6 md:px-8 py-2.5 mb-4 border-b border-[#E2E8F0]/60 shrink-0">
+        <div className="flex gap-2 overflow-x-auto scroll-hide">
+          {dias.map((d, i) => {
+            // El nombre del día viene en d.dia o d.nombre
+            const nombreDia = d.dia || d.nombre;
+            return (
+              <button
+                key={d.id || i}
+                onClick={() => { setActiveDay(i); setExpandedMeal(0); }}
+                className={`flex-1 min-w-[50px] py-2 px-3 rounded-lg text-xs font-semibold transition-all shrink-0 ${
+                  activeDay === i
+                    ?"bg-[var(--brand-primary)] text-white shadow-sm"
+                    :"bg-white text-[#6B7A8D] hover:bg-[#E8F1FB] border border-[#E2E8F0]"
+                }`}
+              >
+                {getDayShort(nombreDia, i)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Habits & Adherence Widget ── */}
-      <div className="px-6 md:px-8 mb-4">
+      <div className="px-6 md:px-8 mb-4 shrink-0">
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           
           {/* Hidratación (Agua) */}

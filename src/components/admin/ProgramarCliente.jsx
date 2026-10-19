@@ -423,9 +423,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             tipo_movimiento: e.tipo_movimiento || "",
             num_series: +e.num_series || 4,
             reps_sugeridas: +e.reps_sugeridas || 10,
-            peso_sugerido: e.peso_sugerido || "",
+            peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
             unidad: e.unidad || "kg",
-            alternativas: e.alternativas || [],
+            alternativas: (e.alternativas || []).map(alt => ({
+              ...alt,
+              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+            })),
             orden: eIdx
           }));
           await dbPost("ejercicios", ejsData);
@@ -682,6 +685,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const saveRutina = async () => {
     setSaving(true);
     try {
+      const toKg = (val, unit) => {
+        if (!val && val !== 0) return null;
+        const n = parseFloat(val);
+        if (isNaN(n)) return null;
+        return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
+      };
+
       let activeCiclo = cicloSel;
       const dSeleccionados = rutinaForm.diasSeleccionados || [];
 
@@ -696,13 +706,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         if (toDelete.length > 0) {
           await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
         }
-        
-        const toKg = (val, unit) => {
-          if (!val && val !== 0) return null;
-          const n = parseFloat(val);
-          if (isNaN(n)) return null;
-          return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
-        };
 
         const toUpdate = [];
         const toInsert = [];
@@ -719,7 +722,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             reps_sugeridas:+e.reps_sugeridas||10,
             peso_sugerido:toKg(e.peso_sugerido, e.unidad||"kg"),
             unidad:e.unidad||"kg",
-            alternativas:e.alternativas||[],
+            alternativas:(e.alternativas||[]).map(alt => ({
+              ...alt,
+              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg")
+            })),
             orden:i 
           };
           if (e.id) {
@@ -766,7 +772,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               reps_sugeridas: +e.reps_sugeridas||10,
               peso_sugerido: toKg(e.peso_sugerido, e.unidad||"kg"),
               unidad: e.unidad||"kg",
-              alternativas: e.alternativas||[],
+              alternativas: (e.alternativas||[]).map(alt => ({
+                ...alt,
+                peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg")
+              })),
               orden: i 
             });
           });
