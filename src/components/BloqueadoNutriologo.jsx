@@ -1,7 +1,9 @@
-import React from"react";
-import { Lock, Mail } from"lucide-react";
+import React from "react";
+import { Lock, Mail } from "lucide-react";
+import { isNativePlayApp } from "../lib/playBilling";
 
 export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
+  const isPlayApp = isNativePlayApp();
   return (
     <div className="min-h-screen bg-[#F0F4FA] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-lg border border-[#E2E8F0] max-w-md w-full overflow-hidden">
@@ -21,7 +23,11 @@ export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
             No encontramos un pago registrado y aprobado para el período de facturación actual.
           </p>
           <p className="text-[#6B7A8D] text-sm leading-relaxed">
-            Para restablecer el acceso a tu panel y el de tus pacientes, por favor realiza tu transferencia SPEI y sube el comprobante en la sección <strong>Mi Membresía</strong>, o contáctanos directamente.
+            {isPlayApp ? (
+              <>Para restablecer el acceso a tu panel y el de tus pacientes, gestiona tu suscripción en la sección <strong>Mi Membresía</strong> o contáctanos directamente.</>
+            ) : (
+              <>Para restablecer el acceso a tu panel y el de tus pacientes, por favor realiza tu transferencia SPEI y sube el comprobante en la sección <strong>Mi Membresía</strong>, o contáctanos directamente.</>
+            )}
           </p>
 
           {/* Contacto */}
@@ -39,7 +45,7 @@ export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
 
           {/* Acceso limitado: Solo pueden ir a Membresía */}
           <p className="text-xs text-[#6B7A8D]">
-            Puedes acceder a <strong>Mi Membresía</strong> para subir tu comprobante de pago.
+            Puedes acceder a <strong>Mi Membresía</strong> para gestionar tu suscripción.
           </p>
         </div>
 

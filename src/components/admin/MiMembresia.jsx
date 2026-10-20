@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from"react";
-import { dbGet, dbPost, storageUpload } from"../../lib/supabase";
-import { useBrand } from"../BrandContext";
-import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info } from"lucide-react";
-import { getRatesForCutoff } from"../../utils/tarifas";
+import React, { useState, useEffect, useMemo } from "react";
+import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
+import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info, ShieldCheck } from "lucide-react";
+import { getRatesForCutoff } from "../../utils/tarifas";
+import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription } from "../../lib/playBilling";
 
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
+  const isPlayApp = isNativePlayApp();
   const [perfil, setPerfil] = useState(null);
   const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
   const [rawCfg, setRawCfg] = useState(null);
@@ -520,53 +522,117 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             )}
           </div>
 
-          {/* Columna Derecha: Pagos */}
+          {/* Columna Derecha: Pagos (Google Play en Android Nativo vs SPEI en Web) */}
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
-              <h2 className="text-lg font-bold text-[#0B1929] mb-4">Datos de Transferencia</h2>
-              
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-4">
+            {isPlayApp ? (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+                <h2 className="text-lg font-bold text-[#0B1929] mb-2 flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-[var(--brand-primary)]" />
+                  Suscripción Google Play
+                </h2>
+                <p className="text-xs text-[#6B7A8D] mb-4">
+                  Facturación integrada a través de tu cuenta de Google Play Store.
+                </p>
+
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3 text-sm">
                   <div>
-                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Banco</p>
-                    <p className="font-bold text-[#0B1929]">{configPago.banco || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">CLABE Interbancaria</p>
-                    <p className="font-bold text-[#0B1929] tracking-widest font-mono break-all sm:break-normal">
-                      {configPago.clabe 
-                        ? configPago.clabe.replace(/(.{4})/g, '$1 ').trim()
-                        : <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>
-                      }
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Modalidad</p>
+                    <p className="font-bold text-[#0B1929]">
+                      {isEstudiante ? "Plan Estudiante" : `Plan Especialista (Nivel ${currentTier})`}
                     </p>
                   </div>
-
                   <div>
-                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</p>
-                    <p className="font-bold text-[#0B1929]">{configPago.beneficiario || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
+                    <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Próximo Corte</p>
+                    <p className="font-bold text-[#0B1929]">{fechaCorteText}</p>
                   </div>
+                  <div className="pt-2 border-t border-gray-200">
+                    <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                      En la app oficial de Android, las suscripciones se procesan con <strong>Google Play Billing</strong> y puedes gestionarlas desde la sección de Pagos y Suscripciones de tu cuenta de Google.
+                    </p>
+                  </div>
+                </div>
 
-                  <div className="pt-3 border-t border-gray-200">
-                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
-                  <p className="font-black text-lg text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
-                    FLX-{profileId ? profileId.substring(0,6).toUpperCase() : 'USER12'}
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    disabled={uploading || loading}
+                    onClick={async () => {
+                      setUploading(true);
+                      try {
+                        const sku = isEstudiante
+                          ? PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE
+                          : currentTier === 3
+                          ? PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER3
+                          : currentTier === 2
+                          ? PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER2
+                          : PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER1;
+                        const res = await startGooglePlaySubscription(sku);
+                        if (res.status === "purchased") {
+                          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción procesada en Google Play.</div>);
+                          loadData();
+                        } else if (res.status === "unavailable_in_region_or_review") {
+                          setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> La suscripción en Google Play se activará al concluir la revisión de la tienda.</div>);
+                        }
+                      } catch (err) {
+                        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                    className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <CreditCard size={18} />
+                    {uploading ? "Conectando con Google Play..." : "Suscribirme con Google Play"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+                <h2 className="text-lg font-bold text-[#0B1929] mb-4">Datos de Transferencia</h2>
+                
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Banco</p>
+                      <p className="font-bold text-[#0B1929]">{configPago.banco || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">CLABE Interbancaria</p>
+                      <p className="font-bold text-[#0B1929] tracking-widest font-mono break-all sm:break-normal">
+                        {configPago.clabe 
+                          ? configPago.clabe.replace(/(.{4})/g, '$1 ').trim()
+                          : <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>
+                        }
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</p>
+                      <p className="font-bold text-[#0B1929]">{configPago.beneficiario || <span className="text-gray-400 italic text-sm font-normal">Sin configurar aún</span>}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200">
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
+                    <p className="font-black text-lg text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
+                      FLX-{profileId ? profileId.substring(0,6).toUpperCase() : 'USER12'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <button disabled={uploading || loading} 
+                    onClick={handleUploadClick}
+                    className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <Upload size={18} />
+                    {loading ? 'Calculando corte...' : uploading ? 'Subiendo...' : 'Subir Comprobante'}
+                  </button>
+                  <p className="text-xs text-center text-[#6B7A8D] mt-3 flex items-center justify-center gap-1">
+                    <AlertCircle size={12}/> Validado manualmente en menos de 2h
                   </p>
                 </div>
               </div>
-
-              <div className="mt-6">
-                <button disabled={uploading || loading} 
-                  onClick={handleUploadClick}
-                  className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
-                >
-                  <Upload size={18} />
-                  {loading ? 'Calculando corte...' : uploading ? 'Subiendo...' : 'Subir Comprobante'}
-                </button>
-                <p className="text-xs text-center text-[#6B7A8D] mt-3 flex items-center justify-center gap-1">
-                  <AlertCircle size={12}/> Validado manualmente en menos de 2h
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

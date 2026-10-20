@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
+import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription } from "../../lib/playBilling";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
  * Reutiliza la estructura visual de MiMembresia.jsx.
  */
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
+  const isPlayApp = isNativePlayApp();
   const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
   const [rawCfg, setRawCfg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -222,52 +224,109 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           </ul>
         </div>
 
-        {/* Pago por SPEI */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
-              <Upload size={20} className="text-[var(--brand-primary)]" />
+        {/* Pago por Google Play (solo en App Android) vs SPEI (solo en Web) */}
+        {isPlayApp ? (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
+                  <ShieldCheck size={20} className="text-[var(--brand-primary)]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#0B1929]">Suscripción Google Play</h3>
+                  <p className="text-xs text-[#6B7A8D]">Facturación segura a través de tu cuenta de Google</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm mb-6">
+                <div className="bg-[#F0F4FA] rounded-xl p-4 space-y-1.5">
+                  <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Estado de tu plan</span>
+                  <p className="font-bold text-[#0B1929]">
+                    {clienteData?.plan_tipo === 'premium' ? 'Plan Premium Activo' : 'Plan Estándar (Gratuito)'}
+                  </p>
+                  {diasRestantesText && (
+                    <p className="text-xs text-[#6B7A8D]">{diasRestantesText}</p>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-800 leading-relaxed">
+                  Al suscribirte desde la app de Android, el cargo mensual de <strong>${Number(TARIFA).toFixed(2)} MXN</strong> se procesa mediante <strong>Google Play Billing</strong> y puedes administrarlo o cancelarlo en cualquier momento desde la sección de Pagos y Suscripciones de Google Play.
+                </div>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-[#0B1929]">Pago por SPEI</h3>
+
+            <button
+              type="button"
+              disabled={uploading || loading}
+              onClick={async () => {
+                setUploading(true);
+                try {
+                  const res = await startGooglePlaySubscription(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM);
+                  if (res.status === "purchased") {
+                    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción procesada en Google Play.</div>);
+                    loadData();
+                  } else if (res.status === "unavailable_in_region_or_review") {
+                    setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> La suscripción en Google Play se activará en cuanto concluya la verificación de la tienda.</div>);
+                  }
+                } catch (err) {
+                  setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+                } finally {
+                  setUploading(false);
+                }
+              }}
+              className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <CreditCard size={16} />
+              {uploading ? "Conectando con Google Play..." : clienteData?.plan_tipo === 'premium' ? "Administrar en Google Play" : "Suscribirme con Google Play"}
+            </button>
           </div>
-
-          {loading ? (
-            <div className="text-[#6B7A8D] text-sm">Cargando datos de pago...</div>
-          ) : (
-            <div className="space-y-3 text-sm mb-6">
-              <div className="bg-[#F0F4FA] rounded-xl p-3">
-                <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario || "FLUX Sport S.A."}</p>
+        ) : (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 flex items-center justify-center">
+                <Upload size={20} className="text-[var(--brand-primary)]" />
               </div>
-              <div className="bg-[#F0F4FA] rounded-xl p-3">
-                <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Banco</span>
-                <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco || "—"}</p>
-              </div>
-              <div className="bg-[#F0F4FA] rounded-xl p-3">
-                <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">CLABE</span>
-                <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe || "—"}</p>
-              </div>
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
-                <p className="font-black text-base text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
-                  FLX-{clienteData?.id ? String(clienteData.id).substring(0,6).toUpperCase() : 'ATLETA'}
-                </p>
-              </div>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-                Transfiere <strong>${Number(TARIFA).toFixed(2)} MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
-              </div>
+              <h3 className="text-lg font-bold text-[#0B1929]">Pago por SPEI</h3>
             </div>
-          )}
 
-          <button
-            onClick={handleUploadClick}
-            disabled={uploading || loading}
-            className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Upload size={16} />
-            {uploading ? "Subiendo..." : historial.some(r => r.estado === 'pendiente') ? "Subir Nuevo Comprobante" : "Subir Comprobante de Pago"}
-          </button>
-        </div>
+            {loading ? (
+              <div className="text-[#6B7A8D] text-sm">Cargando datos de pago...</div>
+            ) : (
+              <div className="space-y-3 text-sm mb-6">
+                <div className="bg-[#F0F4FA] rounded-xl p-3">
+                  <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Beneficiario</span>
+                  <p className="font-bold text-[#0B1929] mt-0.5">{configPago.beneficiario || "FLUX Sport S.A."}</p>
+                </div>
+                <div className="bg-[#F0F4FA] rounded-xl p-3">
+                  <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Banco</span>
+                  <p className="font-bold text-[#0B1929] mt-0.5">{configPago.banco || "—"}</p>
+                </div>
+                <div className="bg-[#F0F4FA] rounded-xl p-3">
+                  <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">CLABE</span>
+                  <p className="font-bold text-[#0B1929] mt-0.5 font-mono tracking-wider">{configPago.clabe || "—"}</p>
+                </div>
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Concepto Obligatorio</p>
+                  <p className="font-black text-base text-amber-700 bg-amber-50 rounded-lg p-2 text-center mt-1 border border-amber-200">
+                    FLX-{clienteData?.id ? String(clienteData.id).substring(0,6).toUpperCase() : 'ATLETA'}
+                  </p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                  Transfiere <strong>${Number(TARIFA).toFixed(2)} MXN</strong> y sube tu comprobante. Tu acceso se renueva por 30 días desde la confirmación.
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleUploadClick}
+              disabled={uploading || loading}
+              className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {uploading ? "Subiendo..." : historial.some(r => r.estado === 'pendiente') ? "Subir Nuevo Comprobante" : "Subir Comprobante de Pago"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Reglas de Facturación */}
