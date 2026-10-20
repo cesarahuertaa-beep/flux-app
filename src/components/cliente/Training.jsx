@@ -530,16 +530,9 @@ export default function Training({
         {/* Barra de Progreso de la Sesión del Día */}
         <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-3.5 flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[#0B1929]">
-                Progreso del Día: {completedSetsDay}/{totalSetsDay} series
-              </span>
-              {totalVolumeKg > 0 && (
-                <span className="text-[11px] font-mono text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded-md">
-                  {Math.round(totalVolumeKg).toLocaleString("es-MX")} kg vol.
-                </span>
-              )}
-            </div>
+            <span className="font-bold text-[#0B1929]">
+              Progreso del Día: {completedSetsDay}/{totalSetsDay} series
+            </span>
             <div className="flex items-center gap-2">
               {sessionPRs.length > 0 && (
                 <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-bold">
