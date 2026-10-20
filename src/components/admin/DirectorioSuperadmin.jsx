@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, storageUpload, dbGet, dbPost, dbPatch } from "../../lib/supabase";
+import { updateProfile, authInvite, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbPost, dbPatch } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 
@@ -219,7 +219,6 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     if (confirmDeleteNutriText !== "ELIMINAR" || !showEditNutri || showEditNutri.isSuperadmin) return;
     setSaving(true);
     try {
-      const { storageListFolder, storageRemoveMany } = await import("../../lib/supabase");
       // 1. Limpiar fotos de progreso en Storage de todos los pacientes asignados a este nutriólogo
       const nutriClients = await dbGet(`clientes?nutriologo_id=eq.${showEditNutri.id}&select=id`);
       for (const c of nutriClients) {

@@ -1,17 +1,23 @@
-import { useState, useEffect } from"react";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from"react-router-dom";
-import { Capacitor } from"@capacitor/core";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet } from"./lib/supabase";
-import { dbUpsert } from"./lib/supabase";
-import { syncQueue } from"./lib/offlineQueue";
-import Landing from"./pages/Landing";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import ClienteView from "./pages/Cliente";
-import Privacidad from "./pages/Privacidad";
-import Terminos from "./pages/Terminos";
+import { useState, useEffect, lazy, Suspense } from "react";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert } from "./lib/supabase";
+import { syncQueue } from "./lib/offlineQueue";
 import { BrandProvider } from "./components/BrandContext";
-import { AppUpdater } from"./components/ui/AppUpdater";
+import { AppUpdater } from "./components/ui/AppUpdater";
+
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Admin = lazy(() => import("./pages/Admin"));
+const ClienteView = lazy(() => import("./pages/Cliente"));
+const Privacidad = lazy(() => import("./pages/Privacidad"));
+const Terminos = lazy(() => import("./pages/Terminos"));
+
+const FullScreenLoader = () => (
+  <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
+    <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
+  </div>
+);
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
@@ -242,38 +248,36 @@ export default function App() {
     <BrandProvider session={session}>
       <AppUpdater />
       <Router>
-        <Routes>
-          <Route path="/privacidad" element={<Privacidad />} />
-          <Route path="/terminos" element={<Terminos />} />
-          <Route path="/" element={
-            isAppMode
-              ? <Navigate to={session ?"/app" :"/login"} replace />
-              : <Landing session={session} onLogout={handleLogout} />
-          } />
-          <Route path="/login" element={
-            restoring ? (
-              <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
-                <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
-              </div>
-            ) : session ? (
-              <Navigate to="/app" replace />
-            ) : (
-              <Login onLogin={handleLogin} />
-            )
-          } />
-          <Route path="/app/*" element={
-            restoring ? (
-              <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
-                <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
-              </div>
-            ) : !session ? (
-              <Navigate to="/login" replace />
-            ) : (
-              <MainApp />
-            )
-          } />
-          <Route path="*" element={<Navigate to={isAppMode ?"/login" :"/"} replace />} />
-        </Routes>
+        <Suspense fallback={<FullScreenLoader />}>
+          <Routes>
+            <Route path="/privacidad" element={<Privacidad />} />
+            <Route path="/terminos" element={<Terminos />} />
+            <Route path="/" element={
+              isAppMode
+                ? <Navigate to={session ? "/app" : "/login"} replace />
+                : <Landing session={session} onLogout={handleLogout} />
+            } />
+            <Route path="/login" element={
+              restoring ? (
+                <FullScreenLoader />
+              ) : session ? (
+                <Navigate to="/app" replace />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            } />
+            <Route path="/app/*" element={
+              restoring ? (
+                <FullScreenLoader />
+              ) : !session ? (
+                <Navigate to="/login" replace />
+              ) : (
+                <MainApp />
+              )
+            } />
+            <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />
+          </Routes>
+        </Suspense>
       </Router>
     </BrandProvider>
   );

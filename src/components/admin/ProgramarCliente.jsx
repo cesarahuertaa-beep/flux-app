@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { ListSkeleton } from "../ui/Skeleton";
@@ -22,8 +22,9 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
-import { ProgresoCliente } from "./ProgresoCliente";
-import TemplatesManagerModal from "../ui/TemplatesManagerModal";
+
+const ProgresoCliente = lazy(() => import("./ProgresoCliente").then(m => ({ default: m.ProgresoCliente })));
+const TemplatesManagerModal = lazy(() => import("../ui/TemplatesManagerModal"));
 
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
@@ -1302,7 +1303,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
 
         {subtab ==="progreso" && (
-          <ProgresoCliente selected={selected} setMsg={setMsg} isMiPlan={isMiPlan} />
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <ProgresoCliente selected={selected} setMsg={setMsg} isMiPlan={isMiPlan} />
+          </Suspense>
         )}
       </>}
 
@@ -1682,22 +1685,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       {/* ── Modal de Plantillas Maestro (Nutrición y Rutinas) ── */}
       {templateModal && (
-        <TemplatesManagerModal
-          type={templateModal}
-          currentData={
-            templateModal === "nutri"
-              ? { macros, dias }
-              : { rutinas, semanas: planForm?.semanas || 4 }
-          }
-          clientes={clientes}
-          onApplyTemplate={
-            templateModal === "nutri"
-              ? handleApplyNutriTemplate
-              : handleApplyRutinaTemplate
-          }
-          onClose={() => setTemplateModal(null)}
-          setMsg={setMsg}
-        />
+        <Suspense fallback={null}>
+          <TemplatesManagerModal
+            type={templateModal}
+            currentData={
+              templateModal === "nutri"
+                ? { macros, dias }
+                : { rutinas, semanas: planForm?.semanas || 4 }
+            }
+            clientes={clientes}
+            onApplyTemplate={
+              templateModal === "nutri"
+                ? handleApplyNutriTemplate
+                : handleApplyRutinaTemplate
+            }
+            onClose={() => setTemplateModal(null)}
+            setMsg={setMsg}
+          />
+        </Suspense>
       )}
     </div>
   );

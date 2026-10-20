@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
-import GroceryListModal from "../ui/GroceryListModal";
+
+const GroceryListModal = lazy(() => import("../ui/GroceryListModal"));
 
 const DAY_SHORT = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const DAY_FULL  = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
@@ -435,12 +436,14 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
 
       {/* ── Modal de Lista de Compras del Súper ── */}
       {showGrocery && (
-        <GroceryListModal
-          dias={dias}
-          onClose={() => setShowGrocery(false)}
-          clienteNombre={clienteNombre}
-          semanaActualCiclo={semanaActualCiclo}
-        />
+        <Suspense fallback={null}>
+          <GroceryListModal
+            dias={dias}
+            onClose={() => setShowGrocery(false)}
+            clienteNombre={clienteNombre}
+            semanaActualCiclo={semanaActualCiclo}
+          />
+        </Suspense>
       )}
     </div>
   );

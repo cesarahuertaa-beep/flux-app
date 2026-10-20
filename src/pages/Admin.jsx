@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from"react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
@@ -6,26 +6,26 @@ import {
 , UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2,
   Clock, Sparkles, ChevronDown
 } from "lucide-react";
-import { AppLayout } from"../components/ui/AppLayout";
-import { Biblioteca } from"../components/admin/Biblioteca";
-import { ProgramarCliente } from"../components/admin/ProgramarCliente";
-import { ProgresoCliente } from"../components/admin/ProgresoCliente";
-import MiMembresiaCivil from"../components/admin/MiMembresiaCivil";
-import { GestionEquipo } from"../components/admin/GestionEquipo";
-import { AgendaAdmin } from"../components/admin/AgendaAdmin";
-import ClienteView from"./Cliente";
-import UserProfile from"../components/UserProfile";
-import PerfilNutriologo from"../components/admin/PerfilNutriologo";
-import Aprobaciones from"../components/admin/Aprobaciones";
-import GestorTienda from"../components/admin/GestorTienda";
-import MiMembresia from"../components/admin/MiMembresia";
-import ControlPagos from"../components/admin/ControlPagos";
-import MisComisiones from"../components/admin/MisComisiones";
-import BloqueadoNutriologo from"../components/BloqueadoNutriologo";
-import { DirectorioSuperadmin } from"../components/admin/DirectorioSuperadmin";
-import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId } from "../lib/supabase";
-import { useBrand } from"../components/BrandContext";
+import { AppLayout } from "../components/ui/AppLayout";
+import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
+import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany } from "../lib/supabase";
+import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
+
+const Biblioteca = lazy(() => import("../components/admin/Biblioteca").then(m => ({ default: m.Biblioteca })));
+const ProgramarCliente = lazy(() => import("../components/admin/ProgramarCliente").then(m => ({ default: m.ProgramarCliente })));
+const MiMembresiaCivil = lazy(() => import("../components/admin/MiMembresiaCivil"));
+const GestionEquipo = lazy(() => import("../components/admin/GestionEquipo").then(m => ({ default: m.GestionEquipo })));
+const AgendaAdmin = lazy(() => import("../components/admin/AgendaAdmin").then(m => ({ default: m.AgendaAdmin })));
+const ClienteView = lazy(() => import("./Cliente"));
+const UserProfile = lazy(() => import("../components/UserProfile"));
+const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
+const Aprobaciones = lazy(() => import("../components/admin/Aprobaciones"));
+const GestorTienda = lazy(() => import("../components/admin/GestorTienda"));
+const MiMembresia = lazy(() => import("../components/admin/MiMembresia"));
+const ControlPagos = lazy(() => import("../components/admin/ControlPagos"));
+const MisComisiones = lazy(() => import("../components/admin/MisComisiones"));
+const DirectorioSuperadmin = lazy(() => import("../components/admin/DirectorioSuperadmin").then(m => ({ default: m.DirectorioSuperadmin })));
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -49,7 +49,9 @@ const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Ad
       </div>
     )}
     <div className="flex-1 w-full relative p-4 md:p-8">
-      {children}
+      <Suspense fallback={<ListSkeleton rows={4} />}>
+        {children}
+      </Suspense>
     </div>
   </div>
 );
@@ -64,8 +66,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return saved ? saved :"perfil";
   });
 
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([tab]));
+
   useEffect(() => {
-    if (tab) sessionStorage.setItem("flux_admin_tab", tab);
+    if (tab) {
+      sessionStorage.setItem("flux_admin_tab", tab);
+      setVisitedTabs(prev => {
+        if (prev.has(tab)) return prev;
+        const next = new Set(prev);
+        next.add(tab);
+        return next;
+      });
+    }
   }, [tab]);
   
   const [clientes, setClientes] = useState([]);
@@ -604,7 +616,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     setSaving(true);
     try {
       // Borrar fotos de storage (progress-photos)
-      const { storageListFolder, storageRemoveMany } = await import("../lib/supabase");
       const files = await storageListFolder("progress-photos", editClient.id);
       if (files && files.length > 0) {
         const paths = files.map(f => `${editClient.id}/${f.name}`);
@@ -826,16 +837,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && tab ==="clientes" && (isSuperadmin || role ==="staff") ? (
-        <DirectorioSuperadmin 
-          myId={myId} 
-          clientes={clientes} 
-          loadClientes={loadClientes} 
-          setMsg={setMsg} 
-          setSelected={setSelected} 
-          setTab={setTab}
-          setEditClient={setEditClient}
-          toggleActivo={toggleActivo}
-        />
+        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+          <DirectorioSuperadmin 
+            myId={myId} 
+            clientes={clientes} 
+            loadClientes={loadClientes} 
+            setMsg={setMsg} 
+            setSelected={setSelected} 
+            setTab={setTab}
+            setEditClient={setEditClient}
+            toggleActivo={toggleActivo}
+          />
+        </Suspense>
       ) : tab ==="clientes" && (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header */}
@@ -1121,7 +1134,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </SubComponentWrapper>
       )}
 
-      {!isCivil && role !== "administrativo" && (
+      {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (
         <div className={tab === "programar" ? "block" : "hidden"}>
           <SubComponentWrapper title="Asignador de Dietas y Rutinas" subtitle="Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente">
             <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
@@ -1129,7 +1142,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && role !== "administrativo" && role !== "staff" && (
+      {!isCivil && role !== "administrativo" && role !== "staff" && (tab === "equipo" || visitedTabs.has("equipo")) && (
         <div className={tab === "equipo" ? "block" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
             <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/>
@@ -1137,7 +1150,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && role !== "staff" && (
+      {!isCivil && role !== "staff" && (tab === "agenda" || visitedTabs.has("agenda")) && (
         <div className={tab === "agenda" ? "block" : "hidden"}>
           <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
             <AgendaAdmin setMsg={setMsg} profileId={myId}/>
@@ -1145,7 +1158,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {(isSuperadmin || role === "staff") && (
+      {(isSuperadmin || role === "staff") && (tab === "aprobaciones" || visitedTabs.has("aprobaciones")) && (
         <div className={tab === "aprobaciones" ? "block" : "hidden"}>
           <SubComponentWrapper title="Aprobaciones" subtitle="Solicitudes de registro y verificación de especialistas">
             <Aprobaciones setMsg={setMsg} />
@@ -1153,7 +1166,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (
+      {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (tab === "membresia" || visitedTabs.has("membresia")) && (
         <div className={tab === "membresia" ? "block" : "hidden"}>
           <SubComponentWrapper title="Mi Membresía" subtitle="Consulta el estado de tu suscripción y sube tus comprobantes de pago">
             <MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
@@ -1161,7 +1174,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {isSuperadmin && (
+      {isSuperadmin && (tab === "pagos" || visitedTabs.has("pagos")) && (
         <div className={tab === "pagos" ? "block" : "hidden"}>
           <SubComponentWrapper title="Auditoría Financiera" subtitle="Control de pagos, tarifas vigentes y comisiones de colaboradores">
             <ControlPagos setMsg={setMsg} />
@@ -1169,7 +1182,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {(role === "staff" || role === "administrativo") && (
+      {(role === "staff" || role === "administrativo") && (tab === "comisiones" || visitedTabs.has("comisiones")) && (
         <div className={tab === "comisiones" ? "block" : "hidden"}>
           <SubComponentWrapper title="Mis Comisiones" subtitle="Resumen de tus comisiones generadas y estado de pago">
             <MisComisiones myId={myId} setMsg={setMsg} />
@@ -1492,7 +1505,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && tab ==="perfil" && (
-        <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+          <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+        </Suspense>
       )}
 
       {tab === "tienda" && (isSuperadmin || role === "staff") && (
@@ -1534,24 +1549,28 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {isCivil && tab ==="perfil" && (
-        <UserProfile
-          session={{ role:"civil", data: clienteData }}
-          onLogout={onLogout}
-          onChangeRole={onChangeRole}
-          multiRoles={multiRoles}
-        />
+        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+          <UserProfile
+            session={{ role:"civil", data: clienteData }}
+            onLogout={onLogout}
+            onChangeRole={onChangeRole}
+            multiRoles={multiRoles}
+          />
+        </Suspense>
       )}
       {/* ════════════ END CIVIL PREMIUM TABS ════════════ */}
 
     
       {(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') && (isCivil ? clienteData : myShadowClient) && (
-        <ClienteView 
-          session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
-          isAtletaMode={false}
-          isEmbedded={true}
-          embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
-          onLogout={onLogout}
-        />
+        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+          <ClienteView 
+            session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
+            isAtletaMode={false}
+            isEmbedded={true}
+            embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
+            onLogout={onLogout}
+          />
+        </Suspense>
       )}
 </AppLayout>
   );

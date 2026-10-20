@@ -1,18 +1,18 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbGet, dbUpsert } from "../lib/supabase";
 import { enqueue, getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
-import { CitasCliente } from "../components/CitasCliente";
-import Nutrition from "../components/cliente/Nutrition";
-import Training from "../components/cliente/Training";
-import Progreso from "../components/cliente/Progreso";
-import UserProfile from "../components/UserProfile";
-import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
+
+const CitasCliente = lazy(() => import("../components/CitasCliente").then(m => ({ default: m.CitasCliente })));
+const Nutrition = lazy(() => import("../components/cliente/Nutrition"));
+const Training = lazy(() => import("../components/cliente/Training"));
+const Progreso = lazy(() => import("../components/cliente/Progreso"));
+const UserProfile = lazy(() => import("../components/UserProfile"));
+const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
 
 const offlineAwareUpsert = async (records) => {
   if (navigator.onLine) {
@@ -236,7 +236,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           <ListSkeleton rows={4} />
         </div>
       ) : (
-        <>
+        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
           {isFinished && (tab ==="nutricion" || tab ==="deporte") ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
               <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center shadow-sm mb-4">
@@ -291,7 +291,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} multiRoles={multiRoles} />
             )
           )}
-        </>
+        </Suspense>
       )}
         </>
   );
