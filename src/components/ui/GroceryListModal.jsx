@@ -94,13 +94,13 @@ function extractQuantityAndFood(rawLine) {
     return parseFloat(str) || 0;
   };
 
-  const UNIDADES_LIST = "g|gr|grs|gramos|kg|kilo|kilos|ml|l|lt|lts|litros|taza|tazas|cda|cdas|cucharada|cucharadas|cdita|cditas|cucharadita|cucharaditas|pza|pzas|pieza|piezas|rebanada|rebanadas|scoop|scoops|lata|latas|sobre|sobres|vaso|vasos|paquete|paquetes";
+  const UNIDADES_LIST = "g|gr|grs|gm|gms|gramo|gramos|kg|kilo|kilos|ml|l|lt|lts|litros|taza|tazas|cda|cdas|cucharada|cucharadas|cdita|cditas|cucharadita|cucharaditas|pza|pzas|pieza|piezas|rebanada|rebanadas|scoop|scoops|lata|latas|sobre|sobres|vaso|vasos|paquete|paquetes";
 
   // ESTRATEGIA 1: Cantidad en paréntesis, ej. "Pechuga de pollo (150g)" o "Arroz (1 taza)"
-  const parenMatch = cleaned.match(new RegExp(`\\((?:aprox\\.?\\s*)?(\\d+(?:[.,]\\d+)?|\\d+\\/\\d+|\\d+\\s+\\d+\\/\\d+)\\s*(${UNIDADES_LIST})?\\)`, "i"));
+  const parenMatch = cleaned.match(new RegExp(`\\((?:aprox\\.?\\s*)?(\\d+(?:[.,]\\d+)?|\\d+\\/\\d+|\\d+\\s+\\d+\\/\\d+)\\s*(${UNIDADES_LIST})?\\.?\\)`, "i"));
   if (parenMatch) {
     cantidadNum = parseNumberStr(parenMatch[1]);
-    unidad = (parenMatch[2] || "g").toLowerCase();
+    unidad = (parenMatch[2] || (cantidadNum >= 25 ? "g" : "pzas")).toLowerCase();
     itemNombre = cleaned.replace(parenMatch[0], "").trim();
   } else {
     // ESTRATEGIA 2: Cantidad al final, ej. "Pechuga de pollo 150g", "Avena 40 gr", "Pan 2 rebanadas"
@@ -111,17 +111,17 @@ function extractQuantityAndFood(rawLine) {
       itemNombre = cleaned.slice(0, endMatch.index).trim();
     } else {
       // ESTRATEGIA 3: Cantidad al inicio con unidad explícita, ej. "150g de pechuga", "1 taza de avena", "2 rebanadas de pan"
-      const startUnitMatch = cleaned.match(new RegExp(`^(\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)\\s*(${UNIDADES_LIST})\\b(?:\\s+de|\\s+del)?\\s*(.*)$`, "i"));
+      const startUnitMatch = cleaned.match(new RegExp(`^(\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)\\s*(${UNIDADES_LIST})\\b\\.?\\s*(?:de\\b|del\\b)?\\s*(.*)$`, "i"));
       if (startUnitMatch) {
         cantidadNum = parseNumberStr(startUnitMatch[1]);
         unidad = startUnitMatch[2].toLowerCase();
         itemNombre = (startUnitMatch[3] || "").trim();
       } else {
-        // ESTRATEGIA 4: Número o fracción al inicio sin unidad explícita, ej. "1/2 aguacate", "2 huevos", "3 claras", "1 manzana"
-        const countMatch = cleaned.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*(?:de\s+)?(.*)$/i);
+        // ESTRATEGIA 4: Número o fracción al inicio sin unidad explícita, ej. "1/2 aguacate", "2 huevos", "250 de carne molida"
+        const countMatch = cleaned.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*(?:de\s+|del\s+)?(.*)$/i);
         if (countMatch && countMatch[2] && countMatch[2].trim().length > 1) {
           cantidadNum = parseNumberStr(countMatch[1]);
-          unidad = "pzas";
+          unidad = cantidadNum >= 25 ? "g" : "pzas";
           itemNombre = countMatch[2].trim();
         }
       }
@@ -138,7 +138,7 @@ function extractQuantityAndFood(rawLine) {
   if (!itemNombre) itemNombre = cleaned;
 
   // Normalizar unidad
-  if (["gr", "grs", "gramos"].includes(unidad)) unidad = "g";
+  if (["gr", "grs", "gm", "gms", "gramo", "gramos"].includes(unidad)) unidad = "g";
   if (["kilo", "kilos"].includes(unidad)) unidad = "kg";
   if (["lt", "lts", "litros"].includes(unidad)) unidad = "L";
   if (["pieza", "piezas", "pza"].includes(unidad)) unidad = "pzas";
@@ -559,19 +559,6 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
               );
             })
           )}
-        </div>
-
-        {/* ── Modal Footer ── */}
-        <div className="p-4 bg-gray-50 border-t border-[#E2E8F0] flex items-center justify-between shrink-0">
-          <p className="text-xs text-[#6B7A8D]">
-            💡 Los artículos tachados se guardan automáticamente para cuando vayas al súper.
-          </p>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            Listo
-          </button>
         </div>
       </div>
     </div>
