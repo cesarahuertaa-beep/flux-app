@@ -342,90 +342,55 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
-        <div className="p-6 border-b border-[#F0F4FA] flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm">
-              <ShoppingBag size={22} />
+        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm shrink-0">
+              <ShoppingBag size={20} />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug truncate" style={{ fontFamily: "DM Sans" }}>
                 Lista de Compras del Súper
               </h2>
-              <p className="text-xs text-[#6B7A8D] mt-0.5">
-                Ingredientes agrupados de tu plan semanal (Semana {semanaActualCiclo})
+              <p className="text-[11px] sm:text-xs text-[#6B7A8D] truncate">
+                Plan semanal • Semana {semanaActualCiclo}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* ── Toolbar: Search, Filters, Stats & Export ── */}
-        <div className="p-5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex flex-col gap-3.5 shrink-0">
+        {/* ── Toolbar: Search, Action Buttons, Progress & Filters ── */}
+        <div className="px-4 py-3 sm:px-6 sm:py-4 bg-[#F8FAFC] border-b border-[#E2E8F0] flex flex-col gap-2.5 shrink-0">
           
-          {/* Top Row: Search & Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Row 1: Search Input + Desktop Actions */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
               <input
                 type="text"
                 placeholder="Buscar ingrediente (ej. pollo, arroz, avena)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] shadow-sm"
+                className="w-full h-9 pl-9 pr-3 bg-white border border-[#E2E8F0] rounded-xl text-xs sm:text-sm text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] shadow-2xs"
               />
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[var(--brand-primary)] hover:opacity-90 shadow-sm transition-all cursor-pointer shrink-0"
-              >
-                {copied ? <CheckCheck size={14} className="text-green-300" /> : <Copy size={14} />}
-                <span>{copied ? "¡Copiado!" : "Copiar a WhatsApp"}</span>
-              </button>
 
-              {completedCount > 0 && (
-                <button
-                  onClick={handleClearAll}
-                  title="Desmarcar todos"
-                  className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-500 bg-white border border-[#E2E8F0] hover:text-red-600 hover:border-red-200 transition-colors shrink-0"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Middle Row: Progress indicator & Alternatives toggle */}
-          <div className="flex items-center justify-between flex-wrap gap-2.5 pt-1 text-xs text-[#6B7A8D]">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[#0B1929]">
-                  {completedCount} de {totalCount} comprados
-                </span>
-                <div className="w-20 sm:w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                    style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Botón Seleccionar / Desmarcar Todo */}
+            {/* Action Buttons: Side-by-side 2-column grid on mobile, inline flex on desktop */}
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 shrink-0">
               {totalCount > 0 && (
                 <button
                   type="button"
                   onClick={handleToggleSelectAll}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`h-9 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     allTargetSelected
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                       : "bg-white text-[#0B1929] border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] shadow-2xs"
@@ -433,35 +398,71 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                 >
                   {allTargetSelected ? (
                     <>
-                      <CheckCheck size={14} className="text-emerald-600" />
-                      <span>Desmarcar todo</span>
+                      <CheckCheck size={14} className="text-emerald-600 shrink-0" />
+                      <span className="truncate">Desmarcar todo</span>
                     </>
                   ) : (
                     <>
-                      <Check size={14} className="text-[var(--brand-primary)]" />
-                      <span>Seleccionar todo</span>
+                      <Check size={14} className="text-[var(--brand-primary)] shrink-0" />
+                      <span className="truncate">Seleccionar todo</span>
                     </>
                   )}
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="h-9 px-3.5 rounded-xl text-xs font-bold text-white bg-[var(--brand-primary)] hover:opacity-90 shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                {copied ? <CheckCheck size={14} className="text-green-300 shrink-0" /> : <Copy size={14} className="shrink-0" />}
+                <span className="truncate">{copied ? "¡Copiado!" : "Copiar a WhatsApp"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Compact Progress Bar + Alternative Options Toggle */}
+          <div className="flex items-center justify-between gap-2 pt-0.5 text-xs text-[#6B7A8D]">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="font-bold text-[#0B1929] whitespace-nowrap text-[11px] sm:text-xs">
+                {completedCount}/{totalCount} comprados
+              </span>
+              <div className="w-16 sm:w-24 bg-gray-200 rounded-full h-1.5 overflow-hidden shrink-0">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
+                />
+              </div>
+              {completedCount > 0 && !allTargetSelected && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  title="Desmarcar comprados"
+                  className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              )}
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer select-none shrink-0 shadow-2xs">
               <input
                 type="checkbox"
                 checked={incluirAlt}
                 onChange={(e) => setIncluirAlt(e.target.checked)}
-                className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
+                className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] w-3.5 h-3.5"
               />
-              <span className="text-xs">Incluir opciones alternativas (Opción 2)</span>
+              <span className="text-[11px] sm:text-xs font-medium text-[#0B1929]">
+                Incluir Opción 2
+              </span>
             </label>
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="flex gap-1.5 overflow-x-auto scroll-hide pb-0.5">
+          {/* Row 3: Category Filter Pills */}
+          <div className="flex gap-1.5 overflow-x-auto scroll-hide pt-0.5">
             <button
               onClick={() => setActiveFilter("todos")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 activeFilter === "todos"
                   ? "bg-[#0B1929] text-white shadow-sm"
                   : "bg-white text-[#6B7A8D] border border-[#E2E8F0] hover:bg-gray-50"
@@ -476,7 +477,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                 <button
                   key={catKey}
                   onClick={() => setActiveFilter(catKey)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
                     activeFilter === catKey
                       ? "bg-[var(--brand-primary)] text-white shadow-sm"
                       : "bg-white text-[#6B7A8D] border border-[#E2E8F0] hover:bg-gray-50"
@@ -492,7 +493,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         </div>
 
         {/* ── Ingredients Checklist Body ── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-2">
           {filteredIngredients.length === 0 ? (
             <div className="py-12 text-center text-[#6B7A8D]">
               <ShoppingBag size={36} className="mx-auto mb-2 text-[#CBD5E1]" />
@@ -508,21 +509,21 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                 <div
                   key={item.id}
                   onClick={() => toggleCheck(item.id)}
-                  className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer select-none ${
+                  className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none ${
                     isChecked
                       ? "bg-gray-50/80 border-[#E2E8F0] opacity-60"
                       : "bg-white border-[#E2E8F0] hover:border-[var(--brand-primary)]/40 hover:shadow-sm"
                   }`}
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
+                      className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
                         isChecked
                           ? "bg-emerald-500 border-emerald-500 text-white"
                           : "border-gray-300 bg-white"
                       }`}
                     >
-                      {isChecked && <Check size={14} className="stroke-[3]" />}
+                      {isChecked && <Check size={13} className="stroke-[3]" />}
                     </div>
 
                     <div className="min-w-0">
@@ -533,12 +534,12 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                       >
                         {item.nombre}
                       </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-[#6B7A8D] font-mono">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[10px] text-[#6B7A8D] font-mono whitespace-nowrap">
                           {catDef.icono} {catDef.nombre}
                         </span>
                         {item.veces > 1 && (
-                          <span className="text-[10px] text-[var(--brand-primary)] font-medium">
+                          <span className="text-[10px] text-[var(--brand-primary)] font-medium whitespace-nowrap">
                             • en {item.veces} comidas
                           </span>
                         )}
@@ -548,7 +549,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
 
                   {item.cantidadNum ? (
                     <div className="shrink-0 text-right">
-                      <span className="inline-block px-3 py-1 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/20 font-mono font-bold text-xs shadow-xs">
+                      <span className="inline-block px-2.5 py-1 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/20 font-mono font-bold text-xs shadow-2xs">
                         {Math.round(item.cantidadNum * 10) / 10} {item.unidad}
                       </span>
                     </div>
