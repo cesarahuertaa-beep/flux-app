@@ -1,31 +1,36 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { dbPatch, dbGet } from"../lib/supabase";
-import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone } from"lucide-react";
-import { Capacitor } from"@capacitor/core";
-import DatosPersonalesCard from"./admin/DatosPersonalesCard";
-import { syncPersonalData } from"../lib/supabase";
-import RoleSwitcher from"./RoleSwitcher";
+import { dbPatch, dbGet, dbPost, storageListFolder, storageRemoveMany } from "../lib/supabase";
+import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone, Trash2, AlertTriangle, X } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import DatosPersonalesCard from "./admin/DatosPersonalesCard";
+import { syncPersonalData } from "../lib/supabase";
+import RoleSwitcher from "./RoleSwitcher";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const navigate = useNavigate();
   const user = session?.data || session; // Cliente o Admin
-  const isCliente = session?.role ==="cliente" || session?.role ==="civil";
+  const isCliente = session?.role === "cliente" || session?.role === "civil";
+  const isSuperadmin = session?.role === "superadmin" || user?.role === "superadmin";
   
   const [form, setForm] = useState({
-    nombre: user?.nombre ||"",
-    telefono: user?.telefono ||"",
-    email: user?.email ||"",
-    avatar_url: user?.avatar_url ||"",
-    fecha_nacimiento: user?.fecha_nacimiento ||"",
-    genero: user?.genero ||"",
-    pais: user?.pais ||"México",
-    estado_provincia: user?.estado_provincia ||""
+    nombre: user?.nombre || "",
+    telefono: user?.telefono || "",
+    email: user?.email || "",
+    avatar_url: user?.avatar_url || "",
+    fecha_nacimiento: user?.fecha_nacimiento || "",
+    genero: user?.genero || "",
+    pais: user?.pais || "México",
+    estado_provincia: user?.estado_provincia || ""
   });
   
-  const [objetivo, setObjetivo] = useState(user?.objetivo ||"");
+  const [objetivo, setObjetivo] = useState(user?.objetivo || "");
   const [isSaving, setIsSaving] = useState(false);
   const [miNutriologo, setMiNutriologo] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     if (isCliente && user?.nutriologo_id) {
@@ -85,6 +90,51 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       if (user) user.objetivo = objetivo;
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleDeleteOwnAccount = async () => {
+    if (confirmDeleteText.trim().toUpperCase() !== "ELIMINAR" || isSuperadmin) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      if (isCliente) {
+        try {
+          const files = await storageListFolder("progress-photos", user.id);
+          if (files && files.length > 0) {
+            const paths = files.map((f) => `${user.id}/${f.name}`);
+            await storageRemoveMany("progress-photos", paths);
+          }
+        } catch (storageErr) {
+          console.warn("Aviso limpiando fotos:", storageErr);
+        }
+        await dbPost("rpc/eliminar_paciente_definitivo", {
+          p_cliente_id: user.id,
+          p_auth_id: user.auth_id || null,
+        });
+      } else {
+        // Desvincular primero a los pacientes para no eliminar sus cuentas personales
+        try {
+          await dbPatch(`clientes?nutriologo_id=eq.${user.id}`, { nutriologo_id: null });
+        } catch (unlinkErr) {
+          console.warn("Aviso desvinculando pacientes:", unlinkErr);
+        }
+        await dbPost("rpc/eliminar_nutriologo_definitivo", {
+          p_nutriologo_id: user.id,
+        });
+      }
+
+      localStorage.clear();
+      setShowDeleteModal(false);
+      if (onLogout) {
+        onLogout();
+      } else {
+        window.location.href = "/app";
+      }
+    } catch (e) {
+      console.error("Error eliminando cuenta:", e);
+      setDeleteError("No se pudo completar la eliminación: " + (e.message || "Intenta de nuevo."));
+      setIsDeleting(false);
     }
   };
 
@@ -210,6 +260,115 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
           </button>
         )}
       </div>
+
+      {/* Zona de Privacidad y Eliminación de Cuenta (Requisito Google Play) */}
+      {!isSuperadmin && (
+        <div className="mt-10 pt-8 border-t border-[#E2E8F0]">
+          <div className="bg-white rounded-2xl border border-red-100 p-5 sm:p-6 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-[#0B1929] flex items-center gap-2">
+                <Trash2 size={16} className="text-red-500" />
+                Eliminar mi cuenta y datos personales
+              </h3>
+              <p className="text-xs text-[#6B7A8D] leading-relaxed">
+                Puedes solicitar la baja definitiva e irreversible de tu cuenta, credenciales de acceso y registros personales asociados en cualquier momento.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmDeleteText("");
+                setDeleteError("");
+                setShowDeleteModal(true);
+              }}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors shrink-0 cursor-pointer"
+            >
+              Eliminar cuenta
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación de Cuenta */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[110] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-[#E2E8F0] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+                    ¿Eliminar cuenta definitivamente?
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D]">Esta acción es permanente e irreversible</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-red-50/70 border border-red-100 rounded-2xl p-3.5 text-xs text-red-900 space-y-1.5 mb-4 leading-relaxed">
+              {isCliente ? (
+                <p>
+                  Se eliminará tu cuenta de acceso, perfil personal, planes asociados, historial de entrenamientos, mediciones y fotografías de progreso de forma definitiva.
+                </p>
+              ) : (
+                <p>
+                  Se eliminará tu perfil profesional, credenciales de acceso y configuración de consultorio. Tus pacientes registrados conservarán sus cuentas personales como usuarios independientes.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2 mb-5">
+              <label className="block text-xs font-bold text-[#0B1929]">
+                Escribe <span className="font-mono text-red-600 bg-red-50 px-1.5 py-0.5 rounded">ELIMINAR</span> para confirmar la baja definitiva:
+              </label>
+              <input
+                type="text"
+                value={confirmDeleteText}
+                onChange={(e) => setConfirmDeleteText(e.target.value)}
+                placeholder="ELIMINAR"
+                disabled={isDeleting}
+                className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm font-mono text-[#0B1929] focus:outline-none focus:border-red-500"
+              />
+              {deleteError && (
+                <p className="text-xs text-red-600 font-medium mt-1">{deleteError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#6B7A8D] bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={confirmDeleteText.trim().toUpperCase() !== "ELIMINAR" || isDeleting}
+                onClick={handleDeleteOwnAccount}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-2 ${
+                  confirmDeleteText.trim().toUpperCase() === "ELIMINAR" && !isDeleting
+                    ? "bg-red-600 hover:bg-red-700 shadow-sm cursor-pointer"
+                    : "bg-red-300 cursor-not-allowed"
+                }`}
+              >
+                <Trash2 size={14} />
+                <span>{isDeleting ? "Eliminando cuenta..." : "Confirmar eliminación"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Espaciador inferior para navegación móvil */}
       <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />

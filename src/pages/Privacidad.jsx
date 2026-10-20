@@ -70,19 +70,32 @@ export default function Privacidad() {
             Sus datos de salud son compartidos únicamente con el profesional que usted tiene asignado dentro de la plataforma (si aplica), para efectos del seguimiento de su plan. No vendemos ni compartimos sus datos sensibles con terceros ajenos al servicio. Podemos compartir datos no sensibles con proveedores de infraestructura (hosting, procesamiento de pagos) únicamente para operar el servicio, quienes están obligados contractualmente a proteger su información.
           </p>
 
-          <p>
-            <strong>Derechos ARCO y Eliminación Definitiva</strong><br/>
-            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales, así como a revocar su consentimiento en cualquier momento. De manera adicional, nuestra plataforma le permite eliminar de forma **definitiva e irreversible** todos sus registros, fotografías, historiales y métricas en cualquier momento desde la configuración de su perfil.
-            <br/><br/>
-            Para ejercer derechos ARCO formalmente, envíe una solicitud a:
-          </p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Correo: cesar.a.huerta.a@gmail.com</li>
-            <li>Teléfono: 775 101 67 33</li>
-          </ul>
-          <p>
-            Su solicitud deberá incluir: nombre completo, descripción clara del derecho que desea ejercer, y documento que acredite su identidad. Responderemos en un plazo máximo de 20 días hábiles, conforme a la ley.
-          </p>
+          <div id="eliminacion" className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-xs space-y-3">
+            <h2 className="text-lg font-bold text-[#0B1929]">
+              Derechos ARCO y Eliminación Definitiva de Cuenta (Política de Retención y Baja de Datos)
+            </h2>
+            <p>
+              Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales, así como a revocar su consentimiento en cualquier momento. De manera adicional, <strong>Flux Sports</strong> le permite eliminar de forma <strong>definitiva e irreversible</strong> su cuenta y todos sus datos personales mediante cualquiera de las siguientes dos vías:
+            </p>
+            <ol className="list-decimal pl-5 space-y-2">
+              <li>
+                <strong>Eliminación directa desde la aplicación (Inmediata):</strong> Inicie sesión en la app móvil o web de FLUX, diríjase a la pestaña <strong>Mi Perfil</strong>, desplácese hasta la sección inferior <em>«Eliminar mi cuenta y datos personales»</em>, presione el botón <strong>Eliminar cuenta</strong> y confirme escribiendo la palabra <code>ELIMINAR</code>. Su cuenta, credenciales de acceso, planes personales, registros de entrenamiento/nutrición y fotografías de progreso serán eliminados de inmediato de nuestros servidores.
+              </li>
+              <li>
+                <strong>Solicitud de eliminación desde la web (Sin abrir la app):</strong> Si ya desinstaló la aplicación o desea solicitar la baja por vía externa, envíe un correo electrónico a <a href="mailto:cesar.a.huerta.a@gmail.com?subject=Eliminar%20cuenta%20FLUX" className="text-blue-600 font-semibold hover:underline">cesar.a.huerta.a@gmail.com</a> desde la dirección de correo asociada a su cuenta con el asunto <strong>«Eliminar cuenta FLUX»</strong>. Procesaremos la baja definitiva de su cuenta y todos sus datos asociados en un plazo máximo de 72 horas hábiles.
+              </li>
+            </ol>
+            <p className="text-xs text-[#6B7A8D] pt-1">
+              <strong>Alcance de los datos eliminados:</strong> Al eliminar una cuenta de paciente o atleta independiente se borran permanentemente sus datos de perfil, credenciales de acceso, planes asignados, bitácoras de entrenamiento, mediciones corporales y fotografías en almacenamiento en la nube. Si un profesional de nutrición elimina su cuenta, se elimina su perfil profesional y credenciales, manteniendo a salvo las cuentas personales de sus usuarios quienes pasan a modalidad independiente.
+            </p>
+            <p className="pt-2">
+              Para ejercer otros derechos ARCO o soporte de privacidad, también puede contactarnos en:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Correo: cesar.a.huerta.a@gmail.com</li>
+              <li>Teléfono: 775 101 67 33</li>
+            </ul>
+          </div>
 
           <p>
             <strong>Medidas de seguridad</strong><br/>
