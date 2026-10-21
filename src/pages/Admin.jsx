@@ -1346,18 +1346,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             </div>
             <div className="p-6 space-y-4">
               {editClient.email && (
-                <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
-                    <div className="text-xs font-bold text-[#0B1929] truncate">{editClient.email}</div>
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Correo de acceso</label>
+                  <input
+                    type="email"
+                    value={editClient.email}
+                    readOnly
+                    className="w-full bg-[#F0F4FA] border border-transparent text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none"
+                  />
                   <button
                     type="button"
                     onClick={() => resendClientAccess(editClient.email)}
                     disabled={saving}
-                    className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                    className="mt-2 w-full py-2 px-3 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    📧 Reenviar acceso
+                    📧 Reenviar correo de acceso
                   </button>
                 </div>
               )}

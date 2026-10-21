@@ -468,24 +468,26 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               </button>
             </div>
             
-            {editUser.email && (
-              <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
-                  <div className="text-xs font-bold text-[#0B1929] truncate">{editUser.email}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => resendCollaboratorAccess(editUser.email)}
-                  disabled={saving}
-                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
-                >
-                  📧 Reenviar acceso
-                </button>
-              </div>
-            )}
-
             <div className="flex flex-col gap-4">
+              {editUser.email && (
+                <div>
+                  <label className="block text-sm font-medium text-[#475569] mb-1">Correo de acceso</label>
+                  <input
+                    type="email"
+                    value={editUser.email}
+                    readOnly
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-sm text-[#0B1929] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => resendCollaboratorAccess(editUser.email)}
+                    disabled={saving}
+                    className="mt-2 w-full py-2 px-3 rounded-lg bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    📧 Reenviar correo de acceso
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-[#475569] mb-1">Nombre completo</label>
                 <input

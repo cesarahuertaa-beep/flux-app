@@ -788,20 +788,17 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       {showEditNutri && (
         <Modal title={<><Pencil size={20} className="text-[var(--brand-primary)]"/> Editar {showEditNutri.nombre}</>} onClose={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>
           {showEditNutri.email && (
-            <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
-                <div className="text-xs font-bold text-[#0B1929] truncate">{showEditNutri.email}</div>
-              </div>
+            <Field label="Correo de acceso">
+              <input className={InputClass} type="email" value={showEditNutri.email} readOnly />
               <button
                 type="button"
                 onClick={() => resendNutriAccess(showEditNutri.email)}
                 disabled={saving}
-                className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                className="mt-2 w-full py-2 px-3 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                📧 Reenviar acceso
+                📧 Reenviar correo de acceso
               </button>
-            </div>
+            </Field>
           )}
           {!showEditNutri.isSuperadmin && (
             <Field label="Tipo de perfil">
