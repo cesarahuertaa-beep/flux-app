@@ -2,59 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
 import { dbGet } from "../../lib/supabase";
 
-// Plantillas maestras predefinidas para Nutrición
-const DEFAULT_NUTRI_TEMPLATES = [
-  {
-    id: "def_nutri_1800",
-    nombre: "Déficit 1,800 kcal — Alta Proteína (5 comidas)",
-    tags: "Definición • 1800 kcal • 140g Prot",
-    isDefault: true,
-    macros: { calorias: 1800, proteina: 140, carbohidratos: 180, grasas: 55 },
-    dias: [
-      {
-        dia: "LUN|Día 1",
-        orden: 0,
-        comidas: [
-          { hora: "08:00", nombre: "Desayuno", opcion1: "3 claras de huevo + 1 huevo entero con espinacas y 2 rebanadas de pan integral tostado", calorias: 380, proteina: 28, carbohidratos: 32, grasas: 12 },
-          { hora: "11:30", nombre: "Colación 1", opcion1: "1 taza de yogurt griego sin azúcar + 1 manzana + 15g de almendras", calorias: 240, proteina: 18, carbohidratos: 25, grasas: 8 },
-          { hora: "14:30", nombre: "Comida", opcion1: "150g de pechuga de pollo a la plancha + 1 taza de arroz blanco cocido + ensalada verde con 1 cdita de aceite de oliva", calorias: 520, proteina: 42, carbohidratos: 55, grasas: 14 },
-          { hora: "17:30", nombre: "Snack Pre-entreno", opcion1: "1 scoop de proteína whey en agua + 1 plátano mediano", calorias: 220, proteina: 25, carbohidratos: 27, grasas: 2 },
-          { hora: "20:30", nombre: "Cena", opcion1: "1 lata de atún en agua con verduras mixtas al vapor y 1/3 de aguacate", calorias: 340, proteina: 32, carbohidratos: 16, grasas: 15 }
-        ]
-      },
-      {
-        dia: "MAR|Día 2",
-        orden: 1,
-        comidas: [
-          { hora: "08:00", nombre: "Desayuno", opcion1: "1 taza de avena cocida con agua + 1 scoop de proteína + canela y 1/2 taza de fresas", calorias: 390, proteina: 30, carbohidratos: 52, grasas: 6 },
-          { hora: "11:30", nombre: "Colación 1", opcion1: "2 huevos cocidos + 1 taza de pepino con limón y sal", calorias: 160, proteina: 13, carbohidratos: 4, grasas: 10 },
-          { hora: "14:30", nombre: "Comida", opcion1: "150g de filete de tilapia o salmón + 150g de camote al horno + espárragos al vapor", calorias: 480, proteina: 38, carbohidratos: 45, grasas: 12 },
-          { hora: "17:30", nombre: "Snack Pre-entreno", opcion1: "2 galletas de arroz inflado con 1 cda de crema de cacahuate", calorias: 190, proteina: 6, carbohidratos: 20, grasas: 9 },
-          { hora: "20:30", nombre: "Cena", opcion1: "120g de pechuga deshebrada con 2 tortillas de maíz y salsa verde casera", calorias: 360, proteina: 35, carbohidratos: 28, grasas: 8 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "def_nutri_2200",
-    nombre: "Mantenimiento 2,200 kcal — Balanceado (4 comidas)",
-    tags: "Mantenimiento • 2200 kcal • 160g Prot",
-    isDefault: true,
-    macros: { calorias: 2200, proteina: 160, carbohidratos: 240, grasas: 65 },
-    dias: [
-      {
-        dia: "LUN|Día 1",
-        orden: 0,
-        comidas: [
-          { hora: "08:30", nombre: "Desayuno", opcion1: "Omelette de 3 huevos enteros con champiñones, queso panela (60g) y 2 rebanadas de pan", calorias: 520, proteina: 35, carbohidratos: 36, grasas: 24 },
-          { hora: "14:00", nombre: "Comida", opcion1: "180g de carne de res magra + 1.5 tazas de pasta integral con salsa de tomate casera y brócoli", calorias: 680, proteina: 52, carbohidratos: 75, grasas: 18 },
-          { hora: "17:30", nombre: "Merienda", opcion1: "Licuado: 1 scoop de whey + 1 taza de leche descremada + 1 plátano + 20g de avena", calorias: 380, proteina: 34, carbohidratos: 48, grasas: 6 },
-          { hora: "21:00", nombre: "Cena", opcion1: "160g de pechuga de pollo con 2 tazas de ensalada mixta, 1/2 aguacate y 1 papa horneada", calorias: 540, proteina: 44, carbohidratos: 40, grasas: 20 }
-        ]
-      }
-    ]
-  }
-];
+// Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
+const DEFAULT_NUTRI_TEMPLATES = [];
 
 // Plantillas maestras predefinidas para Rutinas
 const DEFAULT_RUTINA_TEMPLATES = [
@@ -416,71 +365,103 @@ export default function TemplatesManagerModal({
           {/* TAB 1: CARGAR PLANTILLA */}
           {tab === "cargar" && (
             <div className="space-y-3">
-              <p className="text-xs text-[#6B7A8D] mb-3">
-                Selecciona una plantilla para cargarla automáticamente en el ciclo activo de este paciente:
-              </p>
-
-              {allTemplates.map((t) => {
-                const totalItems = type === "nutri" ? (t.dias || []).length : (t.rutinas || []).length;
-                const unitLabel = type === "nutri" ? "días con menú" : "rutinas";
-
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => {
-                      if (confirm(`¿Aplicar la plantilla "${t.nombre}" a este ciclo? Se importarán todos sus ${unitLabel}.`)) {
-                        onApplyTemplate(t);
-                        onClose();
-                      }
-                    }}
-                    className="p-4 rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] bg-white hover:shadow-md transition-all flex items-center justify-between gap-4 cursor-pointer group"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-[#0B1929] group-hover:text-[var(--brand-primary)] transition-colors">
-                          {t.nombre}
-                        </span>
-                        {t.isDefault ? (
-                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[var(--brand-primary)] text-[10px] font-bold">
-                            Oficial FLUX
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
-                            Tu Plantilla
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-[#6B7A8D] mt-1">{t.tags}</p>
-
-                      <div className="flex items-center gap-3 mt-2 text-[11px] font-mono text-[#6B7A8D]">
-                        <span className="font-semibold text-[#0B1929]">
-                          {totalItems} {unitLabel}
-                        </span>
-                        {type === "nutri" && t.macros?.calorias > 0 && (
-                          <span>• {t.macros.calorias} kcal</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!t.isDefault && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteTemplate(t.id, e)}
-                          title="Eliminar plantilla"
-                          className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 flex items-center justify-center transition-colors"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                      <div className="w-9 h-9 rounded-xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center group-hover:bg-[var(--brand-primary)] group-hover:text-white transition-all">
-                        <ChevronRight size={18} />
-                      </div>
-                    </div>
+              {allTemplates.length === 0 ? (
+                <div className="text-center py-10 px-4 border border-dashed border-[#CBD5E1] rounded-2xl bg-[#F8FAFC]">
+                  <Bookmark className="w-10 h-10 text-[#94A3B8] mx-auto mb-3" />
+                  <p className="text-sm font-bold text-[#0B1929]">No hay plantillas guardadas</p>
+                  <p className="text-xs text-[#6B7A8D] mt-1 max-w-sm mx-auto">
+                    Aún no has guardado plantillas para {type === "nutri" ? "nutrición" : "rutinas"}. Puedes guardar el plan actual como plantilla maestra o clonar el plan de otro paciente.
+                  </p>
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setTab("guardar")}
+                      className="px-3.5 py-2 text-xs font-bold rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      Guardar plan actual
+                    </button>
+                    {clientes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setTab("clonar")}
+                        className="px-3.5 py-2 text-xs font-bold rounded-xl bg-white border border-[#CBD5E1] text-[#0B1929] hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Users size={14} />
+                        Clonar de paciente
+                      </button>
+                    )}
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-[#6B7A8D] mb-3">
+                    Selecciona una plantilla para cargarla automáticamente en el ciclo activo de este paciente:
+                  </p>
+
+                  {allTemplates.map((t) => {
+                    const totalItems = type === "nutri" ? (t.dias || []).length : (t.rutinas || []).length;
+                    const unitLabel = type === "nutri" ? "días con menú" : "rutinas";
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => {
+                          if (confirm(`¿Aplicar la plantilla "${t.nombre}" a este ciclo? Se importarán todos sus ${unitLabel}.`)) {
+                            onApplyTemplate(t);
+                            onClose();
+                          }
+                        }}
+                        className="p-4 rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] bg-white hover:shadow-md transition-all flex items-center justify-between gap-4 cursor-pointer group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-[#0B1929] group-hover:text-[var(--brand-primary)] transition-colors">
+                              {t.nombre}
+                            </span>
+                            {t.isDefault ? (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[var(--brand-primary)] text-[10px] font-bold">
+                                Oficial FLUX
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
+                                Tu Plantilla
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-[#6B7A8D] mt-1">{t.tags}</p>
+
+                          <div className="flex items-center gap-3 mt-2 text-[11px] font-mono text-[#6B7A8D]">
+                            <span className="font-semibold text-[#0B1929]">
+                              {totalItems} {unitLabel}
+                            </span>
+                            {type === "nutri" && t.macros?.calorias > 0 && (
+                              <span>• {t.macros.calorias} kcal</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!t.isDefault && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteTemplate(t.id, e)}
+                              title="Eliminar plantilla"
+                              className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                          <div className="w-9 h-9 rounded-xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center group-hover:bg-[var(--brand-primary)] group-hover:text-white transition-all">
+                            <ChevronRight size={18} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
 
