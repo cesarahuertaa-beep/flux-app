@@ -5,75 +5,8 @@ import { dbGet } from "../../lib/supabase";
 // Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
 const DEFAULT_NUTRI_TEMPLATES = [];
 
-// Plantillas maestras predefinidas para Rutinas
-const DEFAULT_RUTINA_TEMPLATES = [
-  {
-    id: "def_rutina_ppl",
-    nombre: "Push / Pull / Legs (PPL Clásico - 3 Días)",
-    tags: "Hipertrofia • 3-6 Días • Frecuencia 2",
-    isDefault: true,
-    semanas: 4,
-    rutinas: [
-      {
-        nombre: "LUN|Push (Empuje: Pecho, Hombro, Tríceps)",
-        ejercicios: [
-          { nombre: "Press de Banca Plano con Barra", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Press Inclinado con Mancuernas", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Press Militar de Hombro", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Elevaciones Laterales", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Extensión de Tríceps en Polea", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] }
-        ]
-      },
-      {
-        nombre: "MIE|Pull (Jalón: Espalda, Bíceps)",
-        ejercicios: [
-          { nombre: "Jalón al Pecho en Polea", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Remo con Barra o Mancuerna", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Face Pulls", grupo_muscular: "Hombro", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Curl de Bíceps con Barra Z", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Curl Martillo con Mancuernas", grupo_muscular: "Brazos", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] }
-        ]
-      },
-      {
-        nombre: "VIE|Legs (Pierna y Abdomen)",
-        ejercicios: [
-          { nombre: "Sentadilla Libre con Barra", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Prensa de Piernas", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Curl Femoral Tumbado o Sentado", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Elevación de Talones (Pantorrilla)", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] }
-        ]
-      }
-    ]
-  },
-  {
-    id: "def_rutina_torso_pierna",
-    nombre: "Torso / Pierna (Upper / Lower - 4 Días)",
-    tags: "Fuerza e Hipertrofia • 4 Días",
-    isDefault: true,
-    semanas: 4,
-    rutinas: [
-      {
-        nombre: "LUN|Torso A (Pecho, Espalda, Hombro)",
-        ejercicios: [
-          { nombre: "Press de Banca Plano", grupo_muscular: "Pecho", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 6, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Remo con Barra", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Press Militar Mancuernas", grupo_muscular: "Hombro", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Jalón al Pecho", grupo_muscular: "Espalda", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] }
-        ]
-      },
-      {
-        nombre: "MAR|Pierna A (Cuádriceps, Isquios, Gemelos)",
-        ejercicios: [
-          { nombre: "Sentadilla Trasera", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 4, reps_sugeridas: 8, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Peso Muerto Rumano", grupo_muscular: "Pierna", tipo_movimiento: "Compuesto", num_series: 3, reps_sugeridas: 10, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Extensiones de Cuádriceps", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 3, reps_sugeridas: 12, peso_sugerido: null, unidad: "kg", alternativas: [] },
-          { nombre: "Elevación de Talones en Máquina", grupo_muscular: "Pierna", tipo_movimiento: "Aislamiento", num_series: 4, reps_sugeridas: 15, peso_sugerido: null, unidad: "kg", alternativas: [] }
-        ]
-      }
-    ]
-  }
-];
+// Plantillas maestras predefinidas para Rutinas (vacío para usar solo plantillas creadas o clonadas por el profesional)
+const DEFAULT_RUTINA_TEMPLATES = [];
 
 export default function TemplatesManagerModal({
   type = "nutri", // "nutri" | "rutina"
