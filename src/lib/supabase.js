@@ -323,27 +323,33 @@ export const authSignIn = async (email, password) => {
 };
 
 export const authSignUp = async (email, password, nombre) => {
-  const r = await fetch(`${SUPA_URL}/auth/v1/signup`, {
+  const redirectUrl =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? `${window.location.origin}/login`
+      : "https://flux-sport.com/login";
+
+  const r = await fetch(`${SUPA_URL}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`, {
     method: "POST",
     headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, data: { nombre } })
   });
   const d = await r.json();
-  if (!r.ok) throw new Error(d.msg || d.error_description || "Error registrando cuenta");
-  
+  if (!r.ok) throw new Error(d.msg || d.error_description || d.message || "Error registrando cuenta");
+
   if (d.session) {
-      if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
-      if (d.session.access_token) setAuthToken(d.session.access_token);
-    }
+    if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
+    if (d.session.access_token) setAuthToken(d.session.access_token);
+  }
   return d;
 };
 
 // Invitar usuario — extraData: { role, nombre, nombre_marca, color_primario }
-export const authInvite = async (email, extraData={}) => {
+export const authInvite = async (email, extraData = {}) => {
   const r = await fetch(`${SUPA_URL}/functions/v1/invite-user`, {
-    method:"POST",
-    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken || SUPA_KEY}`, "Content-Type":"application/json" },
-    body:JSON.stringify({email, ...extraData})
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, ...extraData })
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "Error al invitar usuario");
@@ -351,19 +357,163 @@ export const authInvite = async (email, extraData={}) => {
 };
 
 export const authResetPassword = async (email) => {
-  const r = await fetch(`${SUPA_URL}/auth/v1/recover`, {
-    method:"POST", headers:{apikey:SUPA_KEY,"Content-Type":"application/json"},
-    body:JSON.stringify({email, redirect_to: window.location.origin})
+  const redirectUrl =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? `${window.location.origin}/login`
+      : "https://flux-sport.com/login";
+
+  const r = await fetch(`${SUPA_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectUrl)}`, {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, redirect_to: redirectUrl })
   });
-  if (!r.ok) throw new Error("Error al enviar email de recuperación");
+  if (!r.ok) {
+    const errData = await r.json().catch(() => ({}));
+    const rawMsg = errData.msg || errData.error_description || errData.message || "";
+    if (r.status === 429 || rawMsg.toLowerCase().includes("rate limit") || rawMsg.toLowerCase().includes("security purposes")) {
+      throw new Error("Por seguridad, espera 60 segundos antes de solicitar otro enlace al mismo correo.");
+    }
+    throw new Error(rawMsg || "Error al enviar email de recuperación");
+  }
 };
 
 export const authUpdatePassword = async (token, password) => {
+  if (!token) {
+    throw new Error("La sesión de recuperación expiró. Solicita un nuevo enlace con '¿Olvidaste tu contraseña?'.");
+  }
   const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
-    method:"PUT", headers:{apikey:SUPA_KEY, Authorization:`Bearer ${token}`, "Content-Type":"application/json"},
-    body:JSON.stringify({password})
+    method: "PUT",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password })
   });
-  if (!r.ok) throw new Error("Error al actualizar contraseña");
+  if (!r.ok) {
+    const errData = await r.json().catch(() => ({}));
+    const rawMsg = errData.msg || errData.error_description || errData.message || "";
+    if (r.status === 401 || r.status === 403 || rawMsg.toLowerCase().includes("expired") || rawMsg.toLowerCase().includes("invalid")) {
+      throw new Error("El enlace ya expiró. Por favor solicita uno nuevo en '¿Olvidaste tu contraseña?'.");
+    }
+    if (rawMsg.toLowerCase().includes("same_password") || rawMsg.toLowerCase().includes("different from the old")) {
+      throw new Error("La nueva contraseña debe ser diferente a la anterior.");
+    }
+    throw new Error(rawMsg || "Error al actualizar contraseña");
+  }
+  return await r.json().catch(() => ({}));
+};
+
+/**
+ * Intercepta de forma SÍNCRONA cualquier hash/query de autenticación de Supabase
+ * (invitación, recuperación de contraseña, confirmación de correo o error de token expirado)
+ * ANTES de que React Router (HashRouter o BrowserRouter) monte o redirija.
+ */
+export const captureAuthHashSynchronously = (isAppMode = false) => {
+  if (typeof window === "undefined") return false;
+
+  const rawHash = window.location.hash || "";
+  const rawSearch = window.location.search || "";
+  const combined = `${rawHash}&${rawSearch}`;
+
+  const hasAuthCallback =
+    combined.includes("access_token=") ||
+    combined.includes("error_description=") ||
+    combined.includes("error=access_denied") ||
+    combined.includes("error=unauthorized_client") ||
+    combined.includes("error_code=otp_expired");
+
+  if (!hasAuthCallback) return false;
+
+  // Extraer parámetros incluso si hay prefijos de HashRouter como #/login#access_token=...
+  const hashQuery = rawHash
+    .replace(/^#\/[^#?]*[#?]?/, "")
+    .replace(/^#/, "");
+  const searchQuery = rawSearch.replace(/^\?/, "");
+  const fullQuery = [hashQuery, searchQuery].filter(Boolean).join("&");
+  const params = new URLSearchParams(fullQuery);
+
+  const token = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  const type = params.get("type") || "recovery";
+  const errorDesc = params.get("error_description");
+  const errorCode = params.get("error_code");
+  const errorType = params.get("error");
+
+  // 1. SIEMPRE cerrar cualquier sesión previa abierta para evitar colisión de cuentas
+  setAuthToken(null);
+  setProfileId(null);
+  saveRefreshToken(null);
+  localStorage.removeItem("flux_role");
+  localStorage.removeItem("flux_client_id");
+  localStorage.removeItem("flux_multi_roles");
+  sessionStorage.removeItem("flux_atleta_data");
+  sessionStorage.removeItem("flux_admin_tab");
+  sessionStorage.removeItem("flux_cliente_tab");
+  sessionStorage.removeItem("flux_programar_subtab");
+  sessionStorage.removeItem("flux_admin_selected_client");
+
+  // 2. Procesar token válido
+  if (token) {
+    let decodedEmail = "";
+    try {
+      const base64Url = token.split(".")[1];
+      if (base64Url) {
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        const payload = JSON.parse(jsonPayload);
+        if (payload.email) decodedEmail = payload.email;
+      }
+    } catch (e) {}
+
+    if (decodedEmail) {
+      sessionStorage.setItem("flux_login_email", decodedEmail);
+    }
+    sessionStorage.removeItem("flux_pending_auth_error");
+
+    if (type === "signup") {
+      // Confirmación de correo de usuario que ya eligió su contraseña al registrarse
+      sessionStorage.removeItem("flux_pending_auth_token");
+      sessionStorage.removeItem("flux_pending_auth_type");
+      sessionStorage.setItem(
+        "flux_pending_auth_info",
+        "¡Correo confirmado exitosamente! Ya puedes iniciar sesión con tu contraseña."
+      );
+      sessionStorage.setItem("flux_login_mode", "login");
+    } else {
+      // Invitación (type=invite) o Recuperación de contraseña (type=recovery / magiclink)
+      sessionStorage.setItem("flux_pending_auth_token", token);
+      sessionStorage.setItem("flux_pending_auth_type", type);
+      if (refreshToken) {
+        sessionStorage.setItem("flux_pending_auth_refresh", refreshToken);
+      }
+      sessionStorage.removeItem("flux_pending_auth_info");
+      sessionStorage.setItem("flux_login_mode", "set_password");
+    }
+  } else if (errorDesc || errorCode || errorType) {
+    // 3. Procesar enlace expirado o ya consumido
+    sessionStorage.removeItem("flux_pending_auth_token");
+    sessionStorage.removeItem("flux_pending_auth_type");
+    sessionStorage.removeItem("flux_pending_auth_info");
+    sessionStorage.setItem(
+      "flux_pending_auth_error",
+      "Este enlace ya expiró o ya fue utilizado (recuerda que los enlaces de correo son de un solo uso). Ingresa tu correo abajo para enviarte un enlace nuevo."
+    );
+    sessionStorage.setItem("flux_login_mode", "reset");
+  }
+
+  // 4. Limpiar la URL de inmediato sin recargar la página para que el Router abra directo en /login
+  try {
+    if (isAppMode) {
+      window.history.replaceState(null, "", window.location.pathname + "#/login");
+    } else {
+      window.history.replaceState(null, "", "/login");
+    }
+  } catch (e) {}
+
+  return true;
 };
 
 export const dbPostMinimal = (p, b) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), headers: { Prefer: "return=minimal" } });

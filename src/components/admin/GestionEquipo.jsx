@@ -1,7 +1,7 @@
-import { useBrand } from"../BrandContext";
-import { useState, useEffect, useCallback } from"react";
-import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2 } from"lucide-react";
-import { authInvite, dbGet, dbPost, dbPatch, getProfileId } from"../../lib/supabase";
+import { useBrand } from "../BrandContext";
+import { useState, useEffect, useCallback } from "react";
+import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2 } from "lucide-react";
+import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
 // Permite que un nutriólogo invite y gestione a su personal administrativo.
@@ -40,51 +40,71 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   useEffect(() => { load(); }, [load]);
 
   const invite = async () => {
-    if (!form.email || !form.nombre) {
+    const cleanEmail = (form.email || "").trim().toLowerCase();
+    const cleanNombre = (form.nombre || "").trim();
+    if (!cleanEmail || !cleanNombre) {
       setMsg("⚠️ Nombre y email son obligatorios");
       return;
     }
     setSaving(true);
     try {
       // INTERCEPTOR: Detectar si el correo ya existe
-      const existingProfiles = await dbGet(`profiles?email=eq.${form.email}`);
-      const existingClientes = await dbGet(`clientes?email=eq.${form.email}`);
+      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
       
       if (existingProfiles.length > 0 || existingClientes.length > 0) {
         setConflictUser({ 
           profile: existingProfiles[0], 
           cliente: existingClientes[0], 
-          email: form.email,
-          typedData: { nombre: form.nombre, telefono: form.telefono }
+          email: cleanEmail,
+          typedData: { nombre: cleanNombre, telefono: form.telefono }
         });
         setShowInvite(false);
         setSaving(false);
         return;
       }
 
-      const authUser = await authInvite(form.email, {
-        role:"administrativo",
-        nombre: form.nombre,
-        telefono: form.telefono
+      const targetRole = isSuperadmin ? "staff" : "administrativo";
+      const authUser = await authInvite(cleanEmail, {
+        role: targetRole,
+        nombre: cleanNombre,
+        telefono: form.telefono,
+        nutriologo_id: myId
       });
       
       // Explicitly update profile to ensure nutriologo_id is linked properly
       await dbPatch(`profiles?id=eq.${authUser.id}`, {
         nutriologo_id: myId,
-        role: isSuperadmin ?"staff" :"administrativo"
+        role: targetRole
       });
 
       setMsg(`✅ Invitación enviada — el ${isSuperadmin ? 'staff' : 'administrativo'} recibirá un email para crear su contraseña`);
       setShowInvite(false);
       setForm({ nombre:"", email:"", telefono:"" });
-      setTimeout(load, 2000);
+      setTimeout(load, 1000);
     } catch (e) { 
-      // Supabase lanza error si el usuario ya existe en auth.users pero no lo encontramos en profiles
       if (e.message?.includes("already been registered")) {
-        setMsg("❌ Este usuario ya tiene cuenta, pero está oculto en la bóveda. Búscalo en Authentication.");
+        try {
+          await authResetPassword(cleanEmail);
+          setMsg("⚠️ El correo ya existía en Auth; se le envió un enlace para configurar su contraseña.");
+        } catch (err) {
+          setMsg("❌ Este usuario ya tiene cuenta registrada.");
+        }
       } else {
         setMsg("❌ " + e.message); 
       }
+    }
+    setSaving(false);
+  };
+
+  const resendCollaboratorAccess = async (emailToSend) => {
+    if (!emailToSend) return;
+    setSaving(true);
+    try {
+      await authResetPassword(emailToSend.trim());
+      setMsg(`✅ Enlace de acceso/contraseña enviado a ${emailToSend}`);
+    } catch (e) {
+      setMsg("❌ " + e.message);
     }
     setSaving(false);
   };
@@ -94,12 +114,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     try {
       const p = conflictUser.profile;
       const c = conflictUser.cliente;
-      const targetId = p?.id || c?.id; // Usamos el ID del perfil o cliente
+      const targetId = p?.id || c?.auth_id;
       
       // Los datos finales a guardar
       const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
       const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
-      const newRole = isSuperadmin ?"staff" :"administrativo";
+      const newRole = isSuperadmin ? "staff" : "administrativo";
 
       // 1. Asegurarnos que exista en profiles y tenga el rol administrativo
       if (p) {
@@ -110,17 +130,27 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
           telefono: finalTelefono,
           activo: true
         });
+      } else if (targetId) {
+        await dbPost("profiles", {
+          id: targetId,
+          email: conflictUser.email,
+          role: newRole,
+          nutriologo_id: myId,
+          nombre: finalNombre,
+          telefono: finalTelefono,
+          activo: true
+        });
       }
 
       // 2. Si existe en clientes, actualizar su información ahí también para sincronizar
-      if (c) {
+      if (c && useNewData) {
         await dbPatch(`clientes?id=eq.${c.id}`, {
           nombre: finalNombre,
           telefono: finalTelefono
         });
       }
 
-      setMsg(`✅ Permisos otorgados exitosamente sin necesidad de registro. Al usuario le aparecerá el Selector de Roles.`);
+      setMsg(`✅ Permisos otorgados exitosamente. Al usuario le aparecerá el Selector de Roles.`);
       setConflictUser(null);
       setForm({ nombre:"", email:"", telefono:"" });
       load();
@@ -438,7 +468,22 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               </button>
             </div>
             
-            <div className="text-sm text-[#6B7A8D] mb-4 truncate">{editUser.email}</div>
+            {editUser.email && (
+              <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
+                  <div className="text-xs font-bold text-[#0B1929] truncate">{editUser.email}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => resendCollaboratorAccess(editUser.email)}
+                  disabled={saving}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                >
+                  📧 Reenviar acceso
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4">
               <div>

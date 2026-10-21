@@ -1,6 +1,6 @@
-import { useState, useEffect } from"react";
-import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from"lucide-react";
-import { dbGet, dbPatch, dbDel, authInvite } from"../../lib/supabase";
+import { useState, useEffect } from "react";
+import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
+import { dbGet, dbPatch, dbDel, authInvite, authResetPassword } from "../../lib/supabase";
 
 export default function Aprobaciones({ setMsg }) {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -22,27 +22,64 @@ export default function Aprobaciones({ setMsg }) {
   const handleApprove = async (sol) => {
     if (!window.confirm(`¿Estás seguro de aprobar a ${sol.nombre} como ${sol.tipo}?`)) return;
     try {
-      await authInvite(sol.email, { role: sol.tipo, nombre: sol.nombre });
-      await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
-      
-      // Intentar migrar los datos al perfil recién creado (esperamos 1 seg por el trigger)
-      setTimeout(async () => {
+      const cleanEmail = sol.email.trim();
+      const existingProfs = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+
+      if (existingProfs && existingProfs.length > 0) {
+        await dbPatch(`profiles?id=eq.${existingProfs[0].id}`, {
+          role: sol.tipo,
+          nombre: sol.nombre,
+          cedula: sol.cedula || "",
+          nombre_marca: sol.nombre_marca || sol.nombre,
+          mapa_url: sol.mapa_url || "",
+          activo: true
+        });
+        // Enviar enlace de acceso / contraseña por si no tenía contraseña configurada
+        try { await authResetPassword(cleanEmail); } catch (e) {}
+      } else {
         try {
-          const profs = await dbGet(`profiles?email=eq.${sol.email}`);
-          if (profs.length > 0) {
-            await dbPatch(`profiles?id=eq.${profs[0].id}`, {
-               cedula: sol.cedula ||"",
-               nombre_marca: sol.nombre_marca ||"",
-               mapa_url: sol.mapa_url ||""
+          const authUser = await authInvite(cleanEmail, {
+            role: sol.tipo,
+            nombre: sol.nombre,
+            nombre_marca: sol.nombre_marca || sol.nombre,
+            cedula: sol.cedula || "",
+            mapa_url: sol.mapa_url || ""
+          });
+          if (authUser?.id) {
+            await dbPatch(`profiles?id=eq.${authUser.id}`, {
+              role: sol.tipo,
+              nombre: sol.nombre,
+              cedula: sol.cedula || "",
+              nombre_marca: sol.nombre_marca || sol.nombre,
+              mapa_url: sol.mapa_url || "",
+              activo: true
             });
           }
-        } catch(e) {}
-      }, 1500);
+        } catch (inviteErr) {
+          if (inviteErr.message?.includes("already been registered") || inviteErr.message?.includes("already exists")) {
+            const profsRetry = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+            if (profsRetry.length > 0) {
+              await dbPatch(`profiles?id=eq.${profsRetry[0].id}`, {
+                role: sol.tipo,
+                nombre: sol.nombre,
+                cedula: sol.cedula || "",
+                nombre_marca: sol.nombre_marca || sol.nombre,
+                mapa_url: sol.mapa_url || "",
+                activo: true
+              });
+            }
+            try { await authResetPassword(cleanEmail); } catch (e) {}
+          } else {
+            throw inviteErr;
+          }
+        }
+      }
 
-      setMsg("✅ Solicitud aprobada y correo enviado.");
+      await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
+      setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
       loadData();
     } catch (e) {
-      setMsg("❌ Error al aprobar:" + e.message);
+      setMsg("❌ Error al aprobar: " + e.message);
     }
   };
 
@@ -53,17 +90,17 @@ export default function Aprobaciones({ setMsg }) {
       setMsg("⚠️ Solicitud rechazada.");
       loadData();
     } catch (e) {
-      setMsg("❌ Error al rechazar:" + e.message);
+      setMsg("❌ Error al rechazar: " + e.message);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm(`¿Estás seguro de eliminar este registro permanentemente?`)) return;
     try {
-      await dbDel("solicitudes_profesionales", id);
+      await dbDel(`solicitudes_profesionales?id=eq.${id}`);
       loadData();
     } catch (e) {
-      setMsg("❌ Error al eliminar:" + e.message);
+      setMsg("❌ Error al eliminar: " + e.message);
     }
   };
 

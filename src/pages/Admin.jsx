@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
-import { authInvite, dbGet, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany } from "../lib/supabase";
+import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 
@@ -475,64 +475,101 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [conflictClient, setConflictClient] = useState(null);
 
   const createClient = async () => {
-    if (!newClient.email||!newClient.nombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
+    const cleanEmail = (newClient.email || "").trim().toLowerCase();
+    const cleanNombre = (newClient.nombre || "").trim();
+    if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
       // INTERCEPTOR: Detectar si el correo ya existe
-      const existingProfiles = await dbGet(`profiles?email=eq.${newClient.email}`);
-      const existingClientes = await dbGet(`clientes?email=eq.${newClient.email}`);
-      
+      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+
+      // 1. Verificar si ya es paciente de ESTE mismo nutriólogo (evitar duplicados)
+      const alreadyMyClient = existingClientes.find(c => c.nutriologo_id === myId);
+      if (alreadyMyClient) {
+        if (!alreadyMyClient.activo) {
+          await dbPatch(`clientes?id=eq.${alreadyMyClient.id}`, { activo: true, deactivated_at: null });
+        }
+        try {
+          await authResetPassword(cleanEmail);
+          setMsg("✅ Este paciente ya estaba en tu lista. Se le acaba de reenviar un nuevo enlace de acceso a su correo.");
+        } catch (resetErr) {
+          setMsg("✅ El paciente ya está en tu lista. (" + resetErr.message + ")");
+        }
+        setShowNewClient(false);
+        setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+        await loadClientes();
+        setSaving(false);
+        return;
+      }
+
       if (existingProfiles.length > 0 || existingClientes.length > 0) {
         const profile = existingProfiles[0];
-        
+
         // Bloqueo / Consentimiento: Si es un colega o rol superior
-        if (profile && ["nutriologo","nutriologo_estudiante","administrativo","staff","superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
           const me = await dbGet(`profiles?id=eq.${myId}`);
           const myName = me[0]?.nombre || 'Nutriólogo';
-          
+
           await dbPost("solicitudes_entrenamiento", {
             from_nutriologo_id: myId,
             from_nutriologo_nombre: myName,
-            to_email: newClient.email,
-            estado:"pendiente"
+            to_email: cleanEmail,
+            estado: "pendiente"
           });
 
           setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
-          setShowNewClient(false); 
-          setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+          setShowNewClient(false);
+          setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
           setSaving(false);
           return;
         }
 
-        // Es un paciente de alguien más o un usuario normal
-        setConflictClient({ 
-          profile: existingProfiles[0], 
-          cliente: existingClientes[0], 
-          email: newClient.email,
-          typedData: { nombre: newClient.nombre, telefono: newClient.telefono, objetivo: newClient.objetivo }
+        // Es un paciente de alguien más o un Atleta Independiente
+        setConflictClient({
+          profile: existingProfiles[0],
+          cliente: existingClientes[0],
+          email: cleanEmail,
+          typedData: { nombre: cleanNombre, telefono: newClient.telefono, objetivo: newClient.objetivo }
         });
         setShowNewClient(false);
         setSaving(false);
         return;
       }
 
-      const authUser = await authInvite(newClient.email, { role:"cliente", nombre: newClient.nombre });
+      const authUser = await authInvite(cleanEmail, { role: "cliente", nombre: cleanNombre });
       await dbPost("clientes", {
-        nombre: newClient.nombre,
+        nombre: cleanNombre,
         objetivo: newClient.objetivo,
-        email: newClient.email,
+        email: cleanEmail,
         telefono: newClient.telefono,
         auth_id: authUser.id,
         activo: true,
         nutriologo_id: myId
       });
-      setShowNewClient(false); setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
-      await loadClientes(); setMsg("✅ Cliente creado - se le envió email de invitación");
-    } catch(e) { 
-      if (e.message?.includes("already been registered")) {
-        setMsg("❌ Este usuario ya tiene cuenta (oculta). Verifica en Authentication.");
+      setShowNewClient(false); setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+      await loadClientes(); setMsg("✅ Paciente creado — se le envió correo de invitación para crear su contraseña.");
+    } catch (e) {
+      if (e.message?.includes("already been registered") || e.message?.includes("already exists")) {
+        try {
+          const cleanEmailFallback = newClient.email.trim().toLowerCase();
+          await dbPost("clientes", {
+            nombre: newClient.nombre.trim(),
+            objetivo: newClient.objetivo,
+            email: cleanEmailFallback,
+            telefono: newClient.telefono,
+            activo: true,
+            nutriologo_id: myId
+          });
+          await authResetPassword(cleanEmailFallback).catch(() => {});
+          setShowNewClient(false); setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+          await loadClientes();
+          setMsg("✅ Paciente vinculado y se le envió un nuevo enlace a su correo para configurar su contraseña.");
+        } catch (fallbackErr) {
+          setMsg("❌ " + fallbackErr.message);
+        }
       } else {
-        setMsg("❌"+e.message); 
+        setMsg("❌ " + e.message);
       }
     }
     setSaving(false);
@@ -543,20 +580,23 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     try {
       const p = conflictClient.profile;
       const c = conflictClient.cliente;
-      
+
       const finalNombre = useNewData ? conflictClient.typedData.nombre : (c?.nombre || p?.nombre || conflictClient.typedData.nombre);
       const finalTelefono = useNewData ? conflictClient.typedData.telefono : (c?.telefono || p?.telefono || conflictClient.typedData.telefono);
 
-      // Creamos una nueva fila de cliente en la tabla clientes
-      await dbPost("clientes", {
-        nombre: finalNombre,
-        objetivo: conflictClient.typedData.objetivo ||"Mejorar salud",
-        email: conflictClient.email,
-        telefono: finalTelefono,
-        auth_id: p?.id || c?.auth_id,
-        activo: true,
-        nutriologo_id: myId
-      });
+      // Evitar duplicado si ya existiera bajo este nutriólogo
+      const existingCheck = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictClient.email)}&nutriologo_id=eq.${myId}`);
+      if (existingCheck.length === 0) {
+        await dbPost("clientes", {
+          nombre: finalNombre,
+          objetivo: conflictClient.typedData.objetivo || "Mejorar salud",
+          email: conflictClient.email,
+          telefono: finalTelefono,
+          auth_id: p?.id || c?.auth_id,
+          activo: true,
+          nutriologo_id: myId
+        });
+      }
 
       // Sincronizar datos si eligió actualizarlos
       if (useNewData) {
@@ -565,10 +605,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       setMsg(`✅ Paciente vinculado exitosamente a tu lista.`);
       setConflictClient(null);
-      setNewClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+      setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
       loadClientes();
     } catch (e) {
-      setMsg("❌ Error al vincular paciente:" + e.message);
+      setMsg("❌ Error al vincular paciente: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const resendClientAccess = async (emailToSend) => {
+    if (!emailToSend) return;
+    setSaving(true);
+    try {
+      await authResetPassword(emailToSend.trim());
+      setMsg(`✅ Enlace para crear/restablecer contraseña enviado a ${emailToSend}`);
+    } catch (e) {
+      setMsg(`❌ ${e.message}`);
     }
     setSaving(false);
   };
@@ -583,8 +635,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       }
       await dbPatch(`clientes?id=eq.${c.id}`, payload);
       await loadClientes();
-      setMsg(`✓ Cliente ${!c.activo ?"activado" :"desactivado"}`);
-    } catch(e) { setMsg("❌ Error:"+e.message); }
+      setMsg(`✓ Cliente ${!c.activo ? "activado" : "desactivado"}`);
+    } catch (e) { setMsg("❌ Error:" + e.message); }
   };
 
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
@@ -593,9 +645,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useEffect(() => {
     if (editClient) {
       setEditClientForm({
-        nombre: editClient.nombre ||"",
-        telefono: editClient.telefono ||"",
-        objetivo: editClient.objetivo ||""
+        nombre: editClient.nombre || "",
+        telefono: editClient.telefono || "",
+        objetivo: editClient.objetivo || ""
       });
     }
   }, [editClient]);
@@ -607,7 +659,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setMsg("✓ Cliente actualizado");
       setEditClient(null);
       loadClientes();
-    } catch(e) { setMsg("❌" + e.message); }
+    } catch (e) { setMsg("❌" + e.message); }
     setSaving(false);
   };
 
@@ -1293,6 +1345,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {editClient.email && (
+                <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
+                    <div className="text-xs font-bold text-[#0B1929] truncate">{editClient.email}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => resendClientAccess(editClient.email)}
+                    disabled={saving}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    📧 Reenviar acceso
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre completo</label>
                 <input value={editClientForm.nombre} onChange={e=>setEditClientForm(p=>({...p,nombre:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbPost, dbPatch } from "../../lib/supabase";
+import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbPost, dbPatch } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 
@@ -147,18 +147,32 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   };
 
   const inviteNutri = async () => {
-    if (!formNutri.email || !formNutri.nombre) { setMsg("❌ Nombre y email requeridos"); return; }
+    const cleanEmail = (formNutri.email || "").trim().toLowerCase();
+    const cleanNombre = (formNutri.nombre || "").trim();
+    if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email requeridos"); return; }
     setSaving(true);
     try {
-      const existingProfiles = await dbGet(`profiles?email=eq.${formNutri.email}`);
-      const existingClientes = await dbGet(`clientes?email=eq.${formNutri.email}`);
-      
+      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+
+      if (existingProfiles.length > 0 && ["nutriologo", "nutriologo_estudiante"].includes(existingProfiles[0].role)) {
+        try {
+          await authResetPassword(cleanEmail);
+          setMsg("✅ Este nutriólogo ya está registrado. Se le reenvió un enlace de acceso a su correo.");
+        } catch (err) {
+          setMsg("✅ Este nutriólogo ya está registrado. (" + err.message + ")");
+        }
+        setShowInviteNutri(false);
+        setSaving(false);
+        return;
+      }
+
       if (existingProfiles.length > 0 || existingClientes.length > 0) {
-        setConflictUser({ 
-          profile: existingProfiles[0], 
-          cliente: existingClientes[0], 
-          email: formNutri.email,
-          typedData: { ...formNutri }
+        setConflictUser({
+          profile: existingProfiles[0],
+          cliente: existingClientes[0],
+          email: cleanEmail,
+          typedData: { ...formNutri, email: cleanEmail, nombre: cleanNombre }
         });
         setConflictType("nutri");
         setShowInviteNutri(false);
@@ -167,10 +181,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       }
 
       const targetRole = formNutri.role || "nutriologo";
-      const authUser = await authInvite(formNutri.email, { role: targetRole, nombre: formNutri.nombre });
+      const authUser = await authInvite(cleanEmail, { role: targetRole, nombre: cleanNombre, nombre_marca: formNutri.nombre_marca });
       await updateProfile(authUser.id, {
         role: targetRole,
-        nombre: formNutri.nombre,
+        nombre: cleanNombre,
         telefono: formNutri.telefono,
         nombre_marca: formNutri.nombre_marca,
         logo_url: formNutri.logo_url,
@@ -181,10 +195,30 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setShowInviteNutri(false);
       setFormNutri({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
       loadNutriologos();
-      setMsg("✅ Invitación enviada");
-    } catch(e) {
-      if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
-      else setMsg("❌ " + e.message);
+      setMsg("✅ Invitación enviada al nutriólogo");
+    } catch (e) {
+      if (e.message?.includes("already been registered")) {
+        try {
+          await authResetPassword(cleanEmail);
+          setMsg("⚠️ El correo ya existía en Auth; se le envió un enlace para configurar su contraseña.");
+        } catch (err) {
+          setMsg("❌ Este usuario ya tiene cuenta registrada.");
+        }
+      } else {
+        setMsg("❌ " + e.message);
+      }
+    }
+    setSaving(false);
+  };
+
+  const resendNutriAccess = async (emailToSend) => {
+    if (!emailToSend) return;
+    setSaving(true);
+    try {
+      await authResetPassword(emailToSend.trim());
+      setMsg(`✅ Enlace de acceso/contraseña enviado a ${emailToSend}`);
+    } catch (e) {
+      setMsg("❌ " + e.message);
     }
     setSaving(false);
   };
@@ -199,7 +233,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       setShowEditNutri(null);
       loadNutriologos();
       setMsg("✅ Cambios guardados");
-    } catch(e) {
+    } catch (e) {
       setMsg("❌ " + e.message);
     }
     setSaving(false);
@@ -210,7 +244,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       await updateProfile(n.id, { activo: n.activo === false ? true : false });
       loadNutriologos();
       setMsg(`✅ Nutriólogo ${n.activo === false ? "activado" : "suspendido"}`);
-    } catch(e) {
+    } catch (e) {
       setMsg("❌ Error: " + e.message);
     }
   };
@@ -249,36 +283,57 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   };
 
   const createClient = async () => {
-    if (!formClient.email || !formClient.nombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
+    const cleanEmail = (formClient.email || "").trim().toLowerCase();
+    const cleanNombre = (formClient.nombre || "").trim();
+    if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
-      const existingProfiles = await dbGet(`profiles?email=eq.${formClient.email}`);
-      const existingClientes = await dbGet(`clientes?email=eq.${formClient.email}`);
-      
+      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+
+      // Evitar duplicado si ya es paciente de este mismo directorio corporativo
+      const alreadyMine = existingClientes.find(c => c.nutriologo_id === resolvedOwnerId);
+      if (alreadyMine) {
+        if (!alreadyMine.activo) {
+          await dbPatch(`clientes?id=eq.${alreadyMine.id}`, { activo: true, deactivated_at: null });
+        }
+        try {
+          await authResetPassword(cleanEmail);
+          setMsg("✅ Este paciente ya estaba en tu lista. Se le reenvió un enlace de acceso a su correo.");
+        } catch (err) {
+          setMsg("✅ Este paciente ya está en tu lista. (" + err.message + ")");
+        }
+        setShowNewClient(false);
+        setFormClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+        await loadClientes();
+        setSaving(false);
+        return;
+      }
+
       if (existingProfiles.length > 0 || existingClientes.length > 0) {
         const profile = existingProfiles[0];
 
         // Consentimiento si es colega o rol superior (solo para cuando lo invitan como paciente)
-        if (profile && ["nutriologo","nutriologo_estudiante","administrativo","staff","superadmin"].includes(profile.role)) {
+        if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
           await dbPost("solicitudes_entrenamiento", {
             from_nutriologo_id: myId,
             from_nutriologo_nombre: myName || 'Superadmin',
-            to_email: formClient.email,
-            estado:"pendiente"
+            to_email: cleanEmail,
+            estado: "pendiente"
           });
 
           setMsg("✅ Solicitud de consentimiento enviada. El colega deberá aceptar desde su perfil.");
-          setShowNewClient(false); 
-          setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
+          setShowNewClient(false);
+          setFormClient({ nombre: "", email: "", objetivo: "", telefono: "" });
           setSaving(false);
           return;
         }
 
-        setConflictUser({ 
-          profile: existingProfiles[0], 
-          cliente: existingClientes[0], 
-          email: formClient.email,
-          typedData: { ...formClient }
+        setConflictUser({
+          profile: existingProfiles[0],
+          cliente: existingClientes[0],
+          email: cleanEmail,
+          typedData: { ...formClient, email: cleanEmail, nombre: cleanNombre }
         });
         setConflictType("cliente");
         setShowNewClient(false);
@@ -286,23 +341,43 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         return;
       }
 
-      const authUser = await authInvite(formClient.email, { role:"cliente", nombre: formClient.nombre });
+      const authUser = await authInvite(cleanEmail, { role: "cliente", nombre: cleanNombre });
       await dbPost("clientes", {
-        nombre: formClient.nombre,
+        nombre: cleanNombre,
         objetivo: formClient.objetivo,
-        email: formClient.email,
+        email: cleanEmail,
         telefono: formClient.telefono,
         nutriologo_id: resolvedOwnerId,
         auth_id: authUser.id,
         activo: true
       });
-      setShowNewClient(false); 
-      setFormClient({ nombre:"", email:"", objetivo:"", telefono:"" });
-      await loadClientes(); 
-      setMsg("✅ Paciente creado (asignado a ti)");
-    } catch(e) { 
-      if (e.message?.includes("already been registered")) setMsg("❌ Este usuario ya tiene cuenta (oculta).");
-      else setMsg("❌"+e.message); 
+      setShowNewClient(false);
+      setFormClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+      await loadClientes();
+      setMsg("✅ Paciente creado y correo de invitación enviado");
+    } catch (e) {
+      if (e.message?.includes("already been registered")) {
+        try {
+          const cleanEmailFallback = formClient.email.trim().toLowerCase();
+          await dbPost("clientes", {
+            nombre: formClient.nombre.trim(),
+            objetivo: formClient.objetivo,
+            email: cleanEmailFallback,
+            telefono: formClient.telefono,
+            nutriologo_id: resolvedOwnerId,
+            activo: true
+          });
+          await authResetPassword(cleanEmailFallback).catch(() => {});
+          setShowNewClient(false);
+          setFormClient({ nombre: "", email: "", objetivo: "", telefono: "" });
+          await loadClientes();
+          setMsg("✅ Paciente vinculado y se le envió un enlace para configurar su contraseña.");
+        } catch (fallbackErr) {
+          setMsg("❌ " + fallbackErr.message);
+        }
+      } else {
+        setMsg("❌ " + e.message);
+      }
     }
     setSaving(false);
   };
@@ -313,7 +388,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       const p = conflictUser.profile;
       const c = conflictUser.cliente;
       const targetId = p?.id || c?.auth_id;
-      
+
       const finalNombre = useNewData ? conflictUser.typedData.nombre : (p?.nombre || c?.nombre || conflictUser.typedData.nombre);
       const finalTelefono = useNewData ? conflictUser.typedData.telefono : (p?.telefono || c?.telefono || conflictUser.typedData.telefono);
 
@@ -330,19 +405,35 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             creado_por_nombre: myName,
             activo: true
           });
+        } else if (targetId) {
+          await dbPost("profiles", {
+            id: targetId,
+            email: conflictUser.email,
+            role: targetRole,
+            nombre: finalNombre,
+            telefono: finalTelefono,
+            nombre_marca: conflictUser.typedData.nombre_marca || finalNombre,
+            logo_url: conflictUser.typedData.logo_url || "",
+            color_primario: conflictUser.typedData.color_primario || "#1A6FD4",
+            creado_por_nombre: myName,
+            activo: true
+          });
         }
         if (useNewData && c) await dbPatch(`clientes?id=eq.${c.id}`, { nombre: finalNombre, telefono: finalTelefono });
         loadNutriologos();
       } else {
-        await dbPost("clientes", {
-          nombre: finalNombre,
-          objetivo: conflictUser.typedData.objetivo || "Mejorar salud",
-          email: conflictUser.email,
-          telefono: finalTelefono,
-          nutriologo_id: resolvedOwnerId,
-          auth_id: targetId,
-          activo: true
-        });
+        const existingCheck = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictUser.email)}&nutriologo_id=eq.${resolvedOwnerId}`);
+        if (existingCheck.length === 0) {
+          await dbPost("clientes", {
+            nombre: finalNombre,
+            objetivo: conflictUser.typedData.objetivo || "Mejorar salud",
+            email: conflictUser.email,
+            telefono: finalTelefono,
+            nutriologo_id: resolvedOwnerId,
+            auth_id: targetId,
+            activo: true
+          });
+        }
         if (useNewData && p) await dbPatch(`profiles?id=eq.${p.id}`, { nombre: finalNombre, telefono: finalTelefono });
         loadClientes();
       }
@@ -696,6 +787,22 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
       {showEditNutri && (
         <Modal title={<><Pencil size={20} className="text-[var(--brand-primary)]"/> Editar {showEditNutri.nombre}</>} onClose={() => { setShowEditNutri(null); setShowConfirmDeleteNutri(false); setConfirmDeleteNutriText(""); }}>
+          {showEditNutri.email && (
+            <div className="bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold text-[#6B7A8D] uppercase tracking-wider">Correo de acceso</div>
+                <div className="text-xs font-bold text-[#0B1929] truncate">{showEditNutri.email}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => resendNutriAccess(showEditNutri.email)}
+                disabled={saving}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-[var(--brand-primary)] text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+              >
+                📧 Reenviar acceso
+              </button>
+            </div>
+          )}
           {!showEditNutri.isSuperadmin && (
             <Field label="Tipo de perfil">
               <select className={InputClass} value={editFormNutri.role || "nutriologo"} onChange={e => setEditFormNutri(p => ({ ...p, role: e.target.value }))}>

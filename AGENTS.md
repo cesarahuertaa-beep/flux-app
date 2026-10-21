@@ -38,3 +38,25 @@ Este archivo define los estándares de sincronización, arquitectura y despliegu
 
 ## 4. Entorno de Ejecución (Windows)
 En Windows PowerShell, las políticas de ejecución pueden restringir scripts directos `.ps1`. Ejecutar los comandos a través de `cmd.exe /c "..."` para garantizar compatibilidad total.
+
+---
+
+## 5. Procedimiento de Limpieza y Organización (Aprendido)
+
+**Estructura**: `flux-app/` = código fuente (va a GitHub). `Desktop\FLUX-Release\` = instaladores compilados (NO va a GitHub; salida definida en `package.json > build.directories.output`).
+
+### Reglas de limpieza del repo (`flux-app/`)
+1. **Verificar antes de borrar**: buscar referencias del archivo en código, `package.json`, `vercel.json`, `capacitor.config.json` y configs de Android. Solo borrar si no hay ninguna (ojo: `main.js` ≠ `main.jsx`).
+2. **Se puede borrar**: scripts temporales sueltos en la raíz (`fix_*`, `check*`, `test*`, `patch.py`, `script.js`, etc.), logs (`*.log`, `db_out.txt`), APKs de prueba, `release/` y `assets/` huérfanos en la raíz, assets de plantilla Vite (`react.svg`, `vite.svg`), duplicados (`electron/main.js`; el activo es `main.cjs`).
+3. **Mover, no borrar**: los `.sql` sueltos van a `supabase/scripts/`.
+4. **NO tocar**: `src/`, `android/`, `public/` (incluye `FLUX.apk`, usado por `Landing.jsx` y `AppUpdater.jsx`), `supabase/functions`, `.env*`, llaves de firma.
+5. **Después de limpiar**: `npm run build` (0 errores) → `npx cap sync android` → commit → push. Usar `cmd.exe /c` para npm y mensajes de commit entre comillas simples en PowerShell.
+6. **Versiones**: guardar versiones con tags de git (`vX.Y.Z-playstore`), no con copias de archivos. Nunca subir archivos de >100 MB a GitHub.
+
+### Reglas de limpieza de `FLUX-Release/`
+- **Conservar**: la versión actual y la anterior (`.aab`, `.apk`, `FLUX Setup X.Y.Z.exe` + `.blockmap`), `latest.yml` (lo usa el auto-updater de Electron), `flux-upload-key.jks`, iconos/gráficos de Play Store y carpeta de capturas.
+- **Borrar**: instaladores `.exe`/`.apk`/`.aab` de versiones anteriores a la previa, `win-unpacked/`, `builder-debug.yml`.
+- Al publicar la v(N+1), borrar la v(N-1).
+
+### Llaves de firma (CRÍTICO)
+- `flux-upload-key.jks` y `android/keystore.properties` (alias `flux-upload`) **no están en git**. Mantener respaldo fuera de la PC (Drive/USB). Nunca subirlos a GitHub ni mostrarlos en chats públicos.

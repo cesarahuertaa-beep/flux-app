@@ -1,25 +1,37 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from"react";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from"lucide-react";
-import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal } from"../lib/supabase";
+import { useState, useEffect } from "react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User } from "lucide-react";
+import { authSignIn, authResetPassword, authUpdatePassword, setAuthToken, setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal, dbPatch, captureAuthHashSynchronously } from "../lib/supabase";
 
 export default function Login({ onLogin }) {
-  const [mode, setMode] = useState(() => sessionStorage.getItem('flux_login_mode') || "login");
+  const [accessToken, setAccessToken] = useState(() => sessionStorage.getItem('flux_pending_auth_token') || "");
+  const [mode, setMode] = useState(() => {
+    if (sessionStorage.getItem('flux_pending_auth_token')) return "set_password";
+    if (sessionStorage.getItem('flux_pending_auth_error')) return "reset";
+    const saved = sessionStorage.getItem('flux_login_mode') || "login";
+    if (saved === "set_password" && !sessionStorage.getItem('flux_pending_auth_token')) return "login";
+    return saved;
+  });
   const [nombre, setNombre] = useState(() => sessionStorage.getItem('flux_login_nombre') || "");
   const [email, setEmail] = useState(() => sessionStorage.getItem('flux_login_email') || "");
-  const [pass, setPass]           = useState("");
-  const [newPass, setNewPass]     = useState("");
+  const [pass, setPass] = useState("");
+  const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [signupType, setSignupType] = useState(() => sessionStorage.getItem('flux_signupType') || "civil");
   const [nombreMarca, setNombreMarca] = useState("");
   const [mapaUrl, setMapaUrl] = useState("");
   const [cedula, setCedula] = useState(() => sessionStorage.getItem('flux_login_cedula') || "");
-  const [err, setErr]             = useState("");
-  const [info, setInfo]           = useState("");
+  const [err, setErr] = useState(() => sessionStorage.getItem('flux_pending_auth_error') || "");
+  const [info, setInfo] = useState(() => sessionStorage.getItem('flux_pending_auth_info') || "");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [accessToken, setAccessToken] = useState("");
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    return !(
+      sessionStorage.getItem('flux_pending_auth_token') ||
+      sessionStorage.getItem('flux_pending_auth_error') ||
+      sessionStorage.getItem('flux_pending_auth_info')
+    );
+  });
   const [fadeSplash, setFadeSplash] = useState(false);
   const [avisoAceptado, setAvisoAceptado] = useState(() => sessionStorage.getItem('flux_aviso') === 'true');
 
@@ -32,41 +44,58 @@ export default function Login({ onLogin }) {
     sessionStorage.setItem('flux_aviso', avisoAceptado ? 'true' : 'false');
   }, [mode, signupType, nombre, email, cedula, avisoAceptado]);
 
-
   useEffect(() => {
+    const syncPendingAuthState = () => {
+      captureAuthHashSynchronously();
+      const pendingToken = sessionStorage.getItem('flux_pending_auth_token');
+      const pendingError = sessionStorage.getItem('flux_pending_auth_error');
+      const pendingInfo = sessionStorage.getItem('flux_pending_auth_info');
+      const pendingEmail = sessionStorage.getItem('flux_login_email');
+
+      if (pendingEmail) setEmail(pendingEmail);
+
+      if (pendingToken) {
+        setAccessToken(pendingToken);
+        setMode("set_password");
+        setErr("");
+        setInfo("Crea tu contraseña para activar y acceder a tu cuenta.");
+        setShowSplash(false);
+      } else if (pendingError) {
+        sessionStorage.removeItem('flux_pending_auth_error');
+        setErr(pendingError);
+        setMode("reset");
+        setShowSplash(false);
+      } else if (pendingInfo) {
+        sessionStorage.removeItem('flux_pending_auth_info');
+        setInfo(pendingInfo);
+        setMode("login");
+        setShowSplash(false);
+      }
+    };
+
+    syncPendingAuthState();
+    window.addEventListener("hashchange", syncPendingAuthState);
+
     const timer1 = setTimeout(() => setFadeSplash(true), 2000);
     const timer2 = setTimeout(() => setShowSplash(false), 2800);
-    const hash = window.location.hash;
-    if (hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.replace("#","?"));
-      const token = params.get("access_token");
-      const type  = params.get("type");
-      if (token && (type==="invite"||type==="recovery"||type==="signup")) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          if (payload.email) setEmail(payload.email);
-        } catch(e) {}
-        setTimeout(() => {
-          setAccessToken(token); 
-          setMode("set_password");
-        }, 0);
-        window.history.replaceState(null,"",window.location.pathname);
-      }
-    } else if (hash.includes("error_description")) {
-      const params = new URLSearchParams(hash.replace("#","?"));
-      const desc = params.get("error_description");
-      if (desc) {
-        setErr("El enlace es inválido o ya expiró (recuerda que los enlaces de invitación son de un solo uso).");
-        window.history.replaceState(null,"",window.location.pathname);
-      }
-    }
-    return () => { clearTimeout(timer1); clearTimeout(timer2); };
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener("hashchange", syncPendingAuthState);
+    };
   }, []);
 
-  const submit = async () => {
+  const submit = async (overrideEmail, overridePass) => {
+    const loginEmail = (typeof overrideEmail === "string" ? overrideEmail : email).trim();
+    const loginPass = typeof overridePass === "string" ? overridePass : pass;
+    if (!loginEmail || !loginPass) {
+      setErr("Ingresa tu correo y contraseña");
+      return;
+    }
     setLoading(true); setErr(""); setInfo("");
     try {
-      const data = await authSignIn(email.trim(), pass);
+      const data = await authSignIn(loginEmail, loginPass);
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
 
@@ -75,109 +104,127 @@ export default function Login({ onLogin }) {
       // 1. Fetch from profiles
       const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
       let adminRole = profiles.length ? profiles[0].role : null;
-      if (adminRole ==="administrativo" && profiles[0].nutriologo_id) {
+      if (adminRole === "administrativo" && profiles[0].nutriologo_id) {
         const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-        if (boss.length && boss[0].role ==="superadmin") {
-          adminRole ="staff";
+        if (boss.length && boss[0].role === "superadmin") {
+          adminRole = "staff";
         }
       }
 
-      if (adminRole && ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(adminRole)) {
-        if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(adminRole) && profiles[0].activo === false) {
-           // Suspended admin account (ignore or we could error, but we skip to allow client login if any)
+      if (adminRole && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole)) {
+        if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
+          // Suspended admin account (skip to allow client login if any)
         } else {
-           availableRoles.push({
-             role: adminRole,
-             data: profiles[0]
-           });
+          availableRoles.push({
+            role: adminRole,
+            data: profiles[0]
+          });
         }
       }
 
       // 2. Fetch from clientes
-      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(email.trim())}`);
+      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(loginEmail)}`);
       for (const clientData of clientRows) {
+        if (!clientData.auth_id && data.user?.id) {
+          try {
+            await dbPatch(`clientes?id=eq.${clientData.id}`, { auth_id: data.user.id });
+            clientData.auth_id = data.user.id;
+          } catch (e) {}
+        }
         if (clientData.nutriologo_id) {
           const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre,nombre_marca`);
           if (nut.length) {
             if (nut[0].activo === false) {
               continue; // Suspended clinic, skip this client profile
             }
-            clientData.nombre_clinica = nut[0].nombre_marca ||"Consultorio";
+            clientData.nombre_clinica = nut[0].nombre_marca || "Consultorio";
             clientData.nutriologo_nombre = nut[0].nombre;
           }
         }
         availableRoles.push({
-          role:"cliente",
+          role: "cliente",
           data: clientData
         });
       }
 
       // 3. AUTO-CREACIÓN DE ATLETA INDEPENDIENTE
       // Todos los usuarios deben tener una cuenta de Atleta Independiente, EXCEPTO Nutriólogos y Superadmin
-      const isNutriOrSuper = adminRole && ["nutriologo","nutriologo_estudiante","superadmin"].includes(adminRole);
-      
+      const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
+
       if (!isNutriOrSuper) {
         const hasIndep = clientRows.some(c => c.nutriologo_id === null);
         if (!hasIndep) {
           try {
-             const nombreMeta = data.user?.user_metadata?.nombre || (profiles.length ? profiles[0].nombre : email.trim().split("@")[0]);
-             const newClient = await dbPostMinimal("clientes", {
-                nombre: nombreMeta,
-                email: email.trim(),
-                auth_id: data.user.id,
-                activo: true,
-                nutriologo_id: null
-             });
-             const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}&nutriologo_id=is.null`);
-             if (checkAgain.length > 0) {
-                 availableRoles.push({ role: 'cliente', data: checkAgain[0] });
-             }
-          } catch(e) {
-             console.error("No se pudo auto-crear Atleta Independiente", e);
+            const nombreMeta = data.user?.user_metadata?.nombre || (profiles.length ? profiles[0].nombre : loginEmail.split("@")[0]);
+            await dbPostMinimal("clientes", {
+              nombre: nombreMeta,
+              email: loginEmail,
+              auth_id: data.user.id,
+              activo: true,
+              nutriologo_id: null
+            });
+            const checkAgain = await dbGet(`clientes?auth_id=eq.${data.user.id}&nutriologo_id=is.null`);
+            if (checkAgain.length > 0) {
+              availableRoles.push({ role: 'cliente', data: checkAgain[0] });
+            }
+          } catch (e) {
+            console.error("No se pudo auto-crear Atleta Independiente", e);
           }
         }
       }
 
       if (availableRoles.length === 0) {
-          setAuthToken(null); setProfileId(null);
-          setErr("ERR_DIAG_1: Perfil intruso detectado o no se pudo crear cuenta de atleta.");
-          setLoading(false); return;
+        setAuthToken(null); setProfileId(null);
+        setErr("No se encontró un perfil activo asociado a esta cuenta.");
+        setLoading(false); return;
       }
 
       let multiRoles = availableRoles.map(r => ({ role: r.role, data: r.data }));
-      
-      // Si ES nutriólogo o superadmin, NO le mostramos el rol"cliente" en el switch normal (usan Modo Atleta)
+
+      // Si ES nutriólogo o superadmin, NO le mostramos el rol "cliente" en el switch normal (usan Modo Atleta)
       if (isNutriOrSuper) {
         multiRoles = multiRoles.filter(r => r.role !== 'cliente');
       }
 
       if (multiRoles.length === 0) {
         setAuthToken(null); setProfileId(null);
-        setErr("ERR_DIAG_2: No se encontro tu cuenta activa.");
+        setErr("Tu cuenta se encuentra suspendida o sin perfiles activos.");
         setLoading(false); return;
       }
 
       const sorted = multiRoles.sort((a, b) => a.role === 'cliente' ? 1 : -1);
       const firstRole = sorted[0];
-      // Un"civil" es un cliente sin nutriólogo asignado
+      // Un "civil" es un cliente sin nutriólogo asignado
       const isCivilUser = firstRole.role === 'cliente' && !firstRole.data?.nutriologo_id;
       const finalRole = isCivilUser ? 'civil' : firstRole.role;
 
       if (sorted.length === 1) {
         onLogin({ role: finalRole, data: firstRole.data, token: data.access_token, profileId: data.user.id });
       } else {
-        onLogin({ 
-          role: finalRole, 
-          data: firstRole.data, 
-          token: data.access_token, 
+        onLogin({
+          role: finalRole,
+          data: firstRole.data,
+          token: data.access_token,
           profileId: data.user.id,
-          multiRoles: sorted 
+          multiRoles: sorted
         });
       }
-} catch(e) { setAuthToken(null); setProfileId(null); setErr("ERR_CATCH:" + e.message); setLoading(false); }
+    } catch (e) {
+      setAuthToken(null);
+      setProfileId(null);
+      const msg = e.message || "Error al iniciar sesión";
+      if (msg.toLowerCase().includes("invalid login credentials")) {
+        setErr("Correo o contraseña incorrectos. Si fuiste invitado recientemente, usa el enlace de tu correo o '¿Olvidaste tu contraseña?'.");
+      } else if (msg.toLowerCase().includes("email not confirmed")) {
+        setErr("Tu correo aún no ha sido confirmado. Revisa tu bandeja de entrada o solicita restablecer tu contraseña.");
+      } else {
+        setErr(msg);
+      }
+      setLoading(false);
+    }
   };
 
-  
+
   const submitProRequest = async () => {
     if (!avisoAceptado) {
       setErr("Debes aceptar el Aviso de Privacidad para continuar.");
@@ -198,10 +245,10 @@ export default function Login({ onLogin }) {
         mapa_url: mapaUrl.trim(),
         estado: 'pendiente'
       });
-      setInfo("Solicitud enviada con éxito. Nuestro equipo la revisará pronto.");
+      setInfo("Solicitud enviada con éxito. Nuestro equipo la revisará pronto y recibirás un correo de invitación.");
       setMode("login");
     } catch (e) {
-      setErr("Error al enviar solicitud:" + e.message);
+      setErr("Error al enviar solicitud: " + e.message);
     }
     setLoading(false);
   };
@@ -221,58 +268,111 @@ export default function Login({ onLogin }) {
     }
     setLoading(true); setErr(""); setInfo("");
     try {
-      const data = await authSignUp(email.trim(), pass, nombre);
-      const userId = data?.user?.id || data?.id;
-        
-        
+      const data = await authSignUp(email.trim(), pass, nombre.trim());
+      const userObj = data?.user || data;
+      const userId = userObj?.id;
+      const identities = userObj?.identities;
 
-        if (!userId) {
-          throw new Error("No se pudo crear el usuario en Auth." + JSON.stringify(data));
-        }
-      
-      try {
-          await dbPostMinimal("clientes", { 
-            nombre: nombre.trim(), 
-            email: email.trim(), 
-            auth_id: userId, 
-            activo: true, 
-            nutriologo_id: null 
+      // En Supabase, si el correo ya existe (ej. fue invitado por un nutriólogo o ya se registró),
+      // devuelve identities: [] por privacidad.
+      if (Array.isArray(identities) && identities.length === 0) {
+        setInfo("Este correo ya tiene una cuenta o invitación registrada. Si no tienes tu contraseña, haz clic en '¿Olvidaste tu contraseña?' para crear una nueva.");
+        setMode("login");
+        setLoading(false);
+        return;
+      }
+
+      if (!userId) {
+        throw new Error("No se pudo crear el usuario en Auth.");
+      }
+
+      // Si Supabase devolvió sesión directa (sin confirmación por correo)
+      if (data?.session?.access_token) {
+        try {
+          await dbPostMinimal("clientes", {
+            nombre: nombre.trim(),
+            email: email.trim(),
+            auth_id: userId,
+            activo: true,
+            nutriologo_id: null
           });
-          await submit(); // Intenta iniciar sesión si no hay confirmación de email
-        } catch (postErr) {
-          // Si la BD rebota el insert (por ejemplo, si"Confirmar Email" está activado en Supabase 
-          // y el usuario aún no tiene Token), no es un error crítico. 
-          // El perfil se creará cuando inicien sesión por primera vez.
-          console.log("Perfil no insertado aún (posible Confirmación de Email pendiente):", postErr.message);
-          setInfo("¡Cuenta creada! Por favor revisa tu bandeja de correo para confirmar tu email e iniciar sesión.");
-          setMode("login");
-        }
-    } catch(e) {
-      setErr("ERR_CATCH:" + e.message);
+        } catch (e) {}
+        await submit(email.trim(), pass);
+        return;
+      }
+
+      // Cuando la confirmación de email está activa, intentamos crear el registro y notificamos al usuario
+      try {
+        await dbPostMinimal("clientes", {
+          nombre: nombre.trim(),
+          email: email.trim(),
+          auth_id: userId,
+          activo: true,
+          nutriologo_id: null
+        });
+      } catch (postErr) {
+        // El perfil de Atleta Independiente se auto-creará en el primer inicio de sesión tras confirmar correo
+      }
+      setPass("");
+      setInfo("¡Cuenta creada! Revisa tu bandeja de entrada (y carpeta de Spam) para confirmar tu correo e iniciar sesión.");
+      setMode("login");
+      setLoading(false);
+    } catch (e) {
+      const msg = e.message || "Error al crear cuenta";
+      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already exists")) {
+        setErr("Este correo ya está registrado. Inicia sesión o usa '¿Olvidaste tu contraseña?'.");
+        setMode("login");
+      } else {
+        setErr(msg);
+      }
       setLoading(false);
     }
   };
 
   const sendReset = async () => {
-    if (!email) { setErr("Escribe tu email"); return; }
-    setLoading(true); setErr("");
+    if (!email || !email.trim()) { setErr("Escribe tu correo electrónico"); return; }
+    setLoading(true); setErr(""); setInfo("");
     try {
       await authResetPassword(email.trim());
-      setInfo("Revisa tu email para restablecer tu contraseña.");
+      setInfo("Te enviamos un enlace a tu correo para crear o restablecer tu contraseña. Revisa también tu carpeta de Spam.");
       setMode("login");
-    } catch(e) { setErr("ERR_CATCH:" + e.message); }
+    } catch (e) {
+      setErr(e.message || "Error al enviar correo de recuperación");
+    }
     setLoading(false);
   };
 
   const setPassword = async () => {
-    if (!newPass || newPass.length < 6) { setErr("Mínimo 6 caracteres"); return; }
+    if (!newPass || newPass.length < 6) { setErr("La contraseña debe tener mínimo 6 caracteres"); return; }
     if (newPass !== confirmPass) { setErr("Las contraseñas no coinciden"); return; }
-    setLoading(true); setErr("");
+    const tokenToUse = accessToken || sessionStorage.getItem('flux_pending_auth_token');
+    if (!tokenToUse) {
+      setErr("Tu sesión de enlace expiró. Solicita un nuevo enlace en '¿Olvidaste tu contraseña?'.");
+      setMode("reset");
+      return;
+    }
+    setLoading(true); setErr(""); setInfo("");
     try {
-      await authUpdatePassword(accessToken, newPass);
-      setInfo("Contraseña establecida. Ya puedes entrar.");
+      const updatedUser = await authUpdatePassword(tokenToUse, newPass);
+      const userEmail = (email || updatedUser?.email || sessionStorage.getItem('flux_login_email') || "").trim();
+
+      sessionStorage.removeItem('flux_pending_auth_token');
+      sessionStorage.removeItem('flux_pending_auth_type');
+      sessionStorage.removeItem('flux_pending_auth_refresh');
+      setAccessToken("");
+
+      if (userEmail) {
+        setEmail(userEmail);
+        setPass(newPass);
+        await submit(userEmail, newPass);
+        return;
+      }
+
+      setInfo("¡Contraseña establecida con éxito! Ya puedes iniciar sesión.");
       setMode("login");
-    } catch(e) { setErr("ERR_CATCH:" + e.message); }
+    } catch (e) {
+      setErr(e.message || "Error al guardar la contraseña");
+    }
     setLoading(false);
   };
 
@@ -524,16 +624,17 @@ export default function Login({ onLogin }) {
               </div>
               <input
                 value={email} onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && sendReset()}
                 placeholder="tu@email.com" type="email"
                 className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-3 w-full outline-none transition-all text-sm"
               />
             </div>
           </div>
           <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ?"ENVIANDO…" :"ENVIAR INSTRUCCIONES"}
+            {loading ?"ENVIANDO…" :"ENVIAR ENLACE A MI CORREO"}
           </button>
           <div className="text-center">
-            <button onClick={() => { setMode("login"); setErr(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
+            <button onClick={() => { setMode("login"); setErr(""); setInfo(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
               Volver al login
             </button>
           </div>
@@ -541,6 +642,15 @@ export default function Login({ onLogin }) {
 
         {/* ── SET PASSWORD FORM ── */}
         {mode ==="set_password" && <>
+          {email && (
+            <div className="mb-4 bg-[#F0F4FA] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 text-xs text-[#0B1929]">
+              <Mail size={15} className="text-[var(--brand-primary)] shrink-0" />
+              <div className="truncate">
+                <span className="text-[#6B7A8D] mr-1">Cuenta:</span>
+                <span className="font-semibold">{email}</span>
+              </div>
+            </div>
+          )}
           <div className="mb-4">
             <div className="text-[11px] text-[#6B7A8D] mb-2 font-semibold uppercase tracking-[1px]">Nueva contraseña</div>
             <div className="relative">
@@ -573,9 +683,25 @@ export default function Login({ onLogin }) {
               </button>
             </div>
           </div>
-          <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
-            {loading ?"GUARDANDO…" :"ESTABLECER CONTRASEÑA"}
+          <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+            {loading ?"GUARDANDO…" :"ESTABLECER CONTRASEÑA Y ENTRAR"}
           </button>
+          <div className="text-center">
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('flux_pending_auth_token');
+                sessionStorage.removeItem('flux_pending_auth_type');
+                sessionStorage.removeItem('flux_pending_auth_refresh');
+                setAccessToken("");
+                setMode("login");
+                setErr("");
+                setInfo("");
+              }}
+              className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]"
+            >
+              Volver al login
+            </button>
+          </div>
         </>}
 
         {/* Footer */}

@@ -43,22 +43,22 @@ serve(async (req) => {
       .eq("id", caller.id)
       .single();
 
-    const allowedRoles = ["superadmin", "admin", "nutriologo"];
+    const allowedRoles = ["superadmin", "admin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"];
     if (!callerProfile || !allowedRoles.includes(callerProfile.role)) {
       throw new Error("No tienes permisos para invitar usuarios");
     }
 
     // ── Procesar la invitación ──
-    const { email, role, nombre, nombre_marca, color_primario, telefono, nutriologo_id } = await req.json();
+    const { email, role, nombre, nombre_marca, color_primario, telefono, nutriologo_id, cedula, mapa_url } = await req.json();
 
     if (!email) throw new Error("Email requerido");
 
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { role, nombre, nombre_marca, color_primario },
-      redirectTo: "https://flux-sport.com",
+      redirectTo: "https://flux-sport.com/login",
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message || JSON.stringify(error));
 
     // Ya creado en auth.users, ahora forzamos la creación/actualización del perfil.
     // Usamos upsert para que si el trigger lo insertó, solo lo actualice.
@@ -73,10 +73,10 @@ serve(async (req) => {
         color_primario: color_primario,
         activo: true,
       };
-      // Si viene telefono, incluirlo
       if (telefono) profileData.telefono = telefono;
-      // Si viene nutriologo_id (para administrativos), incluirlo
       if (nutriologo_id) profileData.nutriologo_id = nutriologo_id;
+      if (cedula) profileData.cedula = cedula;
+      if (mapa_url) profileData.mapa_url = mapa_url;
 
       const { error: profileError } = await supabase.from('profiles').upsert(profileData);
 

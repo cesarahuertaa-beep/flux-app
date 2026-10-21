@@ -85,8 +85,8 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           });
                   }
 
-        if (p.email && !isTeam) {
-          const reqs = await dbGet(`solicitudes_entrenamiento?to_email=eq.${p.email}&estado=eq.pendiente`);
+        if (resolvedEmail && !isTeam) {
+          const reqs = await dbGet(`solicitudes_entrenamiento?to_email=ilike.${encodeURIComponent(resolvedEmail)}&estado=eq.pendiente`);
           setSolicitudes(reqs);
         }
       }

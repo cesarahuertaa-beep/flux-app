@@ -1,10 +1,27 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
+
+const detectIsAppMode = () => {
+  if (typeof window === "undefined") return false;
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true ||
+    window.location.search.includes("pwa=true");
+  return (
+    window.location.protocol === "file:" ||
+    window.location.protocol === "app:" ||
+    Capacitor.isNativePlatform() ||
+    isStandalone
+  );
+};
+
+// Interceptar cualquier token de invitación / recuperación ANTES de montar el Router
+captureAuthHashSynchronously(detectIsAppMode());
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -42,6 +59,9 @@ const clearSessionMeta = () => {
 };
 
 export default function App() {
+  // Asegurar intercepción también en cada render inicial por si cambió el hash
+  captureAuthHashSynchronously(detectIsAppMode());
+
   const [session,    setSession]    = useState(null);
   const [atletaData, setAtletaData] = useState(() => {
     try {
@@ -58,18 +78,27 @@ export default function App() {
   const [restoring,  setRestoring]  = useState(true);
 
   useEffect(() => {
-    if (window.location.hash.includes("access_token") || window.location.hash.includes("error=unauthorized_client") || window.location.hash.includes("error_description")) {
-      setAuthToken(null);
-      setProfileId(null);
-      saveRefreshToken(null);
-      clearSessionMeta();
-      if (window.location.pathname !=="/login") {
-        window.location.href ="/login" + window.location.hash;
-        return;
+    const handleHashChange = () => {
+      if (captureAuthHashSynchronously(detectIsAppMode())) {
+        setSession(null);
+        setAtletaData(null);
+        setRestoring(false);
       }
-    }
+    };
+    window.addEventListener("hashchange", handleHashChange);
 
     const restore = async () => {
+      // Si hay un flujo pendiente de invitación, recuperación o error de correo, NO restaurar sesión previa
+      if (
+        sessionStorage.getItem("flux_pending_auth_token") ||
+        sessionStorage.getItem("flux_pending_auth_error") ||
+        sessionStorage.getItem("flux_pending_auth_info")
+      ) {
+        clearSessionMeta();
+        setRestoring(false);
+        return;
+      }
+
       const token = restoreSession();
       const profileId = restoreProfileId();
       const savedRole = localStorage.getItem("flux_role");
@@ -177,7 +206,10 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     syncQueue(dbUpsert);
 
-    return () => window.removeEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener("hashchange", handleHashChange);
+    };
   }, []);
 
   const handleLogin = (s) => {
