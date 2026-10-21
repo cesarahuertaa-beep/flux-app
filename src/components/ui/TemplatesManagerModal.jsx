@@ -225,75 +225,60 @@ export default function TemplatesManagerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
-        <div className="p-6 border-b border-[#F0F4FA] flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm">
-              {type === "nutri" ? <Utensils size={22} /> : <Dumbbell size={22} />}
+        <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm shrink-0">
+              {type === "nutri" ? <Utensils size={20} /> : <Dumbbell size={20} />}
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
-                Biblioteca de Plantillas Maestro
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-bold text-[#0B1929] leading-tight" style={{ fontFamily: "DM Sans" }}>
+                Plantillas Maestro
               </h2>
-              <p className="text-xs text-[#6B7A8D] mt-0.5">
-                {type === "nutri" ? "Menús semanales completos listos para aplicar" : "Programas completos de entrenamiento"}
+              <p className="text-[11px] sm:text-xs text-[#6B7A8D] mt-0.5 leading-snug">
+                {type === "nutri" ? "Menús semanales listos para aplicar" : "Programas completos de entrenamiento"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* ── Tabs Navigation ── */}
-        <div className="px-6 pt-3 pb-0 bg-[#F8FAFC] border-b border-[#E2E8F0] flex gap-2 shrink-0">
-          <button
-            onClick={() => setTab("cargar")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-              tab === "cargar"
-                ? "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)] shadow-xs"
-                : "text-[#6B7A8D] border-transparent hover:text-[#0B1929]"
-            }`}
-          >
-            <Bookmark size={15} />
-            <span>Plantillas ({allTemplates.length})</span>
-          </button>
-
-          <button
-            onClick={() => setTab("guardar")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-              tab === "guardar"
-                ? "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)] shadow-xs"
-                : "text-[#6B7A8D] border-transparent hover:text-[#0B1929]"
-            }`}
-          >
-            <Plus size={15} />
-            <span>Guardar Actual como Plantilla</span>
-          </button>
-
-          {clientes.length > 0 && (
-            <button
-              onClick={() => setTab("clonar")}
-              className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-                tab === "clonar"
-                  ? "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)] shadow-xs"
-                  : "text-[#6B7A8D] border-transparent hover:text-[#0B1929]"
-              }`}
-            >
-              <Users size={15} />
-              <span>Clonar de Otro Paciente</span>
-            </button>
-          )}
+        <div className="px-2 sm:px-6 pt-2 sm:pt-3 pb-0 bg-[#F8FAFC] border-b border-[#E2E8F0] flex gap-1 sm:gap-2 shrink-0">
+          {[
+            { id: "cargar", icon: Bookmark, short: `Plantillas (${allTemplates.length})`, long: `Plantillas (${allTemplates.length})`, show: true },
+            { id: "guardar", icon: Plus, short: "Guardar", long: "Guardar Actual como Plantilla", show: true },
+            { id: "clonar", icon: Users, short: "Clonar", long: "Clonar de Otro Paciente", show: clientes.length > 0 },
+          ].filter(t => t.show).map(t => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 sm:flex-none px-2 sm:px-4 py-2.5 text-[11px] sm:text-xs font-bold rounded-t-xl transition-all border-b-2 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap ${
+                  tab === t.id
+                    ? "bg-white text-[var(--brand-primary)] border-[var(--brand-primary)] shadow-xs"
+                    : "text-[#6B7A8D] border-transparent hover:text-[#0B1929]"
+                }`}
+              >
+                <Icon size={14} className="shrink-0" />
+                <span className="sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.long}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ── Tab Content ── */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 overscroll-contain">
           
           {/* TAB 1: CARGAR PLANTILLA */}
           {tab === "cargar" && (
@@ -345,7 +330,7 @@ export default function TemplatesManagerModal({
                             onClose();
                           }
                         }}
-                        className="p-4 rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] bg-white hover:shadow-md transition-all flex items-center justify-between gap-4 cursor-pointer group"
+                        className="p-3 sm:p-4 rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] bg-white hover:shadow-md transition-all flex items-center justify-between gap-2 sm:gap-4 cursor-pointer group"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -523,13 +508,13 @@ export default function TemplatesManagerModal({
         </div>
 
         {/* ── Modal Footer ── */}
-        <div className="p-4 bg-gray-50 border-t border-[#E2E8F0] flex items-center justify-between shrink-0">
-          <p className="text-xs text-[#6B7A8D]">
+        <div className="px-4 py-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gray-50 border-t border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0">
+          <p className="hidden sm:block text-xs text-[#6B7A8D]">
             ✨ Las plantillas te ahorran tiempo al reutilizar tus mejores programas.
           </p>
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
           >
             Cerrar
           </button>
