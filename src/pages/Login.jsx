@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, User,
-  Dumbbell, Apple, TrendingUp, ShoppingBag, ShieldCheck, ArrowLeft
+  Dumbbell, Apple, TrendingUp, ShoppingBag, ShieldCheck, ArrowLeft, Flame
 } from "lucide-react";
 import {
   authSignIn, authResetPassword, authUpdatePassword, setAuthToken,
@@ -74,10 +74,10 @@ export default function Login({ onLogin }) {
   const [avisoAceptado, setAvisoAceptado] = useState(() => sessionStorage.getItem('flux_aviso') === 'true');
   const [nutriPool, setNutriPool] = useState([]);
 
-  // Sincronizar color de barras del sistema en Android y PWA según la pantalla activa
+  // Sincronizar color de barras del sistema en Android y PWA en blanco con iconos oscuros
   useEffect(() => {
-    const color = showSplash ? "#FFFFFF" : "#060E1A";
-    const darkIcons = Boolean(showSplash);
+    const color = "#FFFFFF";
+    const darkIcons = true;
     if (typeof document !== "undefined") {
       const metaTheme = document.querySelector('meta[name="theme-color"]');
       if (metaTheme) metaTheme.setAttribute("content", color);
@@ -462,124 +462,105 @@ export default function Login({ onLogin }) {
     setLoading(false);
   };
 
-  // Posiciones estilo Disney+ para las 5 tarjetas superiores (centro protagonista, laterales escalonados)
+  // Tarjetas superiores con solo logos de especialistas (centro protagonista, laterales escalonados)
   const cardSlotStyles = [
-    "w-[64px] h-[92px] sm:w-[78px] sm:h-[110px] opacity-75 scale-95 -mr-1.5 z-10 border-white/15",
-    "w-[72px] h-[104px] sm:w-[88px] sm:h-[124px] opacity-90 scale-95 -mr-1 z-20 border-sky-400/30",
-    "w-[92px] h-[132px] sm:w-[110px] sm:h-[154px] opacity-100 scale-100 z-30 border-sky-400/70 shadow-[0_0_25px_rgba(56,189,248,0.28)]",
-    "w-[72px] h-[104px] sm:w-[88px] sm:h-[124px] opacity-90 scale-95 -ml-1 z-20 border-sky-400/30",
-    "w-[64px] h-[92px] sm:w-[78px] sm:h-[110px] opacity-75 scale-95 -ml-1.5 z-10 border-white/15",
+    "w-[56px] h-[72px] sm:w-[68px] sm:h-[84px] opacity-75 scale-95 -mr-1 z-10 border-[#E2E8F0]",
+    "w-[66px] h-[82px] sm:w-[78px] sm:h-[96px] opacity-90 scale-95 -mr-0.5 z-20 border-[#CBD5E1]",
+    "w-[78px] h-[96px] sm:w-[92px] sm:h-[112px] opacity-100 scale-100 z-30 border-[var(--brand-primary)]/40 shadow-md shadow-blue-500/10 ring-2 ring-[var(--brand-primary)]/10",
+    "w-[66px] h-[82px] sm:w-[78px] sm:h-[96px] opacity-90 scale-95 -ml-0.5 z-20 border-[#CBD5E1]",
+    "w-[56px] h-[72px] sm:w-[68px] sm:h-[84px] opacity-75 scale-95 -ml-1 z-10 border-[#E2E8F0]",
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#061224] via-[#0B1D36] to-[#060E1A] flex flex-col justify-between relative overflow-hidden font-['Inter',sans-serif] text-white select-none">
-      {/* Resplandor ambiental estilo Disney+ con colores FLUX */}
-      <div className="pointer-events-none absolute top-[-10%] left-1/2 -translate-x-1/2 w-[520px] h-[420px] rounded-full bg-[#1A6FD4]/25 blur-[110px]" />
-      <div className="pointer-events-none absolute bottom-[15%] left-1/2 -translate-x-1/2 w-[380px] h-[280px] rounded-full bg-sky-500/10 blur-[95px]" />
-
+    <div className="h-[100dvh] max-h-[100dvh] bg-[#F8FAFC] flex flex-col justify-between relative overflow-hidden font-['Inter',sans-serif] text-[#0B1929] select-none">
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
         <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[280px] h-auto" />
+          <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[260px] h-auto" />
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
-          MODO 1: PANTALLA DE BIENVENIDA ESTILO DISNEY+ (HERO SHOWCASE)
+          MODO 1: PANTALLA DE BIENVENIDA (HERO SHOWCASE)
          ══════════════════════════════════════════════════════════════════ */}
       {mode === "welcome" ? (
-        <div className="flex-1 flex flex-col justify-between w-full max-w-[460px] mx-auto px-6 pt-8 pb-6 relative z-10 animate-in">
+        <div className="h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in">
           
-          {/* 1. Escaparate Superior de 5 Nutriólogos / Especialistas en rotación */}
-          <div className="flex flex-col items-center mt-2">
-            <div className="flex items-center justify-center w-full py-2">
+          {/* 1. Escaparate Superior: Solo logos de los 5 nutriólogos en rotación */}
+          <div className="flex flex-col items-center">
+            <div className="flex items-center justify-center w-full py-1">
               {showcaseCards.map((card, idx) => (
                 <div
                   key={card.id || idx}
-                  className={`${cardSlotStyles[idx]} rounded-2xl border bg-gradient-to-b from-[#13294B] to-[#091526] p-2 flex flex-col items-center justify-between relative overflow-hidden transition-all duration-500`}
+                  className={`${cardSlotStyles[idx]} rounded-2xl border bg-white p-2.5 flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-sm`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#060E1A] via-transparent to-transparent opacity-80 pointer-events-none" />
-                  <div className="w-full flex-1 flex items-center justify-center p-1">
-                    <img
-                      src={card.logo_url || "/flux_logo.jpeg"}
-                      alt={card.name}
-                      onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
-                      className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl object-cover bg-white shadow-md border border-white/20"
-                    />
-                  </div>
-                  <div className="relative z-10 w-full text-center pb-0.5">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-white truncate px-1 leading-tight">
-                      {card.name}
-                    </p>
-                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded-full text-[7px] font-semibold uppercase tracking-wider bg-white/10 text-sky-300 border border-sky-400/20">
-                      {card.badge || "Especialista"}
-                    </span>
-                  </div>
+                  <img
+                    src={card.logo_url || "/flux_logo.jpeg"}
+                    alt="Logo especialista"
+                    onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
+                    className="w-full h-full object-contain rounded-xl"
+                  />
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-sky-300/70 tracking-widest uppercase mt-2 font-medium">
-              Especialistas destacados de la semana
-            </p>
           </div>
 
-          {/* 2. Bloque Central: Logo FLUX + Slogan Principal + Pilares + KEEP GOING */}
-          <div className="flex flex-col items-center text-center my-auto py-4">
-            <div className="relative mb-4">
-              <div className="absolute -inset-3 rounded-3xl bg-sky-400/20 blur-xl" />
+          {/* 2. Bloque Central: Logo FLUX + Marca Oficial + Slogan Principal + Pilares */}
+          <div className="flex flex-col items-center text-center my-auto py-2">
+            <div className="relative mb-3">
               <img
                 src="/flux_logo.jpeg"
                 alt="FLUX"
-                className="relative w-20 h-20 rounded-2xl object-cover shadow-2xl border border-white/20 bg-white"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-sm border border-[#E2E8F0] bg-white"
               />
             </div>
 
-            <div className="tracking-[4px] text-xs font-extrabold text-sky-400 uppercase mb-1 font-['Space_Grotesk',sans-serif]">
-              FLUX HEALTH SYSTEM
+            <div className="tracking-[3px] text-[11px] sm:text-xs font-bold text-[var(--brand-primary)] uppercase mb-1 font-['Space_Grotesk',sans-serif]">
+              FLUX SPORT SUPPLEMENTS
             </div>
 
-            <h1 className="text-[22px] sm:text-[25px] font-extrabold text-white leading-snug max-w-[340px] mt-1" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            <h1 className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug max-w-[280px] sm:max-w-[320px] mx-auto" style={{ fontFamily: "DM Sans, sans-serif" }}>
               Tu nutrición clínica y entrenamiento de alto rendimiento, en un mismo lugar.
             </h1>
 
-            {/* Barra de íconos / pilares estilo Disney + Pixar + Marvel */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 mt-5 px-2 text-[10px] font-bold tracking-wider uppercase text-slate-300">
-              <span className="flex items-center gap-1 text-sky-300">
-                <Apple size={12} className="text-sky-400" /> Nutrición
+            {/* Barra de pilares FLUX */}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-3.5 px-2 text-[10px] font-bold tracking-wider uppercase text-[#6B7A8D]">
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <Apple size={12} className="text-[var(--brand-primary)]" /> Nutrición
               </span>
-              <span className="text-slate-600">+</span>
-              <span className="flex items-center gap-1 text-sky-300">
-                <Dumbbell size={12} className="text-sky-400" /> Rutinas
+              <span className="text-[#CBD5E1]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <Dumbbell size={12} className="text-[var(--brand-primary)]" /> Rutinas
               </span>
-              <span className="text-slate-600">+</span>
-              <span className="flex items-center gap-1 text-sky-300">
-                <TrendingUp size={12} className="text-sky-400" /> Progreso
+              <span className="text-[#CBD5E1]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <TrendingUp size={12} className="text-[var(--brand-primary)]" /> Progreso
               </span>
-              <span className="text-slate-600">+</span>
-              <span className="flex items-center gap-1 text-sky-300">
-                <ShoppingBag size={12} className="text-sky-400" /> Store
+              <span className="text-[#CBD5E1]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <ShoppingBag size={12} className="text-[var(--brand-primary)]" /> Store
               </span>
             </div>
           </div>
 
-          {/* 3. Bloque Inferior: Botón COMENZAR + Subtítulo Keep Going + Barra INICIAR SESIÓN */}
+          {/* 3. Bloque Inferior: Botón COMENZAR + Subtítulo KEEP GOING + INICIAR SESIÓN */}
           <div className="w-full flex flex-col items-center">
             <button
               onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
-              className="w-full py-4 rounded-xl bg-white text-[#061224] font-extrabold text-sm tracking-[2px] uppercase shadow-[0_8px_30px_rgba(255,255,255,0.18)] hover:bg-sky-50 active:scale-[0.99] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
+              className="w-full py-3.5 rounded-xl bg-[var(--brand-primary)] hover:bg-blue-600 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-blue-500/25 active:scale-[0.99] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
             >
               COMENZAR
             </button>
 
-            <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold tracking-[2.5px] uppercase text-sky-300/90 font-['Space_Grotesk',sans-serif]">
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold tracking-[2.5px] uppercase text-[#6B7A8D] font-['Space_Grotesk',sans-serif]">
               <span>KEEP GOING</span>
-              <span>💪</span>
+              <Flame size={13} className="text-[var(--brand-primary)]" />
             </div>
 
-            <div className="w-full border-t border-white/10 mt-5 pt-4 text-center">
+            <div className="w-full border-t border-[#E2E8F0] mt-3.5 pt-3 text-center">
               <button
                 onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
-                className="w-full py-2 text-xs font-bold tracking-[2px] uppercase text-white/90 hover:text-sky-300 transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
+                className="w-full py-1.5 text-xs font-bold tracking-[2px] uppercase text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
               >
                 INICIAR SESIÓN
               </button>
@@ -590,8 +571,8 @@ export default function Login({ onLogin }) {
         /* ══════════════════════════════════════════════════════════════════
             MODO 2: FORMULARIOS (LOGIN, REGISTRO, RECUPERACIÓN)
            ══════════════════════════════════════════════════════════════════ */
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative z-10">
-          <div className="animate-in w-full max-w-[420px] px-7 sm:px-9 pt-7 pb-8 bg-white text-[#0B1929] rounded-3xl border border-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.45)] relative">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 relative z-10 overflow-y-auto max-h-[100dvh]">
+          <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-6 pb-6 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto">
             
             {/* Botón superior para regresar a la pantalla de Bienvenida */}
             <div className="flex items-center justify-between mb-4">
@@ -922,8 +903,9 @@ export default function Login({ onLogin }) {
             </>}
 
             {/* Footer */}
-            <div className="mt-6 text-center text-[10px] text-[#6B7A8D] tracking-[2px] uppercase font-['Space_Grotesk',sans-serif]">
-              KEEP GOING 💪
+            <div className="mt-5 flex items-center justify-center gap-1.5 text-[10px] text-[#6B7A8D] tracking-[2px] uppercase font-['Space_Grotesk',sans-serif]">
+              <span>KEEP GOING</span>
+              <Flame size={12} className="text-[var(--brand-primary)]" />
             </div>
           </div>
         </div>

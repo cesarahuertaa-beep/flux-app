@@ -14,6 +14,20 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            Window window = getWindow();
+            window.setStatusBarColor(Color.WHITE);
+            window.setNavigationBarColor(Color.WHITE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.setNavigationBarContrastEnforced(false);
+            }
+            View decorView = window.getDecorView();
+            WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
+            if (controller != null) {
+                controller.setAppearanceLightStatusBars(true);
+                controller.setAppearanceLightNavigationBars(true);
+            }
+        } catch (Exception ignored) {}
         if (this.bridge != null && this.bridge.getWebView() != null) {
             this.bridge.getWebView().addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
         }
