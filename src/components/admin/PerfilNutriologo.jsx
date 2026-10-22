@@ -158,7 +158,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
   return (
-    <div className="w-full bg-[#F7F9FC] flex flex-col">
+    <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* Header estandarizado */}
       <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">

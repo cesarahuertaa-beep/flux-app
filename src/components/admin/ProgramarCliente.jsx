@@ -1000,7 +1000,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   }
 
   return (
-    <div className="pb-[100px]">
+    <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente ── */}
       
         {/* Cabecera Civil Premium / Mi Plan */}

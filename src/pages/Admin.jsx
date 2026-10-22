@@ -35,7 +35,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 };
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
-  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929]">
+  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
       <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0 pr-12 md:pr-8">
         <div>
@@ -902,7 +902,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           />
         </Suspense>
       ) : tab ==="clientes" && (
-        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+        <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
           {/* Header */}
           <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
             {/* Cabecera superior: Título */}
@@ -1187,7 +1187,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (
-        <div className={tab === "programar" ? "block" : "hidden"}>
+        <div className={tab === "programar" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Asignador de Dietas y Rutinas" subtitle="Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente">
             <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
           </SubComponentWrapper>
@@ -1195,7 +1195,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && role !== "staff" && (tab === "equipo" || visitedTabs.has("equipo")) && (
-        <div className={tab === "equipo" ? "block" : "hidden"}>
+        <div className={tab === "equipo" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
             <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/>
           </SubComponentWrapper>
@@ -1203,7 +1203,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "staff" && (tab === "agenda" || visitedTabs.has("agenda")) && (
-        <div className={tab === "agenda" ? "block" : "hidden"}>
+        <div className={tab === "agenda" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
             <AgendaAdmin setMsg={setMsg} profileId={myId}/>
           </SubComponentWrapper>
@@ -1211,7 +1211,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(isSuperadmin || role === "staff") && (tab === "aprobaciones" || visitedTabs.has("aprobaciones")) && (
-        <div className={tab === "aprobaciones" ? "block" : "hidden"}>
+        <div className={tab === "aprobaciones" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Aprobaciones" subtitle="Solicitudes de registro y verificación de especialistas">
             <Aprobaciones setMsg={setMsg} />
           </SubComponentWrapper>
@@ -1219,7 +1219,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (tab === "membresia" || visitedTabs.has("membresia")) && (
-        <div className={tab === "membresia" ? "block" : "hidden"}>
+        <div className={tab === "membresia" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mi Membresía" subtitle="Consulta el estado de tu suscripción y sube tus comprobantes de pago">
             <MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
           </SubComponentWrapper>
@@ -1227,7 +1227,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {isSuperadmin && (tab === "pagos" || visitedTabs.has("pagos")) && (
-        <div className={tab === "pagos" ? "block" : "hidden"}>
+        <div className={tab === "pagos" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Auditoría Financiera" subtitle="Control de pagos, tarifas vigentes y comisiones de colaboradores">
             <ControlPagos setMsg={setMsg} />
           </SubComponentWrapper>
@@ -1235,7 +1235,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(role === "staff" || role === "administrativo") && (tab === "comisiones" || visitedTabs.has("comisiones")) && (
-        <div className={tab === "comisiones" ? "block" : "hidden"}>
+        <div className={tab === "comisiones" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mis Comisiones" subtitle="Resumen de tus comisiones generadas y estado de pago">
             <MisComisiones myId={myId} setMsg={setMsg} />
           </SubComponentWrapper>

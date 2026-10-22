@@ -157,7 +157,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           - Mobile:   ocupa todo el ancho, deja padding-bottom para la bottom nav
           - Desktop:  flex-1 al lado del sidebar
       ══════════════════════════════════════════════ */}
-      <main className="flex-1 min-w-0 overflow-hidden bg-white flex flex-col relative">
+      <main className="flex-1 min-w-0 overflow-hidden bg-[#F7F9FC] flex flex-col relative">
           
         
         {/* Mobile Notification Bell */}
@@ -166,7 +166,7 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         </div>
 
         {/* Área de contenido que hace scroll */}
-        <div className="flex-1 overflow-y-auto pb-28 md:pb-0 flex flex-col" style={{ scrollPaddingBottom: "7rem" }}>
+        <div className="flex-1 overflow-y-auto pb-28 md:pb-0 flex flex-col bg-[#F7F9FC]" style={{ scrollPaddingBottom: "7rem" }}>
           {children}
         </div>
       </main>
