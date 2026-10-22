@@ -112,6 +112,10 @@ const emptyForm = () => ({
   inbody_magra_brazo_der:"", inbody_magra_brazo_izq:"", inbody_magra_pierna_der:"",
   inbody_magra_pierna_izq:"", inbody_magra_tronco:"",
 
+  // Outputs calculados / InBody
+  calc_masa_grasa:"", calc_masa_muscular:"", calc_masa_osea:"", calc_masa_residual:"",
+  somatotipo_x:"", somatotipo_y:"",
+
   // Legacy/Calculated
   grasa_pct:"", musculo_pct:"", icc:"", glucosa:"", presion_arterial:"", notas:"",
 });
@@ -294,6 +298,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     const filled = emptyForm();
     Object.keys(filled).forEach(k => {
       if (m[k] !== null && m[k] !== undefined && m[k] !=="") filled[k] = String(m[k]);
+    });
+    Object.keys(m).forEach(k => {
+      if (m[k] !== null && m[k] !== undefined && m[k] !== "" && k !== "fotos") {
+        filled[k] = String(m[k]);
+      }
     });
     setForm(filled);
     setEditingId(m.id);
@@ -688,7 +697,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                       <label className="text-sm font-bold text-[#0B1929]">{f.label}</label>
                       <input
                         type={f.type} step={f.step||"any"}
-                        value={f.readOnly && form.metodo_evaluacion === 'manual' ? (liveCalculations[f.key] || '') : form[f.key]}
+                        value={f.readOnly && form.metodo_evaluacion === 'manual' ? (liveCalculations[f.key] || form[f.key] || '') : (form[f.key] ?? '')}
                         readOnly={!!f.readOnly}
                         placeholder={f.readOnly?"Auto":(f.placeholder||"")}
                         className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ?"opacity-60 cursor-not-allowed" :""}`}
