@@ -2,7 +2,7 @@ import React, { useRef, useState } from"react";
 import { Building2, Image as ImageIcon } from"lucide-react";
 import { storageUpload, storageDelete } from"../../lib/supabase";
 
-export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving }) {
+export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -44,7 +44,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] mb-8">
       <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
         <Building2 size={20} className="text-[var(--brand-primary)]" />
-        Identidad de Marca (Consultorio)
+        {isSuperadmin ? "Identidad de Marca (FLUX)" : "Identidad de Marca (Consultorio)"}
       </h2>
       
       <div className="flex flex-col md:flex-row items-center gap-6 pb-8 border-b border-[#E2E8F0] mb-8">
@@ -132,6 +132,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
       </div>
       {isSaving && <div className="text-xs text-[#6B7A8D] flex items-center gap-1 mt-2 justify-end"><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#6B7A8D]"></div> Guardando...</div>}
+      {children}
     </div>
   );
 }

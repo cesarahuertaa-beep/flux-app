@@ -7,10 +7,12 @@ import DatosPersonalesCard from"./DatosPersonalesCard";
 import IdentidadEmpresarialCard from"./IdentidadEmpresarialCard";
 import RoleSwitcher from"../RoleSwitcher";
 import { syncPersonalData } from"../../lib/supabase";
+import { isNativePlayApp } from "../../lib/playBilling";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
   const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
+  const isPlayApp = isNativePlayApp();
+  const [loading, setLoading] = useState(true);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [msg, setMsg] = useState("");
@@ -205,9 +207,70 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       <RoleSwitcher currentRole={role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
 
       <DatosPersonalesCard form={personalForm} setForm={setPersonalForm} onSave={handleSavePersonal} loading={loading} isSaving={savingPersonal} />
-      <IdentidadEmpresarialCard form={businessForm} setForm={setBusinessForm} onSave={handleSaveBusiness} loading={loading} isSaving={savingBusiness} />
+      <IdentidadEmpresarialCard 
+        form={businessForm} 
+        setForm={setBusinessForm} 
+        onSave={handleSaveBusiness} 
+        loading={loading} 
+        isSaving={savingBusiness}
+        isSuperadmin={isSuperadmin}
+      >
+        {/* Datos de Cobro (SPEI): Exclusivo para Superadmin/Team en PWA/Web (Oculto en Play Store por políticas de tienda) */}
+        {!isPlayApp && (isSuperadmin || isTeam) && (
+          <div className="mt-8 pt-8 border-t border-[#E2E8F0]">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-[#0B1929] flex items-center gap-2">
+                <CreditCard size={18} className="text-[var(--brand-primary)]" /> Datos de Cobro de la Plataforma (SPEI)
+              </h3>
+              <div className="h-6 flex items-center justify-end min-w-[24px]">
+                {savingConfig && <Loader2 size={16} className="text-[#6B7A8D] animate-spin" />}
+                {configSuccess && !savingConfig && <CheckCircle2 size={16} className="text-green-500" />}
+                {configError && !savingConfig && <XCircle size={16} className="text-red-500" title="Error al guardar config" />}
+              </div>
+            </div>
+            <p className="text-xs text-[#6B7A8D] mb-5">
+              {isSuperadmin 
+                ? 'Cuenta bancaria a la que los nutriólogos y atletas realizan sus transferencias SPEI en la versión Web.' 
+                : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Banco</label>
+                <input 
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC] text-[14px] text-[#0B1929] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white' : 'text-[#6B7A8D] cursor-not-allowed'}`} 
+                  placeholder="Ej. BBVA, BANAMEX..." 
+                  value={configPago.banco} 
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, banco: e.target.value }))} 
+                  readOnly={!isSuperadmin} 
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">CLABE Interbancaria (18 dígitos)</label>
+                <input 
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC] text-[14px] font-mono tracking-widest text-[#0B1929] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white' : 'text-[#6B7A8D] cursor-not-allowed'}`} 
+                  placeholder="000000000000000000" 
+                  maxLength={18} 
+                  value={configPago.clabe} 
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))} 
+                  readOnly={!isSuperadmin} 
+                />
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Beneficiario / Razón Social</label>
+                <input 
+                  className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC] text-[14px] text-[#0B1929] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white' : 'text-[#6B7A8D] cursor-not-allowed'}`} 
+                  placeholder="Ej. Flux Technologies SA de CV" 
+                  value={configPago.beneficiario} 
+                  onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, beneficiario: e.target.value }))} 
+                  readOnly={!isSuperadmin} 
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </IdentidadEmpresarialCard>
 
-      <div className="mt-10 flex flex-col sm:flex-row gap-4">
+      <div className="mt-8 flex flex-col sm:flex-row gap-4">
         {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
           <button onClick={() => window.location.href = "/"} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <ShoppingBag size={18} /> Ir a la tienda FLUX
@@ -217,39 +280,6 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           <LogOut size={18} /> Salir
         </button>
       </div>
-
-      {/* Sección de datos de cobro */}
-      {(isSuperadmin || isTeam) && (
-        <div className="mt-10 border-t border-[#E2E8F0] pt-8">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-[#0B1929] flex items-center gap-2">
-              <CreditCard size={18} className="text-[var(--brand-primary)]" /> Datos de Cobro (SPEI)
-            </h3>
-            <div className="h-6 flex items-center justify-end min-w-[24px]">
-              {savingConfig && <Loader2 size={16} className="text-[#6B7A8D] animate-spin" />}
-              {configSuccess && !savingConfig && <CheckCircle2 size={16} className="text-green-500" />}
-              {configError && !savingConfig && <XCircle size={16} className="text-red-500" title="Error al guardar config" />}
-            </div>
-          </div>
-          <p className="text-xs text-[#6B7A8D] mb-5">
-            {isSuperadmin ? 'Esta información aparecerá en el panel de "Mi Membresía" de cada nutriólogo.' : 'Datos de la cuenta a la que los nutriólogos realizan sus pagos.'}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Banco</label>
-              <input className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`} placeholder="Ej. BBVA, BANAMEX..." value={configPago.banco} onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, banco: e.target.value }))} readOnly={!isSuperadmin} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">CLABE Interbancaria</label>
-              <input className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-mono tracking-widest focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`} placeholder="000000000000000000" maxLength={18} value={configPago.clabe} onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))} readOnly={!isSuperadmin} />
-            </div>
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Beneficiario</label>
-              <input className={`w-full px-3 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none ${isSuperadmin ? 'focus:ring-2 focus:ring-[var(--brand-primary)]' : 'bg-gray-50 text-[#6B7A8D] cursor-not-allowed'}`} placeholder="Ej. Flux Technologies SA de CV" value={configPago.beneficiario} onChange={e => isSuperadmin && setConfigPago(p => ({ ...p, beneficiario: e.target.value }))} readOnly={!isSuperadmin} />
-            </div>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );

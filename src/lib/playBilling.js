@@ -19,7 +19,9 @@ export const PLAY_BILLING_PRODUCTS = {
  */
 export function isNativePlayApp() {
   try {
-    return Boolean(Capacitor && Capacitor.isNativePlatform());
+    const cap = typeof Capacitor !== "undefined" ? Capacitor : (typeof window !== "undefined" ? window.Capacitor : null);
+    if (!cap) return false;
+    return Boolean(cap.isNativePlatform() || (typeof cap.getPlatform === "function" && cap.getPlatform() === "android"));
   } catch {
     return false;
   }
