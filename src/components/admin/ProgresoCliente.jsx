@@ -234,8 +234,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     try {
       const data = {};
       if (!editingId) data.cliente_id = selected.id;
+      const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos"]);
       const STRING_KEYS = new Set(["fecha","presion_arterial","notas","metodo_evaluacion"]);
       Object.entries(form).forEach(([k, v]) => {
+        if (IGNORED_KEYS.has(k)) return;
         if (v !=="" && v !== null && v !== undefined) {
           if (STRING_KEYS.has(k)) { data[k] = v; }
           else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
@@ -296,11 +298,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
   const startEdit = (m) => {
     const filled = emptyForm();
+    const IGNORED = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos"]);
     Object.keys(filled).forEach(k => {
       if (m[k] !== null && m[k] !== undefined && m[k] !=="") filled[k] = String(m[k]);
     });
     Object.keys(m).forEach(k => {
-      if (m[k] !== null && m[k] !== undefined && m[k] !== "" && k !== "fotos") {
+      if (!IGNORED.has(k) && m[k] !== null && m[k] !== undefined && m[k] !== "") {
         filled[k] = String(m[k]);
       }
     });
