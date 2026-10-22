@@ -108,7 +108,7 @@ export default function MisComisiones({ myId, setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in pb-4">
       
       {/* Encabezado */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">

@@ -422,7 +422,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
       </div>
 
-      <div className="px-6 md:px-8 py-6 md:py-8 pb-32 md:pb-12 max-w-5xl w-full mx-auto space-y-8">
+      <div className="px-6 md:px-8 py-6 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-8">
         {view === 'metricas' && (
           <>
           {COMP_KEYS.length > 0 ? (

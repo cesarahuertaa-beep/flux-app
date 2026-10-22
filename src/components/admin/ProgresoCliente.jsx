@@ -369,7 +369,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   );
 
   return (
-    <div className="pb-24">
+    <div className="pb-2">
       {/* Sub-nav */}
       <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex gap-1 mb-5">
         <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>

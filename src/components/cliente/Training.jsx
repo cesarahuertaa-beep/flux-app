@@ -525,7 +525,7 @@ export default function Training({
       </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-6 md:px-8 flex-1 space-y-3 pb-32 md:pb-12 min-h-0">
+      <div className="px-6 md:px-8 flex-1 space-y-3 pb-6 md:pb-8 min-h-0">
 
         {/* Barra de Progreso de la Sesión del Día */}
         <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-3.5 flex flex-col gap-2">

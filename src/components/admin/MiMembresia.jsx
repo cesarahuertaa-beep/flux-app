@@ -296,7 +296,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-4">
       <input 
         type="file" 
         id="comprobanteUpload" 

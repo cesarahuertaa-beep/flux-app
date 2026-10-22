@@ -301,7 +301,7 @@ export default function ControlPagos({ setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-4">
 
       {/* ── PANEL DE CONFIGURACIÓN DE TARIFAS Y PLANES (OPCIÓN A) ────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">

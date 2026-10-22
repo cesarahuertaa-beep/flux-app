@@ -154,7 +154,7 @@ export default function GestorTienda({ setMsg }) {
             <p className="text-[#6B7A8D] text-sm">No se encontraron productos que coincidan.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
             {filtered.map(p => (
               <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden shadow-sm hover:border-[var(--brand-primary)] transition-colors flex flex-col group">
                 <div className="h-40 bg-[#F0F4FA] relative flex items-center justify-center">
