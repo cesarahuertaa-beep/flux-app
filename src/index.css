@@ -16,8 +16,8 @@ html, body, #root {
   --border: #E2E8F0;
   
   /* These will be overridden dynamically by BrandContext.jsx */
-  --brand-primary: #1A6FD4;
-  --brand-secondary: #E8F1FB;
+  --brand-primary: #56CCF2;
+  --brand-secondary: #E0F7FE;
 }
 
 * {

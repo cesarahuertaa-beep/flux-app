@@ -466,7 +466,7 @@ export default function Login({ onLogin }) {
   const cardSlotStyles = [
     "w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-2xl opacity-75 scale-95 -mr-1.5 z-10 border border-[#E2E8F0] shadow-sm",
     "w-[62px] h-[62px] sm:w-[72px] sm:h-[72px] rounded-2xl opacity-90 scale-95 -mr-1 z-20 border border-[#CBD5E1] shadow-sm",
-    "w-[80px] h-[80px] sm:w-[94px] sm:h-[94px] rounded-2xl opacity-100 scale-100 z-30 border-2 border-[var(--brand-primary)] shadow-lg shadow-blue-500/25 ring-4 ring-[var(--brand-primary)]/15",
+    "w-[80px] h-[80px] sm:w-[94px] sm:h-[94px] rounded-2xl opacity-100 scale-100 z-30 border-2 border-[var(--brand-primary)] shadow-lg shadow-sky-500/25 ring-4 ring-[var(--brand-primary)]/15",
     "w-[62px] h-[62px] sm:w-[72px] sm:h-[72px] rounded-2xl opacity-90 scale-95 -ml-1 z-20 border border-[#CBD5E1] shadow-sm",
     "w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-2xl opacity-75 scale-95 -ml-1.5 z-10 border border-[#E2E8F0] shadow-sm",
   ];
@@ -544,7 +544,7 @@ export default function Login({ onLogin }) {
           <div className="w-full flex flex-col items-center">
             <button
               onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
-              className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:bg-blue-600 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
+              className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-sky-500/30 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
             >
               COMENZAR
             </button>
@@ -667,14 +667,14 @@ export default function Login({ onLogin }) {
                 </div>
               </div>
 
-              <button onClick={submit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+              <button onClick={submit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[var(--brand-primary)] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-sky-500/25'}`}>
                 {loading ? "VERIFICANDO…" : <>ENTRAR <ArrowRight size={16} /></>}
               </button>
 
               <div className="text-center">
                 <button
                   onClick={() => { setMode("reset"); setErr(""); }}
-                  className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8] tracking-wide"
+                  className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[var(--brand-primary)] tracking-wide"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
@@ -743,12 +743,12 @@ export default function Login({ onLogin }) {
                 </div>
               </div>
               <div className="mb-4 flex items-start gap-2">
-                <input type="checkbox" id="aviso_civil" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[#2e5cb8]" />
+                <input type="checkbox" id="aviso_civil" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[var(--brand-primary)]" />
                 <label htmlFor="aviso_civil" className="text-xs text-[#6B7A8D] leading-tight cursor-pointer">
-                  He leído y acepto el <Link to="/privacidad" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
+                  He leído y acepto el <Link to="/privacidad" className="text-[var(--brand-primary)] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
                 </label>
               </div>
-              <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-3 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+              <button onClick={signUpSubmit} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-3 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[var(--brand-primary)] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-sky-500/25'}`}>
                 {loading ? "CREANDO..." : <>CREAR CUENTA <ArrowRight size={16} /></>}
               </button>
               <div className="text-center">
@@ -799,7 +799,7 @@ export default function Login({ onLogin }) {
               <div className="mb-4 flex items-start gap-2">
                 <input type="checkbox" id="aviso_pro" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[#10B981]" />
                 <label htmlFor="aviso_pro" className="text-xs text-[#6B7A8D] leading-tight cursor-pointer">
-                  He leído y acepto el <Link to="/privacidad" className="text-[#1A6FD4] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
+                  He leído y acepto el <Link to="/privacidad" className="text-[var(--brand-primary)] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
                 </label>
               </div>
               <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-3 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
@@ -826,11 +826,11 @@ export default function Login({ onLogin }) {
                   />
                 </div>
               </div>
-              <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+              <button onClick={sendReset} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[var(--brand-primary)] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-sky-500/25'}`}>
                 {loading ? "ENVIANDO…" : "ENVIAR ENLACE A MI CORREO"}
               </button>
               <div className="text-center">
-                <button onClick={() => { setMode("login"); setErr(""); setInfo(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]">
+                <button onClick={() => { setMode("login"); setErr(""); setInfo(""); }} className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[var(--brand-primary)]">
                   Volver al login
                 </button>
               </div>
@@ -879,7 +879,7 @@ export default function Login({ onLogin }) {
                   </button>
                 </div>
               </div>
-              <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-br from-[#2e5cb8] to-[#3d6fd0] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-blue-500/30'}`}>
+              <button onClick={setPassword} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-4 tracking-[1px] font-['Space_Grotesk',sans-serif] transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[var(--brand-primary)] text-white hover:opacity-90 cursor-pointer shadow-lg shadow-sky-500/25'}`}>
                 {loading ? "GUARDANDO…" : "ESTABLECER CONTRASEÑA Y ENTRAR"}
               </button>
               <div className="text-center">
@@ -893,7 +893,7 @@ export default function Login({ onLogin }) {
                     setErr("");
                     setInfo("");
                   }}
-                  className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[#2e5cb8]"
+                  className="bg-transparent border-none text-[#6B7A8D] text-xs cursor-pointer font-['Inter',sans-serif] transition-colors hover:text-[var(--brand-primary)]"
                 >
                   Volver al login
                 </button>

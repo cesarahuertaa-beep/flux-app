@@ -63,7 +63,7 @@ export function AppUpdater() {
           href={targetUrl}
           target='_blank'
           rel='noopener noreferrer'
-          className='w-full flex items-center justify-center gap-2 bg-[#1A6FD4] text-white py-3 rounded-xl font-bold hover:bg-blue-600 transition-colors'
+          className='w-full flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity'
         >
           Actualizar en Google Play
         </a>

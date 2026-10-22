@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from"react";
-import { dbGet, getProfileId } from"../lib/supabase";
+import { createContext, useContext, useEffect, useState } from "react";
+import { dbGet, getProfileId } from "../lib/supabase";
 
 const BrandContext = createContext(null);
 
@@ -7,13 +7,42 @@ export const useBrand = () => useContext(BrandContext);
 
 // Default FLUX brand - used for superadmin or unauthenticated state
 const FLUX_DEFAULT = { 
-  nombre_marca:"FLUX", 
-  color_primario:"#1A6FD4", 
-  logo_url:"/flux_logo.jpeg" 
+  nombre_marca: "FLUX Sport Supplements", 
+  color_primario: "#56CCF2", 
+  logo_url: "/flux_logo.jpeg" 
 };
 
 export function BrandProvider({ children, session }) {
-  const [brand, setBrand] = useState(FLUX_DEFAULT);
+  const [brand, setBrand] = useState(() => {
+    try {
+      const cachedColor = localStorage.getItem("flux_cached_brand_color");
+      const cachedName = localStorage.getItem("flux_cached_brand_name");
+      const cachedLogo = localStorage.getItem("flux_cached_brand_logo");
+      if (cachedColor && cachedColor !== "#1A6FD4") {
+        return {
+          nombre_marca: cachedName || FLUX_DEFAULT.nombre_marca,
+          color_primario: cachedColor,
+          logo_url: cachedLogo || FLUX_DEFAULT.logo_url
+        };
+      }
+    } catch (e) {}
+    return FLUX_DEFAULT;
+  });
+
+  // Inyectar variables en el elemento raíz del DOM para que apliquen a modales, loaders y todo el documento
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--brand-primary", brand.color_primario);
+      document.documentElement.style.setProperty("--brand-secondary", `color-mix(in srgb, ${brand.color_primario} 12%, white)`);
+      document.documentElement.style.setProperty("--brand-primary-hover", `color-mix(in srgb, ${brand.color_primario} 85%, black)`);
+      document.documentElement.style.setProperty("--brand-primary-light", `color-mix(in srgb, ${brand.color_primario} 20%, white)`);
+    }
+    try {
+      localStorage.setItem("flux_cached_brand_color", brand.color_primario);
+      localStorage.setItem("flux_cached_brand_name", brand.nombre_marca);
+      localStorage.setItem("flux_cached_brand_logo", brand.logo_url);
+    } catch (e) {}
+  }, [brand]);
 
   useEffect(() => {
     let active = true;
@@ -35,7 +64,7 @@ export function BrandProvider({ children, session }) {
           if (active && res && res.length > 0) {
             const p = res[0];
             setBrand({
-              nombre_marca: p.nombre_marca || "FLUX",
+              nombre_marca: p.nombre_marca || FLUX_DEFAULT.nombre_marca,
               color_primario: p.color_primario || FLUX_DEFAULT.color_primario,
               logo_url: p.logo_url || FLUX_DEFAULT.logo_url
             });
@@ -43,20 +72,27 @@ export function BrandProvider({ children, session }) {
           }
         }
 
-        // Si es atleta independiente o sin marca asignada, cargar la marca corporativa de FLUX (del superadmin)
-        const superadminRows = await dbGet("profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
-        if (active && superadminRows && superadminRows.length > 0 && superadminRows[0].color_primario) {
-          const sa = superadminRows[0];
-          setBrand({
-            nombre_marca: sa.nombre_marca || "FLUX",
-            color_primario: sa.color_primario || FLUX_DEFAULT.color_primario,
-            logo_url: sa.logo_url || FLUX_DEFAULT.logo_url
-          });
-        } else if (active) {
-          setBrand(FLUX_DEFAULT);
+        // Si es atleta independiente o sin marca asignada con sesión activa, consultar superadmin
+        if (session) {
+          const superadminRows = await dbGet("profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
+          if (active && superadminRows && superadminRows.length > 0 && superadminRows[0].color_primario) {
+            const sa = superadminRows[0];
+            setBrand({
+              nombre_marca: sa.nombre_marca || FLUX_DEFAULT.nombre_marca,
+              color_primario: sa.color_primario || FLUX_DEFAULT.color_primario,
+              logo_url: sa.logo_url || FLUX_DEFAULT.logo_url
+            });
+            return;
+          }
+        }
+
+        if (active) {
+          setBrand(prev => (prev?.color_primario && prev.color_primario !== "#1A6FD4" ? prev : FLUX_DEFAULT));
         }
       } catch (e) {
-        if (active) setBrand(FLUX_DEFAULT);
+        if (active) {
+          setBrand(prev => (prev?.color_primario && prev.color_primario !== "#1A6FD4" ? prev : FLUX_DEFAULT));
+        }
       }
     };
 
@@ -65,18 +101,16 @@ export function BrandProvider({ children, session }) {
   }, [session]);
 
   // Generamos variables CSS dinámicas basadas en el color primario de la marca.
-  // Usamos color-mix para generar fondos ligeros y tonos oscuros (Figma style).
   const cssVars = {
-"--brand-primary": brand.color_primario,
-    // Fondo claro con 10% de opacidad para componentes seleccionados (ej: sidebar activo)
-"--brand-secondary": `color-mix(in srgb, ${brand.color_primario} 10%, white)`,
-"--brand-primary-hover": `color-mix(in srgb, ${brand.color_primario} 85%, black)`,
-"--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
+    "--brand-primary": brand.color_primario,
+    "--brand-secondary": `color-mix(in srgb, ${brand.color_primario} 12%, white)`,
+    "--brand-primary-hover": `color-mix(in srgb, ${brand.color_primario} 85%, black)`,
+    "--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
   };
 
   return (
     <BrandContext.Provider value={brand}>
-      <div style={{ ...cssVars, minHeight:"100vh" }}>
+      <div style={{ ...cssVars, minHeight: "100vh" }}>
         {children}
       </div>
     </BrandContext.Provider>
