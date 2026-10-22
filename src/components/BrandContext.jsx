@@ -16,46 +16,52 @@ export function BrandProvider({ children, session }) {
   const [brand, setBrand] = useState(FLUX_DEFAULT);
 
   useEffect(() => {
-    // Sin sesión o superadmin/admin → siempre FLUX
-    if (!session || session.role ==="superadmin") {
-      setBrand(FLUX_DEFAULT);
-      return;
-    }
+    let active = true;
 
     const fetchBrand = async () => {
       try {
         let profileIdToFetch = null;
 
-        if (session.role ==="cliente" && session.data?.nutriologo_id) {
+        if (session?.role === "cliente" && session.data?.nutriologo_id) {
           // Cliente ve la marca de su nutriólogo
           profileIdToFetch = session.data.nutriologo_id;
-        } else if (session.role ==="nutriologo" || session.role ==="nutriologo_estudiante") {
-          // Nutriólogo ve su propia marca
-          profileIdToFetch = session.profileId || getProfileId();
+        } else if (session?.role === "nutriologo" || session?.role === "nutriologo_estudiante" || session?.role === "superadmin" || session?.role === "admin") {
+          // Nutriólogo o Superadmin ve su propia marca configurada en su perfil
+          profileIdToFetch = session.profileId || getProfileId() || session.data?.id;
         }
 
         if (profileIdToFetch) {
           const res = await dbGet(`profiles?id=eq.${profileIdToFetch}&select=nombre_marca,color_primario,logo_url`);
-          if (res.length > 0) {
+          if (active && res && res.length > 0) {
             const p = res[0];
             setBrand({
               nombre_marca: p.nombre_marca || "FLUX",
-              color_primario: p.color_primario || "#1A6FD4",
-              logo_url: p.logo_url || "/flux_logo.jpeg"
+              color_primario: p.color_primario || FLUX_DEFAULT.color_primario,
+              logo_url: p.logo_url || FLUX_DEFAULT.logo_url
             });
-          } else {
-            setBrand(FLUX_DEFAULT);
+            return;
           }
-        } else {
-          // Rol sin marca propia (civil, atleta independiente, staff, etc.) → restaurar FLUX
+        }
+
+        // Si es atleta independiente o sin marca asignada, cargar la marca corporativa de FLUX (del superadmin)
+        const superadminRows = await dbGet("profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
+        if (active && superadminRows && superadminRows.length > 0 && superadminRows[0].color_primario) {
+          const sa = superadminRows[0];
+          setBrand({
+            nombre_marca: sa.nombre_marca || "FLUX",
+            color_primario: sa.color_primario || FLUX_DEFAULT.color_primario,
+            logo_url: sa.logo_url || FLUX_DEFAULT.logo_url
+          });
+        } else if (active) {
           setBrand(FLUX_DEFAULT);
         }
       } catch (e) {
-        console.error("Error cargando branding", e);
+        if (active) setBrand(FLUX_DEFAULT);
       }
     };
 
     fetchBrand();
+    return () => { active = false; };
   }, [session]);
 
   // Generamos variables CSS dinámicas basadas en el color primario de la marca.

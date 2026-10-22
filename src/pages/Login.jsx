@@ -462,13 +462,13 @@ export default function Login({ onLogin }) {
     setLoading(false);
   };
 
-  // Tarjetas superiores con solo logos de especialistas (centro protagonista, laterales escalonados)
+  // Tarjetas superiores: el borde y contorno azul van directamente sobre el borde natural del logo (sin padding blanco)
   const cardSlotStyles = [
-    "w-[56px] h-[72px] sm:w-[68px] sm:h-[84px] opacity-75 scale-95 -mr-1 z-10 border-[#E2E8F0]",
-    "w-[66px] h-[82px] sm:w-[78px] sm:h-[96px] opacity-90 scale-95 -mr-0.5 z-20 border-[#CBD5E1]",
-    "w-[78px] h-[96px] sm:w-[92px] sm:h-[112px] opacity-100 scale-100 z-30 border-[var(--brand-primary)]/40 shadow-md shadow-blue-500/10 ring-2 ring-[var(--brand-primary)]/10",
-    "w-[66px] h-[82px] sm:w-[78px] sm:h-[96px] opacity-90 scale-95 -ml-0.5 z-20 border-[#CBD5E1]",
-    "w-[56px] h-[72px] sm:w-[68px] sm:h-[84px] opacity-75 scale-95 -ml-1 z-10 border-[#E2E8F0]",
+    "w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-2xl opacity-75 scale-95 -mr-1.5 z-10 border border-[#E2E8F0] shadow-sm",
+    "w-[62px] h-[62px] sm:w-[72px] sm:h-[72px] rounded-2xl opacity-90 scale-95 -mr-1 z-20 border border-[#CBD5E1] shadow-sm",
+    "w-[80px] h-[80px] sm:w-[94px] sm:h-[94px] rounded-2xl opacity-100 scale-100 z-30 border-2 border-[var(--brand-primary)] shadow-lg shadow-blue-500/25 ring-4 ring-[var(--brand-primary)]/15",
+    "w-[62px] h-[62px] sm:w-[72px] sm:h-[72px] rounded-2xl opacity-90 scale-95 -ml-1 z-20 border border-[#CBD5E1] shadow-sm",
+    "w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-2xl opacity-75 scale-95 -ml-1.5 z-10 border border-[#E2E8F0] shadow-sm",
   ];
 
   return (
@@ -486,68 +486,65 @@ export default function Login({ onLogin }) {
       {mode === "welcome" ? (
         <div className="h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in">
           
-          {/* 1. Escaparate Superior: Solo logos de los 5 nutriólogos en rotación */}
-          <div className="flex flex-col items-center">
+          {/* 1. Escaparate Superior: Logos de los 5 nutriólogos con el contorno sobre su borde natural */}
+          <div className="flex flex-col items-center pt-1">
             <div className="flex items-center justify-center w-full py-1">
               {showcaseCards.map((card, idx) => (
                 <div
                   key={card.id || idx}
-                  className={`${cardSlotStyles[idx]} rounded-2xl border bg-white p-2.5 flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-sm`}
+                  className={`${cardSlotStyles[idx]} bg-white flex items-center justify-center relative overflow-hidden transition-all duration-300`}
                 >
                   <img
                     src={card.logo_url || "/flux_logo.jpeg"}
                     alt="Logo especialista"
                     onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
-                    className="w-full h-full object-contain rounded-xl"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 2. Bloque Central: Logo FLUX + Marca Oficial + Slogan Principal + Pilares */}
-          <div className="flex flex-col items-center text-center my-auto py-2">
-            <div className="relative mb-3">
-              <img
-                src="/flux_logo.jpeg"
-                alt="FLUX"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-sm border border-[#E2E8F0] bg-white"
-              />
+          {/* 2. Bloque de Información: Asentado ligeramente arriba del botón de comenzar */}
+          <div className="flex flex-col items-center text-center mt-auto mb-6">
+            {/* Wordmark FLUX estilo Netflix */}
+            <div className="text-4xl sm:text-5xl font-black tracking-[4px] sm:tracking-[6px] text-[#0B1929] uppercase leading-none font-['Space_Grotesk',sans-serif]">
+              FLUX
             </div>
 
-            <div className="tracking-[3px] text-[11px] sm:text-xs font-bold text-[var(--brand-primary)] uppercase mb-1 font-['Space_Grotesk',sans-serif]">
-              FLUX SPORT SUPPLEMENTS
+            <div className="tracking-[3.5px] text-[11px] sm:text-xs font-bold text-[var(--brand-primary)] uppercase mt-2 mb-1.5 font-['Space_Grotesk',sans-serif]">
+              SPORT SUPPLEMENTS
             </div>
 
-            <h1 className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug max-w-[280px] sm:max-w-[320px] mx-auto" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            <h1 className="text-sm sm:text-base font-bold text-[#0B1929] leading-snug max-w-[290px] sm:max-w-[320px] mx-auto mt-1 mb-3" style={{ fontFamily: "DM Sans, sans-serif" }}>
               Tu nutrición clínica y entrenamiento de alto rendimiento, en un mismo lugar.
             </h1>
 
-            {/* Barra de pilares FLUX */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-3.5 px-2 text-[10px] font-bold tracking-wider uppercase text-[#6B7A8D]">
+            {/* Barra de 4 pilares en UNA SOLA FILA */}
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9.5px] font-bold tracking-wider uppercase text-[#6B7A8D] whitespace-nowrap overflow-x-hidden px-1">
               <span className="flex items-center gap-1 text-[#0B1929]">
-                <Apple size={12} className="text-[var(--brand-primary)]" /> Nutrición
+                <Apple size={11} className="text-[var(--brand-primary)] shrink-0" /> Nutrición
               </span>
-              <span className="text-[#CBD5E1]">•</span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
               <span className="flex items-center gap-1 text-[#0B1929]">
-                <Dumbbell size={12} className="text-[var(--brand-primary)]" /> Rutinas
+                <Dumbbell size={11} className="text-[var(--brand-primary)] shrink-0" /> Rutinas
               </span>
-              <span className="text-[#CBD5E1]">•</span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
               <span className="flex items-center gap-1 text-[#0B1929]">
-                <TrendingUp size={12} className="text-[var(--brand-primary)]" /> Progreso
+                <TrendingUp size={11} className="text-[var(--brand-primary)] shrink-0" /> Progreso
               </span>
-              <span className="text-[#CBD5E1]">•</span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
               <span className="flex items-center gap-1 text-[#0B1929]">
-                <ShoppingBag size={12} className="text-[var(--brand-primary)]" /> Store
+                <ShoppingBag size={11} className="text-[var(--brand-primary)] shrink-0" /> Store
               </span>
             </div>
           </div>
 
-          {/* 3. Bloque Inferior: Botón COMENZAR + Subtítulo KEEP GOING + INICIAR SESIÓN */}
+          {/* 3. Bloque Inferior: Botón COMENZAR tipo Píldora + KEEP GOING + Línea divisoria de lado a lado */}
           <div className="w-full flex flex-col items-center">
             <button
               onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
-              className="w-full py-3.5 rounded-xl bg-[var(--brand-primary)] hover:bg-blue-600 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-blue-500/25 active:scale-[0.99] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
+              className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:bg-blue-600 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
             >
               COMENZAR
             </button>
@@ -557,10 +554,11 @@ export default function Login({ onLogin }) {
               <Flame size={13} className="text-[var(--brand-primary)]" />
             </div>
 
-            <div className="w-full border-t border-[#E2E8F0] mt-3.5 pt-3 text-center">
+            {/* Línea divisoria que cruza de lado a lado la pantalla */}
+            <div className="w-[calc(100%+3rem)] -mx-6 border-t border-[#E2E8F0] mt-4 pt-3 text-center">
               <button
                 onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
-                className="w-full py-1.5 text-xs font-bold tracking-[2px] uppercase text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
+                className="w-full py-1 text-xs font-bold tracking-[2px] uppercase text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
               >
                 INICIAR SESIÓN
               </button>
