@@ -39,6 +39,10 @@ Este archivo define los estándares de sincronización, arquitectura y despliegu
 ## 4. Entorno de Ejecución (Windows)
 En Windows PowerShell, las políticas de ejecución pueden restringir scripts directos `.ps1`. Ejecutar los comandos a través de `cmd.exe /c "..."` para garantizar compatibilidad total.
 
+> [!IMPORTANT]
+> **`public/version.json` NO se sube con la versión nueva.** Ese archivo se despliega a la web al instante y `AppUpdater.jsx` lo compara contra la versión instalada. Si se sube antes de que Google Play **apruebe y publique** el build, los usuarios ven un aviso de actualización que todavía no existe en la tienda. Solo se actualiza el número **después** de confirmar que la versión ya está disponible en Play Store. Los scripts de release no deben tocarlo.
+
+
 ---
 
 ## 5. Procedimiento de Limpieza y Organización (Aprendido)
