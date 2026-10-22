@@ -902,9 +902,6 @@ export default function Training({
             </button>
           </div>
         )}
-
-        {/* Espaciador inferior para navegación móvil */}
-        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* Modal de Recompensa al Terminar de Entrenar */}

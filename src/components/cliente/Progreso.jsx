@@ -731,8 +731,6 @@ export default function Progreso({ cliente, isSelfManaged }) {
             
           </div>
         )}
-        {/* Espaciador inferior para navegación móvil */}
-        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* Full Image Modal */}

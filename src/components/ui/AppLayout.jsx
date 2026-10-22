@@ -166,8 +166,12 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         </div>
 
         {/* Área de contenido que hace scroll */}
-        <div className="flex-1 overflow-y-auto pb-28 md:pb-0 flex flex-col bg-[#F7F9FC]" style={{ scrollPaddingBottom: "7rem" }}>
-          {children}
+        <div className="flex-1 overflow-y-auto flex flex-col bg-[#F7F9FC]">
+          <div className="flex-1 flex flex-col">
+            {children}
+          </div>
+          {/* Espaciador inferior para garantizar que la barra de navegación móvil (fixed z-50) nunca tape el contenido final */}
+          <div className="md:hidden h-28 shrink-0 pointer-events-none" aria-hidden="true" />
         </div>
       </main>
 

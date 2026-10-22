@@ -172,7 +172,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-16 px-4 sm:px-6 md:px-8 pt-6 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto w-full pb-8 px-4 sm:px-6 md:px-8 pt-6 overflow-x-hidden">
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 

@@ -429,9 +429,6 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
             </div>
           );
         })}
-
-        {/* Espaciador inferior para garantizar visibilidad completa en móviles sobre la barra de navegación */}
-        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* ── Modal de Lista de Compras del Súper ── */}

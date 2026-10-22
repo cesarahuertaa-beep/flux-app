@@ -390,8 +390,6 @@ export function CitasCliente({ cliente }) {
             )}
           </>
         )}
-        {/* Espaciador inferior para navegación móvil */}
-        <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
 
       {/* ── Modal Agendar Cita ── */}

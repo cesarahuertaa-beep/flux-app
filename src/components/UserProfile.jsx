@@ -152,7 +152,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-32 px-4 sm:px-6 md:px-8 pt-6">
+      <div className="max-w-4xl mx-auto w-full pb-8 px-4 sm:px-6 md:px-8 pt-6">
 
       <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 
@@ -370,8 +370,6 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
         </div>
       )}
 
-      {/* Espaciador inferior para navegación móvil */}
-      <div className="h-28 md:h-0 shrink-0" aria-hidden="true" />
       </div>
     </div>
   );
