@@ -253,7 +253,15 @@ export default function App() {
   const handleBackToAdmin = () => setAtletaData(null);
 
   const MainApp = () => {
-    
+    useEffect(() => {
+      if (typeof document !== "undefined") {
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) metaTheme.setAttribute("content", "#FFFFFF");
+      }
+      if (typeof window !== "undefined" && window.FluxAndroidBars) {
+        try { window.FluxAndroidBars.setBars("#FFFFFF", true); } catch (e) {}
+      }
+    }, []);
 
     if (atletaData) return (
       <ClienteView
