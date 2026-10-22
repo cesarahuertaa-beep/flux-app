@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Model from "@phelian/react-body-highlighter";
 import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X } from "lucide-react";
+import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X, ChevronDown, Layers } from "lucide-react";
 import { parseFotos } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
@@ -82,6 +82,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [personalPhotos, setPersonalPhotos] = useState([]);
   const [uploadingPersonal, setUploadingPersonal] = useState(false);
   const [fullImage, setFullImage] = useState(null);
+  const [showAllMetrics, setShowAllMetrics] = useState(false);
   const fileInputRef = useRef(null);
 
   const loadData = useCallback(async () => {
@@ -313,6 +314,35 @@ export default function Progreso({ cliente, isSelfManaged }) {
     { key:"pantorrilla", label:"PANTORRILLA", unit:"cm" },
   ].filter(k => current[k.key] != null && current[k.key] !==""); // Solo mostrar los que tienen datos
 
+  // ── Selección de métricas principales (Top 4) y secundarias ──
+  const preferredPrimaryKeys = [
+    "peso",
+    "grasa_pct",
+    current.inbody_smm != null && current.inbody_smm !== ""
+      ? "inbody_smm"
+      : current.calc_masa_muscular != null && current.calc_masa_muscular !== ""
+      ? "calc_masa_muscular"
+      : "musculo_pct",
+    current.imc != null && current.imc !== "" ? "imc" : "inbody_score"
+  ];
+
+  const primaryKeys = [];
+  preferredPrimaryKeys.forEach(pk => {
+    const found = COMP_KEYS.find(k => k.key === pk);
+    if (found && !primaryKeys.some(p => p.key === found.key)) {
+      primaryKeys.push(found);
+    }
+  });
+
+  // Completar hasta 4 si alguna preferida no está registrada
+  COMP_KEYS.forEach(k => {
+    if (primaryKeys.length < 4 && !primaryKeys.some(p => p.key === k.key)) {
+      primaryKeys.push(k);
+    }
+  });
+
+  const secondaryKeys = COMP_KEYS.filter(k => !primaryKeys.some(p => p.key === k.key));
+
   const GROUP_LABELS = {
     pecho: "Pecho",
     abdomen: "Abdomen",
@@ -427,83 +457,138 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <>
           {COMP_KEYS.length > 0 ? (
             <>
-              {/* KPI GRID */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {COMP_KEYS.map(k => {
-                const val = current[k.key];
-                const hasPrev = metricas.length > 1;
-                const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
-                let colorClass = "text-[#6B7A8D]";
-                let Icon = Minus;
-                let sign = "";
-                
-                if (d !== null) {
+              {/* ── TOP 4 MÉTRICAS DESTACADAS ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {primaryKeys.map(k => {
+                  const val = current[k.key];
+                  const hasPrev = metricas.length > 1;
+                  const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
+                  let colorClass = "text-[#6B7A8D]";
+                  let Icon = Minus;
+                  let sign = "";
+                  
+                  if (d !== null) {
                     const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") || k.key.includes("cadera") || k.key.includes("icc") ? d < 0 : d > 0;
-                    colorClass = isImprovement ? "text-green-500" : "text-red-500";
-                  Icon = d > 0 ? TrendingUp : TrendingDown;
-                  sign = d > 0 ? "+" : "";
-                }
+                    colorClass = isImprovement ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-rose-600 bg-rose-50 border-rose-100";
+                    Icon = d > 0 ? TrendingUp : TrendingDown;
+                    sign = d > 0 ? "+" : "";
+                  }
 
-                return (
-                  <div key={k.key} className="bg-white rounded-2xl p-5 shadow-sm border border-[#E2E8F0] flex flex-col items-center text-center">
-                    <p className="text-[10px] md:text-xs font-bold text-[#6B7A8D] tracking-widest">{k.label}</p>
-                    <div className="text-2xl md:text-3xl font-bold text-[var(--brand-primary)] mt-2 mb-1">
-                      {val} <span className="text-sm font-semibold text-[#9BA5B0]">{k.unit}</span>
-                    </div>
-                    {d !== null && (
-                      <div className={`flex items-center gap-1 text-xs font-bold ${colorClass}`}>
-                        <Icon size={14} />
-                        {sign}{d.toFixed(1)} {k.unit}
+                  return (
+                    <div 
+                      key={k.key} 
+                      className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-[#E2E8F0] flex flex-col justify-between hover:border-[#CBD5E1] transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1.5">
+                        <p className="text-[10px] md:text-[11px] font-bold text-[#6B7A8D] tracking-wider uppercase truncate">
+                          {k.label}
+                        </p>
+                        {k.key === "peso" && <Scale className="w-3.5 h-3.5 text-[#9BA5B0] shrink-0" />}
+                        {k.key.includes("grasa") && <Activity className="w-3.5 h-3.5 text-[#9BA5B0] shrink-0" />}
+                        {(k.key.includes("musculo") || k.key.includes("smm")) && <BicepsFlexed className="w-3.5 h-3.5 text-[#9BA5B0] shrink-0" />}
+                        {k.key === "imc" && <Ruler className="w-3.5 h-3.5 text-[#9BA5B0] shrink-0" />}
                       </div>
-                    )}
-                    {isEstandar && hasPrev && (
-                      <div className="text-[10px] text-amber-500 font-bold mt-1">📈 Comparativa Premium</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      
+                      <div className="flex items-baseline gap-1 my-1">
+                        <span className="text-2xl md:text-3xl font-black text-[#0B1929] font-['Rajdhani'] tracking-tight">
+                          {val}
+                        </span>
+                        {k.unit && (
+                          <span className="text-xs font-bold text-[#9BA5B0]">
+                            {k.unit}
+                          </span>
+                        )}
+                      </div>
 
-            {/* COMPOSICIÓN CORPORAL VISUAL */}
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[#E2E8F0]">
-              <h2 className="text-lg font-bold text-[#0B1929] mb-6 md:text-center">Composición corporal</h2>
-              <div className="flex flex-row items-center justify-center gap-4 md:gap-16">
-                
-                <div className="flex flex-col gap-6 text-right flex-1">
-                  {current.peso != null && current.peso !== "" && (
-                    <div>
-                      <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">PESO</p>
-                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.peso} <span className="text-[10px] md:text-xs text-[#9BA5B0]">kg</span></p>
+                      <div className="mt-2 pt-2 border-t border-[#F8FAFC] flex items-center justify-between">
+                        {d !== null ? (
+                          <div className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${colorClass}`}>
+                            <Icon size={12} />
+                            <span>{sign}{d.toFixed(1)} {k.unit}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-[#9BA5B0]">Registro base</span>
+                        )}
+                        {isEstandar && hasPrev && (
+                          <span className="text-[10px] text-amber-500 font-bold">Premium</span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-
-                <div className="w-24 h-48 md:w-32 md:h-56 shrink-0 flex items-center justify-center">
-                  <Model 
-                    bodyType={currentBodyType}
-                    data={[]} 
-                    style={{ width: '100%', height: '100%' }}
-                    bodyColor="#CBD5E1"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-6 text-left flex-1">
-                  {current.grasa_pct != null && current.grasa_pct !== "" && (
-                    <div>
-                      <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">GRASA</p>
-                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.grasa_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
-                    </div>
-                  )}
-                  {current.musculo_pct != null && current.musculo_pct !== "" && (
-                    <div>
-                      <p className="text-[10px] font-bold text-[#6B7A8D] tracking-widest">MÚSCULO</p>
-                      <p className="text-xl md:text-2xl font-bold text-[var(--brand-primary)]">{current.musculo_pct} <span className="text-[10px] md:text-xs text-[#9BA5B0]">%</span></p>
-                    </div>
-                  )}
-                </div>
-
+                  );
+                })}
               </div>
-            </div>
+
+              {/* ── ACORDEÓN DESPLEGABLE: MEDIDAS ADICIONALES ── */}
+              {secondaryKeys.length > 0 && (
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden transition-all">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllMetrics(prev => !prev)}
+                    className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-gray-50/80 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-[#F0F4FA] flex items-center justify-center text-[var(--brand-primary)]">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs md:text-sm font-bold text-[#0B1929]">
+                          {showAllMetrics ? "Ocultar medidas complementarias" : "Ver más medidas y composición"}
+                        </span>
+                        <span className="text-[11px] text-[#6B7A8D] ml-2 font-normal">
+                          ({secondaryKeys.length} {secondaryKeys.length === 1 ? "métrica adicional" : "métricas adicionales"})
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`w-7 h-7 rounded-lg bg-[#F0F4FA] flex items-center justify-center text-[#6B7A8D] transition-transform duration-200 ${showAllMetrics ? "rotate-180" : ""}`}>
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </button>
+
+                  {showAllMetrics && (
+                    <div className="p-4 pt-2 border-t border-[#F0F4FA] bg-[#F8FAFC]">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 pt-2">
+                        {secondaryKeys.map(k => {
+                          const val = current[k.key];
+                          const hasPrev = metricas.length > 1;
+                          const d = (!isEstandar && hasPrev) ? delta(current, prev, k.key) : null;
+                          let colorClass = "text-[#6B7A8D]";
+                          let Icon = Minus;
+                          let sign = "";
+                          
+                          if (d !== null) {
+                            const isImprovement = k.key.includes("grasa") || k.key.includes("cintura") || k.key.includes("cadera") || k.key.includes("icc") ? d < 0 : d > 0;
+                            colorClass = isImprovement ? "text-emerald-600" : "text-rose-600";
+                            Icon = d > 0 ? TrendingUp : TrendingDown;
+                            sign = d > 0 ? "+" : "";
+                          }
+
+                          return (
+                            <div 
+                              key={k.key} 
+                              className="bg-white rounded-xl p-3 border border-[#E2E8F0] shadow-2xs text-center flex flex-col justify-between"
+                            >
+                              <p className="text-[10px] font-bold text-[#6B7A8D] tracking-wide uppercase truncate mb-1">
+                                {k.label}
+                              </p>
+                              <div className="text-base md:text-lg font-bold text-[#0B1929] font-['Rajdhani']">
+                                {val} {k.unit && <span className="text-[10px] font-normal text-[#9BA5B0]">{k.unit}</span>}
+                              </div>
+                              {d !== null ? (
+                                <div className={`flex items-center justify-center gap-0.5 text-[10px] font-bold mt-1 ${colorClass}`}>
+                                  <Icon size={11} />
+                                  <span>{sign}{d.toFixed(1)}{k.unit}</span>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-transparent select-none mt-1">—</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* GRÁFICAS DE EVOLUCIÓN Y SOMATOCARTA */}
             <EvolutionCharts

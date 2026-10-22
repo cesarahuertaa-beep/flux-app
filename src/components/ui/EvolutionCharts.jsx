@@ -167,12 +167,10 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
 
   return (
     <div className="space-y-6 my-6">
-      <div className={`grid grid-cols-1 ${somatoPoints.length > 0 ? "lg:grid-cols-12" : ""} gap-6`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ── 1. CURVA DE EVOLUCIÓN CORPORAL ── */}
         <div
-          className={`relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden ${
-            somatoPoints.length > 0 ? "lg:col-span-7" : ""
-          }`}
+          className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-7"
         >
           {isLocked && (
             <div className="absolute inset-0 z-30 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center">
@@ -351,40 +349,43 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
         </div>
 
         {/* ── 2. SOMATOCARTA DE HEATH-CARTER ── */}
-        {somatoPoints.length > 0 && (
-          <div className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
-            {isLocked && (
-              <div className="absolute inset-0 z-30 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center">
-                <Lock size={36} className="text-amber-400 mb-2" />
-                <h3 className="text-base font-bold text-white mb-1">Somatocarta Heath-Carter</h3>
-                <p className="text-slate-200 text-xs max-w-xs">
-                  Visualiza tu biotipo corporal y su trayectoria hacia el mesomorfismo.
+        <div className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
+          {isLocked && (
+            <div className="absolute inset-0 z-30 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center">
+              <Lock size={36} className="text-amber-400 mb-2" />
+              <h3 className="text-base font-bold text-white mb-1">Somatocarta Heath-Carter</h3>
+              <p className="text-slate-200 text-xs max-w-xs">
+                Visualiza tu biotipo corporal y su trayectoria hacia el mesomorfismo.
+              </p>
+            </div>
+          )}
+
+          <div className={isLocked ? "blur-sm pointer-events-none select-none opacity-50" : ""}>
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-bold text-[#0B1929]">
+                    Somatocarta
+                  </h3>
+                </div>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                  Biotipo de Heath-Carter y trayectoria
                 </p>
               </div>
-            )}
 
-            <div className={isLocked ? "blur-sm pointer-events-none select-none opacity-50" : ""}>
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <Target className="w-4 h-4" />
-                    </div>
-                    <h3 className="text-base md:text-lg font-bold text-[#0B1929]">
-                      Somatocarta
-                    </h3>
-                  </div>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5">
-                    Biotipo de Heath-Carter y trayectoria
-                  </p>
-                </div>
-
-                {activeSomato && (
-                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">
-                    {classifySomatotype(activeSomato.x, activeSomato.y)}
-                  </span>
-                )}
-              </div>
+              {activeSomato ? (
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">
+                  {classifySomatotype(activeSomato.x, activeSomato.y)}
+                </span>
+              ) : (
+                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-2.5 py-0.5 rounded-md whitespace-nowrap">
+                  Antropometría Manual
+                </span>
+              )}
+            </div>
 
               {/* SVG Triángulo de Reuleaux / Somatocarta */}
               <div className="w-full flex justify-center my-1">
@@ -545,8 +546,8 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
                 </svg>
               </div>
 
-              {/* Pie de datos del punto seleccionado */}
-              {activeSomato && (
+              {/* Pie de datos del punto seleccionado o estado informativo */}
+              {activeSomato ? (
                 <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 flex items-center justify-between text-xs mt-2">
                   <div>
                     <p className="text-[10px] font-bold text-[#6B7A8D] uppercase">
@@ -578,11 +579,19 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
                     </div>
                   )}
                 </div>
+              ) : (
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-2.5 text-center mt-2">
+                  <p className="text-[11px] font-bold text-[#0B1929]">
+                    Mapeo de Biotipo Corporal
+                  </p>
+                  <p className="text-[10px] text-[#6B7A8D] mt-0.5">
+                    Calculado automáticamente con pliegues cutáneos y diámetros en el protocolo Manual (ISAK).
+                  </p>
+                </div>
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
   );
 }
