@@ -1,7 +1,7 @@
 {
   "name": "flux-app",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -56,6 +56,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@phelian/react-body-highlighter": "^2.0.7",
+    "@revenuecat/purchases-capacitor": "^13.7.6",
     "@tailwindcss/vite": "^4.3.3",
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
