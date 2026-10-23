@@ -13,6 +13,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
+  const [patrocinios, setPatrocinios] = useState([]); // premium de administrativos (activos e históricos)
   const brand = useBrand();
 
   const loadData = async () => {
@@ -34,6 +35,18 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         });
       }
       if (recibos) setHistorial(recibos);
+      try {
+        const pats = await dbGet(`premium_patrocinado?patrocinador_id=eq.${profileId}&gratis=eq.false&order=activo_desde.asc`);
+        if (pats && pats.length > 0) {
+          const ids = [...new Set(pats.map(x => x.miembro_profile_id))].join(",");
+          const nombres = await dbGet(`profiles?id=in.(${ids})&select=id,nombre`);
+          const nmap = {};
+          (nombres || []).forEach(n => { nmap[n.id] = n.nombre; });
+          setPatrocinios(pats.map(x => ({ ...x, nombre: nmap[x.miembro_profile_id] || "Administrativo" })));
+        } else {
+          setPatrocinios([]);
+        }
+      } catch (e) { console.warn("premium_patrocinado:", e); }
     } catch (e) {
       console.error("Error cargando perfil:", e);
     } finally {
@@ -48,7 +61,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   const isEstudiante = perfil?.role === "nutriologo_estudiante";
 
   // Cálculos de fechas y periodos
-  const { desglose, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff, activeRates, expirationDate, diasRestantesText } = useMemo(() => {
+  const { desglose, adminLines, adminTotal, patientSubtotal, activeCount, currentTier, currentRate, nextTierThreshold, totalAmount, fechaCorteText, nextCutoff, activeRates, expirationDate, diasRestantesText } = useMemo(() => {
     const today = new Date();
 
     // ── MODO ESTUDIANTE: Mensualidad fija de 30 días (rolling) ──
@@ -99,6 +112,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
       return {
         desglose: [],
+        adminLines: [],
+        adminTotal: 0,
+        patientSubtotal: tarifaEstudiante,
         activeCount: activePatientsCount,
         currentTier: 1,
         currentRate: tarifaEstudiante,
@@ -219,22 +235,51 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       total += c.costoPaciente;
     });
 
+    // Administrativos Premium patrocinados (mismas reglas de prorrateo/baja que los pacientes)
+    const DAY = 1000 * 60 * 60 * 24;
+    const adminRate = Number(ratesForThisCutoff.admin_premium ?? 50);
+    const adminLinesCalc = [];
+    (patrocinios || []).forEach(s => {
+      const desde = new Date(s.activo_desde);
+      const hasta = s.desactivado_en ? new Date(s.desactivado_en) : null;
+      let dias = 0;
+      let inicio = lastCutoff;
+      let fin = nextCutoff;
+      if (!hasta) {
+        if (desde < lastCutoff) { dias = 30; }
+        else { dias = Math.min(30, Math.ceil(Math.abs(nextCutoff - desde) / DAY)); inicio = desde; }
+      } else if (hasta > lastCutoff) {
+        const start = desde > lastCutoff ? desde : lastCutoff;
+        const diasActivo = Math.ceil(Math.abs(hasta - start) / DAY);
+        if (diasActivo < 20) { dias = 30; }
+        else { dias = Math.min(diasActivo, 30); inicio = start; fin = hasta; }
+      }
+      if (dias > 0) {
+        const periodoStr = `${inicio.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})} al ${fin.toLocaleDateString('es-MX', {day:'2-digit', month:'short'})}`;
+        adminLinesCalc.push({ id: s.id, nombre: s.nombre, diasCobrar: dias, periodoStr, costo: (adminRate / 30) * dias, activo: !s.desactivado_en });
+      }
+    });
+    const adminTotalCalc = adminLinesCalc.reduce((a, l) => a + l.costo, 0);
+
     const strCorte = nextCutoff.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' });
 
     return { 
       desglose: dataList, 
+      adminLines: adminLinesCalc,
+      adminTotal: adminTotalCalc,
+      patientSubtotal: total,
       activeCount: activePatientsCount, 
       currentTier: tier, 
       currentRate: rate, 
       nextTierThreshold: threshold, 
-      totalAmount: total, 
+      totalAmount: total + adminTotalCalc, 
       fechaCorteText: strCorte,
       nextCutoff,
       activeRates: ratesForThisCutoff,
       expirationDate: null,
       diasRestantesText: null
     };
-  }, [clientes, perfil, loading, rawCfg, historial, isEstudiante, profileId]);
+  }, [clientes, perfil, loading, rawCfg, historial, isEstudiante, profileId, patrocinios]);
 
   // Estado del componente
   const status ="active"; // active, pending, review
@@ -260,6 +305,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const reciboRes = await dbPost('recibos_pago', {
         nutriologo_id: profileId,
         monto: totalAmount,
+        monto_admin_premium: adminTotal || 0,
         fecha_corte_mes: nextCutoff.toISOString().split('T')[0],
         comprobante_url: url,
         estado: 'pendiente'
@@ -496,6 +542,23 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                         ))
                       )}
                     </div>
+
+                    {adminLines.length > 0 && (
+                      <div className="border-t border-[#E2E8F0]">
+                        <div className="px-6 py-3 bg-amber-50/60 text-xs font-bold text-amber-700 uppercase tracking-wider">Administrativos Premium</div>
+                        <div className="divide-y divide-gray-100">
+                          {adminLines.map(l => (
+                            <div key={l.id} className="px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+                              <div>
+                                <p className="font-semibold text-[#0B1929]">{l.nombre}{!l.activo && <span className="ml-2 text-[11px] font-medium text-[#6B7A8D]">(dado de baja)</span>}</p>
+                                <p className="text-xs text-[#6B7A8D]">{l.periodoStr} · {l.diasCobrar}/30 días</p>
+                              </div>
+                              <p className="font-bold text-[var(--brand-primary)]">${l.costo.toFixed(2)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Total Summary */}
@@ -503,8 +566,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <p className="text-sm font-bold text-[#6B7A8D]">Subtotal por volumen ({activeCount} pac. a ${currentRate})</p>
-                        <p className="font-bold text-[#0B1929]">${totalAmount.toFixed(2)}</p>
+                        <p className="font-bold text-[#0B1929]">${patientSubtotal.toFixed(2)}</p>
                       </div>
+                      {adminLines.length > 0 && (
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm font-bold text-[#6B7A8D]">Administrativos Premium ({adminLines.length})</p>
+                          <p className="font-bold text-[#0B1929]">${adminTotal.toFixed(2)}</p>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                         <p className="text-sm font-bold text-[#6B7A8D] flex items-center gap-1">
                           Ajuste por mes forzoso pendiente <Info size={14} className="text-gray-400"/>

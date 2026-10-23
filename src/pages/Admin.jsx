@@ -126,6 +126,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
         // ── LOGICA PARA CIVILES (Suscripción rolling de 30 días) ──
         if (isCivil && clienteData) {
+          // Premium de equipo (staff por defecto o patrocinado por un nutriólogo): lo valida el servidor
+          try {
+            const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen`);
+            const origen = fresh?.[0]?.premium_origen;
+            if (origen === 'staff' || origen === 'patrocinado') {
+              await dbPost('rpc/verificar_premium_cliente', { p_cliente: clienteData.id });
+              setBloqueado(false);
+              setDiasGracia(false);
+              return;
+            }
+          } catch (e) { console.warn('verificar_premium_cliente:', e); }
+
           // Buscamos su último recibo válido (aprobado o pendiente)
           const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
           const lastValid = recibos?.find(r => r.estado === 'aprobado');
@@ -1204,7 +1216,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {!isCivil && role !== "administrativo" && role !== "staff" && (tab === "equipo" || visitedTabs.has("equipo")) && (
         <div className={tab === "equipo" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
-            <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin}/>
+            <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin} role={role}/>
           </SubComponentWrapper>
         </div>
       )}

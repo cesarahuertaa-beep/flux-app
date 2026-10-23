@@ -1,15 +1,16 @@
 import { useBrand } from "../BrandContext";
 import { useState, useEffect, useCallback } from "react";
-import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2 } from "lucide-react";
+import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2, Crown } from "lucide-react";
 import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { getLatestConfiguredRates } from "../../utils/tarifas";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
 // Permite que un nutriólogo invite y gestione a su personal administrativo.
 // El administrativo queda ligado al nutriologo_id del creador.
 // ────────────────────────────────────────────────────────────────────────────
 
-export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
+export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   const [equipo, setEquipo]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showInvite, setShowInvite] = useState(false);
@@ -23,9 +24,16 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   // Interceptor State
   const [conflictUser, setConflictUser] = useState(null);
 
+  // Premium patrocinado (administrativos)
+  const isEstudiante = role === "nutriologo_estudiante";
+  const [patrocinios, setPatrocinios] = useState({}); // miembro_profile_id -> registro activo
+  const [tarifaAdmin, setTarifaAdmin] = useState(50);
+  const [confirmPremium, setConfirmPremium] = useState(null); // { miembro, activar }
+
   useBackButton(!!conflictUser, () => setConflictUser(null), 30);
   useBackButton(showInvite, () => setShowInvite(false), 20);
   useBackButton(!!editUser, () => setEditUser(null), 20);
+  useBackButton(!!confirmPremium, () => setConfirmPremium(null), 30);
 
   const myId = profileId || getProfileId();
 
@@ -38,6 +46,20 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
         (isSuperadmin && r.role ==="staff")
       );
       setEquipo(myTeam);
+
+      // Patrocinios premium activos + tarifa vigente (solo aplica a nutriólogos)
+      if (!isSuperadmin) {
+        try {
+          const [pats, cfg] = await Promise.all([
+            dbGet(`premium_patrocinado?patrocinador_id=eq.${myId}&desactivado_en=is.null`),
+            dbGet("configuracion_plataforma?id=eq.1")
+          ]);
+          const m = {};
+          (pats || []).forEach(x => { m[x.miembro_profile_id] = x; });
+          setPatrocinios(m);
+          if (cfg && cfg.length > 0) setTarifaAdmin(getLatestConfiguredRates(cfg[0]).admin_premium);
+        } catch { }
+      }
     } catch { }
     setLoading(false);
   }, [myId, isSuperadmin]);
@@ -49,6 +71,10 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     const cleanNombre = (form.nombre || "").trim();
     if (!cleanEmail || !cleanNombre) {
       setMsg("⚠️ Nombre y email son obligatorios");
+      return;
+    }
+    if (isEstudiante && equipo.length >= 1) {
+      setMsg("⚠️ Como nutriólogo estudiante solo puedes tener 1 administrativo");
       return;
     }
     setSaving(true);
@@ -115,6 +141,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   };
 
   const resolveConflict = async (useNewData) => {
+    if (isEstudiante && equipo.length >= 1) {
+      setMsg("⚠️ Como nutriólogo estudiante solo puedes tener 1 administrativo");
+      setConflictUser(null);
+      return;
+    }
     setSaving(true);
     try {
       const p = conflictUser.profile;
@@ -162,6 +193,21 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
     } catch (e) {
       setMsg("❌ Error al otorgar accesos: " + e.message);
     }
+    setSaving(false);
+  };
+
+  const cambiarPremium = async () => {
+    if (!confirmPremium) return;
+    const { miembro, activar } = confirmPremium;
+    setSaving(true);
+    try {
+      await dbPost(activar ? "rpc/activar_premium_equipo" : "rpc/desactivar_premium_equipo", { p_miembro: miembro.id });
+      setMsg(activar
+        ? `✅ ${miembro.nombre || "El administrativo"} ahora tiene cuenta Premium de atleta`
+        : `Premium retirado a ${miembro.nombre || "el administrativo"}`);
+      setConfirmPremium(null);
+      load();
+    } catch (e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
@@ -286,11 +332,29 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
                     {p.activo !== false ? <Circle className="w-3 h-3 fill-current" /> : <CircleDashed className="w-3 h-3" />}
                     {p.activo !== false ?"Activo" :"Suspendido"}
                   </span>
+                  {p.role === "staff" && (
+                    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
+                      <Crown className="w-3 h-3" /> Premium incluido
+                    </span>
+                  )}
+                  {p.role === "administrativo" && patrocinios[p.id] && (
+                    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
+                      <Crown className="w-3 h-3" /> Premium{patrocinios[p.id].gratis ? " (incluido)" : ""}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Acciones */}
               <div className="flex gap-2 items-center flex-wrap">
+                {!isSuperadmin && p.role === "administrativo" && (
+                  <button
+                    onClick={() => setConfirmPremium({ miembro: p, activar: !patrocinios[p.id] })}
+                    className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 ${patrocinios[p.id] ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-[#E2E8F0] text-[#6B7A8D] hover:bg-[#F8FAFC]"}`}
+                  >
+                    <Crown className="w-3.5 h-3.5" /> {patrocinios[p.id] ? "Quitar Premium" : "Dar Premium"}
+                  </button>
+                )}
                 <button 
                   onClick={() => {
                     setEditUser(p);
@@ -309,6 +373,40 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal confirmación Premium patrocinado */}
+      {confirmPremium && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2 mb-3">
+              <Crown className="w-5 h-5 text-amber-500" />
+              {confirmPremium.activar ? "Activar Premium" : "Quitar Premium"}
+            </h3>
+            {confirmPremium.activar ? (
+              <p className="text-sm text-[#6B7A8D] leading-relaxed mb-5">
+                <strong className="text-[#0B1929]">{confirmPremium.miembro.nombre}</strong> tendrá una cuenta Premium de atleta independiente
+                (desde "Cambiar Perfil"). {isEstudiante
+                  ? <>Como estudiante, este beneficio <strong>no tiene costo</strong> para ti.</>
+                  : <>Se agregarán <strong className="text-[#0B1929]">${Number(tarifaAdmin).toFixed(2)} MXN / mes</strong> a tu facturación, prorrateado como tus pacientes.</>}
+                {" "}Si tu cuenta tiene un adeudo y se bloquea, el Premium se suspende.
+              </p>
+            ) : (
+              <p className="text-sm text-[#6B7A8D] leading-relaxed mb-5">
+                {confirmPremium.miembro.nombre} volverá al plan Estándar. El cobro se calcula con la misma regla de bajas que tus pacientes
+                (si llevaba menos de 20 días en el ciclo se factura el mes completo).
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmPremium(null)} disabled={saving}
+                className="px-4 py-2 text-sm font-bold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC]">Cancelar</button>
+              <button onClick={cambiarPremium} disabled={saving}
+                className="px-4 py-2 text-sm font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 disabled:opacity-50">
+                {saving ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

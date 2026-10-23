@@ -43,6 +43,7 @@ export default function ControlPagos({ setMsg }) {
     nutri_tier3: DEFAULT_RATES.nutri_tier3,
     nutri_estudiante: DEFAULT_RATES.nutri_estudiante,
     civil_premium: DEFAULT_RATES.civil_premium,
+    admin_premium: DEFAULT_RATES.admin_premium,
     comision_pct: DEFAULT_RATES.comision_pct
   });
 
@@ -64,6 +65,7 @@ export default function ControlPagos({ setMsg }) {
           nutri_tier3: latest.nutri_tier3,
           nutri_estudiante: latest.nutri_estudiante,
           civil_premium: latest.civil_premium,
+          admin_premium: latest.admin_premium,
           comision_pct: latest.comision_pct
         });
       }
@@ -94,6 +96,7 @@ export default function ControlPagos({ setMsg }) {
         nutri_tier3: Number(ratesForm.nutri_tier3) || 0,
         nutri_estudiante: Number(ratesForm.nutri_estudiante) || 0,
         civil_premium: Number(ratesForm.civil_premium) || 0,
+        admin_premium: Number(ratesForm.admin_premium) || 0,
         comision_pct: Number(ratesForm.comision_pct) || 0,
         effective_from: nextCutoffStr,
         updated_at: new Date().toISOString()
@@ -176,7 +179,8 @@ export default function ControlPagos({ setMsg }) {
       if (!nutri || !nutri.creado_por) return;
       const colab = nutri.creado_por;
       if (!map[colab]) map[colab] = { totalGenerado: 0, comisionAcumulada: 0, nutriologos: new Set(), recibosCount: 0 };
-      const montoRecibo = Number(r.monto) || 0;
+      // Los administrativos premium patrocinados NO generan comisión para el staff
+      const montoRecibo = Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0));
       const ratesForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
       const pct = (Number(ratesForCut.comision_pct) || 35) / 100;
       map[colab].totalGenerado += montoRecibo;
@@ -393,6 +397,23 @@ export default function ControlPagos({ setMsg }) {
                         min="0"
                         value={ratesForm.nutri_estudiante}
                         onChange={e => setRatesForm(p => ({ ...p, nutri_estudiante: e.target.value }))}
+                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                    </div>
+                  </div>
+                  <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-indigo-600">Administrativo Premium</label>
+                      <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado / mes</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ratesForm.admin_premium}
+                        onChange={e => setRatesForm(p => ({ ...p, admin_premium: e.target.value }))}
                         className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
                       />
                       <span className="text-[11px] text-[#6B7A8D]">MXN</span>

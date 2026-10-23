@@ -15,6 +15,8 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState([]);
+  const [origen, setOrigen] = useState(clienteData?.premium_origen || null); // null | pago | staff | patrocinado
+  const [patrocinador, setPatrocinador] = useState("");
 
   // Cálculos de fecha de vencimiento (Rolling 30 days)
   const { targetCutoff, expirationDate } = React.useMemo(() => {
@@ -89,6 +91,18 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         });
       }
       if (recibos) setHistorial(recibos);
+      try {
+        const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen`);
+        const o = fresh?.[0]?.premium_origen || null;
+        setOrigen(o);
+        if (o === "patrocinado" && clienteData.auth_id) {
+          const pat = await dbGet(`premium_patrocinado?miembro_profile_id=eq.${clienteData.auth_id}&desactivado_en=is.null`);
+          if (pat?.[0]) {
+            const prof = await dbGet(`profiles?id=eq.${pat[0].patrocinador_id}&select=nombre,nombre_marca`);
+            setPatrocinador(prof?.[0]?.nombre_marca || prof?.[0]?.nombre || "tu nutriólogo");
+          }
+        }
+      } catch (e) { console.warn("premium_origen:", e); }
     } catch (e) {
       console.error("Error cargando config de pago:", e);
     } finally {
@@ -153,6 +167,49 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       e.target.value ="";
     }
   };
+
+  // Premium incluido por equipo (staff) o patrocinado por un nutriólogo: sin cobro al atleta
+  if (origen === "staff" || origen === "patrocinado") {
+    return (
+      <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-4">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-[#0B1929]">Tu Membresía (Atleta Independiente)</h2>
+            <p className="text-[#6B7A8D] mt-1">
+              {origen === "staff"
+                ? "Tu cuenta Premium está incluida por ser parte del Staff de FLUX."
+                : `Tu cuenta Premium es cortesía de ${patrocinador || "tu nutriólogo"}.`}
+            </p>
+          </div>
+          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap">
+            <CheckCircle2 size={18} />
+            Premium Activo
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[var(--brand-primary)]">
+          <h3 className="text-lg font-bold text-[#0B1929] mb-4">Incluye</h3>
+          <ul className="space-y-3">
+            {[
+              { icon: <Dumbbell size={15} />, text: "Constructor de rutinas ilimitado" },
+              { icon: <FileText size={15} />, text: "Planeación nutricional propia" },
+              { icon: <BarChart2 size={15} />, text: "Seguimiento de progreso y métricas" },
+              { icon: <ShieldCheck size={15} />, text: "Modo Atleta con cronómetro" }
+            ].map((b, i) => (
+              <li key={i} className="flex items-center gap-2.5 text-sm text-[#0B1929] font-medium">
+                <span className="text-[var(--brand-primary)]">{b.icon}</span>
+                {b.text}
+              </li>
+            ))}
+          </ul>
+          {origen === "patrocinado" && (
+            <p className="text-xs text-[#6B7A8D] mt-5">
+              Si tu acceso como administrativo termina o el patrocinio se suspende, volverás al plan Estándar.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-4">
