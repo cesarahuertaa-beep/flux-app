@@ -15,6 +15,11 @@ export function AppUpdater() {
 
   useEffect(() => {
     const checkForUpdate = async () => {
+      // Si está en la app nativa de Android con soporte de Google Play In-App Updates,
+      // el sistema nativo de Google Play gestiona las actualizaciones automáticamente.
+      if (typeof window !== 'undefined' && window.FluxPlayUpdate?.isPlayStoreSupported?.()) {
+        return;
+      }
       if (!Capacitor.isNativePlatform()) return;
       try {
         const currentInfo = await App.getInfo();
@@ -44,7 +49,7 @@ export function AppUpdater() {
     checkForUpdate();
   }, []);
 
-  if (!updateInfo || dismissed) return null;
+  if (!updateInfo || dismissed || (typeof window !== 'undefined' && window.FluxPlayUpdate?.isPlayStoreSupported?.())) return null;
 
   const targetUrl = updateInfo.android?.playStoreUrl || PLAY_STORE_URL;
 
