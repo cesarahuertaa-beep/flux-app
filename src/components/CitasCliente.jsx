@@ -4,6 +4,7 @@ import {
   CalendarDays, Clock, Video, MapPin, Check, X,
   AlertCircle, Plus, CheckCircle2, ChevronRight, Star
 } from"lucide-react";
+import { useBackButton } from"../lib/backButtonHandler";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -86,6 +87,13 @@ export function CitasCliente({ cliente }) {
   
   // Estados del Modal de Calificar
   const [ratingModal, setRatingModal] = useState({ open: false, citaId: null, puntuacion: 5, comentario:"" });
+  
+  useBackButton(ratingModal.open, () => setRatingModal(prev => ({ ...prev, open: false })), 30);
+  useBackButton(showModal, () => {
+    setShowModal(false);
+    setSelectedDate("");
+    setSelectedSlot(null);
+  }, 20);
   
   // Formulario
   const [selectedDate, setSelectedDate] = useState("");

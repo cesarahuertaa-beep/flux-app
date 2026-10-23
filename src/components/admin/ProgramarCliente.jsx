@@ -22,6 +22,7 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 const ProgresoCliente = lazy(() => import("./ProgresoCliente").then(m => ({ default: m.ProgresoCliente })));
 const TemplatesManagerModal = lazy(() => import("../ui/TemplatesManagerModal"));
@@ -80,6 +81,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
   const imgCropRef = useRef(null);
+
+  useBackButton(!!cropModal, () => {
+    if (cropModal?.objectUrl) {
+      try { URL.revokeObjectURL(cropModal.objectUrl); } catch (e) {}
+    }
+    setCropModal(null);
+  }, 50);
+  useBackButton(!!templateModal, () => setTemplateModal(null), 40);
+  useBackButton(!!showDiaModal, () => setShowDiaModal(false), 20);
+  useBackButton(!!showRutinaModal, () => setShowRutinaModal(false), 20);
+  useBackButton(!!showPlanModal, () => setShowPlanModal(false), 20);
   
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre ||"Desconocido";
 

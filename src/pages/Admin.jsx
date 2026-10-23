@@ -11,6 +11,7 @@ import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
 import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
+import { useBackButton } from "../lib/backButtonHandler";
 
 const Biblioteca = lazy(() => import("../components/admin/Biblioteca").then(m => ({ default: m.Biblioteca })));
 const ProgramarCliente = lazy(() => import("../components/admin/ProgramarCliente").then(m => ({ default: m.ProgramarCliente })));
@@ -473,6 +474,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   }, [isSuperadmin]);
 
   const [conflictClient, setConflictClient] = useState(null);
+
+  useBackButton(!!conflictClient, () => setConflictClient(null), 30);
+  useBackButton(!!showNewClient, () => setShowNewClient(false), 20);
+  useBackButton(!!editClient, () => setEditClient(null), 20);
+  useBackButton(!!selectedWaClient, () => setSelectedWaClient(null), 25);
+  useBackButton(!!selected, () => setSelected(null), 5);
 
   const createClient = async () => {
     const cleanEmail = (newClient.email || "").trim().toLowerCase();

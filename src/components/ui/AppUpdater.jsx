@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Download, X } from 'lucide-react';
+import { useBackButton } from '../../lib/backButtonHandler';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.fluxsport.app';
 
 export function AppUpdater() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [dismissed, setDismissed] = useState(false);
+
+  const canDismiss = !updateInfo?.android?.forceUpdate && !updateInfo?.force;
+  useBackButton(!dismissed && !!updateInfo && canDismiss, () => setDismissed(true), 150);
 
   useEffect(() => {
     const checkForUpdate = async () => {

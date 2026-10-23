@@ -9,6 +9,7 @@ import {
   setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal, dbPatch,
   captureAuthHashSynchronously
 } from "../lib/supabase";
+import { useBackButton } from "../lib/backButtonHandler";
 
 const FALLBACK_SHOWCASE = [
   { id: "fb-1", name: "FLUX Clinical", specialty: "Nutrición Clínica", logo_url: "/flux_logo.jpeg", verified: true, badge: "Especialistas" },
@@ -50,6 +51,8 @@ export default function Login({ onLogin }) {
     if (saved === "set_password" && !sessionStorage.getItem('flux_pending_auth_token')) return "welcome";
     return saved;
   });
+
+  useBackButton(mode !== "welcome" && mode !== "set_password", () => setMode("welcome"), 5);
   const [nombre, setNombre] = useState(() => sessionStorage.getItem('flux_login_nombre') || "");
   const [email, setEmail] = useState(() => sessionStorage.getItem('flux_login_email') || "");
   const [pass, setPass] = useState("");

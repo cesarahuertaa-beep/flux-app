@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { ListSkeleton } from "../ui/Skeleton";
+import { useBackButton } from"../../lib/backButtonHandler";
 import {
   Clock,
   Clock3,
@@ -51,22 +52,25 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
   );
 };
 
-const Modal = ({ title, onClose, children }) => createPortal(
-  <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
-      <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
-        <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
-        <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
-          <XCircle className="w-5 h-5" />
-        </button>
+const Modal = ({ title, onClose, children }) => {
+  useBackButton(true, onClose, 20);
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+          <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
+          <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 flex flex-col gap-4">
+          {children}
+        </div>
       </div>
-      <div className="p-6 flex flex-col gap-4">
-        {children}
-      </div>
-    </div>
-  </div>,
-  document.body
-);
+    </div>,
+    document.body
+  );
+};
 
 const Field = ({ label, children }) => (
   <div className="flex flex-col gap-1.5">
@@ -129,6 +133,10 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
   const [myProfile, setMyProfile]           = useState(null);
   const [selectedWaCita, setSelectedWaCita] = useState(null);
+
+  useBackButton(!!modalRechazo, () => setModalRechazo(null), 25);
+  useBackButton(showHorario, () => setShowHorario(false), 20);
+  useBackButton(!!selectedWaCita, () => setSelectedWaCita(null), 25);
 
   const myId = profileId || getProfileId();
 

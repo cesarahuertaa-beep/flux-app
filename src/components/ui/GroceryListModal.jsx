@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { X, ShoppingBag, Check, Copy, CheckCheck, Search, Trash2, Filter, Utensils, Apple, Wheat, Milk, Package } from "lucide-react";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 // Categorías del supermercado
 const CATEGORIAS = {
@@ -222,6 +223,7 @@ function parseDietIngredients(dias, incluirAlternativas = false) {
 }
 
 export default function GroceryListModal({ dias = [], onClose, clienteNombre, semanaActualCiclo = 1 }) {
+  useBackButton(true, onClose, 60);
   const [incluirAlt, setIncluirAlt] = useState(false);
   const [activeFilter, setActiveFilter] = useState("todos");
   const [search, setSearch] = useState("");

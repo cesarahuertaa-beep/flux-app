@@ -3,6 +3,7 @@ import { calculateBodyComposition } from"../../lib/bodyComposition";
 import { createPortal } from"react-dom";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
+import { useBackButton } from"../../lib/backButtonHandler";
 import { generateProgresoPDF } from"../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from"../../utils/helpers";
 import { 
@@ -140,6 +141,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [editingId,    setEditingId]    = useState(null); // null=new, ID=editing
   const [existingFotos,setExistingFotos]= useState([]);   // fotos ya guardadas al editar
   const brand = useBrand();
+
+  useBackButton(!!lightbox, () => setLightbox(null), 100);
+  useBackButton(showModal, () => setShowModal(false), 20);
 
   const load = useCallback(async () => {
     if (!selected) return;

@@ -3,6 +3,7 @@ import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
 import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save } from"lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
 import { ListSkeleton } from"../ui/Skeleton";
+import { useBackButton } from"../../lib/backButtonHandler";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
 const StatusBadge = ({ s }) => {
@@ -18,6 +19,9 @@ export default function ControlPagos({ setMsg }) {
   const [nutriologos, setNutriologos] = useState({});
   const [loading, setLoading] = useState(true);
   const [modalImg, setModalImg] = useState(null);
+
+  useBackButton(!!modalImg, () => setModalImg(null), 50);
+
   const [filtroEstado, setFiltroEstado] = useState("pendiente");
   const [filtroMes, setFiltroMes] = useState("todos");
   const [expandedColab, setExpandedColab] = useState(null);

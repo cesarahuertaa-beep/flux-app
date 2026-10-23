@@ -2,6 +2,7 @@ import { useState } from"react";
 import { GRUPOS } from"../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from"lucide-react";
+import { useBackButton } from"../../lib/backButtonHandler";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
@@ -12,6 +13,9 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [filtroGrupo, setFiltroGrupo] = useState("Todos");
     const [busqueda, setBusqueda]   = useState("");
   const [preview, setPreview]     = useState(null);
+
+  useBackButton(!!preview, () => setPreview(null), 50);
+  useBackButton(showModal, () => setShowModal(false), 20);
 
   const uploadGif = async (file) => {
     setUploading(true);

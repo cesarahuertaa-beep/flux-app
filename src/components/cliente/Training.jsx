@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 function TimerCard({ brandColor }) {
   const [seconds, setSeconds] = useState(90);
@@ -198,6 +199,9 @@ export default function Training({
   const [activeVariant,   setActiveVariant]   = useState({}); // { [exId]: 'original' | 'alt_0' }
   const [previewEx, setPreviewEx] = useState(null);
   const [showResumen,     setShowResumen]     = useState(false);
+
+  useBackButton(!!previewEx, () => setPreviewEx(null), 50);
+  useBackButton(showResumen, () => setShowResumen(false), 30);
   const [unitPrefs,       setUnitPrefs]       = useState({}); // { [exId_variantId]: 'kg' | 'lb' }
   const [focusedInput,    setFocusedInput]    = useState(null); // { exId, wi, si }
   // Local raw text while user is typing — prevents React from overwriting mid-keystroke

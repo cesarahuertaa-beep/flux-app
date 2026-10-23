@@ -7,6 +7,7 @@ import { useBrand } from "../BrandContext";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { MetricsSkeleton } from "../ui/Skeleton";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -84,6 +85,8 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [fullImage, setFullImage] = useState(null);
   const [showAllMetrics, setShowAllMetrics] = useState(false);
   const fileInputRef = useRef(null);
+
+  useBackButton(!!fullImage, () => setFullImage(null), 100);
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;

@@ -1,11 +1,15 @@
 import { useState, useEffect } from"react";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, ShoppingBag } from"lucide-react";
+import { useBackButton } from"../../lib/backButtonHandler";
 
 export default function GestorTienda({ setMsg }) {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+
+  useBackButton(showModal, () => setShowModal(false), 20);
+
   const [editProd, setEditProd] = useState(null);
   const [form, setForm] = useState({
     nombre:"", subtitulo:"", precio:"", categoria:"suplemento", variantes:"", badge:"", imagen_url:""

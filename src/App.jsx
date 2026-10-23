@@ -5,6 +5,7 @@ import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSession
 import { syncQueue } from "./lib/offlineQueue";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
+import { initBackButtonHandler } from "./lib/backButtonHandler";
 
 const detectIsAppMode = () => {
   if (typeof window === "undefined") return false;
@@ -78,6 +79,7 @@ export default function App() {
   const [restoring,  setRestoring]  = useState(true);
 
   useEffect(() => {
+    initBackButtonHandler();
     const handleHashChange = () => {
       if (captureAuthHashSynchronously(detectIsAppMode())) {
         setSession(null);

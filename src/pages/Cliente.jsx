@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
 import { dbGet, dbUpsert } from "../lib/supabase";
+import { useBackButton } from "../lib/backButtonHandler";
 import { enqueue, getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
@@ -26,6 +27,8 @@ const offlineAwareUpsert = async (records) => {
 export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;
   const brand = useBrand();
+
+  useBackButton(isAtletaMode && typeof onBackToAdmin === "function", onBackToAdmin, 5);
   
   const [tabState, setTab] = useState(() => {
     const saved = sessionStorage.getItem("flux_cliente_tab");

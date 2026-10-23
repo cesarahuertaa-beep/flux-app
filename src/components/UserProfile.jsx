@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import DatosPersonalesCard from "./admin/DatosPersonalesCard";
 import { syncPersonalData } from "../lib/supabase";
 import RoleSwitcher from "./RoleSwitcher";
+import { useBackButton } from "../lib/backButtonHandler";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const navigate = useNavigate();
@@ -31,6 +32,8 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  useBackButton(showDeleteModal && !isDeleting, () => setShowDeleteModal(false), 40);
 
   useEffect(() => {
     if (isCliente && user?.nutriologo_id) {

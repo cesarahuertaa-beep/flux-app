@@ -2,6 +2,7 @@ import { useBrand } from "../BrandContext";
 import { useState, useEffect, useCallback } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2 } from "lucide-react";
 import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 // ─── GestionEquipo ──────────────────────────────────────────────────────────
 // Permite que un nutriólogo invite y gestione a su personal administrativo.
@@ -21,6 +22,10 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin }) {
   
   // Interceptor State
   const [conflictUser, setConflictUser] = useState(null);
+
+  useBackButton(!!conflictUser, () => setConflictUser(null), 30);
+  useBackButton(showInvite, () => setShowInvite(false), 20);
+  useBackButton(!!editUser, () => setEditUser(null), 20);
 
   const myId = profileId || getProfileId();
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
 import { dbGet } from "../../lib/supabase";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 // Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
 const DEFAULT_NUTRI_TEMPLATES = [];
@@ -16,6 +17,7 @@ export default function TemplatesManagerModal({
   onClose,
   setMsg
 }) {
+  useBackButton(true, onClose, 60);
   const [tab, setTab] = useState("cargar"); // "cargar" | "guardar" | "clonar"
   const storageKey = type === "nutri" ? "flux_plantillas_nutri" : "flux_plantillas_rutinas";
 
