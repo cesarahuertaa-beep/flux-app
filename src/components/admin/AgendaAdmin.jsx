@@ -18,6 +18,7 @@ import {
   Plus,
   ChevronDown,
   MapPin,
+  Edit2,
   X
 } from"lucide-react";
 
@@ -130,12 +131,16 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [saving, setSaving]                 = useState(false);
   const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
+  const [editingHorarioId, setEditingHorarioId] = useState(null);
   const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
   const [myProfile, setMyProfile]           = useState(null);
   const [selectedWaCita, setSelectedWaCita] = useState(null);
 
   useBackButton(!!modalRechazo, () => setModalRechazo(null), 25);
-  useBackButton(showHorario, () => setShowHorario(false), 20);
+  useBackButton(showHorario, () => {
+    setShowHorario(false);
+    setEditingHorarioId(null);
+  }, 20);
   useBackButton(!!selectedWaCita, () => setSelectedWaCita(null), 25);
 
   const myId = profileId || getProfileId();
@@ -273,13 +278,45 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setSaving(false);
   };
 
-  const agregarHorario = async () => {
+  const abrirNuevoHorario = () => {
+    setEditingHorarioId(null);
+    setHorarioForm({ dia_semana: 1, hora_inicio: "09:00", hora_fin: "17:00" });
+    setShowHorario(true);
+  };
+
+  const abrirEditarHorario = (h) => {
+    setEditingHorarioId(h.id);
+    setHorarioForm({
+      dia_semana: h.dia_semana,
+      hora_inicio: h.hora_inicio?.slice(0, 5) || "09:00",
+      hora_fin: h.hora_fin?.slice(0, 5) || "17:00"
+    });
+    setShowHorario(true);
+  };
+
+  const guardarHorario = async () => {
+    if (horarioForm.hora_inicio >= horarioForm.hora_fin) {
+      setMsg("❌ La hora de fin debe ser posterior a la hora de inicio");
+      return;
+    }
+    setSaving(true);
     try {
-      await dbPost("disponibilidad", { ...horarioForm, nutriologo_id: myId });
-      setMsg("Horario guardado");
+      if (editingHorarioId) {
+        await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, {
+          dia_semana: horarioForm.dia_semana,
+          hora_inicio: horarioForm.hora_inicio,
+          hora_fin: horarioForm.hora_fin
+        });
+        setMsg("Horario actualizado");
+      } else {
+        await dbPost("disponibilidad", { ...horarioForm, nutriologo_id: myId });
+        setMsg("Horario guardado");
+      }
       setShowHorario(false);
+      setEditingHorarioId(null);
       loadDisponibilidad();
     } catch (e) { setMsg(e.message); }
+    setSaving(false);
   };
 
   const eliminarHorario = async (id) => {
@@ -489,7 +526,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             <div className="text-sm text-[#6B7A8D]">
               Define los días y horas en que los clientes pueden solicitar una cita.
             </div>
-            <Btn small grad onClick={() => setShowHorario(true)}>
+            <Btn small grad onClick={abrirNuevoHorario}>
               <Plus className="w-4 h-4" /> Agregar horario
             </Btn>
           </div>
@@ -498,7 +535,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
               <div className="text-[15px] font-semibold text-[#0B1929] mb-2">Sin horarios configurados</div>
               <div className="text-sm text-[#6B7A8D] mb-5">Agrega tu disponibilidad para que los clientes puedan solicitar citas</div>
-              <Btn small grad onClick={() => setShowHorario(true)}>
+              <Btn small grad onClick={abrirNuevoHorario}>
                 <Plus className="w-4 h-4" /> Agregar primer horario
               </Btn>
             </div>
@@ -514,9 +551,14 @@ export function AgendaAdmin({ setMsg, profileId }) {
                       <Clock3 className="w-4 h-4" /> {h.hora_inicio?.slice(0, 5)} – {h.hora_fin?.slice(0, 5)}
                     </div>
                   </div>
-                  <Btn small outline danger onClick={() => eliminarHorario(h.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Btn>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Btn small outline onClick={() => abrirEditarHorario(h)} title="Editar horario">
+                      <Edit2 className="w-3.5 h-3.5 text-[#6B7A8D]" />
+                    </Btn>
+                    <Btn small outline danger onClick={() => eliminarHorario(h.id)} title="Eliminar horario">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Btn>
+                  </div>
                 </div>
               ))}
             </div>
@@ -550,9 +592,12 @@ export function AgendaAdmin({ setMsg, profileId }) {
         </Modal>
       )}
 
-      {/* Modal Agregar Horario */}
+      {/* Modal Agregar / Editar Horario */}
       {showHorario && (
-        <Modal title="Agregar disponibilidad" onClose={() => setShowHorario(false)}>
+        <Modal 
+          title={editingHorarioId ? "Editar disponibilidad" : "Agregar disponibilidad"} 
+          onClose={() => { setShowHorario(false); setEditingHorarioId(null); }}
+        >
           <Field label="Día de la semana">
             <select 
               className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
@@ -583,8 +628,10 @@ export function AgendaAdmin({ setMsg, profileId }) {
             </Field>
           </div>
           <div className="flex gap-2 justify-end mt-3">
-            <Btn outline onClick={() => setShowHorario(false)}>Cancelar</Btn>
-            <Btn grad onClick={agregarHorario}>Guardar horario</Btn>
+            <Btn outline onClick={() => { setShowHorario(false); setEditingHorarioId(null); }}>Cancelar</Btn>
+            <Btn grad onClick={guardarHorario} disabled={saving}>
+              {saving ? "Guardando…" : (editingHorarioId ? "Guardar cambios" : "Guardar horario")}
+            </Btn>
           </div>
         </Modal>
       )}
