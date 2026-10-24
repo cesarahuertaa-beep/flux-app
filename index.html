@@ -1,16 +1,22 @@
-
 <!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="FLUX — Plataforma de nutrición y entrenamiento personalizado para atletas. Gestiona planes de nutrición, rutinas y progreso." />
-    <meta name="theme-color" content="#04080f" />
+    <meta name="theme-color" content="#FFFFFF" />
     <link rel="icon" type="image/jpeg" href="/flux_logo.jpeg" />
     <title>FLUX — Sport Supplements</title>
+    <style>
+      html, body { margin: 0; background: #F7F9FC; }
+      #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #F7F9FC; }
+      #boot i { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgba(26,111,212,.2); border-top-color: #1A6FD4; animation: boot-spin .8s linear infinite; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Pantalla de arranque instantánea: evita el pantallazo blanco mientras carga el JS -->
+    <div id="root"><div id="boot"><i></i></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

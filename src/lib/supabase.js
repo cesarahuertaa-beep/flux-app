@@ -1,3 +1,4 @@
+import { loadAllCache, persistCacheKey, clearCacheStore, addMutation, getMutations, removeMutation, countMutations, clearMutations } from "./offlineStore";
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -48,81 +49,122 @@ export const restoreSession = () => {
   return null;
 };
 
-/** Registrar callback para cuando la sesión expire (401) */
-// ── Caché de Consultas GET ──
-const CACHE_VERSION = "v3"; // Cambiar esto en nuevas versiones para limpiar la caché
-const queryCache = new Map();
+// ── Caché de Consultas GET (persistente en IndexedDB, sin expiración) ──
+// Mantiene siempre los últimos datos obtenidos con internet para poder usarlos offline.
+const queryCache = new Map(); // path -> { data, timestamp, invalidated? }
 
-const loadCache = () => {
+const persistEntry = (path) => {
+  const e = queryCache.get(path);
+  persistCacheKey(path, e ? { data: e.data, timestamp: e.timestamp, invalidated: !!e.invalidated } : null);
+};
+
+/** Cargar la caché persistida (llamar antes de renderizar la app) */
+export const hydrateOfflineCache = async () => {
   try {
-    // Limpieza de emergencia de cachés viejos
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith("flux_query_cache_") && key !== `flux_query_cache_${CACHE_VERSION}`) {
-        localStorage.removeItem(key);
-      }
+    // Limpieza del antiguo caché en localStorage (límite 5MB, se borraba al llenarse)
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("flux_query_cache")) localStorage.removeItem(key);
     });
-    localStorage.removeItem("flux_query_cache"); // limpiar el legado
-
-    const stored = localStorage.getItem(`flux_query_cache_${CACHE_VERSION}`);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      Object.keys(parsed).forEach(k => {
-        if (Date.now() - parsed[k].timestamp < 300000) {
-          queryCache.set(k, parsed[k]);
-        }
-      });
-    }
-  } catch(e) {}
-};
-loadCache();
-
-const saveCache = () => {
-  try {
-    const obj = {};
-    for (const [k, v] of queryCache.entries()) {
-      obj[k] = v;
-    }
-    localStorage.setItem(`flux_query_cache_${CACHE_VERSION}`, JSON.stringify(obj));
-  } catch(e) {
-    if (e.name === 'QuotaExceededError') localStorage.removeItem(`flux_query_cache_${CACHE_VERSION}`);
-  }
+  } catch { /* ignore */ }
+  const rows = await loadAllCache();
+  rows.forEach((r) => {
+    if (!queryCache.has(r.key)) queryCache.set(r.key, { data: r.data, timestamp: r.timestamp, invalidated: !!r.invalidated });
+  });
 };
 
+/** Marca como obsoleta (NO borra): así el dato sigue disponible offline pero se vuelve a pedir. */
 export const invalidateCache = (table) => {
-  if (!table) { queryCache.clear(); saveCache(); return; }
-  for (const key of queryCache.keys()) {
-    if (key.startsWith(table)) queryCache.delete(key);
+  for (const [key, entry] of queryCache.entries()) {
+    if (!table || key.split("?")[0] === table) {
+      entry.invalidated = true;
+      persistEntry(key);
+    }
   }
-  saveCache();
+};
+
+/** Borrar todo el contenido offline (logout / sesión expirada) */
+export const clearOfflineData = async () => {
+  queryCache.clear();
+  await Promise.all([clearCacheStore(), clearMutations()]);
 };
 
 export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
 
+const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
+
+// Tablas cuyo POST es seguro de encolar offline (no se necesita el id devuelto por el servidor)
+const QUEUEABLE_POST = ["progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
+
+const isQueueable = (method, table) => {
+  if (table.startsWith("rpc/")) return false;
+  if (method === "PATCH" || method === "DELETE") return true;
+  if (method === "POST") return QUEUEABLE_POST.includes(table);
+  return false;
+};
+
+/** Aplica el cambio de forma optimista sobre la caché para que la UI lo vea sin internet */
+const applyOptimistic = (method, path, body) => {
+  const [table, query = ""] = path.split("?");
+  const m = /(?:^|&)id=eq\.([^&]+)/.exec(query);
+  if (!m || (method !== "PATCH" && method !== "DELETE")) return;
+  const id = decodeURIComponent(m[1]);
+  let patch = null;
+  try { patch = body ? JSON.parse(body) : null; } catch { /* ignore */ }
+  for (const [key, entry] of queryCache.entries()) {
+    if (key.split("?")[0] !== table || !Array.isArray(entry.data)) continue;
+    entry.data = method === "DELETE"
+      ? entry.data.filter((r) => String(r?.id) !== id)
+      : entry.data.map((r) => (String(r?.id) === id ? { ...r, ...patch } : r));
+    persistEntry(key);
+  }
+};
+
+const queueMutation = async (method, path, body, prefer) => {
+  const table = path.split("?")[0];
+  await addMutation({ method, path, body: body ?? null, prefer: prefer ?? null, table });
+  applyOptimistic(method, path, body);
+};
+
+const withTimeout = (ms) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, done: () => clearTimeout(timer) };
+};
+
 // ── Función base de petición ──
 const q = async (path, opts={}, onBackgroundUpdate=null) => {
-  const isGet = !opts.method || opts.method === "GET";
+  const method = (opts.method || "GET").toUpperCase();
+  const isGet = method === "GET";
   const table = path.split('?')[0];
   let returnedCache = false;
 
   const fetchNetwork = async () => {
-    const { headers: extraHeaders, upsert, ...restOpts } = opts;
+    const { headers: extraHeaders, upsert, force, ...restOpts } = opts;
     const prefer = upsert ? "resolution=merge-duplicates,return=representation" : "return=representation";
+    const headers = {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: prefer,
+      ...extraHeaders
+    };
     let r;
+    const t = withTimeout(isGet ? (queryCache.has(path) ? 8000 : 20000) : 30000);
     try {
-      r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
-        headers: {
-          apikey: SUPA_KEY,
-          Authorization: `Bearer ${_authToken || SUPA_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: prefer,
-          ...extraHeaders
-        },
-        ...restOpts
-      });
+      if (isOfflineNow()) throw new Error("offline");
+      r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers, ...restOpts, signal: t.signal });
+      t.done();
     } catch (err) {
+      t.done();
       if (isGet) {
         const cached = queryCache.get(path);
         if (cached && !returnedCache) return cached.data;
+      } else if (isQueueable(method, table)) {
+        // Sin internet: guardar para enviar luego y responder como si hubiera funcionado
+        await queueMutation(method, path, restOpts.body, headers.Prefer);
+        let echo = [];
+        try { const b = restOpts.body ? JSON.parse(restOpts.body) : []; echo = Array.isArray(b) ? b : [b]; } catch { /* ignore */ }
+        return method === "POST" ? echo : [];
       }
       if (returnedCache) return; // Ya retornamos caché, morimos silenciosamente
       throw new Error("OFFLINE");
@@ -138,6 +180,7 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
         _refreshQueue = [];
         if (ok === "OFFLINE") {
           if (returnedCache) return;
+          if (isGet && queryCache.has(path)) return queryCache.get(path).data;
           throw new Error("OFFLINE");
         }
         if (!ok) {
@@ -153,21 +196,23 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
     }
 
     if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
-    if (!r.ok) { 
+    if (!r.ok) {
       if (returnedCache) return;
-      const e = await r.text(); throw new Error(e); 
+      // Error de servidor en lectura: usar último dato bueno si existe
+      if (isGet && r.status >= 500 && queryCache.has(path)) return queryCache.get(path).data;
+      const e = await r.text(); throw new Error(e);
     }
-    
-    const t = await r.text(); 
-    const data = t ? JSON.parse(t) : [];
-    
+
+    const txt = await r.text();
+    const data = txt ? JSON.parse(txt) : [];
+
     if (isGet) {
       const prevCached = queryCache.get(path);
       const isDifferent = !prevCached || JSON.stringify(prevCached.data) !== JSON.stringify(data);
-      
-      queryCache.set(path, { data, timestamp: Date.now() });
-      saveCache();
-      
+
+      queryCache.set(path, { data, timestamp: Date.now(), invalidated: false });
+      if (isDifferent || prevCached?.invalidated) persistEntry(path);
+
       // Si la data es diferente a la caché que ya mostramos, actualizamos la UI en silencio
       if (returnedCache && onBackgroundUpdate && isDifferent) {
         onBackgroundUpdate(data);
@@ -177,25 +222,27 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
   };
 
   if (isGet) {
-    const cached = queryCache.get(path);
+    const cached = opts.force ? null : queryCache.get(path);
     if (cached) {
-      // Si la caché es hiper-reciente (< 15 segundos), usamos caché puro para no saturar la red en clics rápidos
-      if (Date.now() - cached.timestamp < 15000) {
+      // Caché hiper-reciente (< 15 s) y válida: sin red para no saturar en clics rápidos
+      if (!cached.invalidated && Date.now() - cached.timestamp < 15000) {
         return cached.data;
       }
-      // Si el componente soporta actualización en 2do plano (SWR), devolvemos caché instantáneo y consultamos en silencio
-      if (onBackgroundUpdate) {
+      // SWR: devolvemos caché instantáneo y consultamos en silencio
+      if (onBackgroundUpdate && !cached.invalidated) {
         returnedCache = true;
         fetchNetwork().catch(() => {}); // Fuego y olvido
         return cached.data;
       }
     }
   } else {
-    invalidateCache(table); // Mutaciones invalidan caché de inmediato
+    invalidateCache(table); // Mutaciones marcan la caché como obsoleta de inmediato
   }
 
   return fetchNetwork();
 };
+
+
 
 // ── Normalizar llaves en inserciones masivas para evitar error PGRST102 (All object keys must match) ──
 const normalizeBatchKeys = (data) => {
@@ -223,20 +270,38 @@ export const dbPatch  = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b
 export const dbDel    = (p)   => q(p, { method: "DELETE" });
 export const dbUpsert = async (p, b) => {
   const normalizedBody = normalizeBatchKeys(b);
-  invalidateCache(p.split('?')[0]); // Invalidar caché en upsert
-  const r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPA_KEY,
-      Authorization: `Bearer ${_authToken || SUPA_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify(normalizedBody)
-  });
+  const table = p.split('?')[0];
+  invalidateCache(table); // Marcar caché obsoleta en upsert
+  const prefer = "resolution=merge-duplicates,return=representation";
+  const body = JSON.stringify(normalizedBody);
+  const queueIt = async () => {
+    await addMutation({ method: "POST", path: p, body, prefer, table });
+    return Array.isArray(normalizedBody) ? normalizedBody : [normalizedBody];
+  };
+  if (isOfflineNow()) return queueIt();
+  let r;
+  const t = withTimeout(30000);
+  try {
+    r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": prefer
+      },
+      body,
+      signal: t.signal
+    });
+    t.done();
+  } catch {
+    t.done();
+    return queueIt(); // Sin conexión: se enviará al recuperarla
+  }
   // Interceptar 401 en upsert — renovar token silenciosamente
   if (r.status === 401 && _authToken) {
     const ok = await refreshSession();
+    if (ok === "OFFLINE") return queueIt();
     if (!ok) {
       setAuthToken(null); setProfileId(null); saveRefreshToken(null);
       if (_onSessionExpired) _onSessionExpired();
@@ -246,8 +311,74 @@ export const dbUpsert = async (p, b) => {
     return dbUpsert(p, normalizedBody);
   }
   if (!r.ok) { const e = await r.text(); throw new Error(e); }
-  const t = await r.text(); return t ? JSON.parse(t) : [];
+  const txt = await r.text(); return txt ? JSON.parse(txt) : [];
 };
+
+// ── Sincronización en segundo plano ──
+let _flushing = false;
+
+/** Envía a Supabase las escrituras guardadas sin internet (en orden). */
+export const flushMutations = async () => {
+  if (_flushing || isOfflineNow()) return 0;
+  _flushing = true;
+  let sent = 0;
+  const touched = new Set();
+  try {
+    const items = await getMutations();
+    for (const m of items) {
+      let r;
+      try {
+        const send = () => fetch(`${SUPA_URL}/rest/v1/${m.path}`, {
+          method: m.method,
+          headers: {
+            apikey: SUPA_KEY,
+            Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+            "Content-Type": "application/json",
+            ...(m.prefer ? { Prefer: m.prefer } : {})
+          },
+          body: m.body ?? undefined
+        });
+        r = await send();
+        if (r.status === 401) {
+          const ok = await refreshSession();
+          if (ok !== true) break; // sin sesión válida / sin red: reintentar luego
+          r = await send();
+        }
+      } catch {
+        break; // sin red: reintentar luego
+      }
+      // Errores temporales: conservar y reintentar luego
+      if (r.status === 401 || r.status === 408 || r.status === 429 || r.status >= 500) break;
+      if (!r.ok) console.warn("[FLUX offline] Mutación descartada:", r.status, m.method, m.path);
+      await removeMutation(m.id);
+      touched.add(m.table);
+      sent++;
+    }
+  } finally {
+    _flushing = false;
+  }
+  if (sent) {
+    touched.forEach((t) => invalidateCache(t));
+    try { window.dispatchEvent(new CustomEvent("flux:synced", { detail: { tables: [...touched] } })); } catch { /* ignore */ }
+  }
+  return sent;
+};
+
+/** Refresca en segundo plano las consultas guardadas que ya están viejas (mantiene el dato "al día"). */
+export const refreshStaleCache = async (maxAgeMs = 120000, limit = 25) => {
+  if (!_authToken || isOfflineNow()) return;
+  const stale = [...queryCache.entries()]
+    .filter(([k, v]) => !k.startsWith("rpc/") && (v.invalidated || Date.now() - v.timestamp > maxAgeMs))
+    .sort((a, b) => a[1].timestamp - b[1].timestamp)
+    .slice(0, limit);
+  for (const [path] of stale) {
+    try { await q(path, { force: true }); } catch { if (isOfflineNow()) break; }
+  }
+};
+
+export const getPendingMutations = countMutations;
+
+
 
 export const storageUpload = async (bucket, path, file) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {

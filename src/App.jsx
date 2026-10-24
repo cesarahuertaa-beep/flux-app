@@ -1,8 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously, clearOfflineData } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
+import { initSyncManager } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
@@ -25,6 +26,14 @@ const detectIsAppMode = () => {
 // Interceptar cualquier token de invitación / recuperación ANTES de montar el Router
 captureAuthHashSynchronously(detectIsAppMode());
 
+// Precargar la pantalla que se va a necesitar en paralelo a la restauración de sesión
+try {
+  const _r = localStorage.getItem("flux_role");
+  if (!_r) import("./pages/Login");
+  else if (_r === "cliente") import("./pages/Cliente");
+  else import("./pages/Admin");
+} catch (e) { /* ignore */ }
+
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -40,6 +49,12 @@ const FullScreenLoader = () => (
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
+  // Copia de la sesión para arrancar al instante (y sin internet) la próxima vez
+  try {
+    localStorage.setItem("flux_session_snapshot", JSON.stringify({
+      role: s.role, data: s.data, profileId: s.profileId || null, multiRoles: s.multiRoles || null,
+    }));
+  } catch (e) { /* ignore */ }
   //"civil" y"cliente" ambos guardan su ID de cliente en flux_client_id
   if ((s.role ==="cliente" || s.role ==="civil") && s.data?.id) {
     localStorage.setItem("flux_client_id", s.data.id);
@@ -55,6 +70,7 @@ const saveSessionMeta = (s) => {
 };
 
 const clearSessionMeta = () => {
+  localStorage.removeItem("flux_session_snapshot");
   localStorage.removeItem("flux_role");
   localStorage.removeItem("flux_client_id");
   localStorage.removeItem("flux_multi_roles");
@@ -127,6 +143,13 @@ export default function App() {
             if (matchingRole) optimisticData = matchingRole.data;
           }
         
+        if (!optimisticData) {
+          try {
+            const snap = JSON.parse(localStorage.getItem("flux_session_snapshot") || "null");
+            if (snap && snap.role === savedRole && snap.data) optimisticData = snap.data;
+          } catch (e) { /* ignore */ }
+        }
+
         if (optimisticData) {
           setSession({ role: savedRole, data: optimisticData, token, profileId, multiRoles: savedMultiRoles });
           setRestoring(false);
@@ -138,8 +161,11 @@ export default function App() {
                 if (!profiles.length || (profiles[0].activo === false && profiles[0].role !=="superadmin")) {
                   setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
                 }
+              } else if ((savedRole === "cliente" || savedRole === "civil") && savedClientId) {
+                const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
+                if (!rows.length) { setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null); }
               }
-            } catch(e) {}
+            } catch(e) { /* sin internet o error temporal: conservar la sesión */ }
           }, 100);
           return;
         }
@@ -183,10 +209,8 @@ export default function App() {
             clearSessionMeta();
           }
         } catch (e) {
-          if (e.message ==="OFFLINE" && savedMultiRoles) {
-            // offline logic already handled by optimistic restore above if data exists,
-            // but just in case we reach here:
-            clearSessionMeta();
+          if (e.message ==="OFFLINE") {
+            // sin internet: conservar datos de sesión para reintentar luego
           } else {
             clearSessionMeta();
           }
@@ -200,6 +224,7 @@ export default function App() {
     restore();
 
     onSessionExpired(() => {
+      clearOfflineData();
       setSession(null);
       setAtletaData(null);
       clearSessionMeta();
@@ -208,6 +233,7 @@ export default function App() {
     const handleOnline = () => syncQueue(dbUpsert);
     window.addEventListener('online', handleOnline);
     syncQueue(dbUpsert);
+    initSyncManager();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -219,6 +245,17 @@ export default function App() {
     const uid = session?.data?.id || session?.data?.auth_id;
     if (uid) {
       initPlayBilling(uid).catch(() => {});
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    if (typeof document !== "undefined") {
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) metaTheme.setAttribute("content", "#FFFFFF");
+    }
+    if (typeof window !== "undefined" && window.FluxAndroidBars) {
+      try { window.FluxAndroidBars.setBars("#FFFFFF", true); } catch (e) { /* ignore */ }
     }
   }, [session]);
 
@@ -234,6 +271,7 @@ export default function App() {
     setAuthToken(null);
     setProfileId(null);
     saveRefreshToken(null);
+    clearOfflineData();
     clearSessionMeta();
     sessionStorage.removeItem('flux_atleta_data');
     setAtletaData(null);
@@ -264,17 +302,7 @@ export default function App() {
   const handleModoAtleta  = (clienteRecord) => setAtletaData(clienteRecord);
   const handleBackToAdmin = () => setAtletaData(null);
 
-  const MainApp = () => {
-    useEffect(() => {
-      if (typeof document !== "undefined") {
-        const metaTheme = document.querySelector('meta[name="theme-color"]');
-        if (metaTheme) metaTheme.setAttribute("content", "#FFFFFF");
-      }
-      if (typeof window !== "undefined" && window.FluxAndroidBars) {
-        try { window.FluxAndroidBars.setBars("#FFFFFF", true); } catch (e) {}
-      }
-    }, []);
-
+  const renderMain = () => {
     if (atletaData) return (
       <ClienteView
         session={{ role:"cliente", data:atletaData, token:session.token, profileId: session.profileId, adminRole: session.role }}
@@ -324,7 +352,7 @@ export default function App() {
               ) : !session ? (
                 <Navigate to="/login" replace />
               ) : (
-                <MainApp />
+                renderMain()
               )
             } />
             <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />

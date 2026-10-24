@@ -10,6 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // el registro se hace en main.jsx solo para web (no en la app nativa)
       includeAssets: ['flux_logo.jpeg', 'flux-favicon.ico'],
       manifest: {
         name: 'FLUX - Sport Supplements',
