@@ -90,6 +90,15 @@ export const clearOfflineData = async () => {
 
 export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
 
+// Estado de red "conocido": se marca caído al primer fallo de fetch y se limpia al primer éxito.
+// Evita esperar timeouts en cada consulta cuando hay wifi pero no hay internet (gimnasio, sótano...).
+let _netDown = false;
+let _lastRetry = 0;
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => { _netDown = false; });
+  window.addEventListener("offline", () => { _netDown = true; });
+}
+
 const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 // Tablas cuyo POST es seguro de encolar offline (no se necesita el id devuelto por el servidor)
@@ -119,10 +128,37 @@ const applyOptimistic = (method, path, body) => {
   }
 };
 
+/** Aplica un upsert (progreso, etc.) sobre las consultas guardadas: lo registrado offline se ve al reabrir */
+const applyOptimisticUpsert = (path, rows) => {
+  const [table, query = ""] = path.split("?");
+  const oc = /(?:^|&)on_conflict=([^&]+)/.exec(query);
+  const keys = oc ? decodeURIComponent(oc[1]).split(",") : ["id"];
+  for (const [key, entry] of queryCache.entries()) {
+    if (key.split("?")[0] !== table || !Array.isArray(entry.data)) continue;
+    const kq = key.split("?")[1] || "";
+    const cm = /(?:^|&)cliente_id=eq\.([^&]+)/.exec(kq);
+    const data = entry.data.slice();
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      if (cm && row.cliente_id != null && String(row.cliente_id) !== cm[1]) continue;
+      const idx = keys.includes("id") && row.id == null
+        ? -1
+        : data.findIndex((r) => keys.every((k) => String(r?.[k] ?? "") === String(row?.[k] ?? "")));
+      if (idx >= 0) data[idx] = { ...data[idx], ...row };
+      else data.push(row);
+    }
+    entry.data = data;
+    persistEntry(key);
+  }
+};
+
 const queueMutation = async (method, path, body, prefer) => {
   const table = path.split("?")[0];
   await addMutation({ method, path, body: body ?? null, prefer: prefer ?? null, table });
   applyOptimistic(method, path, body);
+  if (method === "POST" && table === "progreso") {
+    try { const b = JSON.parse(body); applyOptimisticUpsert(path, Array.isArray(b) ? b : [b]); } catch { /* ignore */ }
+  }
 };
 
 const withTimeout = (ms) => {
@@ -149,13 +185,15 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
       ...extraHeaders
     };
     let r;
-    const t = withTimeout(isGet ? (queryCache.has(path) ? 8000 : 20000) : 30000);
+    const t = withTimeout(isGet ? (queryCache.has(path) ? 4000 : 15000) : 30000);
     try {
-      if (isOfflineNow()) throw new Error("offline");
+      if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("offline");
       r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers, ...restOpts, signal: t.signal });
       t.done();
+      _netDown = false;
     } catch (err) {
       t.done();
+      _netDown = true;
       if (isGet) {
         const cached = queryCache.get(path);
         if (cached && !returnedCache) return cached.data;
@@ -224,6 +262,15 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
   if (isGet) {
     const cached = opts.force ? null : queryCache.get(path);
     if (cached) {
+      // Red conocida como caída: responder al instante con lo guardado y reintentar en segundo plano
+      if (_netDown) {
+        if (Date.now() - _lastRetry > 5000) {
+          _lastRetry = Date.now();
+          returnedCache = true;
+          fetchNetwork().catch(() => {});
+        }
+        return cached.data;
+      }
       // Caché hiper-reciente (< 15 s) y válida: sin red para no saturar en clics rápidos
       if (!cached.invalidated && Date.now() - cached.timestamp < 15000) {
         return cached.data;
@@ -267,6 +314,7 @@ const normalizeBatchKeys = (data) => {
 export const dbGet    = (p, onBgUpdate) => q(p, {}, onBgUpdate);
 export const dbPost   = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
 export const dbPatch  = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b), headers: { Prefer: "return=representation" } });
+export const dbGetFresh = (p) => q(p, { force: true });
 export const dbDel    = (p)   => q(p, { method: "DELETE" });
 export const dbUpsert = async (p, b) => {
   const normalizedBody = normalizeBatchKeys(b);
@@ -276,9 +324,11 @@ export const dbUpsert = async (p, b) => {
   const body = JSON.stringify(normalizedBody);
   const queueIt = async () => {
     await addMutation({ method: "POST", path: p, body, prefer, table });
-    return Array.isArray(normalizedBody) ? normalizedBody : [normalizedBody];
+    const rows = Array.isArray(normalizedBody) ? normalizedBody : [normalizedBody];
+    applyOptimisticUpsert(p, rows);
+    return rows;
   };
-  if (isOfflineNow()) return queueIt();
+  if (isOfflineNow() || _netDown) return queueIt();
   let r;
   const t = withTimeout(30000);
   try {
@@ -348,6 +398,7 @@ export const flushMutations = async () => {
         break; // sin red: reintentar luego
       }
       // Errores temporales: conservar y reintentar luego
+      _netDown = false;
       if (r.status === 401 || r.status === 408 || r.status === 429 || r.status >= 500) break;
       if (!r.ok) console.warn("[FLUX offline] Mutación descartada:", r.status, m.method, m.path);
       await removeMutation(m.id);

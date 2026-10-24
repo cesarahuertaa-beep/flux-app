@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { flushMutations, refreshStaleCache, getAuthToken, dbUpsert } from "./supabase";
 import { syncQueue } from "./offlineQueue";
+import { prefetchSession } from "./prefetch";
 
 let started = false;
 let running = false;
@@ -13,6 +14,7 @@ export const runSync = async () => {
   try {
     await syncQueue(dbUpsert);   // cola heredada (versiones anteriores)
     await flushMutations();      // escrituras hechas sin internet
+    await prefetchSession();     // precarga todo lo del paciente/atleta para usarlo offline
     await refreshStaleCache();   // últimos datos siempre al día
   } catch (e) {
     console.warn("[FLUX sync]", e?.message);

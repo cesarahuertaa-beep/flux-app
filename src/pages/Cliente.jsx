@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
-import { dbGet, dbUpsert } from "../lib/supabase";
+import { dbGet, dbUpsert, getPendingMutations } from "../lib/supabase";
 import { useBackButton } from "../lib/backButtonHandler";
-import { enqueue, getAll } from "../lib/offlineQueue";
+import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
@@ -15,14 +15,9 @@ const Progreso = lazy(() => import("../components/cliente/Progreso"));
 const UserProfile = lazy(() => import("../components/UserProfile"));
 const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
 
-const offlineAwareUpsert = async (records) => {
-  if (navigator.onLine) {
-    await dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id', records);
-  } else {
-    const items = Array.isArray(records) ? records : [records];
-    for (const item of items) await enqueue(item);
-  }
-};
+// dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión
+const offlineAwareUpsert = (records) =>
+  dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id', records);
 
 export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;
@@ -168,7 +163,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       try {
         // Enviar todo el paquete en una sola petición
         await offlineAwareUpsert(recordsToSave);
-        setSyncStatus(navigator.onLine ?"synced" :"local");
+        setSyncStatus(navigator.onLine && (await getPendingMutations()) === 0 ? "synced" : "local");
       } catch(e) {
         console.error("Error guardando progreso en lote:", e);
         setSyncStatus("local");

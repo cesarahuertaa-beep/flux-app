@@ -3,7 +3,7 @@ import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router
 import { Capacitor } from "@capacitor/core";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously, clearOfflineData } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
-import { initSyncManager } from "./lib/syncManager";
+import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
@@ -262,7 +262,9 @@ export default function App() {
   const handleLogin = (s) => {
     if (s.token) setAuthToken(s.token);
     saveSessionMeta(s);
+    localStorage.removeItem("flux_last_prefetch");
     setSession(s);
+    setTimeout(runSync, 1500); // precargar datos para uso offline
     const uid = s?.data?.id || s?.data?.auth_id;
     if (uid) initPlayBilling(uid).catch(() => {});
   };
