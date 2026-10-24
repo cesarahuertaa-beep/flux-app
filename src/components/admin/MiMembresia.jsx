@@ -3,7 +3,7 @@ import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { CreditCard, Upload, AlertCircle, BarChart3, CheckCircle2, FileText, Info, ShieldCheck } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
-import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription } from "../../lib/playBilling";
+import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription, openPlayStoreSubscriptions, restoreGooglePlayPurchases } from "../../lib/playBilling";
 
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const isPlayApp = isNativePlayApp();
@@ -621,7 +621,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   </div>
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-6 space-y-2">
                   <button
                     type="button"
                     disabled={uploading || loading}
@@ -630,14 +630,15 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                       try {
                         const sku = isEstudiante
                           ? PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE
-                          : currentTier === 3
-                          ? PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER3
-                          : currentTier === 2
-                          ? PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER2
-                          : PLAY_BILLING_PRODUCTS.NUTRI_PRO_TIER1;
-                        const res = await startGooglePlaySubscription(sku);
+                          : PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE;
+                        const res = await startGooglePlaySubscription(sku, {
+                          role: isEstudiante ? "nutriologo_estudiante" : "nutriologo",
+                          nutriologoId: profileId,
+                          nombre: perfil?.nombre
+                        });
                         if (res.status === "purchased") {
-                          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción procesada en Google Play.</div>);
+                          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> ¡Suscripción procesada con éxito en Google Play!</div>);
+                          if (onPaymentUploaded) onPaymentUploaded();
                           loadData();
                         } else if (res.status === "unavailable_in_region_or_review") {
                           setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> La suscripción en Google Play se activará al concluir la revisión de la tienda.</div>);
@@ -652,6 +653,35 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   >
                     <CreditCard size={18} />
                     {uploading ? "Conectando con Google Play..." : "Suscribirme con Google Play"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={uploading || loading}
+                    onClick={async () => {
+                      setUploading(true);
+                      try {
+                        const res = await restoreGooglePlayPurchases({
+                          role: isEstudiante ? "nutriologo_estudiante" : "nutriologo",
+                          nutriologoId: profileId,
+                          nombre: perfil?.nombre
+                        });
+                        if (res.hasActiveEntitlement) {
+                          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción restaurada con éxito.</div>);
+                          if (onPaymentUploaded) onPaymentUploaded();
+                          loadData();
+                        } else {
+                          setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> No se encontraron compras activas en esta cuenta de Google Play.</div>);
+                        }
+                      } catch (err) {
+                        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                    className="w-full text-center text-xs text-[#6B7A8D] hover:text-[var(--brand-primary)] py-2 transition-colors cursor-pointer"
+                  >
+                    ¿Ya tienes una suscripción activa? Restaurar compras
                   </button>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { syncQueue } from "./lib/offlineQueue";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
+import { initPlayBilling } from "./lib/playBilling";
 
 const detectIsAppMode = () => {
   if (typeof window === "undefined") return false;
@@ -214,10 +215,19 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const uid = session?.data?.id || session?.data?.auth_id;
+    if (uid) {
+      initPlayBilling(uid).catch(() => {});
+    }
+  }, [session]);
+
   const handleLogin = (s) => {
     if (s.token) setAuthToken(s.token);
     saveSessionMeta(s);
     setSession(s);
+    const uid = s?.data?.id || s?.data?.auth_id;
+    if (uid) initPlayBilling(uid).catch(() => {});
   };
 
   const handleLogout = () => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { CreditCard, Upload, CheckCircle2, FileText, ShieldCheck, Dumbbell, BarChart2, AlertCircle, Info } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
-import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription } from "../../lib/playBilling";
+import { isNativePlayApp, PLAY_BILLING_PRODUCTS, startGooglePlaySubscription, openPlayStoreSubscriptions, restoreGooglePlayPurchases } from "../../lib/playBilling";
 
 /**
  * MiMembresiaCivil — Pantalla de membresía para usuarios Civil Premium.
@@ -312,30 +312,68 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
               </div>
             </div>
 
-            <button
-              type="button"
-              disabled={uploading || loading}
-              onClick={async () => {
-                setUploading(true);
-                try {
-                  const res = await startGooglePlaySubscription(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM);
-                  if (res.status === "purchased") {
-                    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción procesada en Google Play.</div>);
-                    loadData();
-                  } else if (res.status === "unavailable_in_region_or_review") {
-                    setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> La suscripción en Google Play se activará en cuanto concluya la verificación de la tienda.</div>);
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={uploading || loading}
+                onClick={async () => {
+                  if (clienteData?.plan_tipo === 'premium') {
+                    openPlayStoreSubscriptions(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM);
+                    return;
                   }
-                } catch (err) {
-                  setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
-                } finally {
-                  setUploading(false);
-                }
-              }}
-              className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              <CreditCard size={16} />
-              {uploading ? "Conectando con Google Play..." : clienteData?.plan_tipo === 'premium' ? "Administrar en Google Play" : "Suscribirme con Google Play"}
-            </button>
+                  setUploading(true);
+                  try {
+                    const res = await startGooglePlaySubscription(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM, {
+                      role: "civil",
+                      clienteId: clienteData?.id,
+                      nombre: clienteData?.nombre
+                    });
+                    if (res.status === "purchased") {
+                      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> ¡Suscripción activada con éxito en Google Play!</div>);
+                      loadData();
+                    } else if (res.status === "unavailable_in_region_or_review") {
+                      setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> La suscripción en Google Play se activará en cuanto concluya la verificación de la tienda.</div>);
+                    }
+                  } catch (err) {
+                    setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+                className="w-full bg-[var(--brand-primary)] text-white py-3.5 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                <CreditCard size={16} />
+                {uploading ? "Conectando con Google Play..." : clienteData?.plan_tipo === 'premium' ? "Administrar en Google Play" : "Suscribirme con Google Play"}
+              </button>
+
+              <button
+                type="button"
+                disabled={uploading || loading}
+                onClick={async () => {
+                  setUploading(true);
+                  try {
+                    const res = await restoreGooglePlayPurchases({
+                      role: "civil",
+                      clienteId: clienteData?.id,
+                      nombre: clienteData?.nombre
+                    });
+                    if (res.hasActiveEntitlement) {
+                      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción restaurada con éxito.</div>);
+                      loadData();
+                    } else {
+                      setMsg(<div className="flex items-center gap-1.5"><Info className="w-4 h-4 text-blue-500" /> No se encontraron compras activas en esta cuenta de Google Play.</div>);
+                    }
+                  } catch (err) {
+                    setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+                className="w-full text-center text-xs text-[#6B7A8D] hover:text-[var(--brand-primary)] py-2 transition-colors cursor-pointer"
+              >
+                ¿Ya tienes una suscripción? Restaurar compras
+              </button>
+            </div>
           </div>
         ) : (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
