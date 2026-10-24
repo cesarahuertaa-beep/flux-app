@@ -12,7 +12,7 @@ const safe = async (p) => {
  * Precarga (con internet) TODO lo que las pantallas del paciente/atleta consultan,
  * con las mismas rutas que usan, para que quede disponible sin conexión aunque
  * nunca haya abierto esa pestaña. Se guarda en la base local (IndexedDB)
- * y además precarga los GIFs de los ejercicios de la rutina activa.
+ * y además precarga los GIFs de los ejercicios, fotos de platillos y fotos de perfil.
  */
 export const prefetchCliente = async (cliente) => {
   if (!cliente?.id) return false;
@@ -20,10 +20,28 @@ export const prefetchCliente = async (cliente) => {
   const nutriId = cliente.nutriologo_id;
   const mediaUrls = [];
 
+  // 1. Avatar propio del cliente
+  if (cliente.avatar_url) mediaUrls.push(cliente.avatar_url);
+
+  // 2. Consultas de perfil del cliente por email y por ID (usadas por UserProfile.jsx)
+  if (cliente.email) {
+    await safe(`clientes?email=ilike.${encodeURIComponent(cliente.email)}`);
+  }
+  await safe(`clientes?id=eq.${id}`);
+
+  // 3. Nutriólogo asignado: avatar, logo y datos completos
   if (nutriId) {
     const first = await safe(`profiles?id=eq.${nutriId}&select=bloqueado`);
     if (first === null) return false; // sin conexión: no seguir
-    await safe(`profiles?id=eq.${nutriId}`);
+    const profs = await safe(`profiles?id=eq.${nutriId}`);
+    if (Array.isArray(profs) && profs[0]) {
+      const p = profs[0];
+      if (p.avatar_url) mediaUrls.push(p.avatar_url);
+      if (p.logo_url) mediaUrls.push(p.logo_url);
+      if (p.email) {
+        await safe(`profiles?email=ilike.${encodeURIComponent(p.email)}`);
+      }
+    }
   }
 
   const cs = await safe(`ciclos?cliente_id=eq.${id}&activo=eq.true&limit=1`);
@@ -77,7 +95,7 @@ export const prefetchCliente = async (cliente) => {
     await safe(`citas_ratings?cliente_id=eq.${id}&select=cita_id,puntuacion`);
   }
 
-  // Descargar GIFs y fotos de comidas a la caché local permanente en segundo plano
+  // Descargar GIFs, fotos de comidas, avatares y logos a la caché local permanente en segundo plano
   if (mediaUrls.length > 0) {
     precacheMediaList(mediaUrls).catch(() => {});
   }
@@ -86,21 +104,37 @@ export const prefetchCliente = async (cliente) => {
 };
 
 /**
- * Precarga datos del nutriólogo / coach (clientes activos y sus rutinas)
- * para que al entrar a Programar sin internet, los clientes y rutinas
- * ya estén guardados en el teléfono.
+ * Precarga datos del nutriólogo / coach (clientes activos, sus perfiles y rutinas)
+ * para que al entrar sin internet todo esté disponible.
  */
 export const prefetchAdmin = async (profileId, role) => {
   if (!profileId) return false;
   const isSuperadmin = role === "superadmin";
   const filter = isSuperadmin ? "clientes?order=created_at.asc" : `clientes?nutriologo_id=eq.${profileId}&order=created_at.asc`;
+  const mediaUrls = [];
+
+  // Perfil del admin (para UserProfile y PerfilNutriologo)
+  const profs = await safe(`profiles?id=eq.${profileId}`);
+  if (Array.isArray(profs) && profs[0]) {
+    const p = profs[0];
+    if (p.avatar_url) mediaUrls.push(p.avatar_url);
+    if (p.logo_url) mediaUrls.push(p.logo_url);
+    if (p.email) {
+      await safe(`profiles?email=ilike.${encodeURIComponent(p.email)}`);
+    }
+  }
 
   const clientes = await safe(filter);
-  if (!Array.isArray(clientes) || !clientes.length) return false;
+  if (!Array.isArray(clientes) || !clientes.length) {
+    if (mediaUrls.length > 0) precacheMediaList(mediaUrls).catch(() => {});
+    return false;
+  }
 
   // Tomar hasta los 12 clientes más recientes/activos
   const topClientes = clientes.slice(0, 12);
-  const ids = topClientes.map(c => c.id);
+  topClientes.forEach(c => {
+    if (c.avatar_url) mediaUrls.push(c.avatar_url);
+  });
 
   // Precargar ciclos de estos clientes
   for (const c of topClientes) {
@@ -114,6 +148,10 @@ export const prefetchAdmin = async (profileId, role) => {
       await safe(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
     }
     await safe(`rutinas?cliente_id=eq.${c.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
+  }
+
+  if (mediaUrls.length > 0) {
+    precacheMediaList(mediaUrls).catch(() => {});
   }
 
   return true;
@@ -130,7 +168,15 @@ export const prefetchSession = async (force = false) => {
 
     localStorage.setItem(KEY, String(Date.now()));
 
-    // 1. Si es paciente o atleta civil: precarga completa de sus rutinas y GIFs
+    // 1. Guardar en caché logos de sesión y marca activa
+    const sessionMedia = [];
+    if (snap.data?.avatar_url) sessionMedia.push(snap.data.avatar_url);
+    if (snap.data?.logo_url) sessionMedia.push(snap.data.logo_url);
+    const cachedLogo = localStorage.getItem("flux_cached_brand_logo");
+    if (cachedLogo && cachedLogo.startsWith("http")) sessionMedia.push(cachedLogo);
+    if (sessionMedia.length > 0) precacheMediaList(sessionMedia).catch(() => {});
+
+    // 2. Si es paciente o atleta civil: precarga completa de sus rutinas y GIFs
     const clientes = new Map();
     if ((snap.role === "cliente" || snap.role === "civil") && snap.data?.id) {
       clientes.set(snap.data.id, snap.data);
@@ -143,7 +189,7 @@ export const prefetchSession = async (force = false) => {
       if (!ok) { localStorage.setItem(KEY, "0"); break; }
     }
 
-    // 2. Si es Nutriólogo o Superadmin: precarga de clientes y sus programas
+    // 3. Si es Nutriólogo o Superadmin: precarga de clientes y sus programas
     if (["superadmin", "nutriologo", "nutriologo_estudiante", "staff"].includes(snap.role)) {
       const pId = snap.profileId || snap.data?.id;
       if (pId) {

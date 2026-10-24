@@ -7,6 +7,7 @@ import DatosPersonalesCard from "./admin/DatosPersonalesCard";
 import { syncPersonalData } from "../lib/supabase";
 import RoleSwitcher from "./RoleSwitcher";
 import { useBackButton } from "../lib/backButtonHandler";
+import { CachedImage } from "../lib/mediaCache";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const navigate = useNavigate();
@@ -192,10 +193,28 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex justify-center md:justify-start gap-4 shrink-0">
               {miNutriologo.logo_url && (
-                <img src={miNutriologo.logo_url} alt="Logo" className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" />
+                <CachedImage 
+                  src={miNutriologo.logo_url} 
+                  alt="Logo" 
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
+                  fallback={
+                    <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                      <User size={32} />
+                    </div>
+                  }
+                />
               )}
               {miNutriologo.avatar_url && (
-                <img src={miNutriologo.avatar_url} alt="Avatar" className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" />
+                <CachedImage 
+                  src={miNutriologo.avatar_url} 
+                  alt="Avatar" 
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
+                  fallback={
+                    <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                      <User size={32} />
+                    </div>
+                  }
+                />
               )}
               {!miNutriologo.logo_url && !miNutriologo.avatar_url && (
                 <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">

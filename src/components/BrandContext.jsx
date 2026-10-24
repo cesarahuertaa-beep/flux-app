@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { dbGet, getProfileId } from "../lib/supabase";
+import { cacheMediaUrl } from "../lib/mediaCache";
 
 const BrandContext = createContext(null);
 
@@ -41,6 +42,9 @@ export function BrandProvider({ children, session }) {
       localStorage.setItem("flux_cached_brand_color", brand.color_primario);
       localStorage.setItem("flux_cached_brand_name", brand.nombre_marca);
       localStorage.setItem("flux_cached_brand_logo", brand.logo_url);
+      if (brand.logo_url && brand.logo_url.startsWith("http")) {
+        cacheMediaUrl(brand.logo_url).catch(() => {});
+      }
     } catch (e) {}
   }, [brand]);
 

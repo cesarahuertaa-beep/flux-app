@@ -1,6 +1,7 @@
-import React, { useRef, useState } from"react";
-import { Building2, Image as ImageIcon } from"lucide-react";
-import { storageUpload, storageDelete } from"../../lib/supabase";
+import React, { useRef, useState } from "react";
+import { Building2, Image as ImageIcon } from "lucide-react";
+import { storageUpload, storageDelete } from "../../lib/supabase";
+import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
   const fileInputRef = useRef(null);
@@ -14,6 +15,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         const ext = file.name.split('.').pop();
         const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
         const url = await storageUpload("logos", path, file);
+        cacheMediaUrl(url).catch(() => {});
 
         if (form.logo_url && form.logo_url.includes("storage/v1/object/public/logos/")) {
           const oldPath = form.logo_url.split("/public/logos/")[1];
@@ -25,7 +27,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {
-      alert("Error subiendo logo:" + error.message);
+      alert("Error subiendo logo: " + error.message);
     }
     setUploading(false);
   };
@@ -49,11 +51,24 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
       
       <div className="flex flex-col md:flex-row items-center gap-6 pb-8 border-b border-[#E2E8F0] mb-8">
         <div className="relative group cursor-pointer" onClick={() => !uploading && fileInputRef.current?.click()}>
-          {form.logo_url ? (
-            <img src={form.logo_url} alt="Logo" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" />
+          {uploading ? (
+            <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div>
+            </div>
+          ) : form.logo_url ? (
+            <CachedImage 
+              src={form.logo_url} 
+              alt="Logo" 
+              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
+              fallback={
+                <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                  <ImageIcon size={32} />
+                </div>
+              }
+            />
           ) : (
             <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[var(--brand-primary)] transition-colors">
-              {uploading ? <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div> : <ImageIcon size={32} />}
+              <ImageIcon size={32} />
             </div>
           )}
           <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

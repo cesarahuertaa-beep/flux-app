@@ -3,6 +3,7 @@ import { updateProfile, authInvite, authResetPassword, storageUpload, storageLis
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { CachedImage } from "../../lib/mediaCache";
 
 const uploadLogo = async (file) => {
   const ext  = file.name.split(".").pop();
@@ -470,7 +471,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
-              {n.logo_url ? <img src={n.logo_url} alt={n.nombre || "Logo"} className="w-full h-full object-cover"/> : <User className="text-slate-300" size={24}/>}
+              {n.logo_url ? (
+                <CachedImage 
+                  src={n.logo_url} 
+                  alt={n.nombre || "Logo"} 
+                  className="w-full h-full object-cover" 
+                  fallback={<User className="text-slate-300" size={24}/>} 
+                />
+              ) : (
+                <User className="text-slate-300" size={24}/>
+              )}
               {n.isSuperadmin && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-white"></div>}
             </div>
             <div>

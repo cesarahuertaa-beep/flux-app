@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { Capacitor } from "@capacitor/core";
+import { CachedImage } from "../../lib/mediaCache";
 
 
 /**
@@ -64,11 +65,18 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         style={{ width: collapsed ? 64 : 220 }}
       >
         {/* Logo de Marca Dinámico */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-[#E2E5EA] min-h-[72px] ${collapsed ?"justify-center" :""}`}>
-          <img
+        <div className={`flex items-center gap-3 px-4 py-5 border-b border-[#E2E5EA] min-h-[72px] ${collapsed ? "justify-center" : ""}`}>
+          <CachedImage
             src={brand.logo_url}
             alt="Logo"
             className="w-9 h-9 rounded-xl object-cover flex-shrink-0 bg-white"
+            fallback={
+              <img
+                src="/flux_logo.jpeg"
+                alt="Logo"
+                className="w-9 h-9 rounded-xl object-cover flex-shrink-0 bg-white"
+              />
+            }
           />
           {!collapsed && (
             <div className="leading-tight truncate pr-2">

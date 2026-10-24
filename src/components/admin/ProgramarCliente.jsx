@@ -23,6 +23,7 @@ import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { CachedImage } from "../../lib/mediaCache";
 
 const ProgresoCliente = lazy(() => import("./ProgresoCliente").then(m => ({ default: m.ProgresoCliente })));
 const TemplatesManagerModal = lazy(() => import("../ui/TemplatesManagerModal"));
@@ -1452,7 +1453,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                             <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Foto de referencia (opcional)</label>
                             <div className="flex items-center gap-3">
                               {c.foto_url && (
-                                <img src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
+                                <CachedImage src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
                               )}
                               <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors w-full sm:w-auto">
                                 <ImageIcon className="w-4 h-4" />

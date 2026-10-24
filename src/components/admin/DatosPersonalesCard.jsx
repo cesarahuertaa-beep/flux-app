@@ -1,7 +1,8 @@
-import React, { useRef, useState } from"react";
-import { User, Phone, MapPin, Calendar, Camera } from"lucide-react";
-import { PAISES, ESTADOS_MEXICO } from"../../lib/constants";
-import { storageUpload, storageDelete } from"../../lib/supabase";
+import React, { useRef, useState } from "react";
+import { User, Phone, MapPin, Calendar, Camera } from "lucide-react";
+import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
+import { storageUpload, storageDelete } from "../../lib/supabase";
+import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -16,6 +17,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       const ext = file.name.split('.').pop();
       const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
       const url = await storageUpload("logos", path, file);
+      cacheMediaUrl(url).catch(() => {});
       
       // 2. Eliminar la imagen vieja de Supabase Storage para no acumular basura
       if (form.avatar_url && form.avatar_url.includes("storage/v1/object/public/logos/")) {
@@ -29,7 +31,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });
     } catch (error) {
-      alert("Error subiendo foto:" + error.message);
+      alert("Error subiendo foto: " + error.message);
     }
     setUploading(false);
   };
@@ -61,11 +63,24 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
         {/* Avatar Upload */}
         <div className="flex flex-col items-center gap-2 shrink-0">
           <div className="relative group cursor-pointer" onClick={() => !uploading && fileInputRef.current?.click()}>
-            {form.avatar_url ? (
-              <img src={form.avatar_url} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" />
+            {uploading ? (
+              <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div>
+              </div>
+            ) : form.avatar_url ? (
+              <CachedImage 
+                src={form.avatar_url} 
+                alt="Avatar" 
+                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
+                fallback={
+                  <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                    <Camera size={32} />
+                  </div>
+                }
+              />
             ) : (
               <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[var(--brand-primary)] transition-colors">
-                {uploading ? <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div> : <Camera size={32} />}
+                <Camera size={32} />
               </div>
             )}
             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
