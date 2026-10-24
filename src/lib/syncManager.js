@@ -7,14 +7,14 @@ import { prefetchSession } from "./prefetch";
 let started = false;
 let running = false;
 
-/** Envía lo pendiente y refresca datos viejos. Seguro de llamar muchas veces. */
+/** Envía lo pendiente y refresca datos viejos de forma pasiva en segundo plano. Seguro de llamar muchas veces. */
 export const runSync = async () => {
   if (running || !navigator.onLine || !getAuthToken()) return;
   running = true;
   try {
     await syncQueue(dbUpsert);   // cola heredada (versiones anteriores)
     await flushMutations();      // escrituras hechas sin internet
-    await prefetchSession();     // precarga todo lo del paciente/atleta para usarlo offline
+    await prefetchSession();     // precarga pasiva de rutinas, dietas, fotos y GIFs
     await refreshStaleCache();   // últimos datos siempre al día
   } catch (e) {
     console.warn("[FLUX sync]", e?.message);
@@ -23,15 +23,19 @@ export const runSync = async () => {
   }
 };
 
-/** Dispara la sincronización al volver internet, abrir la app, o cada minuto. */
+/** Dispara la sincronización continua pasiva: al volver internet, cambiar estado o periódicamente. */
 export const initSyncManager = () => {
   if (started) return;
   started = true;
+
   window.addEventListener("online", runSync);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) runSync(); });
+  document.addEventListener("visibilitychange", () => runSync());
+
   if (Capacitor.isNativePlatform()) {
-    CapApp.addListener("appStateChange", ({ isActive }) => { if (isActive) runSync(); });
+    CapApp.addListener("appStateChange", () => runSync());
   }
-  setInterval(() => { if (!document.hidden) runSync(); }, 60000);
-  setTimeout(runSync, 3000);
+
+  // Ejecución pasiva periódica continua (no se apaga al estar en background)
+  setInterval(() => runSync(), 60000);
+  setTimeout(runSync, 1500);
 };

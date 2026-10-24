@@ -2,7 +2,7 @@ import { dbGetFresh } from "./supabase";
 import { precacheMediaList } from "./mediaCache";
 
 const KEY = "flux_last_prefetch";
-const MIN_INTERVAL = 3 * 60 * 1000;
+const MIN_INTERVAL = 45 * 1000;
 
 const safe = async (p) => {
   try { return await dbGetFresh(p); } catch { return null; }
