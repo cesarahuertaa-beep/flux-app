@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
+import androidx.activity.EdgeToEdge;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
@@ -28,13 +29,16 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
         try {
             Window window = getWindow();
-            window.setStatusBarColor(Color.WHITE);
-            window.setNavigationBarColor(Color.WHITE);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                window.setNavigationBarContrastEnforced(false);
+            if (Build.VERSION.SDK_INT < 35) {
+                window.setStatusBarColor(Color.WHITE);
+                window.setNavigationBarColor(Color.WHITE);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.setNavigationBarContrastEnforced(false);
+                }
             }
             View decorView = window.getDecorView();
             WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
@@ -136,10 +140,12 @@ public class MainActivity extends BridgeActivity {
                 try {
                     Window window = getWindow();
                     int color = Color.parseColor(bgHex);
-                    window.setStatusBarColor(color);
-                    window.setNavigationBarColor(color);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        window.setNavigationBarContrastEnforced(false);
+                    if (Build.VERSION.SDK_INT < 35) {
+                        window.setStatusBarColor(color);
+                        window.setNavigationBarColor(color);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            window.setNavigationBarContrastEnforced(false);
+                        }
                     }
                     View decorView = window.getDecorView();
                     WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
