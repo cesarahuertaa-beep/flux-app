@@ -10,7 +10,6 @@ import { hydrateOfflineCache } from './lib/supabase'
 if (Capacitor.isNativePlatform()) {
   try {
     navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()))
-    window.caches?.keys().then((ks) => ks.forEach((k) => window.caches.delete(k)))
   } catch { /* ignore */ }
 } else if (window.location.protocol !== 'file:') {
   import('virtual:pwa-register').then((m) => m.registerSW({ immediate: true })).catch(() => {})

@@ -8,6 +8,7 @@ import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -204,19 +205,29 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   const loadPersonalPhotos = useCallback(async () => {
     if (!cliente?.id) return;
+    const cacheKey = `flux_personal_photos_${cliente.id}`;
+    // Cargar primero de local para disponibilidad instantánea y offline
+    try {
+      const saved = localStorage.getItem(cacheKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) setPersonalPhotos(parsed);
+      }
+    } catch (e) {}
+
     try {
       const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
       const indexUrl = `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/index.json?t=${Date.now()}`;
       const r = await fetch(indexUrl);
       if (r.ok) {
         const urls = await r.json();
-        setPersonalPhotos(Array.isArray(urls) ? urls : []);
-      } else {
-        setPersonalPhotos([]);
+        const validUrls = Array.isArray(urls) ? urls : [];
+        setPersonalPhotos(validUrls);
+        try { localStorage.setItem(cacheKey, JSON.stringify(validUrls)); } catch (e) {}
+        precacheMediaList(validUrls).catch(() => {});
       }
     } catch (e) {
-      console.error("Error loading personal photos index", e);
-      setPersonalPhotos([]);
+      console.warn("Sin conexión o error cargando fotos personales, usando versión local.");
     }
   }, [cliente?.id]);
 
@@ -225,6 +236,10 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   const saveIndex = async (urls) => {
     try {
+      const cacheKey = `flux_personal_photos_${cliente.id}`;
+      try { localStorage.setItem(cacheKey, JSON.stringify(urls)); } catch (e) {}
+      precacheMediaList(urls).catch(() => {});
+
       const indexPath = `${cliente.id}/personal/index.json`;
       await storageDelete("progress-photos", indexPath).catch(() => {}); // Ignore error if it doesn't exist
       const blob = new Blob([JSON.stringify(urls)], { type:"application/json" });
@@ -736,7 +751,12 @@ export default function Progreso({ cliente, isSelfManaged }) {
                       className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
                       onClick={() => setFullImage(url)}
                     >
-                      <img src={url} alt={`Progreso evaluación ${i}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <CachedImage
+                        src={url}
+                        alt={`Progreso evaluación ${i}`}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        fallback={<ImageIcon size={32} className="text-[#9BA5B0] m-auto" />}
+                      />
                       <div className="absolute inset-0 bg-[#0B1929]/0 group-hover:bg-[#0B1929]/20 transition-colors" />
                     </div>
                   ))}
@@ -783,10 +803,11 @@ export default function Progreso({ cliente, isSelfManaged }) {
                       className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
                       onClick={() => setFullImage(url)}
                     >
-                      <img 
+                      <CachedImage 
                         src={url} 
                         alt={`Progreso personal ${i}`} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                        fallback={<Camera size={32} className="text-[#9BA5B0] m-auto" />}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
                         <button 
@@ -830,7 +851,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
           >
             <X size={24} />
           </button>
-          <img src={fullImage} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Vista ampliada" onClick={e => e.stopPropagation()} />
+          <CachedImage src={fullImage} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Vista ampliada" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>

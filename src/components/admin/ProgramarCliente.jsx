@@ -114,7 +114,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
         setHistorialDias(hdMapped);
       }
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando historial: {e.message}</div>); }
+    } catch(e) { 
+      if (e.message !== "OFFLINE") {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando historial: {e.message}</div>); 
+      }
+    }
   }, [clientes]);
 
   useEffect(() => { loadHistorial(); }, [loadHistorial]);
@@ -208,7 +212,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setCicloSel(chosen);
       return chosen;
     } catch(e) { 
-      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+      if (e.message !== "OFFLINE") {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+      }
       return null;
     }
   }, [selected, isMiPlan]);
@@ -234,7 +240,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
       setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
+    } catch(e) { 
+      if (e.message !== "OFFLINE") {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+      }
+    }
     setLoading(false);
   }, [selected, cicloSel]);
 

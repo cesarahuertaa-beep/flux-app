@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
+import { CachedImage } from "../../lib/mediaCache";
 
 const GroceryListModal = lazy(() => import("../ui/GroceryListModal"));
 
@@ -379,10 +380,11 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   
                       {(meal.foto_url || meal.imagen_url) && (
                         <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center">
-                          <img
+                          <CachedImage
                             src={meal.foto_url || meal.imagen_url}
                             alt={label}
                             className="w-full h-full object-contain mix-blend-multiply"
+                            fallback={<Apple size={28} className="text-[#6B7A8D]" />}
                           />
                         </div>
                       )}

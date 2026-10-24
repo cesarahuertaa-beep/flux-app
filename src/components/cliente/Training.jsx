@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { CachedImage } from "../../lib/mediaCache";
 
 function TimerCard({ brandColor }) {
   const [seconds, setSeconds] = useState(90);
@@ -631,7 +632,12 @@ export default function Training({
                         className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer text-left p-0"
                       >
                       {activeObj.gif_url ? (
-                        <img src={activeObj.gif_url} alt={activeObj.nombre} className="w-full h-full object-contain mix-blend-multiply" />
+                        <CachedImage
+                          src={activeObj.gif_url}
+                          alt={activeObj.nombre}
+                          className="w-full h-full object-contain mix-blend-multiply"
+                          fallback={<Dumbbell size={28} className="text-[#6B7A8D]" />}
+                        />
                       ) : (
                         <Dumbbell size={28} className="text-[#6B7A8D]" />
                       )}
@@ -652,7 +658,12 @@ export default function Training({
                         >
                           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
                             {v.obj.gif_url ? (
-                              <img src={v.obj.gif_url} className="w-full h-full object-contain mix-blend-multiply" />
+                              <CachedImage
+                                src={v.obj.gif_url}
+                                alt={v.obj.nombre}
+                                className="w-full h-full object-contain mix-blend-multiply"
+                                fallback={<Dumbbell size={20} className="text-[#6B7A8D]" />}
+                              />
                             ) : (
                               <Dumbbell size={20} className="text-[#6B7A8D]" />
                             )}
@@ -1040,7 +1051,16 @@ export default function Training({
           >
             <button onClick={() => setPreviewEx(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20}/></button>
             {previewEx.gif_url ? (
-              <img src={previewEx.gif_url} alt={previewEx.nombre} className="w-full rounded-xl mb-4 shadow-sm bg-[#F8FAFC] border border-[#E2E8F0] object-contain max-h-[300px] mix-blend-multiply" />
+              <CachedImage
+                src={previewEx.gif_url}
+                alt={previewEx.nombre}
+                className="w-full rounded-xl mb-4 shadow-sm bg-[#F8FAFC] border border-[#E2E8F0] object-contain max-h-[300px] mix-blend-multiply"
+                fallback={
+                  <div className="w-full h-[200px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl mb-4 flex items-center justify-center shadow-sm">
+                    <Dumbbell size={48} className="text-[#CBD5E1]" />
+                  </div>
+                }
+              />
             ) : (
               <div className="w-full h-[200px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl mb-4 flex items-center justify-center shadow-sm">
                 <Dumbbell size={48} className="text-[#CBD5E1]" />
