@@ -5,6 +5,7 @@ import {
   AlertCircle, Plus, CheckCircle2, ChevronRight, Star
 } from"lucide-react";
 import { useBackButton } from"../lib/backButtonHandler";
+import { showFluxAlert } from"./ui/ConfirmModal";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -165,7 +166,7 @@ export function CitasCliente({ cliente }) {
       setRatingModal({ open: false, citaId: null, puntuacion: 5, comentario:"" });
     } catch (e) {
       console.error("Error al calificar cita", e);
-      alert("Error al guardar: " + (e.message || "desconocido"));
+      showFluxAlert("Error al guardar", e.message || "Error desconocido");
     }
     setSaving(false);
   };

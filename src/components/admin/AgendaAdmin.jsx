@@ -189,7 +189,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   const loadClientes = useCallback(async () => {
     try {
-      const rows = await dbGet(`clientes?nutriologo_id=eq.${myId}&select=id,nombre,email,telefono&order=nombre.asc`);
+      const rows = await dbGet(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono&order=nombre.asc`);
       setClientes(rows);
     } catch { }
   }, [myId]);

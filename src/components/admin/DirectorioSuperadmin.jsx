@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbPost, dbPatch } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
+import { CustomSelect } from "../ui/CustomSelect";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 
@@ -759,10 +760,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       {showInviteNutri && (
         <Modal title={<><User size={20} className="text-[var(--brand-primary)]"/> Nuevo Nutriólogo</>} onClose={() => setShowInviteNutri(false)}>
           <Field label="Tipo de perfil">
-            <select className={InputClass} value={formNutri.role || "nutriologo"} onChange={e => setFormNutri(p => ({ ...p, role: e.target.value }))}>
-              <option value="nutriologo">Nutriólogo Titular (Cobro por paciente)</option>
-              <option value="nutriologo_estudiante">Nutriólogo Estudiante (Mensualidad fija)</option>
-            </select>
+            <CustomSelect
+              title="Tipo de perfil"
+              className={InputClass}
+              value={formNutri.role || "nutriologo"}
+              onChange={(v) => setFormNutri((p) => ({ ...p, role: v }))}
+              options={[
+                { value: "nutriologo", label: "Nutriólogo Titular (Cobro por paciente)" },
+                { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante (Mensualidad fija)" },
+              ]}
+            />
           </Field>
           <Field label="Nombre completo">
             <input className={InputClass} value={formNutri.nombre} onChange={e => setFormNutri(p=>({...p,nombre:e.target.value}))}/>
@@ -819,10 +826,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           )}
           {!showEditNutri.isSuperadmin && (
             <Field label="Tipo de perfil">
-              <select className={InputClass} value={editFormNutri.role || "nutriologo"} onChange={e => setEditFormNutri(p => ({ ...p, role: e.target.value }))}>
-                <option value="nutriologo">Nutriólogo Titular (Cobro por paciente)</option>
-                <option value="nutriologo_estudiante">Nutriólogo Estudiante (Mensualidad fija)</option>
-              </select>
+              <CustomSelect
+                title="Tipo de perfil"
+                className={InputClass}
+                value={editFormNutri.role || "nutriologo"}
+                onChange={(v) => setEditFormNutri((p) => ({ ...p, role: v }))}
+                options={[
+                  { value: "nutriologo", label: "Nutriólogo Titular (Cobro por paciente)" },
+                  { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante (Mensualidad fija)" },
+                ]}
+              />
             </Field>
           )}
           <Field label="Nombre completo">

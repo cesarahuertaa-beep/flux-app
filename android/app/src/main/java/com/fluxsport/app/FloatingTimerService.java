@@ -358,6 +358,13 @@ public class FloatingTimerService extends Service {
 
     private void onTimerFinished() {
         triggerBeepAndVibrate();
+        FluxNotificationHelper.showStatusBarNotification(
+            getApplicationContext(),
+            null,
+            "¡Tiempo de descanso terminado!",
+            "Tu descanso ha finalizado. Continúa con tu siguiente serie.",
+            "deporte"
+        );
     }
 
     private void triggerBeepAndVibrate() {

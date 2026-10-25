@@ -702,17 +702,94 @@ export const refreshStaleCache = async (maxAgeMs = 90000, limit = 30) => {
 
 export const getPendingMutations = countMutations;
 
-export const storageUpload = async (bucket, path, file) => {
-  const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
-    method: "POST",
-    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": file.type },
-    body: file,
-  });
-  if (!r.ok) {
-    const e = await r.text();
-    throw new Error(e);
+const parseStorageError = (rawText, status) => {
+  try {
+    const parsed = JSON.parse(rawText);
+    const code = parsed.code || parsed.error || "";
+    const msg = parsed.message || "";
+    if (status === 544 || code === "DatabaseTimeout" || msg.includes("timed out")) {
+      return "El servidor tardó en responder. Por favor intenta subir la foto de nuevo.";
+    }
+    if (msg) return msg;
+  } catch {}
+  if (status === 544 || status === 504 || status === 502 || status === 503) {
+    return "El servidor tardó en responder. Por favor intenta subir la foto de nuevo.";
   }
-  return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
+  return rawText || `Error al subir archivo (${status})`;
+};
+
+export const storageUpload = async (bucket, path, file) => {
+  const maxAttempts = 3;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    try {
+      let r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
+        method: "POST",
+        headers: {
+          apikey: SUPA_KEY,
+          Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+          "Content-Type": file.type || "image/jpeg",
+          "x-upsert": "true",
+        },
+        body: file,
+        signal: controller.signal,
+      });
+
+      if (r.status === 401 && _refreshToken && attempt === 1) {
+        clearTimeout(timer);
+        const refreshed = await refreshSession();
+        if (refreshed) {
+          attempt--; // Retry with fresh token
+          continue;
+        }
+      }
+
+      clearTimeout(timer);
+
+      if (r.ok) {
+        return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
+      }
+
+      const errText = await r.text();
+      const isTransient =
+        r.status === 544 ||
+        r.status === 502 ||
+        r.status === 503 ||
+        r.status === 504 ||
+        r.status === 408 ||
+        r.status === 429 ||
+        errText.includes("DatabaseTimeout") ||
+        errText.includes("timed out");
+
+      if (isTransient && attempt < maxAttempts) {
+        await new Promise((res) => setTimeout(res, 800 * attempt));
+        continue;
+      }
+
+      throw new Error(parseStorageError(errText, r.status));
+    } catch (e) {
+      clearTimeout(timer);
+      lastError = e;
+      const isAbortOrNetwork =
+        e.name === "AbortError" ||
+        e.message?.includes("Failed to fetch") ||
+        e.message?.includes("NetworkError") ||
+        e.message?.includes("Load failed");
+      if (isAbortOrNetwork && attempt < maxAttempts) {
+        await new Promise((res) => setTimeout(res, 800 * attempt));
+        continue;
+      }
+      if (e.name === "AbortError") {
+        throw new Error("Tiempo de espera agotado al subir la foto. Verifica tu conexión e intenta de nuevo.");
+      }
+      throw e;
+    }
+  }
+
+  throw lastError || new Error("No se pudo subir la foto.");
 };
 
 export const storageDelete = async (bucket, path) => {

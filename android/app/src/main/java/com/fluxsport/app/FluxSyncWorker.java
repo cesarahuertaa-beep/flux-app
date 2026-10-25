@@ -100,6 +100,12 @@ public class FluxSyncWorker extends Worker {
                 }
             }
 
+            // 4. NOTIFICACIONES NATIVAS EN BARRA DE ESTADO:
+            // Consultar buzón de notificaciones no leídas para mostrarlas en la barra de tareas
+            if (!profileId.isEmpty()) {
+                pullAndShowUnreadNotifications(ctx, cacheMap, supaUrl, supaKey, accessToken, profileId);
+            }
+
             writeCacheFile(ctx, cacheMap);
             prefs.edit().putLong("last_native_sync", System.currentTimeMillis()).apply();
 
@@ -239,6 +245,37 @@ public class FluxSyncWorker extends Worker {
                     }
                 }
             }
+        }
+    }
+
+    private void pullAndShowUnreadNotifications(Context ctx, JSONObject cacheMap, String supaUrl,
+                                                String supaKey, String token, String profileId) {
+        try {
+            JSONArray notifs = fetchAndStore(
+                cacheMap,
+                supaUrl,
+                supaKey,
+                token,
+                "notificaciones?profile_id=eq." + profileId + "&leida=eq.false&order=created_at.asc&limit=15"
+            );
+            if (notifs == null || notifs.length() == 0) return;
+
+            for (int i = 0; i < notifs.length(); i++) {
+                JSONObject n = notifs.optJSONObject(i);
+                if (n == null) continue;
+                String id = n.optString("id", "");
+                String titulo = n.optString("titulo", "Notificación FLUX");
+                String mensaje = n.optString("mensaje", "");
+                String linkUrl = n.optString("link_url", "");
+
+                if (!id.isEmpty() && !FluxNotificationHelper.isAlreadyShown(ctx, id)) {
+                    FluxNotificationHelper.showStatusBarNotification(ctx, id, titulo, mensaje, linkUrl);
+                    // Marcar como leída en Supabase para no volver a dispararla
+                    sendMutationRequest(supaUrl, supaKey, token, "PATCH", "notificaciones?id=eq." + id, "{\"leida\":true}");
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking unread notifications: " + e.getMessage());
         }
     }
 

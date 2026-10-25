@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Building2, Image as ImageIcon } from "lucide-react";
 import { storageUpload, storageDelete } from "../../lib/supabase";
 import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
+import { showFluxAlert } from "../ui/ConfirmModal";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
   const fileInputRef = useRef(null);
@@ -27,7 +28,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {
-      alert("Error subiendo logo: " + error.message);
+      showFluxAlert("Error subiendo logo", error.message);
     }
     setUploading(false);
   };

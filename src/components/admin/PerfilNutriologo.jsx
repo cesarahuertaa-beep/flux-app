@@ -120,8 +120,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         localStorage.setItem("flux_multi_roles", JSON.stringify(multiRoles));
       }
     } catch (e) {
-      setErr("Error guardando datos personales.");
-      alert("Error guardando datos:" + e.message);
+      setErr("Error guardando datos personales: " + (e.message || ""));
     }
     setSavingPersonal(false);
   };

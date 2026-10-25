@@ -45,7 +45,6 @@ function TimerCard({ brandColor }) {
   useEffect(() => {
     if (editingField && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
     }
   }, [editingField]);
 
@@ -143,9 +142,7 @@ function TimerCard({ brandColor }) {
     if (status !== "IDLE") return;
     if (!touchStateRef.current.moved) {
       // Tap without dragging -> open inline direct numeric input
-      const cur = timerStore.getState().seconds;
-      const val = type === "min" ? Math.floor(cur / 60) : cur % 60;
-      setEditText(String(val).padStart(2, "0"));
+      setEditText("");
       setEditingField(type);
       return;
     }
@@ -173,9 +170,7 @@ function TimerCard({ brandColor }) {
   const handleUnitClickDesktop = (type) => {
     if (status !== "IDLE") return;
     if (touchStateRef.current.moved) return;
-    const cur = timerStore.getState().seconds;
-    const val = type === "min" ? Math.floor(cur / 60) : cur % 60;
-    setEditText(String(val).padStart(2, "0"));
+    setEditText("");
     setEditingField(type);
   };
 
@@ -315,13 +310,15 @@ function TimerCard({ brandColor }) {
               pattern="[0-9]*"
               maxLength={2}
               value={editText}
+              placeholder={pad(Math.floor(seconds / 60))}
+              onContextMenu={(e) => e.preventDefault()}
               onChange={(e) => setEditText(e.target.value.replace(/\D/g, "").slice(0, 2))}
               onBlur={commitEditedValue}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitEditedValue();
                 if (e.key === "Escape") setEditingField(null);
               }}
-              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold"
+              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] placeholder:text-[var(--brand-primary)]/40 rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold select-none"
             />
           ) : (
             <div
@@ -354,13 +351,15 @@ function TimerCard({ brandColor }) {
               pattern="[0-9]*"
               maxLength={2}
               value={editText}
+              placeholder={pad(seconds % 60)}
+              onContextMenu={(e) => e.preventDefault()}
               onChange={(e) => setEditText(e.target.value.replace(/\D/g, "").slice(0, 2))}
               onBlur={commitEditedValue}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitEditedValue();
                 if (e.key === "Escape") setEditingField(null);
               }}
-              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold"
+              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] placeholder:text-[var(--brand-primary)]/40 rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold select-none"
             />
           ) : (
             <div
@@ -713,7 +712,7 @@ export default function Training({
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-4 shrink-0">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] mb-4 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">

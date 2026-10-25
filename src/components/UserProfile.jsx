@@ -8,6 +8,7 @@ import { syncPersonalData } from "../lib/supabase";
 import RoleSwitcher from "./RoleSwitcher";
 import { useBackButton } from "../lib/backButtonHandler";
 import { CachedImage } from "../lib/mediaCache";
+import { showFluxAlert } from "./ui/ConfirmModal";
 
 export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
   const navigate = useNavigate();
@@ -82,7 +83,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       }
     } catch (e) {
       console.error("Error saving profile", e);
-      alert("Error guardando:" + e.message);
+      showFluxAlert("Error guardando datos", e.message);
     }
     setIsSaving(false);
   };

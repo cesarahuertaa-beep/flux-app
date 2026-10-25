@@ -1,18 +1,37 @@
 package com.fluxsport.app;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
@@ -38,6 +57,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
@@ -48,10 +68,27 @@ public class MainActivity extends BridgeActivity {
     private static final int RC_APP_UPDATE = 9001;
     private static WeakReference<MainActivity> activeInstance;
     private AppUpdateManager appUpdateManager;
+    private WebView activePdfWebView;
 
     private static volatile long activeTimerEndMs = 0L;
     private static volatile String activeTimerColor = "#00B4D8";
     private static volatile boolean isTimerRunning = false;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        if (newBase != null) {
+            try {
+                Configuration config = new Configuration(newBase.getResources().getConfiguration());
+                if (config.fontScale != 1.0f) {
+                    config.fontScale = 1.0f;
+                    Context ctx = newBase.createConfigurationContext(config);
+                    super.attachBaseContext(ctx);
+                    return;
+                }
+            } catch (Exception ignored) {}
+        }
+        super.attachBaseContext(newBase);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +96,7 @@ public class MainActivity extends BridgeActivity {
         activeInstance = new WeakReference<>(this);
         try {
             Window window = getWindow();
+            WindowCompat.setDecorFitsSystemWindows(window, false);
             if (Build.VERSION.SDK_INT < 35) {
                 window.setStatusBarColor(Color.WHITE);
                 window.setNavigationBarColor(Color.WHITE);
@@ -72,14 +110,61 @@ public class MainActivity extends BridgeActivity {
                 controller.setAppearanceLightStatusBars(true);
                 controller.setAppearanceLightNavigationBars(true);
             }
+
+            View contentView = findViewById(android.R.id.content);
+            if (contentView != null) {
+                contentView.setBackgroundColor(Color.WHITE);
+                ViewCompat.setOnApplyWindowInsetsListener(contentView, (v, windowInsets) -> {
+                    Insets systemBars = windowInsets.getInsets(
+                        WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+                    );
+                    Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+                    int bottomInset = Math.max(systemBars.bottom, ime.bottom);
+                    v.setPadding(systemBars.left, systemBars.top, systemBars.right, bottomInset);
+                    return WindowInsetsCompat.CONSUMED;
+                });
+                ViewCompat.requestApplyInsets(contentView);
+            }
         } catch (Exception ignored) {}
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                WebView.enableSlowWholeDocumentDraw();
+            } catch (Exception ignored) {}
+        }
+
+        FluxNotificationHelper.ensureChannels(this);
+
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            try {
+                WebSettings ws = this.bridge.getWebView().getSettings();
+                ws.setTextZoom(100);
+            } catch (Exception ignored) {}
             this.bridge.getWebView().addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
             this.bridge.getWebView().addJavascriptInterface(new PlayUpdateBridge(), "FluxPlayUpdate");
             this.bridge.getWebView().addJavascriptInterface(new FluxNativeSyncBridge(), "FluxNativeSync");
             this.bridge.getWebView().addJavascriptInterface(new FluxTimerBridge(), "FluxTimerNative");
+            this.bridge.getWebView().addJavascriptInterface(new FluxPdfBridge(), "FluxPdfNative");
+            this.bridge.getWebView().addJavascriptInterface(new FluxNotificationBridge(), "FluxNotificationsNative");
         }
+
+        // Solicitar permiso de notificaciones en barra de estado en Android 13+ (API 33+)
+        if (Build.VERSION.SDK_INT >= 33) {
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                            5501
+                        );
+                    }
+                } catch (Exception ignored) {}
+            }, 1500);
+        }
+
+        handleNotificationIntent(getIntent());
 
         // Programar sincronización periódica nativa con WorkManager (incluso con la app cerrada)
         scheduleNativeSync(false);
@@ -94,9 +179,41 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNotificationIntent(intent);
+    }
+
+    private void handleNotificationIntent(Intent intent) {
+        if (intent == null) return;
+        final String linkUrl = intent.getStringExtra("flux_notif_link");
+        if (linkUrl != null && !linkUrl.isEmpty()) {
+            intent.removeExtra("flux_notif_link");
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                        String safeLink = linkUrl.replace("'", "");
+                        MainActivity.this.bridge.getWebView().evaluateJavascript(
+                            "window.sessionStorage.setItem('flux_pending_notif_link', '" + safeLink + "');" +
+                            "window.dispatchEvent(new CustomEvent('flux:notification-click', { detail: { linkUrl: '" + safeLink + "' } }));",
+                            null
+                        );
+                    }
+                } catch (Exception ignored) {}
+            }, 600);
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         activeInstance = new WeakReference<>(this);
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            try {
+                this.bridge.getWebView().getSettings().setTextZoom(100);
+            } catch (Exception ignored) {}
+        }
         hideFloatingTimerOverlay();
         if (appUpdateManager != null) {
             try {
@@ -424,6 +541,10 @@ public class MainActivity extends BridgeActivity {
                 try {
                     Window window = getWindow();
                     int color = Color.parseColor(bgHex);
+                    View contentView = findViewById(android.R.id.content);
+                    if (contentView != null) {
+                        contentView.setBackgroundColor(color);
+                    }
                     if (Build.VERSION.SDK_INT < 35) {
                         window.setStatusBarColor(color);
                         window.setNavigationBarColor(color);
@@ -441,4 +562,209 @@ public class MainActivity extends BridgeActivity {
             });
         }
     }
+
+    public class FluxPdfBridge {
+        @JavascriptInterface
+        public void printHtml(final String html, final String jobName) {
+            runOnUiThread(() -> {
+                try {
+                    final WebView printWebView = new WebView(MainActivity.this);
+                    activePdfWebView = printWebView;
+                    WebSettings ws = printWebView.getSettings();
+                    ws.setJavaScriptEnabled(false);
+                    ws.setLoadsImagesAutomatically(true);
+                    ws.setTextZoom(100);
+
+                    printWebView.setWebViewClient(new WebViewClient() {
+                        private boolean printed = false;
+
+                        @Override
+                        public void onPageFinished(final WebView view, String url) {
+                            if (printed) return;
+                            printed = true;
+                            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                try {
+                                    PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                                    if (printManager != null) {
+                                        String safeJob = (jobName != null && !jobName.trim().isEmpty())
+                                            ? jobName.trim()
+                                            : "FLUX_Documento";
+                                        PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(safeJob);
+                                        PrintAttributes attrs = new PrintAttributes.Builder()
+                                            .setMediaSize(PrintAttributes.MediaSize.NA_LETTER)
+                                            .setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+                                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                                            .build();
+                                        printManager.print(safeJob, adapter, attrs);
+                                    }
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Error printing PDF: " + e.getMessage());
+                                }
+                            }, 450);
+                        }
+                    });
+
+                    printWebView.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null);
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to initialize printHtml: " + e.getMessage());
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void shareHtmlAsPdf(final String html, final String rawFileName) {
+            runOnUiThread(() -> {
+                try {
+                    final int pageWidth = 800;
+                    final int pageHeight = 1131; // A4 proportion at 800px width
+
+                    final WebView pdfWebView = new WebView(MainActivity.this);
+                    activePdfWebView = pdfWebView;
+                    pdfWebView.setBackgroundColor(Color.WHITE);
+                    pdfWebView.setInitialScale(100);
+
+                    WebSettings ws = pdfWebView.getSettings();
+                    ws.setJavaScriptEnabled(false);
+                    ws.setLoadsImagesAutomatically(true);
+                    ws.setTextZoom(100);
+                    ws.setUseWideViewPort(false);
+
+                    pdfWebView.measure(
+                        View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(pageHeight, View.MeasureSpec.EXACTLY)
+                    );
+                    pdfWebView.layout(0, 0, pageWidth, pageHeight);
+
+                    pdfWebView.setWebViewClient(new WebViewClient() {
+                        private boolean exported = false;
+
+                        @Override
+                        public void onPageFinished(final WebView view, String url) {
+                            if (exported) return;
+                            exported = true;
+                            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                try {
+                                    view.measure(
+                                        View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY),
+                                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                                    );
+                                    int contentHeight = (int) (view.getContentHeight() * view.getScale());
+                                    int totalHeight = Math.max(pageHeight, Math.max(view.getMeasuredHeight(), contentHeight));
+                                    view.layout(0, 0, pageWidth, totalHeight);
+
+                                    int numPages = Math.min(25, Math.max(1, (int) Math.ceil((double) totalHeight / pageHeight)));
+                                    PdfDocument document = new PdfDocument();
+
+                                    for (int p = 0; p < numPages; p++) {
+                                        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, p + 1).create();
+                                        PdfDocument.Page page = document.startPage(pageInfo);
+                                        Canvas canvas = page.getCanvas();
+                                        canvas.drawColor(Color.WHITE);
+                                        canvas.save();
+                                        canvas.translate(0, -p * pageHeight);
+                                        canvas.clipRect(0, p * pageHeight, pageWidth, (p + 1) * pageHeight);
+                                        view.draw(canvas);
+                                        canvas.restore();
+                                        document.finishPage(page);
+                                    }
+
+                                    String cleanName = (rawFileName != null ? rawFileName : "FLUX_Reporte")
+                                        .replaceAll("[^a-zA-Z0-9_\\-]", "_");
+                                    if (cleanName.isEmpty()) cleanName = "FLUX_Reporte";
+                                    if (!cleanName.toLowerCase().endsWith(".pdf")) {
+                                        cleanName = cleanName + ".pdf";
+                                    }
+
+                                    File pdfFile = new File(getCacheDir(), cleanName);
+                                    try (FileOutputStream fos = new FileOutputStream(pdfFile)) {
+                                        document.writeTo(fos);
+                                    }
+                                    document.close();
+
+                                    Uri uri = FileProvider.getUriForFile(
+                                        MainActivity.this,
+                                        getPackageName() + ".fileprovider",
+                                        pdfFile
+                                    );
+
+                                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                                    shareIntent.setType("application/pdf");
+                                    shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName.replace(".pdf", ""));
+                                    shareIntent.putExtra(Intent.EXTRA_TITLE, cleanName);
+                                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                                    Intent chooser = Intent.createChooser(shareIntent, "Compartir PDF");
+                                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(chooser);
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Error generating/sharing PDF: " + e.getMessage());
+                                } finally {
+                                    if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                                        MainActivity.this.bridge.getWebView().evaluateJavascript(
+                                            "window.dispatchEvent(new CustomEvent('flux:pdf-share-done'));",
+                                            null
+                                        );
+                                    }
+                                }
+                            }, 550);
+                        }
+                    });
+
+                    pdfWebView.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null);
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to shareHtmlAsPdf: " + e.getMessage());
+                    if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                        MainActivity.this.bridge.getWebView().evaluateJavascript(
+                            "window.dispatchEvent(new CustomEvent('flux:pdf-share-done'));",
+                            null
+                        );
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Puente nativo de notificaciones para disparar alertas en la barra de estado de Android
+     * inmediatamente desde la app en primer plano y gestionar permisos de Android 13+.
+     */
+    private class FluxNotificationBridge {
+        @JavascriptInterface
+        public boolean hasPermission() {
+            return FluxNotificationHelper.hasPermission(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public void requestPermission() {
+            if (Build.VERSION.SDK_INT >= 33) {
+                runOnUiThread(() -> {
+                    try {
+                        ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                            5501
+                        );
+                    } catch (Exception ignored) {}
+                });
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isAlreadyShown(final String id) {
+            return FluxNotificationHelper.isAlreadyShown(getApplicationContext(), id);
+        }
+
+        @JavascriptInterface
+        public void showNotification(final String id, final String title, final String message, final String linkUrl) {
+            FluxNotificationHelper.showStatusBarNotification(
+                getApplicationContext(),
+                id,
+                title,
+                message,
+                linkUrl
+            );
+        }
+    }
 }
+

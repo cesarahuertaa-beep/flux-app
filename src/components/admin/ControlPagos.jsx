@@ -3,6 +3,7 @@ import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
 import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save } from"lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
 import { ListSkeleton } from"../ui/Skeleton";
+import { CustomSelect } from "../ui/CustomSelect";
 import { useBackButton } from"../../lib/backButtonHandler";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
@@ -508,11 +509,17 @@ export default function ControlPagos({ setMsg }) {
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
-            <Calendar size={16} className="text-[#6B7A8D]" />
-            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize">
-              <option value="todos">Todos los meses</option>
-              {mesesDisponibles.map(m => <option key={m} value={m}>{formatMes(m)}</option>)}
-            </select>
+            <Calendar size={16} className="text-[#6B7A8D] shrink-0" />
+            <CustomSelect
+              title="Filtrar por mes"
+              value={filtroMes}
+              onChange={(v) => setFiltroMes(v)}
+              className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize border-none p-0 shadow-none"
+              options={[
+                { value: "todos", label: "Todos los meses" },
+                ...mesesDisponibles.map((m) => ({ value: m, label: formatMes(m) })),
+              ]}
+            />
           </div>
           <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full">
             {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (

@@ -9,7 +9,7 @@ import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
-import { ConfirmModal } from "../ui/ConfirmModal";
+import { ConfirmModal, showFluxAlert } from "../ui/ConfirmModal";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -268,7 +268,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setPersonalPhotos(updatedUrls);
     } catch (error) {
       console.error(error);
-      alert("Error subiendo fotos personales.");
+      showFluxAlert("Error subiendo fotos", "No se pudieron subir las fotos personales. Intenta de nuevo.");
     } finally {
       setUploadingPersonal(false);
       if (fileInputRef.current) fileInputRef.current.value ="";
@@ -452,7 +452,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* HEADER ESTÁNDAR */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col sm:flex-row sm:items-end justify-between gap-4 pr-12 md:pr-8">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             Mi Seguimiento

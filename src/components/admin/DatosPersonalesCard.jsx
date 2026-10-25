@@ -4,6 +4,7 @@ import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
 import { storageUpload, storageDelete } from "../../lib/supabase";
 import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
 import { CustomSelect } from "../ui/CustomSelect";
+import { showFluxAlert } from "../ui/ConfirmModal";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -24,7 +25,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       if (form.avatar_url && form.avatar_url.includes("storage/v1/object/public/logos/")) {
         const oldPath = form.avatar_url.split("/public/logos/")[1];
         if (oldPath) {
-          await storageDelete("logos", oldPath).catch(err => alert("⚠️ No se pudo borrar la foto anterior del servidor. Por favor, asegúrate de que el bucket 'logos' tenga permisos de DELETE (Update/Delete) en Supabase para usuarios autenticados."));
+          await storageDelete("logos", oldPath).catch(() => {});
         }
       }
 
@@ -32,7 +33,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });
     } catch (error) {
-      alert("Error subiendo foto: " + error.message);
+      showFluxAlert("Error subiendo foto", error.message);
     }
     setUploading(false);
   };

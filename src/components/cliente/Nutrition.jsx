@@ -208,14 +208,14 @@ export default function Nutrition({
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-4 sm:px-6 md:px-8 pt-5 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 shrink-0">
+      <div className="px-4 sm:px-6 md:px-8 pt-5 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-0.5 sm:mb-1">
+            <div className="min-w-0">
+              <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-0.5 sm:mb-1 whitespace-nowrap">
                 Plan de Alimentación
               </p>
-              <h1 className="text-xl sm:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+              <h1 className="text-xl sm:text-2xl font-bold text-[#0B1929] whitespace-nowrap" style={{ fontFamily: "DM Sans" }}>
                 Nutrición Semanal
               </h1>
               {isSelfManaged ? (
@@ -231,8 +231,8 @@ export default function Nutrition({
 
             {/* Total Día pill (en mobile va en la fila superior con el título para ahorrar espacio vertical) */}
             <div className="sm:hidden bg-[#E8F1FB] rounded-xl px-3 py-1.5 flex flex-col items-end shrink-0 border border-[#D0E2F7]">
-              <p className="text-[9px] text-[#6B7A8D] font-mono font-semibold uppercase tracking-wider">Total Día</p>
-              <p className="flex items-center gap-1 text-base font-bold text-[var(--brand-primary)] font-mono leading-none mt-0.5">
+              <p className="text-[9px] text-[#6B7A8D] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">Total Día</p>
+              <p className="flex items-center gap-1 text-base font-bold text-[var(--brand-primary)] font-mono leading-none mt-0.5 whitespace-nowrap">
                 <Flame size={15} className="text-[var(--brand-primary)]" />
                 {totalKcal} <span className="text-[10px] text-[var(--brand-primary)]/70 font-sans">kcal</span>
               </p>
@@ -243,14 +243,14 @@ export default function Nutrition({
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={() => setShowGrocery(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors whitespace-nowrap"
             >
               <ShoppingBag size={15} className="text-[var(--brand-primary)] shrink-0" />
               <span>Lista del Súper</span>
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors whitespace-nowrap"
             >
               <FileText size={15} className="shrink-0" />
               <span>Descargar PDF</span>
@@ -299,12 +299,12 @@ export default function Nutrition({
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}
           <div className="flex-1 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-[#0B1929]">
-                <Droplets size={16} className="text-cyan-500 fill-cyan-500" />
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-[#0B1929] whitespace-nowrap">
+                <Droplets size={16} className="text-cyan-500 fill-cyan-500 shrink-0" />
                 <span>Hidratación del Día</span>
               </div>
-              <span className="font-mono text-cyan-600 font-bold text-xs">
+              <span className="font-mono text-cyan-600 font-bold text-xs whitespace-nowrap">
                 {aguaActual} / {metaAguaMl} ml ({pctAgua}%)
               </span>
             </div>
@@ -320,24 +320,24 @@ export default function Nutrition({
               <button
                 type="button"
                 onClick={() => addAgua(250)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 font-semibold text-xs border border-cyan-200 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 font-semibold text-xs border border-cyan-200 transition-colors cursor-pointer whitespace-nowrap"
               >
-                <Plus size={13} />
+                <Plus size={13} className="shrink-0" />
                 <span>250 ml (1 vaso)</span>
               </button>
               <button
                 type="button"
                 onClick={() => addAgua(500)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs border border-blue-200 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs border border-blue-200 transition-colors cursor-pointer whitespace-nowrap"
               >
-                <Plus size={13} />
+                <Plus size={13} className="shrink-0" />
                 <span>500 ml (1 botella)</span>
               </button>
               {aguaActual > 0 && (
                 <button
                   type="button"
                   onClick={() => addAgua(-250)}
-                  className="p-1 rounded-lg bg-gray-100 text-[#6B7A8D] hover:bg-gray-200 text-xs transition-colors cursor-pointer"
+                  className="p-1 rounded-lg bg-gray-100 text-[#6B7A8D] hover:bg-gray-200 text-xs transition-colors cursor-pointer shrink-0"
                   title="Restar 250 ml"
                 >
                   <Minus size={13} />

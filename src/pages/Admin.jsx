@@ -38,7 +38,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0 pr-12 md:pr-8">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div>
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
@@ -80,6 +80,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       });
     }
   }, [tab]);
+
+  useEffect(() => {
+    const onNavigateTab = (e) => {
+      const nextTab = e?.detail?.tab;
+      if (nextTab) setTab(nextTab);
+    };
+    window.addEventListener("flux:navigate-tab", onNavigateTab);
+    return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
+  }, []);
   
   const [clientes, setClientes] = useState([]);
   const [selected, setSelected] = useState(() => {
@@ -915,10 +924,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
       {/* Toast Notification (z-[110] para que siempre esté arriba) */}
       {msg && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-top-4">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] w-max max-w-[92vw] animate-in slide-in-from-top-4">
           <div className="bg-white px-4 py-3 rounded-xl shadow-lg border border-[#E2E8F0] flex items-center gap-3">
-            <span className="text-sm font-medium text-[#0B1929]">{msg}</span>
-            <button onClick={() => setMsg("")} className="text-[#6B7A8D] hover:text-[#0B1929]">
+            <span className="text-sm font-medium text-[#0B1929] break-words min-w-0">{msg}</span>
+            <button onClick={() => setMsg("")} className="text-[#6B7A8D] hover:text-[#0B1929] shrink-0">
               <X size={16} />
             </button>
           </div>

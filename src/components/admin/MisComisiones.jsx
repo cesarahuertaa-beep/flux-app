@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from"react";
 import { dbGet, dbPatch } from"../../lib/supabase";
 import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
 import { getRatesForCutoff } from"../../utils/tarifas";
+import { CustomSelect } from "../ui/CustomSelect";
 
 export default function MisComisiones({ myId, setMsg }) {
   const [myName, setMyName] = useState(null);
@@ -121,17 +122,17 @@ export default function MisComisiones({ myId, setMsg }) {
         </div>
         
         <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
-          <Calendar size={16} className="text-[#6B7A8D]" />
-          <select
+          <Calendar size={16} className="text-[#6B7A8D] shrink-0" />
+          <CustomSelect
+            title="Filtrar por mes"
             value={filtroMes}
-            onChange={e => setFiltroMes(e.target.value)}
-            className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize"
-          >
-            <option value="todos">Todos los meses (Histórico)</option>
-            {mesesDisponibles.map(m => (
-              <option key={m} value={m}>{formatMes(m)}</option>
-            ))}
-          </select>
+            onChange={(v) => setFiltroMes(v)}
+            className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize border-none p-0 shadow-none"
+            options={[
+              { value: "todos", label: "Todos los meses (Histórico)" },
+              ...mesesDisponibles.map((m) => ({ value: m, label: formatMes(m) })),
+            ]}
+          />
         </div>
       </div>
 

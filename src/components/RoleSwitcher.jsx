@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, User, Loader2 } from 'lucide-react';
+import { showFluxAlert } from './ui/ConfirmModal';
 
 export default function RoleSwitcher({ currentRole, currentData, multiRoles, onChangeRole, activeNutriologo }) {
   const [switchingTo, setSwitchingTo] = useState(null);
@@ -21,7 +22,7 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
           onChangeRole(r);
         } catch (error) {
           console.error('Error switching role:', error);
-          alert('Error al cambiar de perfil: ' + error.message);
+          showFluxAlert('Error al cambiar de perfil', error.message);
           setSwitchingTo(null);
         }
     }, 50);

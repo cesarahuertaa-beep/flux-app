@@ -40,6 +40,16 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     if (tab) sessionStorage.setItem("flux_cliente_tab", tab);
   }, [tab]);
 
+  useEffect(() => {
+    if (isEmbedded) return;
+    const onNavigateTab = (e) => {
+      const nextTab = e?.detail?.tab;
+      if (nextTab) setTab(nextTab);
+    };
+    window.addEventListener("flux:navigate-tab", onNavigateTab);
+    return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
+  }, [isEmbedded]);
+
   const [nutri, setNutri] = useState(null);
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);

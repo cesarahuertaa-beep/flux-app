@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
 import { dbGet } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
-import { ConfirmModal } from "./ConfirmModal";
+import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
 
 // Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
@@ -80,7 +80,7 @@ export default function TemplatesManagerModal({
 
   const handleSaveCurrentAsTemplate = () => {
     if (!nuevoNombre.trim()) {
-      alert("Por favor ingresa un nombre para la plantilla");
+      showFluxAlert("Nombre requerido", "Por favor ingresa un nombre para la plantilla.");
       return;
     }
 
@@ -169,7 +169,7 @@ export default function TemplatesManagerModal({
         // Cargar nutrición de ese ciclo
         const nRes = await dbGet(`nutricion?ciclo_id=eq.${selectedCicloId}`);
         if (!nRes || nRes.length === 0) {
-          alert("El ciclo seleccionado no tiene plan de nutrición.");
+          showFluxAlert("Sin plan de nutrición", "El ciclo seleccionado no tiene plan de nutrición.");
           return;
         }
         const nut = nRes[0];
@@ -201,7 +201,7 @@ export default function TemplatesManagerModal({
         // Cargar rutinas de ese ciclo
         const rutRes = await dbGet(`rutinas?ciclo_id=eq.${selectedCicloId}&order=orden.asc`);
         if (!rutRes || rutRes.length === 0) {
-          alert("El ciclo seleccionado no tiene rutinas.");
+          showFluxAlert("Sin rutinas", "El ciclo seleccionado no tiene rutinas.");
           return;
         }
         const rids = rutRes.map((r) => r.id).join(",");
@@ -234,7 +234,7 @@ export default function TemplatesManagerModal({
 
       onClose();
     } catch (e) {
-      alert("Error clonando ciclo: " + e.message);
+      showFluxAlert("Error clonando ciclo", e.message);
     }
   };
 

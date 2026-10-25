@@ -579,6 +579,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setCicloSel(activeCiclo);
       if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, activeCiclo.id);
       await loadData(activeCiclo);
+      if (!isMiPlan && selected?.auth_id) {
+        dbPost("notificaciones", {
+          profile_id: selected.auth_id,
+          titulo: "Nuevo plan asignado",
+          mensaje: `Tu especialista te ha asignado el plan "${tpl.nombre}".`,
+          tipo: "plan",
+          link_url: "nutricion",
+          entidad_id: activeCiclo?.id || selected.id
+        }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+      }
       setMsg(
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
@@ -729,6 +739,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
       setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
+      if (!isMiPlan && selected?.auth_id) {
+        const throttleKey = `flux_notif_nutri_${selected.id}`;
+        const lastSent = Number(sessionStorage.getItem(throttleKey) || 0);
+        if (Date.now() - lastSent > 120000) {
+          sessionStorage.setItem(throttleKey, String(Date.now()));
+          dbPost("notificaciones", {
+            profile_id: selected.auth_id,
+            titulo: "Plan de Nutrición actualizado",
+            mensaje: "Tu nutriólogo ha actualizado tu plan de alimentación.",
+            tipo: "plan",
+            link_url: "nutricion",
+            entidad_id: currentNutri?.id || selected.id
+          }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+        }
+      }
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
     setSaving(false);
   };
@@ -787,7 +812,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     if (!imgCropRef.current || !completedCrop) return;
     const img = imgCropRef.current;
     const canvas = document.createElement("canvas");
-    const OUTPUT = 600;
+    const OUTPUT = 500;
     canvas.width = OUTPUT;
     canvas.height = OUTPUT;
     const ctx = canvas.getContext("2d");
@@ -807,7 +832,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(true);
     setMsg(<div className="flex items-center gap-1.5 text-blue-500">Subiendo foto...</div>);
     try {
-      const blob = await new Promise((res) => canvas.toBlob(res,"image/jpeg", 0.92));
+      const blob = await new Promise((res) => canvas.toBlob(res,"image/jpeg", 0.82));
       const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
       const url = await storageUpload("comidas", path, blob);
       updComida(idx,"foto_url", url);
@@ -962,6 +987,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setShowRutinaModal(false); 
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>); 
       await loadData();
+      if (!isMiPlan && selected?.auth_id) {
+        const throttleKey = `flux_notif_rutina_${selected.id}`;
+        const lastSent = Number(sessionStorage.getItem(throttleKey) || 0);
+        if (Date.now() - lastSent > 120000) {
+          sessionStorage.setItem(throttleKey, String(Date.now()));
+          dbPost("notificaciones", {
+            profile_id: selected.auth_id,
+            titulo: "Rutina de Entrenamiento actualizada",
+            mensaje: "Tu especialista ha actualizado tu rutina de entrenamiento.",
+            tipo: "plan",
+            link_url: "deporte",
+            entidad_id: activeCiclo?.id || selected.id
+          }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+        }
+      }
     } catch(e) { 
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
     }

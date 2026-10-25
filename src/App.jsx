@@ -7,6 +7,7 @@ import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
 import FloatingTimerBubble from "./components/ui/FloatingTimerBubble";
+import NotificationManager from "./components/ui/NotificationManager";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
 import { initPlayBilling } from "./lib/playBilling";
 
@@ -340,6 +341,7 @@ export default function App() {
     <BrandProvider session={session}>
       <AppUpdater />
       <FloatingTimerBubble />
+      <NotificationManager session={session} />
       <Router>
         <Suspense fallback={<FullScreenLoader />}>
           <Routes>

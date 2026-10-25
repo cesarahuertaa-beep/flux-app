@@ -44,8 +44,10 @@ h1, h2, h3, h4, h5, h6 {
 html, body {
   overscroll-behavior-y: none;
   background-color: var(--background);
-  /* Evita el bounce de Safari en iOS */
+  /* Evita el bounce de Safari en iOS y el escalado automático de fuentes en WebView */
   -webkit-overflow-scrolling: touch;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Spinner de carga */
