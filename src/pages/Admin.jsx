@@ -1643,73 +1643,87 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         document.body
       )}
 
-      {!isCivil && tab ==="perfil" && (
-        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-          <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
-        </Suspense>
+      {!isCivil && (tab === "perfil" || visitedTabs.has("perfil")) && (
+        <div className={tab === "perfil" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+          </Suspense>
+        </div>
       )}
 
-      {tab === "tienda" && (isSuperadmin || role === "staff") && (
-        <SubComponentWrapper title="Gestor de Tienda FLUX" subtitle="Administra el catálogo de productos y suplementos de la tienda">
-          <GestorTienda setMsg={setMsg}/>
-        </SubComponentWrapper>
+      {(isSuperadmin || role === "staff") && (tab === "tienda" || visitedTabs.has("tienda")) && (
+        <div className={tab === "tienda" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <SubComponentWrapper title="Gestor de Tienda FLUX" subtitle="Administra el catálogo de productos y suplementos de la tienda">
+            <GestorTienda setMsg={setMsg}/>
+          </SubComponentWrapper>
+        </div>
       )}
     
       {/* ════════════ CIVIL PREMIUM TABS ════════════ */}
-      {isCivil && tab === "mi_plan" && (
-        <SubComponentWrapper
-          title="Mi Plan"
-          subtitle="Configura tus propios ciclos de alimentación, rutinas y evaluaciones"
-          eyebrow="Atleta Independiente"
-        >
-          {clienteData ? (
-            <ProgramarCliente
-              clientes={[clienteData]}
-              selected={clienteData}
-              setSelected={() => {}}
-              setMsg={setMsg}
-              biblioteca={biblioteca}
-              isMiPlan={true}
+      {isCivil && (tab === "mi_plan" || visitedTabs.has("mi_plan")) && (
+        <div className={tab === "mi_plan" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <SubComponentWrapper
+            title="Mi Plan"
+            subtitle="Configura tus propios ciclos de alimentación, rutinas y evaluaciones"
+            eyebrow="Atleta Independiente"
+          >
+            {clienteData ? (
+              <ProgramarCliente
+                clientes={[clienteData]}
+                selected={clienteData}
+                setSelected={() => {}}
+                setMsg={setMsg}
+                biblioteca={biblioteca}
+                isMiPlan={true}
+              />
+            ) : (
+              <ListSkeleton rows={4} />
+            )}
+          </SubComponentWrapper>
+        </div>
+      )}
+
+      {isCivil && (tab === "membresia" || visitedTabs.has("membresia")) && (
+        <div className={tab === "membresia" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <SubComponentWrapper
+            title="Mi Membresía"
+            subtitle="Gestiona tu suscripción mensual y sube tus comprobantes de pago"
+            eyebrow="Atleta Independiente"
+          >
+            <MiMembresiaCivil clienteData={clienteData} setMsg={setMsg} />
+          </SubComponentWrapper>
+        </div>
+      )}
+
+      {isCivil && (tab === "perfil" || visitedTabs.has("perfil")) && (
+        <div className={tab === "perfil" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <UserProfile
+              session={{ role:"civil", data: clienteData }}
+              onLogout={onLogout}
+              onChangeRole={onChangeRole}
+              multiRoles={multiRoles}
             />
-          ) : (
-            <ListSkeleton rows={4} />
-          )}
-        </SubComponentWrapper>
-      )}
-
-      {isCivil && tab === "membresia" && (
-        <SubComponentWrapper
-          title="Mi Membresía"
-          subtitle="Gestiona tu suscripción mensual y sube tus comprobantes de pago"
-          eyebrow="Atleta Independiente"
-        >
-          <MiMembresiaCivil clienteData={clienteData} setMsg={setMsg} />
-        </SubComponentWrapper>
-      )}
-
-      {isCivil && tab ==="perfil" && (
-        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-          <UserProfile
-            session={{ role:"civil", data: clienteData }}
-            onLogout={onLogout}
-            onChangeRole={onChangeRole}
-            multiRoles={multiRoles}
-          />
-        </Suspense>
+          </Suspense>
+        </div>
       )}
       {/* ════════════ END CIVIL PREMIUM TABS ════════════ */}
 
     
-      {(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') && (isCivil ? clienteData : myShadowClient) && (
-        <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-          <ClienteView 
-            session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
-            isAtletaMode={false}
-            isEmbedded={true}
-            embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
-            onLogout={onLogout}
-          />
-        </Suspense>
+      {((tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ||
+        visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('progreso_atleta')) && 
+        (isCivil ? clienteData : myShadowClient) && (
+        <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ? "flex-1 flex flex-col min-h-full" : "hidden"}>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <ClienteView 
+              session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
+              isAtletaMode={false}
+              isEmbedded={true}
+              embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
+              onLogout={onLogout}
+            />
+          </Suspense>
+        </div>
       )}
 </AppLayout>
   );

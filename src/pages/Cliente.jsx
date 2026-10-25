@@ -66,8 +66,18 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
   const tab = isEmbedded ? embeddedTab : tabState;
 
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([tab]));
+
   useEffect(() => {
-    if (tab) sessionStorage.setItem("flux_cliente_tab", tab);
+    if (tab) {
+      sessionStorage.setItem("flux_cliente_tab", tab);
+      setVisitedTabs(prev => {
+        if (prev.has(tab)) return prev;
+        const next = new Set(prev);
+        next.add(tab);
+        return next;
+      });
+    }
   }, [tab]);
 
   useEffect(() => {
@@ -346,52 +356,61 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </div>
           ) : (
             <>
-              
-              {tab ==="nutricion" && (
-                <Nutrition
-                  dias={dias}
-                  cliente={cliente}
-                  nutri={nutri}
-                  semanaActualCiclo={currentCycleWeek}
-                  ultimoPeso={ultimoPeso}
-                  nutriProgreso={nutriProgreso}
-                  onNutriProgressChange={handleNutriProgressChange}
-                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
-                />
+              {(tab === "nutricion" || visitedTabs.has("nutricion")) && (
+                <div className={tab === "nutricion" ? "flex-1 flex flex-col" : "hidden"}>
+                  <Nutrition
+                    dias={dias}
+                    cliente={cliente}
+                    nutri={nutri}
+                    semanaActualCiclo={currentCycleWeek}
+                    ultimoPeso={ultimoPeso}
+                    nutriProgreso={nutriProgreso}
+                    onNutriProgressChange={handleNutriProgressChange}
+                    isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
+                  />
+                </div>
               )}
 
-              {tab ==="deporte" && (
-                <Training 
-                  rutinas={rutinas} 
-                  progreso={progreso}
-                  progresoSemanaAnterior={progreso}
-                  clienteNombre={cliente.nombre}
-                  onSaveExercise={async () => {}}
-                  onProgressChange={handleProgressChange}
-                  semanaActualCiclo={currentCycleWeek}
-                  syncStatus={syncStatus}
-                  isLocked={isFuture}
-                  ultimoPeso={ultimoPeso}
-                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
-                />
+              {(tab === "deporte" || visitedTabs.has("deporte")) && (
+                <div className={tab === "deporte" ? "flex-1 flex flex-col" : "hidden"}>
+                  <Training 
+                    rutinas={rutinas} 
+                    progreso={progreso}
+                    progresoSemanaAnterior={progreso}
+                    clienteNombre={cliente.nombre}
+                    onSaveExercise={async () => {}}
+                    onProgressChange={handleProgressChange}
+                    semanaActualCiclo={currentCycleWeek}
+                    syncStatus={syncStatus}
+                    isLocked={isFuture}
+                    ultimoPeso={ultimoPeso}
+                    isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
+                  />
+                </div>
               )}
             </>
           )}
 
-          {tab ==="progreso" && (
-            <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
+          {(tab === "progreso" || visitedTabs.has("progreso")) && (
+            <div className={tab === "progreso" ? "flex-1 flex flex-col" : "hidden"}>
+              <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
+            </div>
           )}
 
-          {tab ==="citas" && (
-            <CitasCliente cliente={cliente} />
+          {(tab === "citas" || visitedTabs.has("citas")) && (
+            <div className={tab === "citas" ? "flex-1 flex flex-col" : "hidden"}>
+              <CitasCliente cliente={cliente} />
+            </div>
           )}
 
-          {tab ==="perfil" && (
-            isAtletaMode ? (
-              <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
-            ) : (
-              <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} multiRoles={multiRoles} />
-            )
+          {(tab === "perfil" || visitedTabs.has("perfil")) && (
+            <div className={tab === "perfil" ? "flex-1 flex flex-col" : "hidden"}>
+              {isAtletaMode ? (
+                <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
+              ) : (
+                <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+              )}
+            </div>
           )}
         </Suspense>
       )}

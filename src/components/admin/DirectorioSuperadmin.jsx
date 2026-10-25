@@ -101,7 +101,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [myRole, setMyRole] = useState("superadmin");
 
   const loadNutriologos = async () => {
-    setLoading(true);
+    if (nutriologos.length === 0) setLoading(true);
     try {
       const data = await dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
       const currentUser = await dbGet(`profiles?id=eq.${myId}`).catch(() => []);
