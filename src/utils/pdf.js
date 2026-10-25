@@ -26,6 +26,199 @@ const safeUrl = (url) => {
   return escapeHtml(url);
 };
 
+const FLUX_PAGINATION_SCRIPT = `
+<script>
+(function() {
+  function paginateDocument() {
+    var PAGE_HEIGHT = 1131; // Relación A4 exacta a 800px de ancho (800 * 297 / 210 = 1131.4)
+    var MARGIN_TOP = 48;    // Margen superior limpio para páginas >= 1
+    var MARGIN_BOTTOM = 56; // Margen inferior limpio para todas las páginas
+    var USABLE_HEIGHT = PAGE_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM; // 1027px
+
+    // Limpiar espaciadores previos si se re-ejecuta
+    var oldSpacers = document.querySelectorAll('.flux-page-spacer');
+    for (var i = 0; i < oldSpacers.length; i++) {
+      oldSpacers[i].remove();
+    }
+
+    function createSpacer(height) {
+      var sp = document.createElement('div');
+      sp.className = 'flux-page-spacer';
+      sp.style.cssText = 'height:' + Math.max(1, Math.round(height)) + 'px;width:100%;display:block;margin:0;padding:0;border:none;background:transparent;clear:both;';
+      return sp;
+    }
+
+    function getElementBounds(el) {
+      var rect = el.getBoundingClientRect();
+      var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+      var top = rect.top + scrollY;
+      var height = rect.height || el.offsetHeight || 0;
+      return { top: top, height: height, bottom: top + height };
+    }
+
+    function splitTableAtRow(table, splitRow, spacerHeight) {
+      var newTable = table.cloneNode(false);
+      var thead = table.querySelector('thead');
+      if (thead) {
+        newTable.appendChild(thead.cloneNode(true));
+      }
+      var tbody = document.createElement('tbody');
+      newTable.appendChild(tbody);
+
+      var curr = splitRow;
+      var rowsToMove = [];
+      while (curr) {
+        rowsToMove.push(curr);
+        curr = curr.nextElementSibling;
+      }
+      for (var r = 0; r < rowsToMove.length; r++) {
+        tbody.appendChild(rowsToMove[r]);
+      }
+
+      var spacer = createSpacer(spacerHeight);
+      if (table.nextSibling) {
+        table.parentNode.insertBefore(spacer, table.nextSibling);
+        table.parentNode.insertBefore(newTable, spacer.nextSibling);
+      } else {
+        table.parentNode.appendChild(spacer);
+        table.parentNode.appendChild(newTable);
+      }
+      return newTable;
+    }
+
+    var sections = Array.from(document.body.children);
+
+    for (var s = 0; s < sections.length; s++) {
+      var sec = sections[s];
+      if (sec.classList.contains('flux-page-spacer')) continue;
+      if (sec.tagName === 'SCRIPT' || sec.tagName === 'STYLE') continue;
+
+      var b = getElementBounds(sec);
+      if (b.height <= 0) continue;
+
+      var page = Math.floor(b.top / PAGE_HEIGHT);
+      var safeBottom = (page + 1) * PAGE_HEIGHT - MARGIN_BOTTOM;
+
+      var isHeader = sec.classList.contains('title-sec') || sec.classList.contains('dia-title');
+      if (isHeader) {
+        var nextSec = sec.nextElementSibling;
+        while (nextSec && (nextSec.classList.contains('flux-page-spacer') || nextSec.tagName === 'SCRIPT')) {
+          nextSec = nextSec.nextElementSibling;
+        }
+        if (b.bottom > safeBottom || (b.bottom + 80) > safeBottom) {
+          var targetTop = (page + 1) * PAGE_HEIGHT + MARGIN_TOP;
+          var spHeight = targetTop - b.top;
+          if (spHeight > 0) {
+            sec.parentNode.insertBefore(createSpacer(spHeight), sec);
+            b = getElementBounds(sec);
+            page = Math.floor(b.top / PAGE_HEIGHT);
+            safeBottom = (page + 1) * PAGE_HEIGHT - MARGIN_BOTTOM;
+          }
+        }
+        continue;
+      }
+
+      if (b.bottom <= safeBottom) {
+        continue;
+      }
+
+      // Si sobrepasa el límite seguro
+      if (b.height <= USABLE_HEIGHT) {
+        var targetTop = (page + 1) * PAGE_HEIGHT + MARGIN_TOP;
+        var spHeight = targetTop - b.top;
+        if (spHeight > 0) {
+          sec.parentNode.insertBefore(createSpacer(spHeight), sec);
+        }
+      } else {
+        var targetTable = sec.tagName === 'TABLE' ? sec : sec.querySelector('table');
+        if (targetTable) {
+          var rows = Array.from(targetTable.querySelectorAll('tbody tr'));
+          if (rows.length === 0) {
+            rows = Array.from(targetTable.querySelectorAll('tr')).filter(function(r) { return !r.closest('thead'); });
+          }
+
+          for (var rIdx = 0; rIdx < rows.length; rIdx++) {
+            var row = rows[rIdx];
+            var rb = getElementBounds(row);
+            var rPage = Math.floor(rb.top / PAGE_HEIGHT);
+            var rSafeBottom = (rPage + 1) * PAGE_HEIGHT - MARGIN_BOTTOM;
+
+            if (rb.bottom > rSafeBottom) {
+              var rTargetTop = (rPage + 1) * PAGE_HEIGHT + MARGIN_TOP;
+              var rowSpHeight = rTargetTop - rb.top;
+              if (rowSpHeight > 0) {
+                var newT = splitTableAtRow(targetTable, row, rowSpHeight);
+                targetTable = newT;
+                rows = Array.from(targetTable.querySelectorAll('tbody tr'));
+                rIdx = -1;
+              }
+            }
+          }
+        } else {
+          var targetTop = (page + 1) * PAGE_HEIGHT + MARGIN_TOP;
+          var spHeight = targetTop - b.top;
+          if (spHeight > 0) {
+            sec.parentNode.insertBefore(createSpacer(spHeight), sec);
+          }
+        }
+      }
+    }
+
+    var maxB = 0;
+    var all = document.body.querySelectorAll('*');
+    for (var k = 0; k < all.length; k++) {
+      var item = all[k];
+      if (item.classList.contains('flux-page-spacer')) continue;
+      var ib = getElementBounds(item);
+      if (ib.bottom > maxB) maxB = ib.bottom;
+    }
+
+    var totalPages = Math.max(1, Math.ceil((maxB + 20) / PAGE_HEIGHT));
+    var exactHeight = totalPages * PAGE_HEIGHT;
+    document.body.style.minHeight = exactHeight + 'px';
+    document.body.style.height = exactHeight + 'px';
+    document.body.style.boxSizing = 'border-box';
+    document.body.setAttribute('data-flux-pages', totalPages);
+  }
+
+  function init() {
+    var imgs = Array.from(document.images);
+    if (imgs.length === 0) {
+      paginateDocument();
+      return;
+    }
+    var pending = imgs.length;
+    function imgDone() {
+      pending--;
+      if (pending <= 0) {
+        paginateDocument();
+      }
+    }
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].complete) {
+        pending--;
+      } else {
+        imgs[i].addEventListener('load', imgDone);
+        imgs[i].addEventListener('error', imgDone);
+      }
+    }
+    if (pending <= 0) {
+      paginateDocument();
+    } else {
+      setTimeout(paginateDocument, 400);
+    }
+  }
+
+  if (document.readyState === 'complete') {
+    init();
+  } else {
+    window.addEventListener('load', init);
+    document.addEventListener('DOMContentLoaded', init);
+  }
+})();
+</script>
+`;
+
 /**
  * Abre un visor interactivo de Vista Previa de PDF dentro de la app
  * con soporte para:
@@ -359,9 +552,16 @@ const openPdfPreviewModal = ({ html, title, fileName, accent = "#1A6FD4" }) => {
       shareBtn.disabled = true;
       shareBtn.style.opacity = "0.7";
       shareBtn.innerHTML = `<span>Preparando PDF...</span>`;
-      window.FluxPdfNative.shareHtmlAsPdf(html, fileName || "FLUX_Documento");
+      let htmlToShare = html;
+      try {
+        const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
+        if (doc && doc.documentElement && doc.body && doc.body.getAttribute("data-flux-pages")) {
+          htmlToShare = "<!DOCTYPE html>" + doc.documentElement.outerHTML;
+        }
+      } catch (err) {}
+      window.FluxPdfNative.shareHtmlAsPdf(htmlToShare, fileName || "FLUX_Documento");
       // Safety fallback timeout in case event is missed
-      setTimeout(onShareDone, 5000);
+      setTimeout(onShareDone, 6000);
       return;
     }
 
@@ -408,22 +608,131 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Nutricional - ${clienteNombre}</title>
   <style>
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:30px;max-width:800px;margin:0 auto}
-    .header{text-align:center;border-bottom:3px solid ${accent};padding-bottom:20px;margin-bottom:24px}
-    .brand-logo{max-height:80px;max-width:240px;object-fit:contain;margin-bottom:6px}
-    .brand-name{font-size:32px;font-weight:900;color:${dark};letter-spacing:4px}
-    .brand-sub{font-size:12px;color:${accent};letter-spacing:2px;margin-top:2px}
-    .client-info{background:${light};border-left:4px solid ${accent};padding:12px 16px;border-radius:4px;margin-bottom:20px}
-    .macros{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-    .macro-box{background:${dark};color:white;border-radius:10px;padding:14px;text-align:center}
-    .macro-val{font-size:24px;font-weight:900}
-    .macro-lbl{font-size:11px;opacity:.8}
-    .dia{margin-bottom:20px;page-break-inside:avoid}
-    .dia-title{background:${accent};color:white;padding:8px 14px;border-radius:6px 6px 0 0;font-weight:700;font-size:15px}
-    table{width:100%;border-collapse:collapse}
-    th{background:${light};padding:8px 10px;text-align:left;font-size:12px;color:${dark}}
-    td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;vertical-align:top}
-    .footer{text-align:center;margin-top:30px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:14px}
+    @page {
+      size: A4 portrait;
+      margin: 14mm 12mm 16mm 12mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #0B1929;
+      background: #fff;
+      padding: 24px 20px;
+      margin: 0 auto;
+      max-width: 800px;
+      line-height: 1.45;
+    }
+    @media print {
+      body {
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      .flux-page-spacer {
+        display: none !important;
+        height: 0 !important;
+      }
+    }
+    .flux-page-spacer {
+      width: 100%;
+      display: block;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      clear: both;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 3px solid ${accent};
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .brand-logo { max-height: 75px; max-width: 220px; object-fit: contain; margin-bottom: 6px; }
+    .brand-name { font-size: 28px; font-weight: 900; color: ${dark}; letter-spacing: 3px; }
+    .brand-sub { font-size: 11px; color: ${accent}; letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
+    .client-info {
+      background: ${light};
+      border-left: 4px solid ${accent};
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .macros {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .macro-box {
+      background: ${dark};
+      color: white;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .macro-val { font-size: 20px; font-weight: 900; }
+    .macro-lbl { font-size: 10px; opacity: .85; }
+    .dia {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .dia-title {
+      background: ${accent};
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px 6px 0 0;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th {
+      background: ${light};
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 11px;
+      color: ${dark};
+      font-weight: 700;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 11px;
+      vertical-align: top;
+      line-height: 1.4;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 11px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
   </style></head><body>
   <div class="header">
     ${
@@ -461,6 +770,7 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
     })
     .join("")}
   <div class="footer">Plan generado por ${nombre} · Keep Going 💪</div>
+  ${FLUX_PAGINATION_SCRIPT}
   </body></html>`;
 
   const cleanClient = String(cliente.nombre || "Paciente").replace(/[^a-zA-Z0-9_\-]/g, "_");
@@ -500,22 +810,138 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progreso_${clienteNombre}</title>
   <style>
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:30px;max-width:800px;margin:0 auto}
-    .header{text-align:center;border-bottom:3px solid ${accent};padding-bottom:20px;margin-bottom:24px}
-    .brand-logo{max-height:80px;max-width:240px;object-fit:contain;margin-bottom:6px}
-    .brand-name{font-size:32px;font-weight:900;color:${dark};letter-spacing:4px}
-    .brand-sub{font-size:12px;color:${accent};letter-spacing:2px;margin-top:2px}
-    .client-info{background:${light};border-left:4px solid ${accent};padding:12px 16px;border-radius:4px;margin-bottom:24px}
-    .title-sec{font-size:16px;font-weight:700;color:${dark};margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
-    .macros{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:30px}
-    .macro-box{background:${dark};color:white;border-radius:10px;padding:14px;text-align:center}
-    .macro-val{font-size:24px;font-weight:900}
-    .macro-lbl{font-size:11px;opacity:.8;margin-top:4px}
-    table{width:100%;border-collapse:collapse;margin-bottom:30px}
-    th{background:${light};padding:10px;text-align:center;font-size:12px;color:${dark};border:1px solid #ddd}
-    td{padding:10px;border:1px solid #ddd;font-size:12px;text-align:center;vertical-align:middle}
-    .date-col{font-weight:700;text-align:left}
-    .footer{text-align:center;margin-top:40px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:14px}
+    @page {
+      size: A4 portrait;
+      margin: 14mm 12mm 16mm 12mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #0B1929;
+      background: #fff;
+      padding: 24px 20px;
+      margin: 0 auto;
+      max-width: 800px;
+      line-height: 1.45;
+    }
+    @media print {
+      body {
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      .flux-page-spacer {
+        display: none !important;
+        height: 0 !important;
+      }
+    }
+    .flux-page-spacer {
+      width: 100%;
+      display: block;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      clear: both;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 3px solid ${accent};
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .brand-logo { max-height: 75px; max-width: 220px; object-fit: contain; margin-bottom: 6px; }
+    .brand-name { font-size: 28px; font-weight: 900; color: ${dark}; letter-spacing: 3px; }
+    .brand-sub { font-size: 11px; color: ${accent}; letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
+    .client-info {
+      background: ${light};
+      border-left: 4px solid ${accent};
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .title-sec {
+      font-size: 14px;
+      font-weight: 700;
+      color: ${dark};
+      margin-top: 20px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .macros {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .macro-box {
+      background: ${dark};
+      color: white;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .macro-val { font-size: 20px; font-weight: 900; }
+    .macro-lbl { font-size: 10px; opacity: .85; margin-top: 2px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th {
+      background: ${light};
+      padding: 8px;
+      text-align: center;
+      font-size: 11px;
+      color: ${dark};
+      border: 1px solid #e2e8f0;
+      font-weight: 700;
+    }
+    td {
+      padding: 7px 8px;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .date-col { font-weight: 700; text-align: left; }
+    .photo-group {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin-bottom: 16px;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 11px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
   </style></head><body>
   
   <div class="header">
@@ -598,13 +1024,13 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
         .filter((m) => parseFotos(m.fotos).length > 0)
         .map(
           (m) => `
-        <div style="margin-bottom:20px;">
+        <div class="photo-group" style="margin-bottom:20px;">
           <div style="font-weight:700; font-size:14px; margin-bottom:10px; color:${dark};">📅 ${fmtDate(m.fecha)}</div>
           <div style="display:flex; gap:12px; flex-wrap:wrap;">
             ${parseFotos(m.fotos)
               .map(
                 (url) => `
-              <div style="break-inside: avoid; page-break-inside: avoid;">
+              <div class="photo-item" style="break-inside: avoid; page-break-inside: avoid;">
                 <img src="${safeUrl(url)}" style="max-width:280px; max-height:350px; width:auto; height:auto; display:block; border-radius:8px; border:1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" alt="Foto progreso"/>
               </div>
             `
@@ -623,6 +1049,7 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
   }
 
   <div class="footer">Reporte generado por ${nombre} · Keep Going 💪</div>
+  ${FLUX_PAGINATION_SCRIPT}
   </body></html>`;
 
   const cleanClient = String(cliente.nombre || "Paciente").replace(/[^a-zA-Z0-9_\-]/g, "_");

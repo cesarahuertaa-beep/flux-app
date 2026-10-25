@@ -591,7 +591,7 @@ public class MainActivity extends BridgeActivity {
                                             : "FLUX_Documento";
                                         PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(safeJob);
                                         PrintAttributes attrs = new PrintAttributes.Builder()
-                                            .setMediaSize(PrintAttributes.MediaSize.NA_LETTER)
+                                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
                                             .setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300))
                                             .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                                             .build();
@@ -615,8 +615,13 @@ public class MainActivity extends BridgeActivity {
         public void shareHtmlAsPdf(final String html, final String rawFileName) {
             runOnUiThread(() -> {
                 try {
+                    String baseName = (rawFileName != null && !rawFileName.trim().isEmpty())
+                        ? rawFileName.trim().replaceAll("(?i)\\.pdf$", "")
+                        : "FLUX_Reporte";
+                    final String cleanName = baseName.replaceAll("[^a-zA-Z0-9_\\-]", "_") + ".pdf";
+
                     final int pageWidth = 800;
-                    final int pageHeight = 1131; // A4 proportion at 800px width
+                    final int pageHeight = 1131; // Exact A4 aspect ratio: 800 * 297 / 210
 
                     final WebView pdfWebView = new WebView(MainActivity.this);
                     activePdfWebView = pdfWebView;
@@ -624,7 +629,8 @@ public class MainActivity extends BridgeActivity {
                     pdfWebView.setInitialScale(100);
 
                     WebSettings ws = pdfWebView.getSettings();
-                    ws.setJavaScriptEnabled(false);
+                    ws.setJavaScriptEnabled(true);
+                    ws.setDomStorageEnabled(true);
                     ws.setLoadsImagesAutomatically(true);
                     ws.setTextZoom(100);
                     ws.setUseWideViewPort(false);
@@ -642,6 +648,7 @@ public class MainActivity extends BridgeActivity {
                         public void onPageFinished(final WebView view, String url) {
                             if (exported) return;
                             exported = true;
+
                             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                                 try {
                                     view.measure(
@@ -650,9 +657,14 @@ public class MainActivity extends BridgeActivity {
                                     );
                                     int contentHeight = (int) (view.getContentHeight() * view.getScale());
                                     int totalHeight = Math.max(pageHeight, Math.max(view.getMeasuredHeight(), contentHeight));
-                                    view.layout(0, 0, pageWidth, totalHeight);
 
-                                    int numPages = Math.min(25, Math.max(1, (int) Math.ceil((double) totalHeight / pageHeight)));
+                                    // 20px tolerance so small trailing margins never trigger an accidental blank page
+                                    int rawPages = (int) Math.ceil((double) (totalHeight - 20) / pageHeight);
+                                    int numPages = Math.min(30, Math.max(1, rawPages));
+
+                                    int layoutHeight = Math.max(totalHeight, numPages * pageHeight);
+                                    view.layout(0, 0, pageWidth, layoutHeight);
+
                                     PdfDocument document = new PdfDocument();
 
                                     for (int p = 0; p < numPages; p++) {
@@ -668,44 +680,16 @@ public class MainActivity extends BridgeActivity {
                                         document.finishPage(page);
                                     }
 
-                                    String cleanName = (rawFileName != null ? rawFileName : "FLUX_Reporte")
-                                        .replaceAll("[^a-zA-Z0-9_\\-]", "_");
-                                    if (cleanName.isEmpty()) cleanName = "FLUX_Reporte";
-                                    if (!cleanName.toLowerCase().endsWith(".pdf")) {
-                                        cleanName = cleanName + ".pdf";
-                                    }
-
                                     File pdfFile = new File(getCacheDir(), cleanName);
                                     try (FileOutputStream fos = new FileOutputStream(pdfFile)) {
                                         document.writeTo(fos);
                                     }
                                     document.close();
 
-                                    Uri uri = FileProvider.getUriForFile(
-                                        MainActivity.this,
-                                        getPackageName() + ".fileprovider",
-                                        pdfFile
-                                    );
-
-                                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                                    shareIntent.setType("application/pdf");
-                                    shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-                                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName.replace(".pdf", ""));
-                                    shareIntent.putExtra(Intent.EXTRA_TITLE, cleanName);
-                                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                                    Intent chooser = Intent.createChooser(shareIntent, "Compartir PDF");
-                                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                    startActivity(chooser);
+                                    sendPdfShareIntent(pdfFile, cleanName);
                                 } catch (Exception e) {
                                     Log.w(TAG, "Error generating/sharing PDF: " + e.getMessage());
-                                } finally {
-                                    if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
-                                        MainActivity.this.bridge.getWebView().evaluateJavascript(
-                                            "window.dispatchEvent(new CustomEvent('flux:pdf-share-done'));",
-                                            null
-                                        );
-                                    }
+                                    notifyPdfShareDone();
                                 }
                             }, 550);
                         }
@@ -714,14 +698,48 @@ public class MainActivity extends BridgeActivity {
                     pdfWebView.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null);
                 } catch (Exception e) {
                     Log.w(TAG, "Failed to shareHtmlAsPdf: " + e.getMessage());
-                    if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
-                        MainActivity.this.bridge.getWebView().evaluateJavascript(
-                            "window.dispatchEvent(new CustomEvent('flux:pdf-share-done'));",
-                            null
-                        );
-                    }
+                    notifyPdfShareDone();
                 }
             });
+        }
+
+        private void sendPdfShareIntent(File pdfFile, String cleanName) {
+            try {
+                if (!pdfFile.exists() || pdfFile.length() == 0) {
+                    Log.w(TAG, "PDF file is empty or does not exist");
+                    return;
+                }
+
+                Uri uri = FileProvider.getUriForFile(
+                    MainActivity.this,
+                    getPackageName() + ".fileprovider",
+                    pdfFile
+                );
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("application/pdf");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName.replace(".pdf", ""));
+                shareIntent.putExtra(Intent.EXTRA_TITLE, cleanName);
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                Intent chooser = Intent.createChooser(shareIntent, "Compartir PDF");
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(chooser);
+            } catch (Exception e) {
+                Log.w(TAG, "Error sending share intent: " + e.getMessage());
+            } finally {
+                notifyPdfShareDone();
+            }
+        }
+
+        private void notifyPdfShareDone() {
+            if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                MainActivity.this.bridge.getWebView().evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('flux:pdf-share-done'));",
+                    null
+                );
+            }
         }
     }
 
