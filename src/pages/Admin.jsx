@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
@@ -125,20 +125,37 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [bloqueado, setBloqueado] = useState(false);
   const [diasGracia, setDiasGracia] = useState(false); // true = días 11-12, mostrar alerta
 
+  const hasCheckedPagoRef = useRef(false);
+  const hasHealedShadowRef = useRef(false);
+
   // ── VERIFICACIÓN DE MORA (Nutriólogos y Civiles) ──
   useEffect(() => {
     const checkPago = async () => {
-      if (role !=="nutriologo" && role !=="nutriologo_estudiante" && role !=="civil") return;
+      if (role !== "nutriologo" && role !== "nutriologo_estudiante" && role !== "civil") return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      if (hasCheckedPagoRef.current) return;
+      hasCheckedPagoRef.current = true;
 
       try {
         const today = new Date();
 
+        const updateBloqueado = async (shouldBlock, inGrace = false) => {
+          setBloqueado(shouldBlock);
+          setDiasGracia(inGrace);
+          try {
+            const current = await dbGet(`profiles?id=eq.${myId}&select=bloqueado`);
+            if (current && current.length > 0 && current[0]?.bloqueado !== shouldBlock) {
+              await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: shouldBlock });
+            }
+          } catch (e) {
+            console.warn("Error actualizando bloqueado en profiles:", e);
+          }
+        };
+
         // ── LOGICA PARA CIVILES (Suscripción rolling de 30 días) ──
         if (isCivil && clienteData) {
-          // Premium de equipo (staff por defecto o patrocinado por un nutriólogo): lo valida el servidor
           try {
-            const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen`);
+            const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen,plan_tipo,activo`);
             const origen = fresh?.[0]?.premium_origen;
             if (origen === 'staff' || origen === 'patrocinado') {
               await dbPost('rpc/verificar_premium_cliente', { p_cliente: clienteData.id });
@@ -146,41 +163,43 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               setDiasGracia(false);
               return;
             }
-          } catch (e) { console.warn('verificar_premium_cliente:', e); }
 
-          // Buscamos su último recibo válido (aprobado o pendiente)
-          const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
-          const lastValid = recibos?.find(r => r.estado === 'aprobado');
+            const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
+            const lastValid = recibos?.find(r => r.estado === 'aprobado');
 
-          if (!lastValid) {
-            // Si nunca ha pagado, se queda como estándar
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
-            setBloqueado(false); // NO lo bloqueamos de la app, solo limitamos funciones
-            setDiasGracia(false);
-            return;
+            if (!lastValid) {
+              if (fresh?.[0]?.plan_tipo !== 'estandar') {
+                await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
+              }
+              setBloqueado(false);
+              setDiasGracia(false);
+              return;
+            }
+
+            const expirationDate = new Date(lastValid.fecha_corte_mes + "T23:59:59");
+            const blockDate = new Date(expirationDate);
+            blockDate.setDate(blockDate.getDate() + 2);
+
+            if (today > blockDate) {
+              if (fresh?.[0]?.plan_tipo !== 'estandar') {
+                await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
+              }
+              setBloqueado(false);
+              setDiasGracia(false);
+            } else if (today > expirationDate && today <= blockDate) {
+              setDiasGracia(true);
+              setBloqueado(false);
+            } else {
+              if (fresh?.[0]?.plan_tipo !== 'premium' || !fresh?.[0]?.activo) {
+                await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, plan_tipo: 'premium', deactivated_at: null });
+              }
+              setBloqueado(false);
+              setDiasGracia(false);
+            }
+          } catch (e) {
+            console.warn('Error en verificacion pago civil:', e);
           }
-
-          // Su vencimiento es la fecha_corte_mes del recibo válido
-          const expirationDate = new Date(lastValid.fecha_corte_mes +"T23:59:59");
-          const blockDate = new Date(expirationDate);
-          blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
-
-          if (today > blockDate) {
-            // Pasaron los días de gracia, vuelve a ser estándar
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { plan_tipo: 'estandar' });
-            setBloqueado(false); // NO se bloquea pantalla completa
-            setDiasGracia(false);
-          } else if (today > expirationDate && today <= blockDate) {
-            // En días de gracia (alerta)
-            setDiasGracia(true);
-            setBloqueado(false);
-          } else {
-            // Suscripción activa y vigente (premium)
-            await dbPatch(`clientes?id=eq.${clienteData.id}`, { activo: true, plan_tipo: 'premium', deactivated_at: null });
-            setBloqueado(false);
-            setDiasGracia(false);
-          }
-          return; // Fin lógica civiles
+          return;
         }
 
         let firstClientDate = null;
@@ -198,9 +217,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           const lastApproved = recibosEst?.find(r => r.estado === "aprobado");
 
           if (tienePendiente || (!firstClientDate && !lastApproved)) {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-            setBloqueado(false);
-            setDiasGracia(false);
+            await updateBloqueado(false, false);
             return;
           }
 
@@ -214,20 +231,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
 
           const blockDate = new Date(expirationDate);
-          blockDate.setDate(blockDate.getDate() + 2); // 2 días de gracia
+          blockDate.setDate(blockDate.getDate() + 2);
 
           if (today > blockDate) {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
-            setBloqueado(true);
-            setDiasGracia(false);
+            await updateBloqueado(true, false);
           } else if (today > expirationDate && today <= blockDate) {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-            setDiasGracia(true);
-            setBloqueado(false);
+            await updateBloqueado(false, true);
           } else {
-            await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-            setBloqueado(false);
-            setDiasGracia(false);
+            await updateBloqueado(false, false);
           }
           return;
         }
@@ -241,11 +252,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
         }
 
-        // Si no tiene pacientes, no debe nada. O si su primer paciente entró después del último corte, tampoco.
         if (!firstClientDate || firstClientDate > lastPassedCutoff) {
-          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-          setBloqueado(false);
-          setDiasGracia(false);
+          await updateBloqueado(false, false);
           return;
         }
 
@@ -254,23 +262,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         const pagadoOPendiente = recibos && recibos.some(r => r.estado === 'aprobado' || r.estado === 'pendiente');
 
         if (pagadoOPendiente) {
-          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: false });
-          setBloqueado(false);
-          setDiasGracia(false);
+          await updateBloqueado(false, false);
           return;
         }
 
         const diaHoy = today.getDate();
         if (today >= lastPassedCutoff && diaHoy >= DIA_BLOQUEO) {
-          await dbPatch(`profiles?id=eq.${myId}`, { bloqueado: true });
-          setBloqueado(true);
-          setDiasGracia(false);
+          await updateBloqueado(true, false);
         } else if (today >= lastPassedCutoff && diaHoy > diaCorte && diaHoy < DIA_BLOQUEO) {
-          setDiasGracia(true);
-          setBloqueado(false);
+          await updateBloqueado(false, true);
         } else {
-          setBloqueado(false);
-          setDiasGracia(false);
+          await updateBloqueado(false, false);
         }
 
       } catch (e) {
@@ -286,8 +288,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
   const bibliotecaFilter ="biblioteca_ejercicios?order=nombre.asc";
 
-  const loadClientes = useCallback(async () => {
-    setLoading(true);
+  const loadClientes = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && clientes.length === 0) setLoading(true);
     let _allNutris = [];
     let _me = [];
 
@@ -324,7 +326,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       const candidates = findShadowCandidates(r, myEmailNorm);
       if (candidates.length > 0) {
-        // Priorizar el expediente original (r ya viene en orden created_at.asc)
         setMyShadowClient(candidates[0]);
       }
 
@@ -341,13 +342,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     };
 
     try { 
-      const [r, allNutris, me, activeCiclosRes, recentProgRes, recentMetricasRes] = await Promise.all([
+      const [r, allNutris, me] = await Promise.all([
         dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)).catch(() => []),
         dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`).catch(() => []),
         dbGet(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`).catch(() => []),
-        dbGet(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
-        dbGet(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`).catch(() => []),
-        dbGet(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`).catch(() => [])
       ]);
       _allNutris = allNutris;
       _me = me;
@@ -355,6 +353,29 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         setMyProfile(me[0]);
       }
       updateState(r, allNutris, me);
+
+      // Consulta de retención acotada por IDs de clientes (ejecuta en <10ms en vez de escanear toda la DB)
+      const clientIds = (Array.isArray(r) ? r : []).map(c => c.id).filter(Boolean);
+      let activeCiclosRes = [];
+      let recentProgRes = [];
+      let recentMetricasRes = [];
+
+      if (clientIds.length > 0) {
+        if (!isSuperadmin && role !== "staff") {
+          const cIdsParam = clientIds.slice(0, 100).join(",");
+          [activeCiclosRes, recentProgRes, recentMetricasRes] = await Promise.all([
+            dbGet(`ciclos?activo=eq.true&cliente_id=in.(${cIdsParam})&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
+            dbGet(`progreso?cliente_id=in.(${cIdsParam})&select=cliente_id,updated_at&order=updated_at.desc&limit=500`).catch(() => []),
+            dbGet(`metricas_progreso?cliente_id=in.(${cIdsParam})&select=cliente_id,fecha,created_at&order=created_at.desc&limit=500`).catch(() => [])
+          ]);
+        } else {
+          [activeCiclosRes, recentProgRes, recentMetricasRes] = await Promise.all([
+            dbGet(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
+            dbGet(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=1000`).catch(() => []),
+            dbGet(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=500`).catch(() => [])
+          ]);
+        }
+      }
 
       const activityMap = {};
       if (Array.isArray(recentMetricasRes)) {
@@ -385,12 +406,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         lastActivityMap: activityMap
       });
 
-      if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0) {
+      // Auto-sanar perfil de atleta sombra (máximo una vez por sesión para evitar bucles)
+      if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0 && !hasHealedShadowRef.current) {
+        hasHealedShadowRef.current = true;
         const jwtEmail = getJwtEmail();
         const trueEmail = (me[0].email || jwtEmail || "").trim();
         const myEmailNorm = trueEmail.toLowerCase();
 
-        // 1. Auto-sanar profiles.email si estaba vacío o null
         if (!me[0].email && trueEmail) {
           dbPatch(`profiles?id=eq.${myId}`, { email: trueEmail }).catch(() => {});
         }
@@ -415,8 +437,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             console.error("Error auto-creando perfil atleta:", err);
           }
         } else if (candidates.length > 0) {
-          // Si hay más de un candidato (ej. el original con datos + un clon vacío reciente),
-          // verificamos cuál tiene datos y limpiamos los duplicados vacíos.
           let primaryClone = candidates[0];
           if (candidates.length > 1) {
             const candidateChecks = await Promise.all(
@@ -438,7 +458,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             const withData = candidateChecks.find(x => x.hasData);
             if (withData) primaryClone = withData.cand;
 
-            // Eliminar clones duplicados que estén completamente vacíos
             for (const item of candidateChecks) {
               if (item.cand.id !== primaryClone.id && !item.hasData && item.cand.objetivo === "Mi entrenamiento personal") {
                 dbDel(`clientes?id=eq.${item.cand.id}`).catch(() => {});
@@ -446,7 +465,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             }
           }
 
-          // 2. Auto-sanar el expediente original para que tenga email real, auth_id y plan_tipo premium
           const patchPayload = {};
           if (trueEmail && primaryClone.email !== trueEmail) patchPayload.email = trueEmail;
           if (myId && primaryClone.auth_id !== myId) patchPayload.auth_id = myId;
@@ -484,7 +502,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       if (table && !["clientes", "profiles", "ciclos", "biblioteca_ejercicios"].includes(table)) return;
       if (syncDebounce) clearTimeout(syncDebounce);
       syncDebounce = setTimeout(() => {
-        loadClientes();
+        loadClientes({ silent: true });
         if (!table || table === "biblioteca_ejercicios") loadBiblioteca();
       }, 450);
     };
@@ -947,8 +965,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             toggleActivo={toggleActivo}
           />
         </Suspense>
-      ) : tab ==="clientes" && (
-        <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+      ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
+        <div className={tab === "clientes" ? "flex-1 flex flex-col bg-[#F7F9FC] min-h-full" : "hidden"}>
           {/* Header */}
           <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
             {/* Cabecera superior: Título */}
@@ -1216,20 +1234,24 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {/* Sub-Components */}
-      {(role === "superadmin" || role === "staff") && tab === "biblioteca" && (
-        <SubComponentWrapper title="Biblioteca de Ejercicios" subtitle="Colección global de ejercicios con demostración visual">
-          <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
-        </SubComponentWrapper>
+      {(role === "superadmin" || role === "staff") && (tab === "biblioteca" || visitedTabs.has("biblioteca")) && (
+        <div className={tab === "biblioteca" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <SubComponentWrapper title="Biblioteca de Ejercicios" subtitle="Colección global de ejercicios con demostración visual">
+            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
+          </SubComponentWrapper>
+        </div>
       )}
       
-      {!isCivil && tab === "mi_entrenamiento" && (
-        <SubComponentWrapper title="Mi Plan Personal" subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones">
-          {myShadowClient ? (
-            <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
-          ) : (
-            <ListSkeleton rows={4} />
-          )}
-        </SubComponentWrapper>
+      {!isCivil && (tab === "mi_entrenamiento" || visitedTabs.has("mi_entrenamiento")) && (
+        <div className={tab === "mi_entrenamiento" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+          <SubComponentWrapper title="Mi Plan Personal" subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones">
+            {myShadowClient ? (
+              <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
+            ) : (
+              <ListSkeleton rows={4} />
+            )}
+          </SubComponentWrapper>
+        </div>
       )}
 
       {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (

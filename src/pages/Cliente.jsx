@@ -94,9 +94,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   
   const [biblioteca, setBiblioteca] = useState([]);
 
-  const loadData = async () => {
+  const loadData = async ({ silent = false } = {}) => {
+    if (!silent && dias.length === 0 && rutinas.length === 0) {
+      setLoading(true);
+    }
     try {
-      if (cliente?.nutriologo_id) {
+      if (!isEmbedded && cliente?.nutriologo_id) {
         const nutriProfile = await dbGet(`profiles?id=eq.${cliente.nutriologo_id}&select=bloqueado`);
         if (nutriProfile && nutriProfile[0]?.bloqueado) {
           setNutriologoBloqueado(true);
@@ -105,48 +108,53 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         }
       }
 
-      const cs = await dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`);
+      // Consultas paralelas iniciales
+      const [cs, met, npRows] = await Promise.all([
+        dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`).catch(() => []),
+        dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`).catch(() => []),
+        dbGet(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`).catch(() => [])
+      ]);
+
       const ciclo = cs.length ? cs[0] : null;
       setCicloActivo(ciclo);
 
-      try {
-        const met = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`);
-        if (met && met.length > 0 && met[0].peso) {
-          setUltimoPeso(parseFloat(met[0].peso));
-        }
-      } catch(e) {}
+      if (met && met.length > 0 && met[0].peso) {
+        setUltimoPeso(parseFloat(met[0].peso));
+      }
 
+      if (Array.isArray(npRows)) {
+        const npMap = {};
+        npRows.forEach(r => {
+          if (r?.dia_id && r?.semana != null) {
+            npMap[`${r.dia_id}-${r.semana}`] = r;
+          }
+        });
+        setNutriProgreso(npMap);
+      }
 
       const cicloFilter = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
 
-      const ns = await dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`);
-      if (ns.length) {
+      // Consultas paralelas de nutrición y rutinas
+      const [ns, rs] = await Promise.all([
+        dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`).catch(() => []),
+        dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => [])
+      ]);
+
+      if (ns && ns.length) {
         setNutri(ns[0]);
-        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
-        setDias(ds.map(d => ({ 
-          ...d, 
-          comidas: (d.comidas || []).sort((a, b) => a.orden - b.orden) 
-        })));
+        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+        if (ds) {
+          setDias(ds.map(d => ({ 
+            ...d, 
+            comidas: (d.comidas || []).sort((a, b) => a.orden - b.orden) 
+          })));
+        }
       } else {
         setNutri(null);
         setDias([]);
       }
 
-      try {
-        const npRows = await dbGet(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`);
-        if (Array.isArray(npRows)) {
-          const npMap = {};
-          npRows.forEach(r => {
-            if (r?.dia_id && r?.semana != null) {
-              npMap[`${r.dia_id}-${r.semana}`] = r;
-            }
-          });
-          setNutriProgreso(npMap);
-        }
-      } catch (e) {}
-
-      const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
-      const rsFull = rs.map(r => ({ 
+      const rsFull = (rs || []).map(r => ({ 
         ...r, 
         ejercicios: (r.ejercicios || []).sort((a, b) => a.orden - b.orden) 
       }));
@@ -154,7 +162,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
+        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
         if (ps && Array.isArray(ps)) {
           const pm = {};
           ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
@@ -167,7 +175,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           setProgreso(pm);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error cargando datos del cliente:", e);
+    }
     setLoading(false);
   };
 
@@ -176,7 +186,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     let cacheTimer = null;
 
     const onFocus = () => {
-      if (document.visibilityState === 'visible') loadData();
+      if (document.visibilityState === 'visible') loadData({ silent: true });
     };
 
     const onCacheUpdated = () => {
@@ -186,7 +196,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           Object.keys(pendingSavesRef.current || {}).length === 0 &&
           Object.keys(pendingNutriSavesRef.current || {}).length === 0
         ) {
-          loadData();
+          loadData({ silent: true });
         }
       }, 300);
     };
