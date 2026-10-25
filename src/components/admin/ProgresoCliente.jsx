@@ -334,43 +334,44 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
          const calc = calculateBodyComposition(data, selected.sexo, edad);
          Object.assign(data, calc);
       }
-      // Upload new photos
-      const uploadedUrls = [];
-      for (const file of pendingFotos) {
-        const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${selected.id}/${Date.now()}_${cleanName}`;
-        const compressedFile = await compressImageIfNeeded(file);
-        const url = await storageUpload("progress-photos", path, compressedFile);
-        uploadedUrls.push(url);
+
+      // Subir fotos en paralelo para máxima velocidad
+      let uploadedUrls = [];
+      if (pendingFotos.length > 0) {
+        uploadedUrls = await Promise.all(
+          pendingFotos.map(async (file, idx) => {
+            const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+            const path = `${selected.id}/${Date.now()}_${idx}_${cleanName}`;
+            const compressedFile = await compressImageIfNeeded(file);
+            return await storageUpload("progress-photos", path, compressedFile);
+          })
+        );
       }
+
       // Merge existing + new photos
       const allFotos = [...existingFotos, ...uploadedUrls];
       data.fotos = allFotos;
 
-        if (editingId) {
-          await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
-        } else {
-          await dbPost("metricas_progreso", data);
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
-          
-          // Send notification if patient is uploading their own progress (non-blocking)
-          if (['cliente', 'client'].includes(localStorage.getItem('flux_role')) && selected.nutriologo_id) {
-            try {
-              await dbPost("notificaciones", {
-                profile_id: selected.nutriologo_id,
-                titulo:"Nuevo progreso registrado",
-                mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
-                tipo:"progreso",
-                link_url:"clientes", // Redirect to directory
-                entidad_id: selected.id
-              }, { headers: { Prefer: "return=minimal" } });
-            } catch (notifErr) {
-              console.warn("No se pudo enviar notificación de progreso:", notifErr);
-            }
-          }
+      if (editingId) {
+        await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
+        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
+      } else {
+        await dbPost("metricas_progreso", data);
+        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
+        
+        // Send notification if patient is uploading their own progress (non-blocking)
+        if (['cliente', 'client'].includes(localStorage.getItem('flux_role')) && selected.nutriologo_id) {
+          dbPost("notificaciones", {
+            profile_id: selected.nutriologo_id,
+            titulo:"Nuevo progreso registrado",
+            mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
+            tipo:"progreso",
+            link_url:"clientes", // Redirect to directory
+            entidad_id: selected.id
+          }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
         }
-        closeModal();
+      }
+      closeModal();
       await load();
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);
@@ -402,15 +403,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
   const deleteFoto = async (metrica, fotoUrl) => {
     const newFotos = parseFotos(metrica.fotos).filter(u => u !== fotoUrl);
-    await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
+    // Actualización optimista en 0ms
+    setMetricas(prev => prev.map(m => m.id === metrica.id ? { ...m, fotos: newFotos } : m));
+    setExistingFotos(prev => prev.filter(u => u !== fotoUrl));
     
-    if (fotoUrl && fotoUrl.includes("storage/v1/object/public/progress-photos/")) {
-      const oldPath = fotoUrl.split("/public/progress-photos/")[1];
-      if (oldPath) {
-        await storageDelete("progress-photos", oldPath).catch(err => console.warn("No se pudo borrar foto progreso", err));
+    try {
+      await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
+      if (fotoUrl && fotoUrl.includes("storage/v1/object/public/progress-photos/")) {
+        const oldPath = fotoUrl.split("/public/progress-photos/")[1];
+        if (oldPath) {
+          storageDelete("progress-photos", oldPath).catch(err => console.warn("No se pudo borrar foto progreso", err));
+        }
+      } else if (fotoUrl && fotoUrl.includes("storage/v1/object/public/logos/")) {
+        const oldPath = fotoUrl.split("/public/logos/")[1];
+        if (oldPath) {
+          storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar foto", err));
+        }
       }
+    } catch (err) {
+      console.warn("Error borrando foto", err);
     }
-    await load();
   };
 
   const deleteMetrica = (id) => {
@@ -421,12 +433,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       danger: true,
       icon: "trash",
       onConfirm: async () => {
+        const prevMetricas = metricas;
+        // Eliminación optimista en 0ms
+        setConfirmDelete(null);
+        setMetricas(prev => prev.filter(m => m.id !== id));
+        setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
         try {
           await dbDel(`metricas_progreso?id=eq.${id}`);
-          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
-          setConfirmDelete(null);
-          await load();
         } catch(err) {
+          setMetricas(prevMetricas);
           setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
         }
       }

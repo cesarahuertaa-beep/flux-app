@@ -219,8 +219,12 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
     try {
       const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-      const indexUrl = `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/index.json?t=${Date.now()}`;
-      const r = await fetch(indexUrl);
+      const primaryIndexUrl = `${SUPA_URL}/storage/v1/object/public/logos/personal_photos_${cliente.id}.json?t=${Date.now()}`;
+      let r = await fetch(primaryIndexUrl);
+      if (!r.ok) {
+        const legacyIndexUrl = `${SUPA_URL}/storage/v1/object/public/progress-photos/${cliente.id}/personal/index.json?t=${Date.now()}`;
+        r = await fetch(legacyIndexUrl);
+      }
       if (r.ok) {
         const urls = await r.json();
         const validUrls = Array.isArray(urls) ? urls : [];
@@ -238,43 +242,56 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   const saveIndex = async (urls) => {
     try {
+      const cleanUrls = (urls || []).filter(u => typeof u === "string" && !u.startsWith("blob:"));
       const cacheKey = `flux_personal_photos_${cliente.id}`;
-      try { localStorage.setItem(cacheKey, JSON.stringify(urls)); } catch (e) {}
-      precacheMediaList(urls).catch(() => {});
+      try { localStorage.setItem(cacheKey, JSON.stringify(cleanUrls)); } catch (e) {}
+      precacheMediaList(cleanUrls).catch(() => {});
 
-      const indexPath = `${cliente.id}/personal/index.json`;
-      await storageDelete("progress-photos", indexPath).catch(() => {}); // Ignore error if it doesn't exist
-      const blob = new Blob([JSON.stringify(urls)], { type:"application/json" });
-      await storageUpload("progress-photos", indexPath, blob);
+      const blob = new Blob([JSON.stringify(cleanUrls)], { type: "application/json" });
+      await storageUpload("logos", `personal_photos_${cliente.id}.json`, blob, { upsert: true });
     } catch (e) {
       console.error("Error saving index", e);
     }
   };
 
   const handlePersonalUpload = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const fileList = e.target.files ? Array.from(e.target.files) : [];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileList.length === 0) return;
+
+    // 1. Mostrar vista previa en 0ms de forma optimista
+    const tempEntries = fileList.map((file) => ({
+      file,
+      tempUrl: URL.createObjectURL(file),
+    }));
+    const tempUrls = tempEntries.map((x) => x.tempUrl);
+    const basePhotos = personalPhotos.filter((u) => !u.startsWith("blob:"));
+    setPersonalPhotos([...basePhotos, ...tempUrls]);
     setUploadingPersonal(true);
+
     try {
-      const newUrls = [];
-      for (const file of Array.from(files)) {
-        const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${cliente.id}/personal/${Date.now()}_${cleanName}`;
-        const compressedFile = await compressImageIfNeeded(file);
-        const url = await storageUpload("progress-photos", path, compressedFile);
-        newUrls.push(url);
-      }
-      
-      const updatedUrls = [...personalPhotos, ...newUrls];
-      await saveIndex(updatedUrls);
-      setPersonalPhotos(updatedUrls);
+      const uploadedUrls = await Promise.all(
+        tempEntries.map(async ({ file }, idx) => {
+          const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path = `${cliente.id}/personal/${Date.now()}_${idx}_${cleanName}`;
+          const compressedFile = await compressImageIfNeeded(file);
+          return await storageUpload("progress-photos", path, compressedFile);
+        })
+      );
+
+      const finalUrls = [...basePhotos, ...uploadedUrls];
+      setPersonalPhotos(finalUrls);
+      await saveIndex(finalUrls);
     } catch (error) {
       console.error(error);
+      setPersonalPhotos(basePhotos);
       const msg = error?.message || "No se pudieron subir las fotos personales. Intenta de nuevo.";
       showFluxAlert("Error subiendo fotos", msg);
     } finally {
+      tempUrls.forEach((u) => {
+        try { URL.revokeObjectURL(u); } catch {}
+      });
       setUploadingPersonal(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -286,15 +303,19 @@ export default function Progreso({ cliente, isSelfManaged }) {
       danger: true,
       icon: "trash",
       onConfirm: async () => {
+        // Eliminación instantánea en 0ms en la interfaz
+        setConfirmDelete(null);
+        const updatedUrls = personalPhotos.filter((u) => u !== url);
+        setPersonalPhotos(updatedUrls);
         try {
-          const pathPart = url.split("progress-photos/")[1];
-          if (pathPart) {
-            await storageDelete("progress-photos", pathPart).catch(() => {});
-          }
-          const updatedUrls = personalPhotos.filter(u => u !== url);
           await saveIndex(updatedUrls);
-          setPersonalPhotos(updatedUrls);
-          setConfirmDelete(null);
+          if (url.includes("progress-photos/")) {
+            const pathPart = url.split("progress-photos/")[1];
+            if (pathPart) await storageDelete("progress-photos", pathPart).catch(() => {});
+          } else if (url.includes("logos/")) {
+            const pathPart = url.split("logos/")[1];
+            if (pathPart) await storageDelete("logos", pathPart).catch(() => {});
+          }
         } catch (e) {
           console.error("Error deleting", e);
         }

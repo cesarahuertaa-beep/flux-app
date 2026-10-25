@@ -1,47 +1,99 @@
 -- ==============================================================================
--- Script: fix_storage_and_progreso.sql
--- Soluciona:
--- 1. Permisos RLS de Storage en bucket 'comidas' y 'comprobantes'
--- 2. Índice único para evitar 'statement timeout (57014)' en registro de series
+-- FLUX: Corrección Definitiva de Storage y Permisos de Progreso / Mi Plan
+-- Ejecuta este script en el Editor SQL de tu panel de Supabase.
 -- ==============================================================================
 
--- 1. STORAGE POLICIES (Comidas, Comprobantes, Logos, Ejercicios)
-DO $$
-BEGIN
-  -- Eliminar políticas previas conflictivas si existen
-  DROP POLICY IF EXISTS "Permitir subidas comidas y comprobantes" ON storage.objects;
-  DROP POLICY IF EXISTS "Permitir editar comidas y comprobantes" ON storage.objects;
-  DROP POLICY IF EXISTS "Permitir borrar comidas y comprobantes" ON storage.objects;
-  DROP POLICY IF EXISTS "Public Access Comidas" ON storage.objects;
+-- 1. Asegurar que los buckets sean públicos
+UPDATE storage.buckets SET public = true WHERE id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios');
 
-  -- Crear política amplia para subida de fotos
-  CREATE POLICY "Permitir subidas comidas y comprobantes" ON storage.objects 
-    FOR INSERT TO public 
-    WITH CHECK (bucket_id IN ('comidas', 'comprobantes', 'logos', 'ejercicios', 'progress-photos'));
+-- 2. Políticas de SELECT (Lectura Pública) en Storage
+DROP POLICY IF EXISTS "Permitir lectura publica de imagenes FLUX" ON storage.objects;
+CREATE POLICY "Permitir lectura publica de imagenes FLUX"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios'));
 
-  CREATE POLICY "Permitir editar comidas y comprobantes" ON storage.objects 
-    FOR UPDATE TO public 
-    USING (bucket_id IN ('comidas', 'comprobantes', 'logos', 'ejercicios', 'progress-photos'));
+-- 3. Políticas de INSERT en Storage para usuarios autenticados
+DROP POLICY IF EXISTS "Permitir subida a usuarios autenticados FLUX" ON storage.objects;
+CREATE POLICY "Permitir subida a usuarios autenticados FLUX"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios'));
 
-  CREATE POLICY "Permitir borrar comidas y comprobantes" ON storage.objects 
-    FOR DELETE TO public 
-    USING (bucket_id IN ('comidas', 'comprobantes', 'logos', 'ejercicios', 'progress-photos'));
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Error configurando storage policies: %', SQLERRM;
-END $$;
+-- 4. Políticas de UPDATE en Storage (para soportar x-upsert / sobrescrituras)
+DROP POLICY IF EXISTS "Permitir actualizacion a usuarios autenticados FLUX" ON storage.objects;
+CREATE POLICY "Permitir actualizacion a usuarios autenticados FLUX"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios'))
+WITH CHECK (bucket_id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios'));
 
--- 2. TABLA PROGRESO: Columna e Índice Único
-DO $$
-BEGIN
-  -- Asegurar que la columna variante_id existe
-  ALTER TABLE public.progreso ADD COLUMN IF NOT EXISTS variante_id TEXT DEFAULT 'original';
+-- 5. Políticas de DELETE en Storage
+DROP POLICY IF EXISTS "Permitir borrado a usuarios autenticados FLUX" ON storage.objects;
+CREATE POLICY "Permitir borrado a usuarios autenticados FLUX"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id IN ('comidas', 'progress-photos', 'logos', 'comprobantes', 'ejercicios'));
 
-  -- Crear índice único compuesto para PostgREST upsert (on_conflict)
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_progreso_upsert_full
-    ON public.progreso (ejercicio_id, cliente_id, semana, serie, tipo, COALESCE(variante_id, 'original'));
+-- 6. Políticas de RLS en metricas_progreso para Atletas Independientes / Pacientes
+ALTER TABLE public.metricas_progreso ENABLE ROW LEVEL SECURITY;
 
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_progreso_upsert_5col
-    ON public.progreso (ejercicio_id, cliente_id, semana, serie, tipo);
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Error configurando indices de progreso: %', SQLERRM;
-END $$;
+DROP POLICY IF EXISTS "Usuarios pueden ver su propio progreso" ON public.metricas_progreso;
+CREATE POLICY "Usuarios pueden ver su propio progreso" ON public.metricas_progreso
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.clientes c 
+    WHERE c.id = cliente_id AND (c.auth_id = auth.uid() OR c.nutriologo_id = auth.uid())
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.profiles p 
+    WHERE p.id = auth.uid() AND p.role IN ('superadmin', 'administrativo')
+  )
+);
+
+DROP POLICY IF EXISTS "Usuarios pueden insertar su propio progreso" ON public.metricas_progreso;
+CREATE POLICY "Usuarios pueden insertar su propio progreso" ON public.metricas_progreso
+FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.clientes c 
+    WHERE c.id = cliente_id AND (c.auth_id = auth.uid() OR c.nutriologo_id = auth.uid())
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.profiles p 
+    WHERE p.id = auth.uid() AND p.role IN ('superadmin', 'administrativo')
+  )
+);
+
+DROP POLICY IF EXISTS "Usuarios pueden actualizar su propio progreso" ON public.metricas_progreso;
+CREATE POLICY "Usuarios pueden actualizar su propio progreso" ON public.metricas_progreso
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.clientes c 
+    WHERE c.id = cliente_id AND (c.auth_id = auth.uid() OR c.nutriologo_id = auth.uid())
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.profiles p 
+    WHERE p.id = auth.uid() AND p.role IN ('superadmin', 'administrativo')
+  )
+);
+
+DROP POLICY IF EXISTS "Usuarios pueden eliminar su propio progreso" ON public.metricas_progreso;
+CREATE POLICY "Usuarios pueden eliminar su propio progreso" ON public.metricas_progreso
+FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM public.clientes c 
+    WHERE c.id = cliente_id AND (c.auth_id = auth.uid() OR c.nutriologo_id = auth.uid())
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.profiles p 
+    WHERE p.id = auth.uid() AND p.role IN ('superadmin', 'administrativo')
+  )
+);
+
+-- 7. Índices de rendimiento para borrados y consultas masivas instantáneas
+CREATE INDEX IF NOT EXISTS idx_comidas_dia_id ON public.comidas(dia_id);
+CREATE INDEX IF NOT EXISTS idx_ejercicios_rutina_id ON public.ejercicios(rutina_id);
+CREATE INDEX IF NOT EXISTS idx_nutricion_dias_nutricion_id ON public.nutricion_dias(nutricion_id);
+CREATE INDEX IF NOT EXISTS idx_progreso_ejercicio_id ON public.progreso(ejercicio_id);
+CREATE INDEX IF NOT EXISTS idx_progreso_cliente_id ON public.progreso(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_metricas_progreso_cliente_id ON public.metricas_progreso(cliente_id);

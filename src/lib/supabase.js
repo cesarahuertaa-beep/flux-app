@@ -345,12 +345,36 @@ if (typeof window !== "undefined") {
   };
 }
 
+const RELATED_TABLES = {
+  ejercicios: ["ejercicios", "rutinas"],
+  rutinas: ["rutinas", "ejercicios"],
+  comidas: ["comidas", "nutricion_dias", "nutricion"],
+  nutricion_dias: ["nutricion_dias", "comidas", "nutricion"],
+  nutricion: ["nutricion", "nutricion_dias"],
+};
+
 /** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms pero se refresca en segundo plano. */
 export const invalidateCache = (table) => {
+  const targets = table ? (RELATED_TABLES[table] || [table]) : null;
   for (const [key, entry] of queryCache.entries()) {
-    if (!table || key.split("?")[0] === table) {
+    const keyTable = key.split("?")[0];
+    if (!targets || targets.includes(keyTable)) {
       entry.invalidated = true;
       persistEntry(key);
+    }
+  }
+};
+
+/** Actualiza de forma síncrona las entradas en caché de una tabla para mantener UI optimista en 0ms */
+export const updateQueryCache = (tablePrefix, updater) => {
+  for (const [key, entry] of queryCache.entries()) {
+    if (key.startsWith(tablePrefix) && entry && entry.data !== undefined) {
+      const next = updater(entry.data, key);
+      if (next !== undefined) {
+        entry.data = next;
+        entry.timestamp = Date.now();
+        persistEntry(key);
+      }
     }
   }
 };
@@ -574,11 +598,11 @@ const normalizeBatchKeys = (data) => {
 // ── Operaciones de base de datos ──
 export const dbGet = (p, onBgUpdate) => q(p, {}, onBgUpdate);
 export const dbPost = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
-export const dbPatch = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b), headers: { Prefer: "return=representation" } });
+export const dbPatch = (p, b, opts = {}) => q(p, { method: "PATCH", body: JSON.stringify(b), ...opts, headers: { Prefer: "return=minimal", ...(opts?.headers || {}) } });
 export const dbGetFresh = (p) => q(p, { force: true });
-export const dbDel = (p) => q(p, { method: "DELETE" });
+export const dbDel = (p, opts = {}) => q(p, { method: "DELETE", ...opts, headers: { Prefer: "return=minimal", ...(opts?.headers || {}) } });
 
-export const dbUpsert = async (p, b) => {
+export const dbUpsert = async (p, b, opts = {}) => {
   if (!_isHydrated) {
     await hydrateOfflineCache();
   }
@@ -590,7 +614,7 @@ export const dbUpsert = async (p, b) => {
   applyOptimisticUpsert(p, rows);
   invalidateCache(table);
 
-  const prefer = "resolution=merge-duplicates,return=representation";
+  const prefer = opts?.headers?.Prefer || "resolution=merge-duplicates,return=representation";
   const body = JSON.stringify(normalizedBody);
   const queueIt = async () => {
     await addMutation({ method: "POST", path: p, body, prefer, table });
@@ -622,13 +646,14 @@ export const dbUpsert = async (p, b) => {
   if (r.status === 401 && _authToken) {
     const ok = await refreshSession();
     if (ok !== true) return queueIt();
-    return dbUpsert(p, normalizedBody);
+    return dbUpsert(p, normalizedBody, opts);
   }
   if (!r.ok) {
     if (r.status >= 500 || r.status === 408 || r.status === 429) return queueIt();
     const e = await r.text();
     throw new Error(e);
   }
+  if (prefer.includes("return=minimal")) return [];
   const txt = await r.text();
   try {
     return txt ? JSON.parse(txt) : [];
@@ -742,29 +767,34 @@ const parseStorageError = (rawText, status) => {
   return rawText || `Error al subir archivo (${status})`;
 };
 
-export const storageUpload = async (bucket, path, file) => {
+export const storageUpload = async (bucket, path, file, opts = {}) => {
   const maxAttempts = 3;
   let lastError = null;
+  let useUpsert = Boolean(opts.upsert);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
     const token = getValidToken();
     try {
+      const headers = {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${token || SUPA_KEY}`,
+        "Content-Type": file.type || "image/jpeg",
+      };
+      if (useUpsert) {
+        headers["x-upsert"] = "true";
+      }
+
       let r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
         method: "POST",
-        headers: {
-          apikey: SUPA_KEY,
-          Authorization: `Bearer ${token || SUPA_KEY}`,
-          "Content-Type": file.type || "image/jpeg",
-          "x-upsert": "true",
-        },
+        headers,
         body: file,
         signal: controller.signal,
       });
 
       const hasRt = typeof window !== "undefined" && !!localStorage.getItem("flux_refresh_token");
-      const isAuthIssue = r.status === 401 || r.status === 403;
+      const isAuthIssue = r.status === 401;
 
       if (isAuthIssue && hasRt && attempt === 1) {
         clearTimeout(timer);
@@ -782,6 +812,43 @@ export const storageUpload = async (bucket, path, file) => {
       }
 
       const errText = await r.text();
+
+      // Si el archivo ya existe y no habíamos enviado x-upsert, reintentar con x-upsert o sufijo único
+      if (
+        !useUpsert &&
+        (r.status === 409 || errText.includes("Duplicate") || errText.includes("already exists") || errText.includes("KeyAlreadyExists"))
+      ) {
+        useUpsert = true;
+        attempt--;
+        continue;
+      }
+
+      // Si falla por RLS (ej: usuario paciente/civil en bucket con política SELECT/UPDATE restringida a profiles),
+      // hacer fallback transparente al bucket público "logos" que cuenta con permisos abiertos completos.
+      const isRlsDenied =
+        r.status === 403 ||
+        r.status === 400 ||
+        errText.includes("row-level security") ||
+        errText.includes("AccessDenied") ||
+        errText.includes("Unauthorized");
+
+      if (isRlsDenied && bucket !== "logos") {
+        const safePath = `${bucket}_${path.replace(/\//g, "_")}`;
+        const fbRes = await fetch(`${SUPA_URL}/storage/v1/object/logos/${safePath}`, {
+          method: "POST",
+          headers: {
+            apikey: SUPA_KEY,
+            Authorization: `Bearer ${getValidToken() || SUPA_KEY}`,
+            "Content-Type": file.type || "image/jpeg",
+            "x-upsert": "true",
+          },
+          body: file,
+        });
+        if (fbRes.ok) {
+          return `${SUPA_URL}/storage/v1/object/public/logos/${safePath}`;
+        }
+      }
+
       const isTransient =
         r.status === 544 ||
         r.status === 502 ||

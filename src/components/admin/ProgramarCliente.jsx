@@ -22,7 +22,7 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
-import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
+import { dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
@@ -86,12 +86,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   // ── Historial para Plantillas ──
   const [historialRutinas, setHistorialRutinas] = useState([]);
   const [historialDias, setHistorialDias] = useState([]);
+  const historialLoadedRef = useRef(false);
 
-  // ── Crop de foto de comida ──
+  // ── Crop de foto de comida y subidas en segundo plano ──
   const [cropModal, setCropModal] = useState(null); // { objectUrl, mealIndex }
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
   const imgCropRef = useRef(null);
+  const pendingPhotoUploadsRef = useRef({});
 
   useBackButton(!!cropModal, () => {
     if (cropModal?.objectUrl) {
@@ -107,15 +109,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre ||"Desconocido";
 
   const loadHistorial = useCallback(async () => {
-    if (!clientes || clientes.length === 0) return;
+    if (!clientes || clientes.length === 0 || historialLoadedRef.current) return;
+    historialLoadedRef.current = true;
     try {
-      // Revertimos al uso de in.(ids) porque RLS podría requerir el cliente_id
-      // o la tabla podría no tener created_at
       const ids = clientes.map(c => c.id).join(",");
-      const hr = await dbGet(`rutinas?cliente_id=in.(${ids})`).catch(() => []);
+      const [hr, hn] = await Promise.all([
+        dbGet(`rutinas?cliente_id=eq.${selected?.id || clientes[0].id}`).catch(() => []),
+        dbGet(`nutricion?cliente_id=in.(${ids})`).catch(() => []),
+      ]);
+      // Cargar todas las rutinas en segundo plano sin bloquear
+      dbGet(`rutinas?cliente_id=in.(${ids})`).then(allHr => {
+        if (allHr) setHistorialRutinas(allHr);
+      }).catch(() => {});
       if (hr) setHistorialRutinas(hr);
       
-      const hn = await dbGet(`nutricion?cliente_id=in.(${ids})`).catch(() => []);
       if (hn && hn.length > 0) {
         const nids = hn.map(n => n.id).join(",");
         const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})`).catch(() => []);
@@ -128,13 +135,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
     } catch(e) { 
-      if (!isOfflineError(e)) {
-        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando historial: {e.message}</div>); 
-      }
+      historialLoadedRef.current = false;
     }
-  }, [clientes]);
-
-  useEffect(() => { loadHistorial(); }, [loadHistorial]);
+  }, [clientes, selected?.id]);
 
   const onSelectHistorialRutina = async (e) => {
     const rid = e?.target ? e.target.value : (e || "");
@@ -142,7 +145,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     if (e?.target) e.target.value = "";
     const r = historialRutinas.find(x => String(x.id) === String(rid));
     if (!r) return;
-    setLoading(true);
     try {
       const ejs = await dbGet(`ejercicios?rutina_id=eq.${rid}&order=orden.asc`);
       setRutinaForm(p => ({
@@ -162,7 +164,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando rutina</div>);
       }
     }
-    setLoading(false);
   };
 
   const onSelectHistorialDia = async (e) => {
@@ -171,7 +172,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     if (e?.target) e.target.value = "";
     const d = historialDias.find(x => String(x.id) === String(did));
     if (!d) return;
-    setLoading(true);
     try {
       const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
       setDiaForm(p => ({
@@ -190,7 +190,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando día</div>);
       }
     }
-    setLoading(false);
   };
 
   // ── Cargar ciclos del cliente ──
@@ -241,19 +240,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   }, [selected, isMiPlan]);
 
   // ── Cargar datos del ciclo seleccionado ──
-  const loadData = useCallback(async (targetCiclo = cicloSel) => {
+  const loadData = useCallback(async (targetCiclo = cicloSel, opts = {}) => {
     if (!selected) return;
-    setLoading(true);
+    const { silent = false, forceFresh = false } = opts;
+    if (!silent) setLoading(true);
     try {
-      // Filtrar por ciclo si hay uno seleccionado, si no mostrar planes sin ciclo
       const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
       const cicloFilter = currentCiclo
         ? `ciclo_id=eq.${currentCiclo.id}`
         : `ciclo_id=is.null`;
 
+      const fetchFn = forceFresh ? dbGetFresh : dbGet;
+
       const [ns, rs] = await Promise.all([
-        dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []),
-        dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
+        fetchFn(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []),
+        fetchFn(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
       ]);
 
       if (rs) {
@@ -263,7 +264,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       if (ns && ns.length) {
         setNutri(ns[0]);
         setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
-        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+        const ds = await fetchFn(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
         if (ds) {
           setDias(ds.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) })));
         }
@@ -273,7 +274,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
       }
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [selected, cicloSel]);
 
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
@@ -288,7 +289,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (table === "ciclos") loadCiclos();
-        else if (cicloSel !== undefined) loadData();
+        else if (cicloSel !== undefined) loadData(cicloSel, { silent: true });
       }, 400);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
@@ -306,45 +307,57 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const eliminarCiclo = async (ciclo, e) => {
     e.stopPropagation(); // no seleccionar el ciclo al dar clic en borrar
     try {
-      // Verificar si tiene datos
-      const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`);
-      const ruts   = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`);
-      
-      const doDelete = async () => {
-        try {
-          // Borrar en cascada manualmente para máxima seguridad
-          if (nutris.length > 0 || ruts.length > 0) {
-            for (const n of nutris) await dbDel(`nutricion?id=eq.${n.id}`);
-            for (const r of ruts) await dbDel(`rutinas?id=eq.${r.id}`);
-          }
+      // Verificar si tiene datos en paralelo
+      const [nutris, ruts] = await Promise.all([
+        dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`).catch(() => []),
+        dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`).catch(() => []),
+      ]);
 
-          // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
-          if (ciclo.activo) {
-            const anteriores = ciclos.filter(c => c.id !== ciclo.id && !c.activo);
-            if (anteriores.length > 0) {
-              await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
-              setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`}</div>);
-            } else {
-              setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
-            }
+      const doDelete = async () => {
+        // Cierre y actualización optimista en 0ms
+        setConfirmDelete(null);
+        const prevCiclos = ciclos;
+        const remainingCiclos = ciclos.filter(c => c.id !== ciclo.id);
+        setCiclos(remainingCiclos);
+
+        if (ciclo.activo) {
+          const anterior = remainingCiclos.find(c => !c.activo) || remainingCiclos[0] || null;
+          if (anterior) {
+            setCicloSel(anterior);
+            setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró: "${anterior.nombre}"`}</div>);
+            dbPatch(`ciclos?id=eq.${anterior.id}`, { activo: true }).catch(() => {});
           } else {
+            setCicloSel(null);
             setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
           }
+        } else {
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
+        }
 
-          await dbDel(`ciclos?id=eq.${ciclo.id}`);
-          await loadCiclos();
-          setConfirmDelete(null);
+        try {
+          const delPromises = [];
+          if (nutris?.length > 0) {
+            delPromises.push(dbDel(`nutricion?id=in.(${nutris.map(n => n.id).join(",")})`));
+          }
+          if (ruts?.length > 0) {
+            delPromises.push(dbDel(`rutinas?id=in.(${ruts.map(r => r.id).join(",")})`));
+          }
+          delPromises.push(dbDel(`ciclos?id=eq.${ciclo.id}`));
+          await Promise.all(delPromises);
+          loadCiclos();
+          loadData(undefined, { silent: true, forceFresh: true });
         } catch(err) {
           if (!isOfflineError(err)) {
+            setCiclos(prevCiclos);
             setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>); 
           }
         }
       };
 
-      if (nutris.length > 0 || ruts.length > 0) {
+      if ((nutris?.length || 0) > 0 || (ruts?.length || 0) > 0) {
         setConfirmDelete({
           title: "¡Cuidado! Eliminar ciclo completo",
-          description: `Este ciclo contiene ${ruts.length} rutina(s) y ${nutris.length} plan(es) de nutrición. Si continúas, se destruirá todo su contenido permanentemente.`,
+          description: `Este ciclo contiene ${ruts?.length || 0} rutina(s) y ${nutris?.length || 0} plan(es) de nutrición. Si continúas, se destruirá todo su contenido permanentemente.`,
           confirmText: "Eliminar todo",
           danger: true,
           icon: "alert",
@@ -387,28 +400,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
       }
       const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: finalName, fecha_inicio: planForm.fecha_inicio, activo: true });
+      setShowPlanModal(false);
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
       await loadCiclos(cRes[0].id);
       setCicloSel(cRes[0]);
       if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cRes[0].id);
-      await loadData(cRes[0]);
-      setShowPlanModal(false);
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
+      await loadData(cRes[0], { silent: true, forceFresh: true });
       
       // Notify the patient (non-blocking)
-      // we need to make sure we don't notify if the user is a civil (isMiPlan)
       if (!isMiPlan && selected.auth_id) {
-        try {
-          await dbPost("notificaciones", {
-            profile_id: selected.auth_id,
-            titulo: "Nuevo plan disponible",
-            mensaje: "Tu nutriólogo ha creado un nuevo ciclo para ti.",
-            tipo: "plan",
-            link_url: "mi_plan",
-            entidad_id: cRes[0].id
-          }, { headers: { Prefer: "return=minimal" } });
-        } catch (notifErr) {
-          console.warn("No se pudo enviar la notificación al paciente:", notifErr);
-        }
+        dbPost("notificaciones", {
+          profile_id: selected.auth_id,
+          titulo: "Nuevo plan disponible",
+          mensaje: "Tu nutriólogo ha creado un nuevo ciclo para ti.",
+          tipo: "plan",
+          link_url: "mi_plan",
+          entidad_id: cRes[0].id
+        }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
       }
     } catch(e) { 
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
@@ -493,7 +501,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         }
       }
 
-      await loadData(activeCiclo);
+      await loadData(activeCiclo, { silent: true, forceFresh: true });
       setMsg(
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
@@ -581,7 +589,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       setCicloSel(activeCiclo);
       if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, activeCiclo.id);
-      await loadData(activeCiclo);
+      await loadData(activeCiclo, { silent: true, forceFresh: true });
       if (!isMiPlan && selected?.auth_id) {
         dbPost("notificaciones", {
           profile_id: selected.auth_id,
@@ -636,6 +644,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const openNewDia  = () => { 
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(dias.length)) return;
+    loadHistorial();
     setEditDia(null); 
     setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }); 
     setShowDiaModal(true); 
@@ -657,8 +666,95 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const saveDia = async () => {
-    setSaving(true);
+    const formSnap = {
+      ...diaForm,
+      diasSeleccionados: [...(diaForm.diasSeleccionados || [])],
+      comidas: (diaForm.comidas || []).map(c => ({ ...c })),
+    };
+    const editDiaSnap = editDia;
+    const prevDias = dias;
+
+    // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
+    if (editDiaSnap) {
+      const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
+      const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
+      const optimisticComidas = formSnap.comidas.map((c, i) => ({
+        ...c,
+        id: c.id || `temp_${Date.now()}_${i}`,
+        dia_id: editDiaSnap.id,
+        hora: c.hora || "",
+        nombre: c.nombre || "",
+        opcion1: c.opcion1 || "",
+        opcion2: c.opcion2 || "",
+        calorias: +c.calorias || null,
+        proteina: +c.proteina || null,
+        carbohidratos: +c.carbohidratos || null,
+        grasas: +c.grasas || null,
+        foto_url: c.foto_url || "",
+        orden: i,
+      }));
+      const optimisticDia = {
+        ...editDiaSnap,
+        dia: finalName,
+        orden: formSnap.orden,
+        comidas: optimisticComidas,
+      };
+      setDias(prev => prev.map(d => d.id === editDiaSnap.id ? optimisticDia : d));
+      updateQueryCache("nutricion_dias", (list) =>
+        Array.isArray(list) ? list.map(d => d.id === editDiaSnap.id ? optimisticDia : d) : list
+      );
+    } else {
+      const dSeleccionados = formSnap.diasSeleccionados || [];
+      const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+      let orderCounter = formSnap.orden;
+      const optimisticNewDias = creationDays.map((dayCode, idx) => {
+        const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
+        const tempDiaId = `temp_dia_${Date.now()}_${idx}`;
+        const dObj = {
+          id: tempDiaId,
+          nutricion_id: nutri?.id || "temp_nutri",
+          dia: finalName,
+          orden: orderCounter++,
+          comidas: formSnap.comidas.map((c, i) => ({
+            ...c,
+            id: `temp_com_${Date.now()}_${idx}_${i}`,
+            dia_id: tempDiaId,
+            hora: c.hora || "",
+            nombre: c.nombre || `Comida ${i + 1}`,
+            opcion1: c.opcion1 || "",
+            opcion2: c.opcion2 || "",
+            calorias: +c.calorias || 0,
+            proteina: +c.proteina || 0,
+            carbohidratos: +c.carbohidratos || 0,
+            grasas: +c.grasas || 0,
+            foto_url: c.foto_url || "",
+            orden: i,
+          })),
+        };
+        return dObj;
+      });
+      setDias(prev => [...prev, ...optimisticNewDias]);
+    }
+
+    setShowDiaModal(false);
+    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>);
+
+    // 2. Persistencia asíncrona en segundo plano (sin bloquear la interfaz)
     try {
+      // Esperar subidas de fotos de comidas que sigan en curso
+      const resolvedComidas = await Promise.all(
+        formSnap.comidas.map(async (c, idx) => {
+          let finalFotoUrl = c.foto_url || "";
+          if (pendingPhotoUploadsRef.current[idx]) {
+            try {
+              const uploadedUrl = await pendingPhotoUploadsRef.current[idx];
+              if (uploadedUrl) finalFotoUrl = uploadedUrl;
+            } catch {}
+          }
+          return { ...c, foto_url: finalFotoUrl.startsWith("blob:") ? "" : finalFotoUrl };
+        })
+      );
+
       let currentNutri = nutri;
       if (!currentNutri) {
         const payload = { cliente_id: selected.id, calorias: 0, proteina: 0, carbohidratos: 0, grasas: 0 };
@@ -668,30 +764,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         setNutri(currentNutri);
       }
 
-      if (editDia) { 
-        const dayCode = diaForm.diasSeleccionados?.length > 0 ? diaForm.diasSeleccionados[0] :"S/D";
-        const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
-        await dbPatch(`nutricion_dias?id=eq.${editDia.id}`, { dia:finalName, orden:diaForm.orden }); 
-        const diaId = editDia.id; 
-        
-        const oldIds = editDia.comidas.map(c => c.id);
-        const newIds = diaForm.comidas.filter(c => c.id).map(c => c.id);
+      if (editDiaSnap && !String(editDiaSnap.id).startsWith("temp_")) {
+        const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
+        const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
+        const diaId = editDiaSnap.id;
+
+        const oldIds = (editDiaSnap.comidas || []).map(c => c.id).filter(id => id && !String(id).startsWith("temp_"));
+        const newIds = resolvedComidas.filter(c => c.id && !String(c.id).startsWith("temp_")).map(c => c.id);
         const toDelete = oldIds.filter(id => !newIds.includes(id));
-        if (toDelete.length > 0) {
-          await dbDel(`comidas?id=in.(${toDelete.join(",")})`);
-        }
 
         const toUpdate = [];
         const toInsert = [];
 
-        diaForm.comidas.forEach((c, i) => {
-          const data = { 
-            dia_id: diaId, hora: c.hora||"", nombre: c.nombre||"", 
-            opcion1: c.opcion1||"", opcion2: c.opcion2||"", 
-            calorias: +c.calorias||null, proteina: +c.proteina||null, carbohidratos: +c.carbohidratos||null, grasas: +c.grasas||null,
-            foto_url: c.foto_url||"", orden: i 
+        resolvedComidas.forEach((c, i) => {
+          const data = {
+            dia_id: diaId,
+            hora: c.hora || "",
+            nombre: c.nombre || "",
+            opcion1: c.opcion1 || "",
+            opcion2: c.opcion2 || "",
+            calorias: +c.calorias || null,
+            proteina: +c.proteina || null,
+            carbohidratos: +c.carbohidratos || null,
+            grasas: +c.grasas || null,
+            foto_url: c.foto_url || "",
+            orden: i,
           };
-          if (c.id) {
+          if (c.id && !String(c.id).startsWith("temp_")) {
             data.id = c.id;
             toUpdate.push(data);
           } else {
@@ -699,36 +798,44 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }
         });
 
+        const ops = [
+          dbPatch(`nutricion_dias?id=eq.${diaId}`, { dia: finalName, orden: formSnap.orden }),
+        ];
+        if (toDelete.length > 0) {
+          ops.push(dbDel(`comidas?id=in.(${toDelete.join(",")})`));
+        }
         if (toUpdate.length > 0) {
-          await dbUpsert("comidas?on_conflict=id", toUpdate, {
-            headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-          });
+          ops.push(
+            dbUpsert("comidas?on_conflict=id", toUpdate, {
+              headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+            })
+          );
         }
         if (toInsert.length > 0) {
-          await dbPost("comidas", toInsert, {
-            headers: { Prefer: "return=minimal" },
-          });
+          ops.push(
+            dbPost("comidas", toInsert, {
+              headers: { Prefer: "return=minimal" },
+            })
+          );
         }
-      } else { 
-        // Creación masiva optimizada (Bulk Insert)
-        const dSeleccionados = diaForm.diasSeleccionados || [];
+        await Promise.all(ops);
+      } else {
+        const dSeleccionados = formSnap.diasSeleccionados || [];
         const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
-        let orderCounter = diaForm.orden;
+        let orderCounter = formSnap.orden;
 
-        // 1. Bulk insert de todos los días
         const diasData = creationDays.map(dayCode => {
-          const finalName = diaForm.tituloPersonalizado ? `${dayCode}|${diaForm.tituloPersonalizado}` : `${dayCode}|`;
+          const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
           const d = { nutricion_id: currentNutri.id, dia: finalName, orden: orderCounter };
           orderCounter++;
           return d;
         });
-        
+
         const creados = await dbPost("nutricion_dias", diasData);
 
-        // 2. Bulk insert de todas las comidas para todos los días creados
         const comidasData = [];
-        creados.forEach(nuevoDia => {
-          diaForm.comidas.forEach((c, i) => {
+        (creados || []).forEach(nuevoDia => {
+          resolvedComidas.forEach((c, i) => {
             comidasData.push({
               dia_id: nuevoDia.id,
               hora: c.hora || "",
@@ -740,7 +847,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
               carbohidratos: +c.carbohidratos || 0,
               grasas: +c.grasas || 0,
               foto_url: c.foto_url || "",
-              orden: i
+              orden: i,
             });
           });
         });
@@ -751,7 +858,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           });
         }
       }
-      setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
+
+      loadData(cicloSel, { silent: true, forceFresh: true });
+
       if (!isMiPlan && selected?.auth_id) {
         const throttleKey = `flux_notif_nutri_${selected.id}`;
         const lastSent = Number(sessionStorage.getItem(throttleKey) || 0);
@@ -767,8 +876,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
         }
       }
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
-    setSaving(false);
+    } catch (e) {
+      if (!isOfflineError(e)) {
+        setDias(prevDias);
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
+      }
+    }
   };
 
   const deleteDia = (d) => {
@@ -780,13 +893,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       danger: true,
       icon: "trash",
       onConfirm: async () => {
+        const prevDias = dias;
+        // Eliminación optimista en 0ms
+        setConfirmDelete(null);
+        setDias(prev => prev.filter(x => x.id !== d.id));
+        updateQueryCache("nutricion_dias", (list) =>
+          Array.isArray(list) ? list.filter(x => x.id !== d.id) : list
+        );
+        setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>);
+        if (String(d.id).startsWith("temp_")) return;
         try {
           await dbDel(`nutricion_dias?id=eq.${d.id}`);
-          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>);
-          setConfirmDelete(null);
-          await loadData();
         } catch(err) {
           if (!isOfflineError(err)) {
+            setDias(prevDias);
             setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
           }
         }
@@ -794,7 +914,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     });
   };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }));
-  const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
+  const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; if (cs[i]) cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
   
   // Abre el modal de recorte en lugar de subir directo
@@ -809,58 +929,95 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     e.target.value ="";
   };
 
-  // Cuando la imagen carga en el cropper, centrar el recorte cuadrado automáticamente
+  // Cuando la imagen carga en el cropper, centrar el recorte cuadrado automáticamente e inicializar completedCrop en px
   const onCropImageLoad = (e) => {
-    const { naturalWidth, naturalHeight } = e.currentTarget;
+    const { width, height, naturalWidth, naturalHeight } = e.currentTarget;
     const centeredCrop = centerCrop(
       makeAspectCrop({ unit:"%", width: 80 }, 1, naturalWidth, naturalHeight),
       naturalWidth,
       naturalHeight
     );
     setCrop(centeredCrop);
+    if (width && height) {
+      setCompletedCrop({
+        unit: "px",
+        x: (centeredCrop.x / 100) * width,
+        y: (centeredCrop.y / 100) * height,
+        width: (centeredCrop.width / 100) * width,
+        height: (centeredCrop.height / 100) * height,
+      });
+    } else {
+      setCompletedCrop(centeredCrop);
+    }
   };
 
-  // Confirmar recorte: canvas → blob → upload
+  // Confirmar recorte: canvas → blob → preview instantáneo en 0ms + upload en segundo plano
   const confirmCrop = async () => {
-    if (!imgCropRef.current || !completedCrop) return;
+    const activeCrop = completedCrop || crop;
+    if (!imgCropRef.current || !activeCrop) return;
     const img = imgCropRef.current;
     const canvas = document.createElement("canvas");
     const OUTPUT = 500;
     canvas.width = OUTPUT;
     canvas.height = OUTPUT;
     const ctx = canvas.getContext("2d");
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
-    ctx.drawImage(
-      img,
-      completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
-      0, 0, OUTPUT, OUTPUT
-    );
+
+    let sx, sy, sWidth, sHeight;
+    if (activeCrop.unit === "%") {
+      sx = (activeCrop.x / 100) * img.naturalWidth;
+      sy = (activeCrop.y / 100) * img.naturalHeight;
+      sWidth = (activeCrop.width / 100) * img.naturalWidth;
+      sHeight = (activeCrop.height / 100) * img.naturalHeight;
+    } else {
+      const scaleX = img.naturalWidth / (img.width || img.naturalWidth);
+      const scaleY = img.naturalHeight / (img.height || img.naturalHeight);
+      sx = activeCrop.x * scaleX;
+      sy = activeCrop.y * scaleY;
+      sWidth = activeCrop.width * scaleX;
+      sHeight = activeCrop.height * scaleY;
+    }
+
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, OUTPUT, OUTPUT);
     const idx = cropModal.mealIndex;
     const objectUrl = cropModal.objectUrl;
     setCropModal(null);
-    setSaving(true);
-    setMsg(<div className="flex items-center gap-1.5 text-blue-500">Subiendo foto...</div>);
+
     try {
-      const blob = await new Promise((res) => canvas.toBlob(res,"image/jpeg", 0.82));
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+      try { URL.revokeObjectURL(objectUrl); } catch {}
+      if (!blob) return;
+
+      // Mostrar miniatura de inmediato en 0ms
+      const localPreviewUrl = URL.createObjectURL(blob);
+      updComida(idx, "foto_url", localPreviewUrl);
+
       const path = `comida_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-      const url = await storageUpload("comidas", path, blob);
-      updComida(idx,"foto_url", url);
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto subida</div>);
+      const uploadPromise = storageUpload("comidas", path, blob)
+        .then((remoteUrl) => {
+          updComida(idx, "foto_url", remoteUrl);
+          try { URL.revokeObjectURL(localPreviewUrl); } catch {}
+          delete pendingPhotoUploadsRef.current[idx];
+          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto subida</div>);
+          return remoteUrl;
+        })
+        .catch((err) => {
+          delete pendingPhotoUploadsRef.current[idx];
+          setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
+          throw err;
+        });
+
+      pendingPhotoUploadsRef.current[idx] = uploadPromise;
     } catch (err) {
+      try { URL.revokeObjectURL(objectUrl); } catch {}
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {err.message}</div>);
     }
-    URL.revokeObjectURL(objectUrl);
-    setSaving(false);
   };
 
   // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { 
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(rutinas.length)) return;
+    loadHistorial();
     setEditRutina(null); 
     setRutinaForm({ diasSeleccionados:[], tituloPersonalizado:"", ejercicios:[] }); 
     setShowRutinaModal(true); 
@@ -894,52 +1051,129 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const saveRutina = async () => {
-    setSaving(true);
-    try {
-      const toKg = (val, unit) => {
-        if (!val && val !== 0) return null;
-        const n = parseFloat(val);
-        if (isNaN(n)) return null;
-        return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
+    const toKg = (val, unit) => {
+      if (!val && val !== 0) return null;
+      const n = parseFloat(val);
+      if (isNaN(n)) return null;
+      return unit === 'lb' ? parseFloat((n * 0.45359237).toFixed(4)) : n;
+    };
+
+    const formSnap = {
+      ...rutinaForm,
+      diasSeleccionados: [...(rutinaForm.diasSeleccionados || [])],
+      ejercicios: (rutinaForm.ejercicios || []).map(e => ({
+        ...e,
+        alternativas: (e.alternativas || []).map(a => ({ ...a })),
+      })),
+    };
+    const editRutinaSnap = editRutina;
+    const prevRutinas = rutinas;
+    const activeCiclo = cicloSel;
+    const dSeleccionados = formSnap.diasSeleccionados || [];
+
+    // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
+    if (editRutinaSnap) {
+      const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${formSnap.tituloPersonalizado}` : formSnap.tituloPersonalizado;
+      const optimisticEjercicios = formSnap.ejercicios.map((e, i) => ({
+        ...e,
+        id: e.id || `temp_ej_${Date.now()}_${i}`,
+        rutina_id: editRutinaSnap.id,
+        biblioteca_id: e.biblioteca_id || null,
+        nombre: e.nombre,
+        gif_url: e.gif_url || "",
+        grupo_muscular: e.grupo_muscular || "",
+        tipo_movimiento: e.tipo_movimiento || "",
+        num_series: +e.num_series || 4,
+        reps_sugeridas: +e.reps_sugeridas || 10,
+        peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
+        unidad: e.unidad || "kg",
+        alternativas: (e.alternativas || []).map(alt => ({
+          ...alt,
+          peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
+        })),
+        orden: i,
+      }));
+      const optimisticRutina = {
+        ...editRutinaSnap,
+        nombre: finalName,
+        ejercicios: optimisticEjercicios,
       };
+      setRutinas(prev => prev.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r));
+      updateQueryCache("rutinas", (list) =>
+        Array.isArray(list) ? list.map(r => r.id === editRutinaSnap.id ? optimisticRutina : r) : list
+      );
+    } else {
+      const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+      const optimisticNewRutinas = diasToCreate.map((d, idx) => {
+        const finalName = d === "S/D" ? formSnap.tituloPersonalizado : `${d}|${formSnap.tituloPersonalizado}`;
+        const tempRutId = `temp_rut_${Date.now()}_${idx}`;
+        return {
+          id: tempRutId,
+          cliente_id: selected.id,
+          ciclo_id: activeCiclo?.id || null,
+          nombre: finalName,
+          semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+formSnap.semanas || 4),
+          fecha_inicio: formSnap.fecha_inicio || null,
+          orden: prevRutinas.length + idx,
+          ejercicios: formSnap.ejercicios.map((e, i) => ({
+            ...e,
+            id: `temp_ej_${Date.now()}_${idx}_${i}`,
+            rutina_id: tempRutId,
+            biblioteca_id: e.biblioteca_id || null,
+            nombre: e.nombre,
+            gif_url: e.gif_url || "",
+            grupo_muscular: e.grupo_muscular || "",
+            tipo_movimiento: e.tipo_movimiento || "",
+            num_series: +e.num_series || 4,
+            reps_sugeridas: +e.reps_sugeridas || 10,
+            peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
+            unidad: e.unidad || "kg",
+            alternativas: (e.alternativas || []).map(alt => ({
+              ...alt,
+              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
+            })),
+            orden: i,
+          })),
+        };
+      });
+      setRutinas(prev => [...prev, ...optimisticNewRutinas]);
+    }
 
-      let activeCiclo = cicloSel;
-      const dSeleccionados = rutinaForm.diasSeleccionados || [];
+    setShowRutinaModal(false);
+    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>);
 
-      if (editRutina) {
-        const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${rutinaForm.tituloPersonalizado}` : rutinaForm.tituloPersonalizado;
-        await dbPatch(`rutinas?id=eq.${editRutina.id}`, { nombre: finalName });
-        const rid=editRutina.id; 
-        
-        const oldIds = editRutina.ejercicios.map(e => e.id);
-        const newIds = rutinaForm.ejercicios.filter(e => e.id).map(e => e.id);
+    // 2. Persistencia en segundo plano (con peticiones en paralelo)
+    try {
+      if (editRutinaSnap && !String(editRutinaSnap.id).startsWith("temp_")) {
+        const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${formSnap.tituloPersonalizado}` : formSnap.tituloPersonalizado;
+        const rid = editRutinaSnap.id;
+
+        const oldIds = (editRutinaSnap.ejercicios || []).map(e => e.id).filter(id => id && !String(id).startsWith("temp_"));
+        const newIds = formSnap.ejercicios.filter(e => e.id && !String(e.id).startsWith("temp_")).map(e => e.id);
         const toDelete = oldIds.filter(id => !newIds.includes(id));
-        if (toDelete.length > 0) {
-          await dbDel(`ejercicios?id=in.(${toDelete.join(",")})`);
-        }
 
         const toUpdate = [];
         const toInsert = [];
 
-        rutinaForm.ejercicios.forEach((e, i) => {
-          const data = { 
-            rutina_id:rid, 
-            biblioteca_id:e.biblioteca_id||null, 
-            nombre:e.nombre, 
-            gif_url:e.gif_url||"", 
-            grupo_muscular:e.grupo_muscular||"", 
-            tipo_movimiento:e.tipo_movimiento||"", 
-            num_series:+e.num_series||4, 
-            reps_sugeridas:+e.reps_sugeridas||10,
-            peso_sugerido:toKg(e.peso_sugerido, e.unidad||"kg"),
-            unidad:e.unidad||"kg",
-            alternativas:(e.alternativas||[]).map(alt => ({
+        formSnap.ejercicios.forEach((e, i) => {
+          const data = {
+            rutina_id: rid,
+            biblioteca_id: e.biblioteca_id || null,
+            nombre: e.nombre,
+            gif_url: e.gif_url || "",
+            grupo_muscular: e.grupo_muscular || "",
+            tipo_movimiento: e.tipo_movimiento || "",
+            num_series: +e.num_series || 4,
+            reps_sugeridas: +e.reps_sugeridas || 10,
+            peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
+            unidad: e.unidad || "kg",
+            alternativas: (e.alternativas || []).map(alt => ({
               ...alt,
-              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg")
+              peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
             })),
-            orden:i 
+            orden: i,
           };
-          if (e.id) {
+          if (e.id && !String(e.id).startsWith("temp_")) {
             data.id = e.id;
             toUpdate.push(data);
           } else {
@@ -947,55 +1181,62 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }
         });
 
+        const ops = [
+          dbPatch(`rutinas?id=eq.${rid}`, { nombre: finalName }),
+        ];
+        if (toDelete.length > 0) {
+          ops.push(dbDel(`ejercicios?id=in.(${toDelete.join(",")})`));
+        }
         if (toUpdate.length > 0) {
-          await dbUpsert("ejercicios?on_conflict=id", toUpdate, {
-            headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-          });
+          ops.push(
+            dbUpsert("ejercicios?on_conflict=id", toUpdate, {
+              headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+            })
+          );
         }
         if (toInsert.length > 0) {
-          await dbPost("ejercicios", toInsert, {
-            headers: { Prefer: "return=minimal" },
-          });
+          ops.push(
+            dbPost("ejercicios", toInsert, {
+              headers: { Prefer: "return=minimal" },
+            })
+          );
         }
+        await Promise.all(ops);
       } else {
-        // Creación masiva optimizada (Bulk Insert)
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
-        
-        // 1. Bulk insert de todas las rutinas
         const rutinasData = diasToCreate.map((d, idx) => {
-          const finalName = d ==="S/D" ? rutinaForm.tituloPersonalizado : `${d}|${rutinaForm.tituloPersonalizado}`;
+          const finalName = d === "S/D" ? formSnap.tituloPersonalizado : `${d}|${formSnap.tituloPersonalizado}`;
           return {
             cliente_id: selected.id,
             ciclo_id: activeCiclo?.id || null,
             nombre: finalName,
-            semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+rutinaForm.semanas || 4),
-            fecha_inicio: rutinaForm.fecha_inicio || null,
-            orden: rutinas.length + idx
+            semanas: activeCiclo ? getCycleWeeks(activeCiclo) : (+formSnap.semanas || 4),
+            fecha_inicio: formSnap.fecha_inicio || null,
+            orden: prevRutinas.length + idx,
           };
         });
-        
+
         const creadas = await dbPost("rutinas", rutinasData);
-        
-        // 2. Bulk insert de todos los ejercicios para todas las rutinas creadas
+
         const ejerciciosData = [];
-        creadas.forEach(nuevaRutina => {
-          rutinaForm.ejercicios.forEach((e, i) => {
-            ejerciciosData.push({ 
-              rutina_id: nuevaRutina.id, 
-              biblioteca_id: e.biblioteca_id||null, 
-              nombre: e.nombre, 
-              gif_url: e.gif_url||"", 
-              grupo_muscular: e.grupo_muscular||"", 
-              tipo_movimiento: e.tipo_movimiento||"", 
-              num_series: +e.num_series||4, 
-              reps_sugeridas: +e.reps_sugeridas||10,
-              peso_sugerido: toKg(e.peso_sugerido, e.unidad||"kg"),
-              unidad: e.unidad||"kg",
-              alternativas: (e.alternativas||[]).map(alt => ({
+        (creadas || []).forEach(nuevaRutina => {
+          formSnap.ejercicios.forEach((e, i) => {
+            ejerciciosData.push({
+              rutina_id: nuevaRutina.id,
+              biblioteca_id: e.biblioteca_id || null,
+              nombre: e.nombre,
+              gif_url: e.gif_url || "",
+              grupo_muscular: e.grupo_muscular || "",
+              tipo_movimiento: e.tipo_movimiento || "",
+              num_series: +e.num_series || 4,
+              reps_sugeridas: +e.reps_sugeridas || 10,
+              peso_sugerido: toKg(e.peso_sugerido, e.unidad || "kg"),
+              unidad: e.unidad || "kg",
+              alternativas: (e.alternativas || []).map(alt => ({
                 ...alt,
-                peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg")
+                peso_sugerido: toKg(alt.peso_sugerido, alt.unidad || e.unidad || "kg"),
               })),
-              orden: i 
+              orden: i,
             });
           });
         });
@@ -1006,10 +1247,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           });
         }
       }
-      
-      setShowRutinaModal(false); 
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>); 
-      await loadData();
+
+      loadData(activeCiclo, { silent: true, forceFresh: true });
+
       if (!isMiPlan && selected?.auth_id) {
         const throttleKey = `flux_notif_rutina_${selected.id}`;
         const lastSent = Number(sessionStorage.getItem(throttleKey) || 0);
@@ -1025,10 +1265,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
         }
       }
-    } catch(e) { 
-      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+    } catch (e) {
+      if (!isOfflineError(e)) {
+        setRutinas(prevRutinas);
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
+      }
     }
-    setSaving(false);
   };
 
   const deleteRutina = (r) => {
@@ -1040,13 +1282,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       danger: true,
       icon: "trash",
       onConfirm: async () => {
+        const prevRutinas = rutinas;
+        // Eliminación optimista en 0ms
+        setConfirmDelete(null);
+        setRutinas(prev => prev.filter(x => x.id !== r.id));
+        updateQueryCache("rutinas", (list) =>
+          Array.isArray(list) ? list.filter(x => x.id !== r.id) : list
+        );
+        setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>);
+        if (String(r.id).startsWith("temp_")) return;
         try {
           await dbDel(`rutinas?id=eq.${r.id}`);
-          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>);
-          setConfirmDelete(null);
-          await loadData();
         } catch(err) {
           if (!isOfflineError(err)) {
+            setRutinas(prevRutinas);
             setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
           }
         }
