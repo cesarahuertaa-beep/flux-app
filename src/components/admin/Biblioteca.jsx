@@ -3,10 +3,13 @@ import { GRUPOS } from"../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Download, Dumbbell, Play, Video, X, CheckCircle2, AlertCircle } from"lucide-react";
 import { useBackButton } from"../../lib/backButtonHandler";
+import { CustomSelect } from "../ui/CustomSelect";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showModal, setShowModal] = useState(false);
   const [editEj, setEditEj]       = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null); // ejercicio a eliminar
   const [form, setForm]           = useState({ nombre:"", grupo_muscular:"Pecho", gif_url:"" });
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -43,10 +46,16 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     setSaving(false);
   };
 
-  const deleteEj = async (e) => {
-    if (!confirm(`¿Eliminar "${e.nombre}"? Esta acción no se puede deshacer.`)) return;
-    await dbDel(`biblioteca_ejercicios?id=eq.${e.id}`);
-    setMsg(<div className='flex gap-2 items-center'><Trash2 className='w-4 h-4 text-red-500'/> Ejercicio eliminado</div>); onUpdate();
+  const executeDelete = async () => {
+    if (!deleteModal) return;
+    try {
+      await dbDel(`biblioteca_ejercicios?id=eq.${deleteModal.id}`);
+      setMsg(<div className='flex gap-2 items-center'><Trash2 className='w-4 h-4 text-red-500'/> Ejercicio eliminado</div>);
+      setDeleteModal(null);
+      onUpdate();
+    } catch(e) {
+      setMsg('❌ ' + e.message);
+    }
   };
 
   const filtrados = biblioteca.filter(e => {
@@ -77,7 +86,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex gap-2.5 mb-5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+      <div className="flex gap-2.5 mb-5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm items-center">
         <div className="relative flex-1 min-w-[160px] max-w-[220px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
           <input
@@ -87,14 +96,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif]"
           />
         </div>
-        <select
+        <CustomSelect
           value={filtroGrupo}
-          onChange={e => setFiltroGrupo(e.target.value)}
-          className="bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif] min-w-[130px]"
-        >
-          <option>Todos</option>
-          {GRUPOS.map(g => <option key={g}>{g}</option>)}
-        </select>
+          onChange={setFiltroGrupo}
+          options={["Todos", ...GRUPOS]}
+          className="min-w-[140px]"
+        />
         
         {(filtroGrupo !=="Todos" || busqueda) && (
           <button
@@ -172,7 +179,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       <button onClick={() => openEdit(e)} className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
                         <Edit2 size={12} /> Editar
                       </button>
-                      <button onClick={() => deleteEj(e)} className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
+                      <button onClick={() => setDeleteModal(e)} className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors">
                         <Trash2 size={12} /> Borrar
                       </button>
                     </div>
@@ -204,11 +211,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Grupo muscular</label>
-                  <select value={form.grupo_muscular} onChange={e => setForm(p => ({...p,grupo_muscular:e.target.value}))} className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all">
-                    {GRUPOS.map(g => <option key={g}>{g}</option>)}
-                  </select>
+                  <CustomSelect
+                    value={form.grupo_muscular}
+                    onChange={v => setForm(p => ({ ...p, grupo_muscular: v }))}
+                    options={GRUPOS}
+                  />
                 </div>
-                
               </div>
               
               <div>
@@ -290,6 +298,17 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           </div>
         </div>
       )}
+
+      {/* ── Confirm Delete Modal ── */}
+      <ConfirmModal
+        isOpen={Boolean(deleteModal)}
+        onClose={() => setDeleteModal(null)}
+        onConfirm={executeDelete}
+        title={`¿Eliminar "${deleteModal?.nombre}"?`}
+        description="Esta acción eliminará el ejercicio de la biblioteca global permanentemente."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

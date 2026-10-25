@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
 import { dbGet, dbPatch, dbDel, authInvite, authResetPassword } from "../../lib/supabase";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 export default function Aprobaciones({ setMsg }) {
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -19,34 +21,20 @@ export default function Aprobaciones({ setMsg }) {
 
   useEffect(() => { loadData(); }, []);
 
-  const handleApprove = async (sol) => {
-    if (!window.confirm(`¿Estás seguro de aprobar a ${sol.nombre} como ${sol.tipo}?`)) return;
-    try {
-      const cleanEmail = sol.email.trim();
-      const existingProfs = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-
-      if (existingProfs && existingProfs.length > 0) {
-        await dbPatch(`profiles?id=eq.${existingProfs[0].id}`, {
-          role: sol.tipo,
-          nombre: sol.nombre,
-          cedula: sol.cedula || "",
-          nombre_marca: sol.nombre_marca || sol.nombre,
-          mapa_url: sol.mapa_url || "",
-          activo: true
-        });
-        // Enviar enlace de acceso / contraseña por si no tenía contraseña configurada
-        try { await authResetPassword(cleanEmail); } catch (e) {}
-      } else {
+  const handleApprove = (sol) => {
+    setConfirmAction({
+      title: `¿Aprobar a ${sol.nombre}?`,
+      description: `Se registrará como ${sol.tipo} y se le enviará un correo para acceder a la plataforma.`,
+      confirmText: "Aprobar",
+      danger: false,
+      icon: "alert",
+      onConfirm: async () => {
         try {
-          const authUser = await authInvite(cleanEmail, {
-            role: sol.tipo,
-            nombre: sol.nombre,
-            nombre_marca: sol.nombre_marca || sol.nombre,
-            cedula: sol.cedula || "",
-            mapa_url: sol.mapa_url || ""
-          });
-          if (authUser?.id) {
-            await dbPatch(`profiles?id=eq.${authUser.id}`, {
+          const cleanEmail = sol.email.trim();
+          const existingProfs = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+
+          if (existingProfs && existingProfs.length > 0) {
+            await dbPatch(`profiles?id=eq.${existingProfs[0].id}`, {
               role: sol.tipo,
               nombre: sol.nombre,
               cedula: sol.cedula || "",
@@ -54,54 +42,94 @@ export default function Aprobaciones({ setMsg }) {
               mapa_url: sol.mapa_url || "",
               activo: true
             });
-          }
-        } catch (inviteErr) {
-          if (inviteErr.message?.includes("already been registered") || inviteErr.message?.includes("already exists")) {
-            const profsRetry = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-            if (profsRetry.length > 0) {
-              await dbPatch(`profiles?id=eq.${profsRetry[0].id}`, {
-                role: sol.tipo,
-                nombre: sol.nombre,
-                cedula: sol.cedula || "",
-                nombre_marca: sol.nombre_marca || sol.nombre,
-                mapa_url: sol.mapa_url || "",
-                activo: true
-              });
-            }
             try { await authResetPassword(cleanEmail); } catch (e) {}
           } else {
-            throw inviteErr;
+            try {
+              const authUser = await authInvite(cleanEmail, {
+                role: sol.tipo,
+                nombre: sol.nombre,
+                nombre_marca: sol.nombre_marca || sol.nombre,
+                cedula: sol.cedula || "",
+                mapa_url: sol.mapa_url || ""
+              });
+              if (authUser?.id) {
+                await dbPatch(`profiles?id=eq.${authUser.id}`, {
+                  role: sol.tipo,
+                  nombre: sol.nombre,
+                  cedula: sol.cedula || "",
+                  nombre_marca: sol.nombre_marca || sol.nombre,
+                  mapa_url: sol.mapa_url || "",
+                  activo: true
+                });
+              }
+            } catch (inviteErr) {
+              if (inviteErr.message?.includes("already been registered") || inviteErr.message?.includes("already exists")) {
+                const profsRetry = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+                if (profsRetry.length > 0) {
+                  await dbPatch(`profiles?id=eq.${profsRetry[0].id}`, {
+                    role: sol.tipo,
+                    nombre: sol.nombre,
+                    cedula: sol.cedula || "",
+                    nombre_marca: sol.nombre_marca || sol.nombre,
+                    mapa_url: sol.mapa_url || "",
+                    activo: true
+                  });
+                }
+                try { await authResetPassword(cleanEmail); } catch (e) {}
+              } else {
+                throw inviteErr;
+              }
+            }
           }
+
+          await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
+          setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
+          setConfirmAction(null);
+          loadData();
+        } catch (e) {
+          setMsg("❌ Error al aprobar: " + e.message);
         }
       }
-
-      await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
-      setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
-      loadData();
-    } catch (e) {
-      setMsg("❌ Error al aprobar: " + e.message);
-    }
+    });
   };
 
-  const handleReject = async (sol) => {
-    if (!window.confirm(`¿Estás seguro de rechazar a ${sol.nombre}?`)) return;
-    try {
-      await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'rechazada' });
-      setMsg("⚠️ Solicitud rechazada.");
-      loadData();
-    } catch (e) {
-      setMsg("❌ Error al rechazar: " + e.message);
-    }
+  const handleReject = (sol) => {
+    setConfirmAction({
+      title: `¿Rechazar a ${sol.nombre}?`,
+      description: "Esta solicitud cambiará a estado rechazada.",
+      confirmText: "Rechazar",
+      danger: true,
+      icon: "alert",
+      onConfirm: async () => {
+        try {
+          await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'rechazada' });
+          setMsg("⚠️ Solicitud rechazada.");
+          setConfirmAction(null);
+          loadData();
+        } catch (e) {
+          setMsg("❌ Error al rechazar: " + e.message);
+        }
+      }
+    });
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`¿Estás seguro de eliminar este registro permanentemente?`)) return;
-    try {
-      await dbDel(`solicitudes_profesionales?id=eq.${id}`);
-      loadData();
-    } catch (e) {
-      setMsg("❌ Error al eliminar: " + e.message);
-    }
+  const handleDelete = (id) => {
+    setConfirmAction({
+      title: "¿Eliminar registro?",
+      description: "¿Estás seguro de eliminar este registro permanentemente?",
+      confirmText: "Eliminar",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`solicitudes_profesionales?id=eq.${id}`);
+          setConfirmAction(null);
+          loadData();
+        } catch (e) {
+          setMsg("❌ Error al eliminar: " + e.message);
+        }
+      }
+    });
   };
 
   if (loading) {
@@ -169,6 +197,18 @@ export default function Aprobaciones({ setMsg }) {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={confirmAction?.onConfirm}
+        title={confirmAction?.title}
+        description={confirmAction?.description}
+        confirmText={confirmAction?.confirmText || "Eliminar"}
+        cancelText={confirmAction?.cancelText || "Cancelar"}
+        danger={confirmAction?.danger ?? true}
+        icon={confirmAction?.icon || "trash"}
+      />
     </div>
   );
 }

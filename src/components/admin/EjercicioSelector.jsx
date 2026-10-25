@@ -1,6 +1,7 @@
-import { useState } from"react";
-import { GRUPOS } from"../../lib/constants";
-import { Search, Image as ImageIcon } from"lucide-react";
+import { useState } from "react";
+import { GRUPOS } from "../../lib/constants";
+import { Search, Image as ImageIcon } from "lucide-react";
+import { CustomSelect } from "../ui/CustomSelect";
 
 export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   const [busqueda, setBusqueda] = useState("");
@@ -9,7 +10,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   const filtrados = biblioteca.filter(e => {
     const yaEsta = selected.find(s => s.biblioteca_id === e.id);
     if (yaEsta) return false;
-    const matchG = filtroGrupo ==="Todos" || e.grupo_muscular === filtroGrupo;
+    const matchG = filtroGrupo === "Todos" || e.grupo_muscular === filtroGrupo;
     const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
     return matchG && matchB;
   });
@@ -29,14 +30,13 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
             className="w-full bg-white border border-[#E2E8F0] rounded-xl pl-9 pr-4 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
           />
         </div>
-        <select 
-          value={filtroGrupo} 
-          onChange={e => setFiltroGrupo(e.target.value)} 
-          className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
-        >
-          <option>Todos</option>
-          {GRUPOS.map(g => <option key={g}>{g}</option>)}
-        </select>
+        <div className="min-w-[150px]">
+          <CustomSelect 
+            value={filtroGrupo} 
+            onChange={setFiltroGrupo} 
+            options={["Todos", ...GRUPOS]}
+          />
+        </div>
       </div>
 
       {biblioteca.length === 0 ? (

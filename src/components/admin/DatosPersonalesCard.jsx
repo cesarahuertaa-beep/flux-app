@@ -3,6 +3,7 @@ import { User, Phone, MapPin, Calendar, Camera } from "lucide-react";
 import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
 import { storageUpload, storageDelete } from "../../lib/supabase";
 import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
+import { CustomSelect } from "../ui/CustomSelect";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
   const fileInputRef = useRef(null);
@@ -124,16 +125,17 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
           </div>
           <div>
             <label className="block text-sm font-medium text-[#0B1929] mb-1">Género</label>
-            <select 
+            <CustomSelect 
               value={form.genero} 
-              onChange={e => { setForm({...form, genero: e.target.value}); onSave({...form, genero: e.target.value}); }}
-              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
-            >
-              <option value="">Selecciona...</option>
-              <option value="Femenino">Femenino</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Otro">Otro</option>
-            </select>
+              onChange={val => { setForm(p => ({...p, genero: val})); onSave({...form, genero: val}); }}
+              placeholder="Selecciona..."
+              options={[
+                { value: "", label: "Selecciona..." },
+                { value: "Femenino", label: "Femenino" },
+                { value: "Masculino", label: "Masculino" },
+                { value: "Otro", label: "Otro" }
+              ]}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#0B1929] mb-1">
@@ -149,25 +151,25 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-sm font-medium text-[#0B1929] mb-1">País</label>
-              <select 
+              <CustomSelect 
                 value={form.pais} 
-                onChange={e => { setForm({...form, pais: e.target.value}); onSave({...form, pais: e.target.value}); }}
-                className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
-              >
-                {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+                onChange={val => { setForm(p => ({...p, pais: val})); onSave({...form, pais: val}); }}
+                placeholder="Selecciona país..."
+                options={PAISES}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#0B1929] mb-1">Estado</label>
-              {form.pais ==="México" ? (
-                <select 
+              {form.pais === "México" ? (
+                <CustomSelect 
                   value={form.estado_provincia} 
-                  onChange={e => { setForm({...form, estado_provincia: e.target.value}); onSave({...form, estado_provincia: e.target.value}); }}
-                  className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
-                >
-                  <option value="">Selecciona...</option>
-                  {ESTADOS_MEXICO.map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
+                  onChange={val => { setForm(p => ({...p, estado_provincia: val})); onSave({...form, estado_provincia: val}); }}
+                  placeholder="Selecciona..."
+                  options={[
+                    { value: "", label: "Selecciona..." },
+                    ...ESTADOS_MEXICO
+                  ]}
+                />
               ) : (
                 <input 
                   type="text" 

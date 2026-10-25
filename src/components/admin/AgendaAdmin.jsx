@@ -4,6 +4,8 @@ import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { ListSkeleton } from "../ui/Skeleton";
 import { useBackButton } from"../../lib/backButtonHandler";
+import { ConfirmModal } from "../ui/ConfirmModal";
+import { CustomSelect } from "../ui/CustomSelect";
 import {
   Clock,
   Clock3,
@@ -129,6 +131,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
+  const [confirmDelete, setConfirmDelete]   = useState(null);
   const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
   const [editingHorarioId, setEditingHorarioId] = useState(null);
@@ -319,13 +322,22 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setSaving(false);
   };
 
-  const eliminarHorario = async (id) => {
-    if (!confirm("¿Eliminar este horario de disponibilidad?")) return;
-    try {
-      await dbDel(`disponibilidad?id=eq.${id}`);
-      setMsg("Horario eliminado");
-      loadDisponibilidad();
-    } catch (e) { setMsg(e.message); }
+  const eliminarHorario = (id) => {
+    setConfirmDelete({
+      title: "¿Eliminar horario?",
+      description: "Este bloque de disponibilidad se eliminará.",
+      confirmText: "Eliminar horario",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`disponibilidad?id=eq.${id}`);
+          setMsg("Horario eliminado");
+          setConfirmDelete(null);
+          loadDisponibilidad();
+        } catch (e) { setMsg(e.message); }
+      }
+    });
   };
 
   // ── Helpers de render ──
@@ -599,32 +611,26 @@ export function AgendaAdmin({ setMsg, profileId }) {
           onClose={() => { setShowHorario(false); setEditingHorarioId(null); }}
         >
           <Field label="Día de la semana">
-            <select 
-              className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
+            <CustomSelect 
               value={horarioForm.dia_semana} 
-              onChange={e => setHorarioForm(p => ({ ...p, dia_semana: +e.target.value }))}
-            >
-              {DIAS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
+              onChange={val => setHorarioForm(p => ({ ...p, dia_semana: Number(val) }))}
+              options={DIAS_FULL.map((d, i) => ({ value: i, label: d }))}
+            />
           </Field>
           <div className="grid grid-cols-2 gap-3 mt-1">
             <Field label="Hora inicio">
-              <select 
-                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
+              <CustomSelect 
                 value={horarioForm.hora_inicio} 
-                onChange={e => setHorarioForm(p => ({ ...p, hora_inicio: e.target.value }))}
-              >
-                {HORAS.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
+                onChange={val => setHorarioForm(p => ({ ...p, hora_inicio: val }))}
+                options={HORAS}
+              />
             </Field>
             <Field label="Hora fin">
-              <select 
-                className="w-full rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] bg-white"
+              <CustomSelect 
                 value={horarioForm.hora_fin} 
-                onChange={e => setHorarioForm(p => ({ ...p, hora_fin: e.target.value }))}
-              >
-                {HORAS.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
+                onChange={val => setHorarioForm(p => ({ ...p, hora_fin: val }))}
+                options={HORAS}
+              />
             </Field>
           </div>
           <div className="flex gap-2 justify-end mt-3">
@@ -779,6 +785,18 @@ export function AgendaAdmin({ setMsg, profileId }) {
         </div>,
         document.body
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
 import { dbGet } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { ConfirmModal } from "./ConfirmModal";
+import { CustomSelect } from "./CustomSelect";
 
 // Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
 const DEFAULT_NUTRI_TEMPLATES = [];
@@ -19,6 +21,7 @@ export default function TemplatesManagerModal({
 }) {
   useBackButton(true, onClose, 60);
   const [tab, setTab] = useState("cargar"); // "cargar" | "guardar" | "clonar"
+  const [confirmAction, setConfirmAction] = useState(null);
   const storageKey = type === "nutri" ? "flux_plantillas_nutri" : "flux_plantillas_rutinas";
 
   // Cargar plantillas de usuario
@@ -146,8 +149,17 @@ export default function TemplatesManagerModal({
 
   const handleDeleteTemplate = (id, e) => {
     e.stopPropagation();
-    if (!confirm("¿Seguro que deseas eliminar esta plantilla guardada?")) return;
-    saveUserTemplates(userTemplates.filter((t) => t.id !== id));
+    setConfirmAction({
+      title: "¿Eliminar plantilla?",
+      description: "Esta plantilla guardada se eliminará permanentemente.",
+      confirmText: "Eliminar",
+      danger: true,
+      icon: "trash",
+      onConfirm: () => {
+        saveUserTemplates(userTemplates.filter((t) => t.id !== id));
+        setConfirmAction(null);
+      }
+    });
   };
 
   const handleCloneFromCycle = async () => {
@@ -327,10 +339,18 @@ export default function TemplatesManagerModal({
                       <div
                         key={t.id}
                         onClick={() => {
-                          if (confirm(`¿Aplicar la plantilla "${t.nombre}" a este ciclo? Se importarán todos sus ${unitLabel}.`)) {
-                            onApplyTemplate(t);
-                            onClose();
-                          }
+                          setConfirmAction({
+                            title: `¿Aplicar "${t.nombre}"?`,
+                            description: `Se importarán todos sus ${unitLabel} al ciclo activo.`,
+                            confirmText: "Aplicar plantilla",
+                            danger: false,
+                            icon: "alert",
+                            onConfirm: () => {
+                              onApplyTemplate(t);
+                              setConfirmAction(null);
+                              onClose();
+                            }
+                          });
                         }}
                         className="p-3 sm:p-4 rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] bg-white hover:shadow-md transition-all flex items-center justify-between gap-2 sm:gap-4 cursor-pointer group"
                       >
@@ -451,18 +471,18 @@ export default function TemplatesManagerModal({
                 <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
                   1. Seleccionar Paciente
                 </label>
-                <select
+                <CustomSelect
                   value={selectedClienteId}
-                  onChange={(e) => setSelectedClienteId(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                >
-                  <option value="">-- Elige un paciente del directorio --</option>
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre} ({c.email || "Sin email"})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedClienteId}
+                  placeholder="-- Elige un paciente del directorio --"
+                  options={[
+                    { value: "", label: "-- Elige un paciente del directorio --" },
+                    ...clientes.map((c) => ({
+                      value: c.id,
+                      label: `${c.nombre} (${c.email || "Sin email"})`
+                    }))
+                  ]}
+                />
               </div>
 
               {selectedClienteId && (
@@ -477,17 +497,15 @@ export default function TemplatesManagerModal({
                       Este paciente aún no tiene ciclos o planes registrados.
                     </p>
                   ) : (
-                    <select
+                    <CustomSelect
                       value={selectedCicloId}
-                      onChange={(e) => setSelectedCicloId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    >
-                      {clienteCiclos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre.split("|")[0]} {c.activo ? "🟢 (Plan Activo)" : ""}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setSelectedCicloId}
+                      placeholder="-- Seleccionar ciclo / plan --"
+                      options={clienteCiclos.map((c) => ({
+                        value: c.id,
+                        label: `${c.nombre.split("|")[0]} ${c.activo ? "🟢 (Plan Activo)" : ""}`
+                      }))}
+                    />
                   )}
                 </div>
               )}
@@ -523,6 +541,18 @@ export default function TemplatesManagerModal({
         </div>
 
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={confirmAction?.onConfirm}
+        title={confirmAction?.title}
+        description={confirmAction?.description}
+        confirmText={confirmAction?.confirmText || "Eliminar"}
+        cancelText={confirmAction?.cancelText || "Cancelar"}
+        danger={confirmAction?.danger ?? true}
+        icon={confirmAction?.icon || "trash"}
+      />
     </div>
   );
 }

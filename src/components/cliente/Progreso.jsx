@@ -9,6 +9,7 @@ import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -82,6 +83,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   
   const [view, setView] = useState('metricas');
   const [personalPhotos, setPersonalPhotos] = useState([]);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [uploadingPersonal, setUploadingPersonal] = useState(false);
   const [fullImage, setFullImage] = useState(null);
   const [showAllMetrics, setShowAllMetrics] = useState(false);
@@ -273,19 +275,28 @@ export default function Progreso({ cliente, isSelfManaged }) {
     }
   };
 
-  const handlePersonalDelete = async (url) => {
-    if (!confirm("¿Eliminar esta foto personal?")) return;
-    try {
-      const pathPart = url.split("progress-photos/")[1];
-      if (pathPart) {
-        await storageDelete("progress-photos", pathPart).catch(() => {});
+  const handlePersonalDelete = (url) => {
+    setConfirmDelete({
+      title: "¿Eliminar foto personal?",
+      description: "Esta foto se eliminará permanentemente de tu galería privada.",
+      confirmText: "Eliminar foto",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          const pathPart = url.split("progress-photos/")[1];
+          if (pathPart) {
+            await storageDelete("progress-photos", pathPart).catch(() => {});
+          }
+          const updatedUrls = personalPhotos.filter(u => u !== url);
+          await saveIndex(updatedUrls);
+          setPersonalPhotos(updatedUrls);
+          setConfirmDelete(null);
+        } catch (e) {
+          console.error("Error deleting", e);
+        }
       }
-      const updatedUrls = personalPhotos.filter(u => u !== url);
-      await saveIndex(updatedUrls);
-      setPersonalPhotos(updatedUrls);
-    } catch (e) {
-      console.error("Error deleting", e);
-    }
+    });
   };
 
   if (loading) {
@@ -854,6 +865,18 @@ export default function Progreso({ cliente, isSelfManaged }) {
           <CachedImage src={fullImage} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Vista ampliada" onClick={e => e.stopPropagation()} />
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
     </div>
   );
 }

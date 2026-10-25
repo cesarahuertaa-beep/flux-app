@@ -19,6 +19,8 @@ import {
 import { SortableItem } from "../SortableItem";
 import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
+import { ConfirmModal } from "../ui/ConfirmModal";
+import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
 import { dbGet, dbPost, dbPatch, dbDel, dbUpsert, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
@@ -47,6 +49,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   }, [subtab]);
 
   const [searchProg, setSearchProg] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // ── Ciclos ──
   const [ciclos, setCiclos] = useState([]);
@@ -134,17 +137,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   useEffect(() => { loadHistorial(); }, [loadHistorial]);
 
   const onSelectHistorialRutina = async (e) => {
-    const rid = e.target.value;
+    const rid = e?.target ? e.target.value : (e || "");
     if (!rid) return;
-    e.target.value =""; // reset select
-    const r = historialRutinas.find(x => String(x.id) === rid);
+    if (e?.target) e.target.value = "";
+    const r = historialRutinas.find(x => String(x.id) === String(rid));
     if (!r) return;
     setLoading(true);
     try {
       const ejs = await dbGet(`ejercicios?rutina_id=eq.${rid}&order=orden.asc`);
       setRutinaForm(p => ({
         ...p,
-        nombre: r.nombre +" (Copia)",
+        nombre: r.nombre + " (Copia)",
         semanas: r.semanas,
         ejercicios: ejs.map(x => {
            const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
@@ -163,17 +166,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   };
 
   const onSelectHistorialDia = async (e) => {
-    const did = e.target.value;
+    const did = e?.target ? e.target.value : (e || "");
     if (!did) return;
-    e.target.value =""; // reset select
-    const d = historialDias.find(x => String(x.id) === did);
+    if (e?.target) e.target.value = "";
+    const d = historialDias.find(x => String(x.id) === String(did));
     if (!d) return;
     setLoading(true);
     try {
       const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
       setDiaForm(p => ({
         ...p,
-        dia: d.dia +" (Copia)",
+        dia: d.dia + " (Copia)",
         comidas: coms.map(x => {
            const copy = {...x, _dndId: Math.random().toString(36).slice(2,9)};
            delete copy.id;
@@ -296,40 +299,64 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
   // ── (Ciclos se crean ahora desde los modales de Día/Rutina) ──
 
-  // ── Eliminar ciclo (solo si está vacío) ──
+  // ── Eliminar ciclo ──
   const eliminarCiclo = async (ciclo, e) => {
     e.stopPropagation(); // no seleccionar el ciclo al dar clic en borrar
     try {
       // Verificar si tiene datos
       const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`);
       const ruts   = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`);
-      if (nutris.length > 0 || ruts.length > 0) {
-        const conf = confirm(`¡CUIDADO!\n\nEste ciclo contiene ${ruts.length} rutina(s) y ${nutris.length} plan(es) de nutrición.\n\nSi continúas, se DESTRUIRÁ TODO su contenido permanentemente.\n\n¿Estás 100% seguro de eliminarlo en cascada?`);
-        if (!conf) return;
-        
-        // Borrar en cascada manualmente para máxima seguridad
-        for (const n of nutris) await dbDel(`nutricion?id=eq.${n.id}`);
-        for (const r of ruts) await dbDel(`rutinas?id=eq.${r.id}`);
-      } else {
-        if (!confirm(`¿Eliminar el ciclo "${ciclo.nombre}"? Esta acción no se puede deshacer.`)) return;
-      }
+      
+      const doDelete = async () => {
+        try {
+          // Borrar en cascada manualmente para máxima seguridad
+          if (nutris.length > 0 || ruts.length > 0) {
+            for (const n of nutris) await dbDel(`nutricion?id=eq.${n.id}`);
+            for (const r of ruts) await dbDel(`rutinas?id=eq.${r.id}`);
+          }
 
-      // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
-      if (ciclo.activo) {
-        const anteriores = ciclos.filter(c => c.id !== ciclo.id && !c.activo);
-        if (anteriores.length > 0) {
-          // El primero en la lista es el más reciente (orden desc por created_at)
-          await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró:"${anteriores[0].nombre}"`}</div>);
-        } else {
-          setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
+          // Si era el activo, reactivar el ciclo anterior (el más reciente entre los archivados)
+          if (ciclo.activo) {
+            const anteriores = ciclos.filter(c => c.id !== ciclo.id && !c.activo);
+            if (anteriores.length > 0) {
+              await dbPatch(`ciclos?id=eq.${anteriores[0].id}`, { activo: true });
+              setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> {`Ciclo eliminado. Se restauró: "${anteriores[0].nombre}"`}</div>);
+            } else {
+              setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
+            }
+          } else {
+            setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
+          }
+
+          await dbDel(`ciclos?id=eq.${ciclo.id}`);
+          await loadCiclos();
+          setConfirmDelete(null);
+        } catch(err) {
+          if (!isOfflineError(err)) {
+            setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>); 
+          }
         }
-      } else {
-        setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ciclo eliminado.</div>);
-      }
+      };
 
-      await dbDel(`ciclos?id=eq.${ciclo.id}`);
-      await loadCiclos();
+      if (nutris.length > 0 || ruts.length > 0) {
+        setConfirmDelete({
+          title: "¡Cuidado! Eliminar ciclo completo",
+          description: `Este ciclo contiene ${ruts.length} rutina(s) y ${nutris.length} plan(es) de nutrición. Si continúas, se destruirá todo su contenido permanentemente.`,
+          confirmText: "Eliminar todo",
+          danger: true,
+          icon: "alert",
+          onConfirm: doDelete
+        });
+      } else {
+        setConfirmDelete({
+          title: `¿Eliminar "${ciclo.nombre}"?`,
+          description: "Esta acción no se puede deshacer.",
+          confirmText: "Eliminar",
+          danger: true,
+          icon: "trash",
+          onConfirm: doDelete
+        });
+      }
     } catch(e) { 
       if (!isOfflineError(e)) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
@@ -706,7 +733,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteDia  = async (d) => { if (!confirm(`¿Eliminar"${d.dia}"?`)) return; await dbDel(`nutricion_dias?id=eq.${d.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>); await loadData(); };
+  const deleteDia = (d) => {
+    const diaTitulo = (d.dia || "").split('|').filter(Boolean).join(' - ') || "este día";
+    setConfirmDelete({
+      title: `¿Eliminar "${diaTitulo}"?`,
+      description: "Esta acción eliminará el día y todas sus comidas asociadas permanentemente.",
+      confirmText: "Eliminar día",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`nutricion_dias?id=eq.${d.id}`);
+          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>);
+          setConfirmDelete(null);
+          await loadData();
+        } catch(err) {
+          if (!isOfflineError(err)) {
+            setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
+          }
+        }
+      }
+    });
+  };
   const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }));
   const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
   const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
@@ -920,7 +968,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     setSaving(false);
   };
 
-  const deleteRutina = async (r) => { if (!confirm(`¿Eliminar"${r.nombre}"?`)) return; await dbDel(`rutinas?id=eq.${r.id}`); setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>); await loadData(); };
+  const deleteRutina = (r) => {
+    const rutinaTitulo = (r.nombre || "").split('|').filter(Boolean).join(' - ') || "esta rutina";
+    setConfirmDelete({
+      title: `¿Eliminar "${rutinaTitulo}"?`,
+      description: "Esta acción eliminará la rutina y todos sus ejercicios permanentemente.",
+      confirmText: "Eliminar rutina",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`rutinas?id=eq.${r.id}`);
+          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>);
+          setConfirmDelete(null);
+          await loadData();
+        } catch(err) {
+          if (!isOfflineError(err)) {
+            setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
+          }
+        }
+      }
+    });
+  };
   const addEj = (ej) => {
     if (activeAltSlot === null) {
       if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
@@ -1436,12 +1505,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
                   <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
                     <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                    <select onChange={onSelectHistorialDia} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
-                      <option value="">-- Seleccionar día preexistente --</option>
-                      {historialDias.map(hd => (
-                        <option key={hd.id} value={hd.id}>{(hd.dia ||"").split('|').length > 1 ? (hd.dia ||"").split('|').join(' - ') : (hd.dia ||"Sin título")} (de {getClientName(hd.cliente_id)})</option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value=""
+                      onChange={onSelectHistorialDia}
+                      placeholder="-- Seleccionar día preexistente --"
+                      options={[
+                        { value: "", label: "-- Seleccionar día preexistente --" },
+                        ...historialDias.map(hd => ({
+                          value: hd.id,
+                          label: `${(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de ${getClientName(hd.cliente_id)})`
+                        }))
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -1549,12 +1624,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                 <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
                   <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
                     <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                    <select onChange={onSelectHistorialRutina} className="w-full px-2.5 py-2 rounded-lg border border-[#E2E8F0] bg-white text-[14px]">
-                      <option value="">-- Seleccionar rutina preexistente --</option>
-                      {historialRutinas.map(hr => (
-                        <option key={hr.id} value={hr.id}>{(hr.nombre ||"").split('|').length > 1 ? (hr.nombre ||"").split('|').join(' - ') : (hr.nombre ||"Sin título")} (de {getClientName(hr.cliente_id)})</option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value=""
+                      onChange={onSelectHistorialRutina}
+                      placeholder="-- Seleccionar rutina preexistente --"
+                      options={[
+                        { value: "", label: "-- Seleccionar rutina preexistente --" },
+                        ...historialRutinas.map(hr => ({
+                          value: hr.id,
+                          label: `${(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de ${getClientName(hr.cliente_id)})`
+                        }))
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -1773,6 +1854,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           />
         </Suspense>
       )}
+
+      {/* ── Modal de Confirmación Estilizado ── */}
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
     </div>
   );
 }

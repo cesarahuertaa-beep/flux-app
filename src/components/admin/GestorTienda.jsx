@@ -2,11 +2,14 @@ import { useState, useEffect } from"react";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, ShoppingBag } from"lucide-react";
 import { useBackButton } from"../../lib/backButtonHandler";
+import { ConfirmModal } from "../ui/ConfirmModal";
+import { CustomSelect } from "../ui/CustomSelect";
 
 export default function GestorTienda({ setMsg }) {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useBackButton(showModal, () => setShowModal(false), 20);
 
@@ -84,15 +87,24 @@ export default function GestorTienda({ setMsg }) {
     setSaving(false);
   };
 
-  const deleteProd = async (p) => {
-    if (!confirm(`¿Eliminar ${p.nombre}?`)) return;
-    try {
-      await dbDel(`productos?id=eq.${p.id}`);
-      setMsg("Producto eliminado");
-      loadProductos();
-    } catch (e) {
-      setMsg("Error al eliminar:" + e.message);
-    }
+  const deleteProd = (p) => {
+    setConfirmDelete({
+      title: `¿Eliminar "${p.nombre}"?`,
+      description: "Este producto se eliminará del catálogo de la tienda.",
+      confirmText: "Eliminar producto",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`productos?id=eq.${p.id}`);
+          setMsg("Producto eliminado");
+          setConfirmDelete(null);
+          loadProductos();
+        } catch (e) {
+          setMsg("Error al eliminar:" + e.message);
+        }
+      }
+    });
   };
 
   const filtered = productos.filter(p => {
@@ -240,10 +252,14 @@ export default function GestorTienda({ setMsg }) {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase mb-1.5">Categoría</label>
-                  <select value={form.categoria} onChange={e=>setForm(p=>({...p, categoria:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2 text-sm outline-none">
-                    <option value="suplemento">Suplemento</option>
-                    <option value="ropa">Ropa Deportiva</option>
-                  </select>
+                  <CustomSelect 
+                    value={form.categoria} 
+                    onChange={val => setForm(p => ({ ...p, categoria: val }))} 
+                    options={[
+                      { value: "suplemento", label: "Suplemento" },
+                      { value: "ropa", label: "Ropa Deportiva" }
+                    ]}
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase mb-1.5">Etiqueta (Badge)</label>
@@ -282,6 +298,18 @@ export default function GestorTienda({ setMsg }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
     </div>
   );
 }

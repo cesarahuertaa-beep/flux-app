@@ -14,6 +14,7 @@ import {
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { ListSkeleton } from "../ui/Skeleton";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 const METRIC_GROUPS_MANUAL = [
   { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
@@ -126,6 +127,7 @@ const fmtDate = (d) => new Date(d +"T12:00:00").toLocaleDateString("es-MX", { ye
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [metricas,     setMetricas]     = useState([]);
   const [rutinas,      setRutinas]      = useState([]);
   const [nutriDias,    setNutriDias]    = useState([]);
@@ -409,10 +411,24 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     await load();
   };
 
-  const deleteMetrica = async (id) => {
-    if (!confirm("¿Eliminar esta evaluación? Esta acción no se puede deshacer.")) return;
-    await dbDel(`metricas_progreso?id=eq.${id}`);
-    setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>); await load();
+  const deleteMetrica = (id) => {
+    setConfirmDelete({
+      title: "¿Eliminar evaluación?",
+      description: "Esta evaluación y sus mediciones se eliminarán permanentemente. Esta acción no se puede deshacer.",
+      confirmText: "Eliminar evaluación",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        try {
+          await dbDel(`metricas_progreso?id=eq.${id}`);
+          setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
+          setConfirmDelete(null);
+          await load();
+        } catch(err) {
+          setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
+        }
+      }
+    });
   };
 
   const edadCalc = selected?.edad || (selected?.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
@@ -1260,6 +1276,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         </div>,
         document.body
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
 
     </div>
   );
