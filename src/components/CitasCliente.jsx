@@ -34,36 +34,42 @@ const ESTADOS = {
 };
 
 // ── Genera horarios disponibles dado un rango de disponibilidad y citas ya tomadas ──
-const generarSlots = (disponibilidad, citasOcupadas, selectedDate) => {
+const generarSlots = (disponibilidad, citasOcupadas, selectedDate, nutriologoDuracion = 60) => {
   if (!selectedDate || !disponibilidad.length) return [];
-  const date = new Date(selectedDate +"T12:00:00");
+  const date = new Date(selectedDate + "T12:00:00");
   const diaSemana = date.getDay();
   const reglas = disponibilidad.filter(d => d.dia_semana === diaSemana);
   if (!reglas.length) return [];
 
   const slots = [];
   for (const regla of reglas) {
+    const duracion = Number(regla.duracion_minutos) || Number(nutriologoDuracion) || 60;
     const [hIni, mIni] = regla.hora_inicio.split(":").map(Number);
     const [hFin, mFin] = regla.hora_fin.split(":").map(Number);
     let hora = hIni * 60 + mIni;
     const fin = hFin * 60 + mFin;
-    while (hora + 60 <= fin) {
+    while (hora + duracion <= fin) {
       const h = Math.floor(hora / 60);
       const m = hora % 60;
-      const hStr = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+      const hStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       
       const [y, mo, dDay] = selectedDate.split("-").map(Number);
-      const slotDate = new Date(y, mo - 1, dDay, h, m, 0);
-      const isoSlot = slotDate.toISOString();
+      const slotStart = new Date(y, mo - 1, dDay, h, m, 0);
+      const slotEnd = new Date(slotStart.getTime() + duracion * 60000);
+      const isoSlot = slotStart.toISOString();
 
       const ocupado = citasOcupadas.some(c => {
-        if (c.estado ==="rechazada" || c.estado ==="cancelada") return false;
+        if (c.estado === "rechazada" || c.estado === "cancelada") return false;
         if (!c.fecha_hora) return false;
-        return new Date(c.fecha_hora).getTime() === slotDate.getTime();
+        const citaStart = new Date(c.fecha_hora).getTime();
+        const citaDur = (Number(c.duracion_minutos) || duracion) * 60000;
+        const citaEnd = citaStart + citaDur;
+        // Comprobación de solapamiento de intervalos
+        return slotStart.getTime() < citaEnd && slotEnd.getTime() > citaStart;
       });
 
-      slots.push({ hora: hStr, iso: isoSlot, ocupado });
-      hora += 60;
+      slots.push({ hora: hStr, iso: isoSlot, duracion, ocupado });
+      hora += duracion;
     }
   }
   return slots;
@@ -101,23 +107,32 @@ export function CitasCliente({ cliente }) {
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalidad, setModalidad] = useState("presencial");
+  const [nutriologoDuracion, setNutriologoDuracion] = useState(60);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, d, r] = await Promise.all([
-        dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`),
+      const [c, d, r, nProf] = await Promise.all([
+        dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`).catch(() => 
+          dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`)
+        ),
         dbGet(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`),
-        dbGet(`citas_ratings?cliente_id=eq.${clienteId}&select=cita_id,puntuacion`)
+        dbGet(`citas_ratings?cliente_id=eq.${clienteId}&select=cita_id,puntuacion`),
+        dbGet(`profiles?id=eq.${nutriologoId}&select=id,nombre,duracion_cita`).catch(() => []),
       ]);
+
+      if (Array.isArray(nProf) && nProf.length > 0 && nProf[0].duracion_cita) {
+        setNutriologoDuracion(Number(nProf[0].duracion_cita));
+      }
       
       const now = new Date();
       if (Array.isArray(c)) {
         for (const cita of c) {
           if (cita.estado === 'confirmada') {
             const citaTime = new Date(cita.fecha_hora);
-            const diffHours = (now - citaTime) / (1000 * 60 * 60);
-            if (diffHours >= 1) {
+            const diffMinutes = (now - citaTime) / (1000 * 60);
+            const dur = Number(cita.duracion_minutos) || nutriologoDuracion || 60;
+            if (diffMinutes >= dur) {
               cita.estado = 'completada';
               dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
             }
@@ -139,17 +154,17 @@ export function CitasCliente({ cliente }) {
       console.error("Error al cargar citas o ratings", e);
     }
     setLoading(false);
-  }, [clienteId, nutriologoId]);
+  }, [clienteId, nutriologoId, nutriologoDuracion]);
 
   useEffect(() => { if (clienteId && nutriologoId) loadData(); }, [loadData]);
 
   // Actualizar slots cuando cambia la fecha
   useEffect(() => {
     if (!selectedDate) { setSlots([]); setSelectedSlot(null); return; }
-    const s = generarSlots(disponibilidad, citas, selectedDate);
+    const s = generarSlots(disponibilidad, citas, selectedDate, nutriologoDuracion);
     setSlots(s);
     setSelectedSlot(null);
-  }, [selectedDate, disponibilidad, citas]);
+  }, [selectedDate, disponibilidad, citas, nutriologoDuracion]);
 
   const submitRating = async () => {
     if (!ratingModal.citaId || !ratingModal.puntuacion) return;
@@ -175,14 +190,23 @@ export function CitasCliente({ cliente }) {
     if (!selectedSlot) return;
     setSaving(true);
     setErrorReq("");
+    const durMin = Number(selectedSlot.duracion) || nutriologoDuracion || 60;
+    const payload = {
+      cliente_id: clienteId,
+      nutriologo_id: nutriologoId,
+      fecha_hora: selectedSlot.iso,
+      modalidad,
+      estado: "pendiente",
+      duracion_minutos: durMin,
+    };
     try {
-      const cRes = await dbPost("citas", {
-        cliente_id: clienteId,
-        nutriologo_id: nutriologoId,
-        fecha_hora: selectedSlot.iso,
-        modalidad,
-        estado:"pendiente"
-      });
+      let cRes;
+      try {
+        cRes = await dbPost("citas", payload);
+      } catch {
+        delete payload.duracion_minutos;
+        cRes = await dbPost("citas", payload);
+      }
 
       try {
         // Notify nutritionist (fire and forget)
@@ -448,32 +472,52 @@ export function CitasCliente({ cliente }) {
               {/* Selector de Horario */}
               {selectedDate && (
                 <div className="animate-in fade-in slide-in-from-top-2">
-                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-widest mb-2">
-                    2. Selecciona el Horario
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-widest">
+                      2. Selecciona el Horario
+                    </label>
+                    {slots.length > 0 && (
+                      <span className="text-[11px] font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2.5 py-0.5 rounded-full">
+                        {slots[0]?.duracion || nutriologoDuracion || 60} min por cita
+                      </span>
+                    )}
+                  </div>
                   {slots.length === 0 ? (
                     <div className="text-sm text-[#6B7A8D] bg-white border border-[#E2E8F0] border-dashed rounded-xl p-4 text-center">
                       No hay horarios disponibles para este día. Por favor selecciona otro.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {slots.map(slot => (
-                        <button
-                          key={slot.iso}
-                          disabled={slot.ocupado}
-                          onClick={() => setSelectedSlot(slot)}
-                          className={`py-2 rounded-lg text-sm font-mono font-semibold transition-all border ${
-                            slot.ocupado 
-                              ?"bg-[#F7F9FC] border-[#E2E8F0] text-[#CBD5E1] opacity-50 cursor-not-allowed" 
-                              : selectedSlot?.iso === slot.iso
-                                ?"bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-md"
-                                :"bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
-                          }`}
-                        >
-                          {slot.hora} {slot.ocupado &&"🔒"}
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {slots.map(slot => (
+                          <button
+                            key={slot.iso}
+                            disabled={slot.ocupado}
+                            onClick={() => setSelectedSlot(slot)}
+                            className={`py-2 rounded-lg text-sm font-mono font-semibold transition-all border ${
+                              slot.ocupado 
+                                ?"bg-[#F7F9FC] border-[#E2E8F0] text-[#CBD5E1] opacity-50 cursor-not-allowed" 
+                                : selectedSlot?.iso === slot.iso
+                                  ?"bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-md"
+                                  :"bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+                            }`}
+                          >
+                            {slot.hora} {slot.ocupado &&"🔒"}
+                          </button>
+                        ))}
+                      </div>
+                      {selectedSlot && (
+                        <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <Clock size={14} className="text-emerald-600" />
+                            Horario seleccionado: {selectedSlot.hora}
+                          </span>
+                          <span className="font-bold bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                            {selectedSlot.duracion || 60} minutos
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

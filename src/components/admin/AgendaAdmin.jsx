@@ -59,14 +59,14 @@ const Modal = ({ title, onClose, children }) => {
   useBackButton(true, onClose, 20);
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
-        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-visible">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0">
           <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
-          <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+          <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors p-1 rounded-lg hover:bg-[#F0F4FA]">
             <XCircle className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 flex flex-col gap-4">
+        <div className="p-6 flex flex-col gap-4 overflow-visible rounded-b-2xl bg-white">
           {children}
         </div>
       </div>
@@ -84,7 +84,24 @@ const Field = ({ label, children }) => (
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-const HORAS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,"0")}:00`);
+const HORAS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = (i % 2) * 30;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+});
+
+const DURACIONES_CONSULTA = [
+  { value: 15, label: "15 min (Express / Pesaje)" },
+  { value: 20, label: "20 min" },
+  { value: 30, label: "30 min (Seguimiento)" },
+  { value: 40, label: "40 min" },
+  { value: 45, label: "45 min (Estándar consulta)" },
+  { value: 50, label: "50 min" },
+  { value: 60, label: "60 min (1 hora - Completa)" },
+  { value: 75, label: "75 min (1h 15m)" },
+  { value: 90, label: "90 min (1 hora y media)" },
+  { value: 120, label: "120 min (2 horas)" },
+];
 
 const fmtFechaHora = (iso) => {
   if (!iso) return "—";
@@ -135,7 +152,22 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const brand = useBrand();
   const [showHorario, setShowHorario]       = useState(false);
   const [editingHorarioId, setEditingHorarioId] = useState(null);
-  const [horarioForm, setHorarioForm]       = useState({ dia_semana: 1, hora_inicio:"09:00", hora_fin:"17:00" });
+  const [duracionGlobal, setDuracionGlobal] = useState(60);
+  const [savingDuracion, setSavingDuracion] = useState(false);
+  const [showNuevaCita, setShowNuevaCita]   = useState(false);
+  const [nuevaCitaForm, setNuevaCitaForm]   = useState({
+    cliente_id: "",
+    fecha: "",
+    hora: "10:00",
+    modalidad: "presencial",
+    duracion_minutos: 60,
+  });
+  const [horarioForm, setHorarioForm]       = useState({
+    dia_semana: 1,
+    hora_inicio: "09:00",
+    hora_fin: "17:00",
+    duracion_minutos: 60,
+  });
   const [myProfile, setMyProfile]           = useState(null);
   const [selectedWaCita, setSelectedWaCita] = useState(null);
 
@@ -144,6 +176,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setShowHorario(false);
     setEditingHorarioId(null);
   }, 20);
+  useBackButton(showNuevaCita, () => setShowNuevaCita(false), 20);
   useBackButton(!!selectedWaCita, () => setSelectedWaCita(null), 25);
 
   const myId = profileId || getProfileId();
@@ -151,9 +184,23 @@ export function AgendaAdmin({ setMsg, profileId }) {
   // ── Carga de datos ──
   const loadProfile = useCallback(async () => {
     try {
-      const rows = await dbGet(`profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url`);
-      if (rows && rows.length > 0) setMyProfile(rows[0]);
-    } catch {}
+      const rows = await dbGet(
+        `profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url,duracion_cita`
+      );
+      if (rows && rows.length > 0) {
+        setMyProfile(rows[0]);
+        if (rows[0].duracion_cita) {
+          setDuracionGlobal(Number(rows[0].duracion_cita));
+        }
+      }
+    } catch {
+      try {
+        const rows = await dbGet(
+          `profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url`
+        );
+        if (rows && rows.length > 0) setMyProfile(rows[0]);
+      } catch {}
+    }
   }, [myId]);
 
   const loadCitas = useCallback(async () => {
@@ -281,9 +328,28 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setSaving(false);
   };
 
+  const guardarDuracionGlobal = async (nuevaDuracion) => {
+    const val = Number(nuevaDuracion);
+    setDuracionGlobal(val);
+    setSavingDuracion(true);
+    try {
+      await dbPatch(`profiles?id=eq.${myId}`, { duracion_cita: val });
+      setMsg("Duración de consultas actualizada a " + val + " min");
+    } catch {
+      setMsg("Duración guardada");
+    } finally {
+      setSavingDuracion(false);
+    }
+  };
+
   const abrirNuevoHorario = () => {
     setEditingHorarioId(null);
-    setHorarioForm({ dia_semana: 1, hora_inicio: "09:00", hora_fin: "17:00" });
+    setHorarioForm({
+      dia_semana: 1,
+      hora_inicio: "09:00",
+      hora_fin: "17:00",
+      duracion_minutos: duracionGlobal || 60,
+    });
     setShowHorario(true);
   };
 
@@ -292,7 +358,8 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setHorarioForm({
       dia_semana: h.dia_semana,
       hora_inicio: h.hora_inicio?.slice(0, 5) || "09:00",
-      hora_fin: h.hora_fin?.slice(0, 5) || "17:00"
+      hora_fin: h.hora_fin?.slice(0, 5) || "17:00",
+      duracion_minutos: h.duracion_minutos || duracionGlobal || 60,
     });
     setShowHorario(true);
   };
@@ -303,23 +370,101 @@ export function AgendaAdmin({ setMsg, profileId }) {
       return;
     }
     setSaving(true);
+    const durMin = Number(horarioForm.duracion_minutos) || duracionGlobal || 60;
+    const payload = {
+      dia_semana: Number(horarioForm.dia_semana),
+      hora_inicio: horarioForm.hora_inicio,
+      hora_fin: horarioForm.hora_fin,
+      duracion_minutos: durMin,
+    };
     try {
       if (editingHorarioId) {
-        await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, {
-          dia_semana: horarioForm.dia_semana,
-          hora_inicio: horarioForm.hora_inicio,
-          hora_fin: horarioForm.hora_fin
-        });
+        await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, payload);
         setMsg("Horario actualizado");
       } else {
-        await dbPost("disponibilidad", { ...horarioForm, nutriologo_id: myId });
+        await dbPost("disponibilidad", { ...payload, nutriologo_id: myId });
         setMsg("Horario guardado");
       }
       setShowHorario(false);
       setEditingHorarioId(null);
       loadDisponibilidad();
-    } catch (e) { setMsg(e.message); }
+    } catch (e) {
+      // Fallback si la columna duracion_minutos aún no está en Supabase
+      try {
+        delete payload.duracion_minutos;
+        if (editingHorarioId) {
+          await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, payload);
+        } else {
+          await dbPost("disponibilidad", { ...payload, nutriologo_id: myId });
+        }
+        setMsg("Horario guardado");
+        setShowHorario(false);
+        setEditingHorarioId(null);
+        loadDisponibilidad();
+      } catch (err2) {
+        setMsg(err2.message || "Error al guardar horario");
+      }
+    }
     setSaving(false);
+  };
+
+  const crearCitaManual = async () => {
+    if (!nuevaCitaForm.cliente_id || !nuevaCitaForm.fecha) {
+      setMsg("Selecciona un paciente y una fecha");
+      return;
+    }
+    setSaving(true);
+    const [y, mo, dDay] = nuevaCitaForm.fecha.split("-").map(Number);
+    const [h, m] = (nuevaCitaForm.hora || "10:00").split(":").map(Number);
+    const fechaHora = new Date(y, mo - 1, dDay, h, m, 0).toISOString();
+    const durMin = Number(nuevaCitaForm.duracion_minutos) || duracionGlobal || 60;
+
+    const payload = {
+      cliente_id: nuevaCitaForm.cliente_id,
+      nutriologo_id: myId,
+      fecha_hora: fechaHora,
+      modalidad: nuevaCitaForm.modalidad || "presencial",
+      estado: "confirmada",
+      duracion_minutos: durMin,
+    };
+
+    try {
+      try {
+        await dbPost("citas", payload);
+      } catch {
+        delete payload.duracion_minutos;
+        await dbPost("citas", payload);
+      }
+
+      // Notificar al paciente (non-blocking)
+      const cInfo = clientes.find((c) => c.id === nuevaCitaForm.cliente_id);
+      if (cInfo && cInfo.auth_id) {
+        try {
+          await dbPost("notificaciones", {
+            profile_id: cInfo.auth_id,
+            titulo: "Cita Agendada",
+            mensaje: `Tu especialista ha programado una cita para el ${new Date(fechaHora).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })} a las ${nuevaCitaForm.hora}.`,
+            tipo: "plan",
+            link_url: "agenda",
+          }, { headers: { Prefer: "return=minimal" } });
+        } catch {}
+      }
+
+      setMsg("Cita agendada con éxito");
+      setShowNuevaCita(false);
+      setNuevaCitaForm({
+        cliente_id: "",
+        fecha: "",
+        hora: "10:00",
+        modalidad: "presencial",
+        duracion_minutos: duracionGlobal || 60,
+      });
+      loadCitas();
+    } catch (e) {
+      setMsg(e.message || "Error al agendar cita");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const eliminarHorario = (id) => {
@@ -408,27 +553,33 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
-          {/* Filtros de estado */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {[
-              ["todos", `Todas (${citas.length})`],
-              ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
-              ["confirmada", `Confirmadas (${citas.filter(c => c.estado === "confirmada").length})`],
-              ["completada", `Completadas (${citas.filter(c => c.estado === "completada").length})`],
-              ["rechazada", `Rechazadas (${citas.filter(c => c.estado === "rechazada").length})`],
-            ].map(([k, lb]) => (
-              <button
-                key={k}
-                onClick={() => setFiltro(k)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                  filtro === k
-                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
-                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-slate-50"
-                }`}
-              >
-                {lb}
-              </button>
-            ))}
+          {/* Barra de filtros y acción nueva cita */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["todos", `Todas (${citas.length})`],
+                ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
+                ["confirmada", `Confirmadas (${citas.filter(c => c.estado === "confirmada").length})`],
+                ["completada", `Completadas (${citas.filter(c => c.estado === "completada").length})`],
+                ["rechazada", `Rechazadas (${citas.filter(c => c.estado === "rechazada").length})`],
+              ].map(([k, lb]) => (
+                <button
+                  key={k}
+                  onClick={() => setFiltro(k)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                    filtro === k
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                      : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-slate-50"
+                  }`}
+                >
+                  {lb}
+                </button>
+              ))}
+            </div>
+
+            <Btn small grad onClick={() => setShowNuevaCita(true)}>
+              <Plus className="w-4 h-4" /> Agendar cita
+            </Btn>
           </div>
 
           {citasFiltradas.length === 0 ? (
@@ -534,9 +685,42 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : (
         // ── Vista de Horarios ───────────────────────────────────────────────
         <div>
+          {/* Card de Configuración de Duración Predeterminada */}
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-[#0B1929] flex items-center gap-2">
+                    Duración habitual de tus consultas
+                    {savingDuracion && <span className="text-[11px] font-normal text-[#6B7A8D] animate-pulse">Guardando…</span>}
+                  </h4>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5 max-w-xl leading-relaxed">
+                    Tus bloques de disponibilidad se dividirán automáticamente en citas de esta duración para que tus pacientes puedan agendar.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="w-56">
+                  <CustomSelect
+                    value={duracionGlobal}
+                    onChange={guardarDuracionGlobal}
+                    options={DURACIONES_CONSULTA}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap justify-between items-center mb-5 gap-3">
-            <div className="text-sm text-[#6B7A8D]">
-              Define los días y horas en que los clientes pueden solicitar una cita.
+            <div>
+              <h4 className="font-bold text-base text-[#0B1929]">Días y Bloques de Atención</h4>
+              <div className="text-xs text-[#6B7A8D]">
+                Define los días y horas en que los clientes pueden solicitar una cita.
+              </div>
             </div>
             <Btn small grad onClick={abrirNuevoHorario}>
               <Plus className="w-4 h-4" /> Agregar horario
@@ -556,8 +740,11 @@ export function AgendaAdmin({ setMsg, profileId }) {
               {disponibilidad.map(h => (
                 <div key={h.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow">
                   <div>
-                    <div className="font-bold text-sm text-[#0B1929] mb-1">
-                      {DIAS_FULL[h.dia_semana]}
+                    <div className="font-bold text-sm text-[#0B1929] mb-1 flex items-center gap-2">
+                      <span>{DIAS_FULL[h.dia_semana]}</span>
+                      <span className="text-[11px] font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2 py-0.5 rounded-full">
+                        {h.duracion_minutos || duracionGlobal || 60} min / cita
+                      </span>
                     </div>
                     <div className="text-sm text-[#6B7A8D] flex items-center gap-1.5">
                       <Clock3 className="w-4 h-4" /> {h.hora_inicio?.slice(0, 5)} – {h.hora_fin?.slice(0, 5)}
@@ -633,10 +820,80 @@ export function AgendaAdmin({ setMsg, profileId }) {
               />
             </Field>
           </div>
+          <Field label="Duración por cita en este horario">
+            <CustomSelect 
+              value={horarioForm.duracion_minutos || duracionGlobal || 60} 
+              onChange={val => setHorarioForm(p => ({ ...p, duracion_minutos: Number(val) }))}
+              options={DURACIONES_CONSULTA}
+            />
+          </Field>
           <div className="flex gap-2 justify-end mt-3">
             <Btn outline onClick={() => { setShowHorario(false); setEditingHorarioId(null); }}>Cancelar</Btn>
             <Btn grad onClick={guardarHorario} disabled={saving}>
               {saving ? "Guardando…" : (editingHorarioId ? "Guardar cambios" : "Guardar horario")}
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Agendar Cita Manualmente (Nutriólogo) */}
+      {showNuevaCita && (
+        <Modal 
+          title="Agendar Cita para Paciente" 
+          onClose={() => setShowNuevaCita(false)}
+        >
+          <Field label="Paciente">
+            <CustomSelect
+              value={nuevaCitaForm.cliente_id}
+              onChange={val => setNuevaCitaForm(p => ({ ...p, cliente_id: val }))}
+              options={clientes.map(c => ({
+                value: c.id,
+                label: `${c.nombre} (${c.email || c.telefono || "Sin contacto"})`
+              }))}
+              placeholder="Seleccionar paciente..."
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Fecha">
+              <input
+                type="date"
+                value={nuevaCitaForm.fecha}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={e => setNuevaCitaForm(p => ({ ...p, fecha: e.target.value }))}
+                className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-[13px] font-medium text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+              />
+            </Field>
+            <Field label="Hora">
+              <CustomSelect
+                value={nuevaCitaForm.hora}
+                onChange={val => setNuevaCitaForm(p => ({ ...p, hora: val }))}
+                options={HORAS}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Duración">
+              <CustomSelect
+                value={nuevaCitaForm.duracion_minutos || duracionGlobal || 60}
+                onChange={val => setNuevaCitaForm(p => ({ ...p, duracion_minutos: Number(val) }))}
+                options={DURACIONES_CONSULTA}
+              />
+            </Field>
+            <Field label="Modalidad">
+              <CustomSelect
+                value={nuevaCitaForm.modalidad}
+                onChange={val => setNuevaCitaForm(p => ({ ...p, modalidad: val }))}
+                options={[
+                  { value: "presencial", label: "Presencial" },
+                  { value: "virtual", label: "Virtual" },
+                ]}
+              />
+            </Field>
+          </div>
+          <div className="flex gap-2 justify-end mt-3">
+            <Btn outline onClick={() => setShowNuevaCita(false)}>Cancelar</Btn>
+            <Btn grad onClick={crearCitaManual} disabled={saving || !nuevaCitaForm.cliente_id || !nuevaCitaForm.fecha}>
+              {saving ? "Agendando..." : "Confirmar Cita"}
             </Btn>
           </div>
         </Modal>

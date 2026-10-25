@@ -11,7 +11,19 @@ export function CustomSelect({
   dropdownClassName = "",
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef(null);
+
+  // Detect available space to open upward or downward
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // If there's less than 230px below and more room above, flip upward
+      setOpenUpward(spaceBelow < 230 && spaceAbove > spaceBelow);
+    }
+  }, [isOpen]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -56,7 +68,9 @@ export function CustomSelect({
 
       {isOpen && (
         <div
-          className={`absolute z-[150] left-0 right-0 mt-1.5 bg-white border border-[#E2E8F0] rounded-xl shadow-xl py-1 max-h-56 overflow-y-auto scroll-hide animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}
+          className={`absolute z-[250] left-0 right-0 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl py-1 max-h-56 overflow-y-auto scroll-hide overscroll-contain animate-in fade-in zoom-in-95 duration-100 ${
+            openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } ${dropdownClassName}`}
         >
           {normalizedOptions.map((opt) => {
             const isSelected = opt.value === value;
