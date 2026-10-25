@@ -144,6 +144,8 @@ public class FluxSyncWorker extends Worker {
 
     private void pullClientPlan(JSONObject cacheMap, String supaUrl, String supaKey, String token,
                                 String clientId, boolean includeProgressByIds) throws Exception {
+        fetchAndStore(cacheMap, supaUrl, supaKey, token,
+            "nutricion_progreso?cliente_id=eq." + clientId + "&limit=1000");
         JSONArray csActive = fetchAndStore(cacheMap, supaUrl, supaKey, token,
             "ciclos?cliente_id=eq." + clientId + "&activo=eq.true&limit=1");
         JSONArray csAll = fetchAndStore(cacheMap, supaUrl, supaKey, token,

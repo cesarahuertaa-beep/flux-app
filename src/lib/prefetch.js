@@ -73,7 +73,8 @@ export const prefetchPlanCliente = async (clienteId, mediaUrls = []) => {
     });
   }
 
-  // 4. Verificaciones de datos rápidos usadas por Admin.jsx (shadow candidates)
+  // 4. Verificaciones de datos rápidos usadas por Admin.jsx y progreso nutricional
+  await safe(`nutricion_progreso?cliente_id=eq.${clienteId}&limit=1000`);
   await safe(`ciclos?cliente_id=eq.${clienteId}&select=id&limit=1`);
   await safe(`rutinas?cliente_id=eq.${clienteId}&select=id&limit=1`);
   await safe(`metricas_progreso?cliente_id=eq.${clienteId}&select=id&limit=1`);

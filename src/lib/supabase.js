@@ -240,7 +240,7 @@ const reapplyPendingMutations = async (filterTable = null) => {
       if (filterTable && m.table !== filterTable) continue;
       if (m.method === "PATCH" || m.method === "DELETE") {
         applyOptimistic(m.method, m.path, m.body);
-      } else if (m.method === "POST" && m.table === "progreso") {
+      } else if (m.method === "POST" && (m.table === "progreso" || m.table === "nutricion_progreso")) {
         try {
           const b = JSON.parse(m.body);
           applyOptimisticUpsert(m.path, Array.isArray(b) ? b : [b]);
@@ -367,7 +367,7 @@ if (typeof window !== "undefined") {
 const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 // Tablas cuyo POST es seguro de encolar offline
-const QUEUEABLE_POST = ["progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
+const QUEUEABLE_POST = ["progreso", "nutricion_progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
 
 const isQueueable = (method, table) => {
   if (table.startsWith("rpc/")) return false;
@@ -380,7 +380,7 @@ const queueMutation = async (method, path, body, prefer) => {
   const table = path.split("?")[0];
   await addMutation({ method, path, body: body ?? null, prefer: prefer ?? null, table });
   applyOptimistic(method, path, body);
-  if (method === "POST" && table === "progreso") {
+  if (method === "POST" && (table === "progreso" || table === "nutricion_progreso")) {
     try { const b = JSON.parse(body); applyOptimisticUpsert(path, Array.isArray(b) ? b : [b]); } catch { /* ignore */ }
   }
 };

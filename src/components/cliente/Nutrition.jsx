@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
-import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
 import { CachedImage } from "../../lib/mediaCache";
@@ -8,35 +8,132 @@ const GroceryListModal = lazy(() => import("../ui/GroceryListModal"));
 
 const DAY_SHORT = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const DAY_FULL  = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const JS_DAY_CODES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1, isSelfManaged }) {
+const normalizeDayCode = (str) =>
+  String(str || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+export default function Nutrition({
+  dias,
+  cliente,
+  nutri,
+  semanaActualCiclo = 1,
+  ultimoPeso = null,
+  nutriProgreso = {},
+  onNutriProgressChange,
+  isSelfManaged,
+}) {
   const [activeDay, setActiveDay]       = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
   const [showGrocery, setShowGrocery]   = useState(false);
+  const autoSelectedForPlanRef          = useRef(null);
   const brand = useBrand();
 
-  // ── Hábitos diarios: Hidratación y Comidas Realizadas ──
-  const habitStorageKey = `flux_nutri_habits_${cliente?.id || "user"}_s${semanaActualCiclo}_d${activeDay}`;
-  const [habitsData, setHabitsData] = useState(() => {
-    try {
-      const saved = localStorage.getItem(habitStorageKey);
-      return saved ? JSON.parse(saved) : { agua: 0, comidasDone: {} };
-    } catch {
-      return { agua: 0, comidasDone: {} };
+  const getDayShort = (nombre, i) => {
+    if (!nombre) return DAY_SHORT[i] ?? `Día ${i + 1}`;
+    const parts = String(nombre).split("|");
+    return parts.length > 1 ? parts[0] : "S/D";
+  };
+
+  const getDayFull = (nombre, i) => {
+    if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
+    const parts = String(nombre).split("|");
+    const title = parts.length > 1 ? parts.slice(1).join("|") : parts[0];
+    return `${title || DAY_FULL[i] || `Día ${i + 1}`} — Semana ${semanaActualCiclo}`;
+  };
+
+  // Auto-seleccionar la pestaña del día actual (en hora local del dispositivo) al cargar el plan
+  useEffect(() => {
+    if (!Array.isArray(dias) || dias.length === 0) return;
+    const planSignature = `${cliente?.id || ""}_${dias.map((d) => d.id).join(",")}`;
+    if (autoSelectedForPlanRef.current === planSignature) return;
+    autoSelectedForPlanRef.current = planSignature;
+
+    const todayCodeNorm = normalizeDayCode(JS_DAY_CODES[new Date().getDay()]);
+    const matchIdx = dias.findIndex((d, i) => {
+      const code = getDayShort(d.dia || d.nombre, i);
+      return normalizeDayCode(code) === todayCodeNorm;
+    });
+
+    if (matchIdx >= 0) {
+      setActiveDay(matchIdx);
+    } else {
+      // Si el plan es de 5 días (ej. Lun–Vie) y hoy es Sáb o Dom, mostrar el último día hábil del plan (ej. Vie)
+      const isWeekend = todayCodeNorm === "sab" || todayCodeNorm === "dom";
+      if (isWeekend) {
+        const friIdx = dias.findIndex((d, i) => normalizeDayCode(getDayShort(d.dia || d.nombre, i)) === "vie");
+        setActiveDay(friIdx >= 0 ? friIdx : dias.length - 1);
+      } else {
+        setActiveDay(0);
+      }
     }
+  }, [dias, cliente?.id]);
+
+  const safeActiveDay = Array.isArray(dias) && activeDay < dias.length ? activeDay : 0;
+  const diaActual     = Array.isArray(dias) ? dias[safeActiveDay] : null;
+  const diaId         = diaActual?.id;
+  const comidas       = diaActual?.comidas || [];
+
+  const pesoKg = parseFloat(ultimoPeso || cliente?.peso || nutri?.peso || 0);
+  const metaAguaMl = pesoKg > 0 ? Math.round((pesoKg * 35) / 50) * 50 : 2500;
+
+  // ── Hábitos por Día del Plan + Semana del Ciclo (se conserva toda la semana y se reinicia al llegar la nueva semana) ──
+  const habitStorageKey = `flux_nutri_habits_${cliente?.id || "user"}_s${semanaActualCiclo}_dia_${diaId || safeActiveDay}`;
+  const legacyStorageKey = `flux_nutri_habits_${cliente?.id || "user"}_s${semanaActualCiclo}_d${safeActiveDay}`;
+
+  const readLocalHabits = () => {
+    try {
+      const saved = localStorage.getItem(habitStorageKey) || localStorage.getItem(legacyStorageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const serverRec = diaId ? nutriProgreso?.[`${diaId}-${semanaActualCiclo}`] : null;
+
+  const [habitsData, setHabitsData] = useState(() => {
+    if (serverRec) {
+      return { agua: Number(serverRec.agua_ml) || 0, comidasDone: serverRec.comidas_done || {} };
+    }
+    return readLocalHabits() || { agua: 0, comidasDone: {} };
   });
 
-  // Al cambiar de día o semana, recargar los hábitos correspondientes
+  // Al cambiar de día, de semana o recibir datos sincronizados, actualizar el estado del día activo
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(habitStorageKey);
-      setHabitsData(saved ? JSON.parse(saved) : { agua: 0, comidasDone: {} });
-    } catch {
+    const rec = diaId ? nutriProgreso?.[`${diaId}-${semanaActualCiclo}`] : null;
+    const local = readLocalHabits();
+
+    if (rec) {
+      const next = { agua: Number(rec.agua_ml) || 0, comidasDone: rec.comidas_done || {} };
+      setHabitsData(next);
+      try { localStorage.setItem(habitStorageKey, JSON.stringify(next)); } catch {}
+    } else if (local) {
+      setHabitsData(local);
+      // Si había datos en localStorage que aún no estaban en Supabase, sincronizarlos automáticamente
+      const hasLocalData = (Number(local.agua) > 0) || Object.values(local.comidasDone || {}).some(Boolean);
+      if (hasLocalData && diaId && typeof onNutriProgressChange === "function") {
+        const doneCount = comidas.filter((_, idx) => !!local.comidasDone?.[idx]).length;
+        onNutriProgressChange({
+          dia_id: diaId,
+          semana: Number(semanaActualCiclo) || 1,
+          agua_ml: Number(local.agua) || 0,
+          meta_agua_ml: metaAguaMl,
+          comidas_done: local.comidasDone || {},
+          comidas_realizadas: doneCount,
+          total_comidas: comidas.length,
+        });
+      }
+    } else {
       setHabitsData({ agua: 0, comidasDone: {} });
     }
-  }, [habitStorageKey]);
+  }, [habitStorageKey, diaId, semanaActualCiclo, serverRec?.updated_at]);
 
-  // Persistir cambios
+  // Persistir cambios en localStorage + Supabase (Local-First)
   const updateHabits = (updater) => {
     setHabitsData((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -45,12 +142,22 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
       } catch (e) {
         console.error(e);
       }
+      if (diaId && typeof onNutriProgressChange === "function") {
+        const doneCount = comidas.filter((_, idx) => !!next.comidasDone?.[idx]).length;
+        onNutriProgressChange({
+          dia_id: diaId,
+          semana: Number(semanaActualCiclo) || 1,
+          agua_ml: Number(next.agua) || 0,
+          meta_agua_ml: metaAguaMl,
+          comidas_done: next.comidasDone || {},
+          comidas_realizadas: doneCount,
+          total_comidas: comidas.length,
+        });
+      }
       return next;
     });
   };
 
-  const pesoKg = parseFloat(cliente?.peso || nutri?.peso || 0);
-  const metaAguaMl = pesoKg > 0 ? Math.round(pesoKg * 35 / 50) * 50 : 2500;
   const aguaActual = habitsData?.agua || 0;
   const pctAgua = Math.min(100, Math.round((aguaActual / metaAguaMl) * 100));
 
@@ -86,8 +193,6 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
     );
   }
 
-  const diaActual  = dias[activeDay];
-  const comidas    = diaActual?.comidas || [];
   const caloriasMeta = nutri?.calorias || nutri?.calorias_meta || 0; // fallback to legacy
   const sumKcal = comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0);
   const totalKcal = sumKcal > 0 ? sumKcal : caloriasMeta;
@@ -95,18 +200,6 @@ export default function Nutrition({ dias, cliente, nutri, semanaActualCiclo = 1,
   const totalCarbs = comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
   const totalGrasas = comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
   const clienteNombre = cliente?.nombre;
-
-  const getDayShort = (nombre, i) => {
-    if (!nombre) return DAY_SHORT[i] ?? `Día ${i + 1}`;
-    const parts = String(nombre).split('|');
-    return parts.length > 1 ? parts[0] :"S/D";
-  };
-  const getDayFull = (nombre, i) => {
-    if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
-    const parts = String(nombre).split('|');
-    const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
-    return `${title} — Semana ${semanaActualCiclo}`;
-  };
 
   const handleDownloadPDF = () => {
     generateNutriPDF(cliente, nutri, dias, brand);

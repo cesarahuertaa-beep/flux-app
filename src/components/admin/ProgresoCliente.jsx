@@ -8,7 +8,8 @@ import { generateProgresoPDF } from"../../utils/pdf";
 import { parseFotos, getSemanasConFecha } from"../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
-  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock
+  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
+  UtensilsCrossed, Droplets, Check, Apple
 } from"lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -127,6 +128,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const [metricas,     setMetricas]     = useState([]);
   const [rutinas,      setRutinas]      = useState([]);
+  const [nutriDias,    setNutriDias]    = useState([]);
+  const [nutriProgreso,setNutriProgreso]= useState({});
+  const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
   const [ciclos,       setCiclos]       = useState([]);
   const [cicloSel,     setCicloSel]     = useState(null); // ciclo activo por defecto
   const [progreso,     setProgreso]     = useState({});
@@ -145,64 +149,137 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   useBackButton(!!lightbox, () => setLightbox(null), 100);
   useBackButton(showModal, () => setShowModal(false), 20);
 
+  const loadCicloData = useCallback(async (ciclo) => {
+    if (!selected) return;
+    const cicloFiltro = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
+
+    // 1. Rutinas y progreso de pesas
+    const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
+    const rsFull = await Promise.all((rs || []).map(async (r) => {
+      const ejs = Array.isArray(r.ejercicios)
+        ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0))
+        : await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
+      return { ...r, ejercicios: ejs };
+    }));
+    setRutinas(rsFull);
+
+    const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
+    if (allIds.length) {
+      const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
+      const pm = {};
+      (ps || []).forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+      setProgreso(pm);
+    } else {
+      setProgreso({});
+    }
+
+    // 2. Plan de Nutrición y progreso de hábitos (agua y comidas por semana)
+    const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFiltro}`).catch(() => []);
+    let diasLoaded = [];
+    if (Array.isArray(ns) && ns.length > 0) {
+      const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+      diasLoaded = (ds || []).map(d => ({
+        ...d,
+        comidas: (d.comidas || []).sort((a, b) => (a.orden || 0) - (b.orden || 0))
+      }));
+      setNutriDias(diasLoaded);
+    } else {
+      setNutriDias([]);
+    }
+
+    const npRows = await dbGet(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`).catch(() => []);
+    const npMap = {};
+    if (Array.isArray(npRows)) {
+      npRows.forEach(r => {
+        if (r?.dia_id && r?.semana != null) {
+          npMap[`${r.dia_id}-${r.semana}`] = r;
+        }
+      });
+    }
+
+    // Respaldo de lectura desde localStorage si se consulta en el mismo dispositivo
+    if (diasLoaded.length > 0) {
+      for (let w = 1; w <= 12; w++) {
+        diasLoaded.forEach((d, idx) => {
+          const mapKey = `${d.id}-${w}`;
+          if (npMap[mapKey]) return;
+          try {
+            const k1 = `flux_nutri_habits_${selected.id}_s${w}_dia_${d.id}`;
+            const k2 = `flux_nutri_habits_${selected.id}_s${w}_d${idx}`;
+            const raw = localStorage.getItem(k1) || localStorage.getItem(k2);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              const comidasList = d.comidas || [];
+              const doneCount = comidasList.filter((_, cIdx) => !!parsed?.comidasDone?.[cIdx]).length;
+              if ((Number(parsed?.agua) > 0) || doneCount > 0) {
+                npMap[mapKey] = {
+                  cliente_id: selected.id,
+                  dia_id: d.id,
+                  semana: w,
+                  agua_ml: Number(parsed.agua) || 0,
+                  meta_agua_ml: 2500,
+                  comidas_done: parsed.comidasDone || {},
+                  comidas_realizadas: doneCount,
+                  total_comidas: comidasList.length,
+                };
+              }
+            }
+          } catch {}
+        });
+      }
+    }
+    setNutriProgreso(npMap);
+  }, [selected]);
+
   const load = useCallback(async () => {
     if (!selected) return;
     setLoading(true);
     try {
-      const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`);
-      setMetricas(ms);
+      const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`).catch(() => []);
+      setMetricas(ms || []);
 
       // Load cycles and select the active one by default
-      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=fecha_inicio.desc`);
-      setCiclos(cs);
-      const activeCiclo = cs.find(c => c.activo) || cs[0] || null;
+      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
+      setCiclos(cs || []);
+      const activeCiclo = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
       setCicloSel(prev => prev ?? activeCiclo); // Only set on first load
 
-      // Load routines of the active cycle only
-      const cicloFiltro = activeCiclo ? `ciclo_id=eq.${activeCiclo.id}` : `ciclo_id=is.null`;
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&order=orden.asc`);
-      const rsFull = await Promise.all(rs.map(async r => ({
-        ...r, ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`)
-      })));
-      setRutinas(rsFull);
-      const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
-      if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
-        const pm = {};
-        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-        setProgreso(pm);
-      } else {
-        setProgreso({});
-      }
+      await loadCicloData(activeCiclo);
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
-  }, [selected]);
+  }, [selected, loadCicloData, setMsg]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Load routines for any selected cycle (used when the user clicks a cycle pill)
+  useEffect(() => {
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      if (saving || showModal) return;
+      const table = ev?.detail?.table;
+      if (table && !["metricas_progreso", "progreso", "nutricion_progreso", "rutinas", "nutricion_dias", "ciclos"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (cicloSel !== undefined) loadCicloData(cicloSel);
+      }, 400);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [saving, showModal, cicloSel, loadCicloData]);
+
+  // Load routines & nutrition for any selected cycle (used when the user clicks a cycle pill)
   const loadRutinas = useCallback(async (ciclo) => {
-    if (!selected || !ciclo) return;
+    if (!selected) return;
     setLoading(true);
     try {
-      const filtro = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${filtro}&order=orden.asc`);
-      const rsFull = await Promise.all(rs.map(async r => ({
-        ...r, ejercicios: await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`)
-      })));
-      setRutinas(rsFull);
-      const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
-      if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`);
-        const pm = {};
-        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-        setProgreso(pm);
-      } else {
-        setProgreso({});
-      }
+      await loadCicloData(ciclo);
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
-  }, [selected]);
+  }, [selected, loadCicloData, setMsg]);
 
   const updForm = (key, val) => {
     setForm(p => {
@@ -387,12 +464,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   return (
     <div className="pb-2">
       {/* Sub-nav */}
-      <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex gap-1 mb-5">
+      <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex flex-wrap gap-1 mb-5">
         <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <BarChart2 className="w-4 h-4" /> Evaluaciones
         </button>
         <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
           <Dumbbell className="w-4 h-4" /> {(isMiPlan || isCivil) ? "Bitácora de Rutinas" : "Rutinas del cliente"}
+        </button>
+        <button onClick={()=>setSub("nutricion")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="nutricion" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
+          <UtensilsCrossed className="w-4 h-4" /> {(isMiPlan || isCivil) ? "Hábitos y Dieta" : "Nutrición y Agua"}
         </button>
       </div>
 
@@ -542,7 +622,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin rutinas asignadas</div>
             </div>
           ):rutinas.map(r=>{
-            const semanas = getSemanasConFecha(r);
+            const semanas = getSemanasConFecha(r, cicloSel);
             const tieneData = r.ejercicios.some(ej => Object.keys(progreso).some(key => key.startsWith(`${ej.id}-`)));
             return (
               <div key={r.id} className="mb-6">
@@ -584,7 +664,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                           }
                           const activeVariants = Array.from(variantsWithData).sort();
 
-                          return activeVariants.map((vid, vidIdx) => {
+                          return activeVariants.map((vid) => {
                             const isOriginal = vid ==="original";
                             const altIdx = isOriginal ? -1 : parseInt(vid.replace("alt_",""));
                             const exObj = isOriginal ? ej : (ej.alternativas || [])[altIdx] || ej;
@@ -645,6 +725,363 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── NUTRICIÓN Y AGUA DEL CLIENTE ── */}
+      {sub==="nutricion"&&(
+        <div>
+          {/* Cycle selector */}
+          {ciclos.length > 0 && (
+            <div className="mb-4">
+              <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
+              <div className="flex gap-1.5 flex-wrap">
+                {ciclos.map(c => (
+                  <button key={c.id} onClick={async () => { setCicloSel(c); setSelectedNutriWeek(null); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    cicloSel?.id===c.id 
+                      ? (c.activo ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" :"bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
+                      :"bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                  }`}>
+                    {c.nombre.split("|")[0]}
+                    {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {nutriDias.length === 0 ? (
+            <div className="text-center py-16 text-[#6B7A8D]">
+              <div className="flex justify-center mb-3 text-[#E2E8F0]"><UtensilsCrossed className="w-12 h-12" /></div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin plan nutricional en este ciclo</div>
+              <div className="text-[13px]">Asigna días de dieta en la pestaña de Programar para visualizar el cumplimiento diario de agua y comidas.</div>
+            </div>
+          ) : (() => {
+            const semanasNutri = getSemanasConFecha(rutinas[0] || null, cicloSel);
+            const currentWeekObj = semanasNutri.find(s => s.isCurrent) || semanasNutri[0];
+            const activeWeekNum = selectedNutriWeek || currentWeekObj?.weekNum || 1;
+            const activeWeekObj = semanasNutri.find(s => s.weekNum === activeWeekNum) || semanasNutri[0];
+
+            const pesoRef = Number(metricas[0]?.peso || selected?.peso) || 0;
+            const defaultMetaAgua = pesoRef > 0 ? Math.round((pesoRef * 35) / 50) * 50 : 2500;
+
+            let totalComidasSemana = 0;
+            let totalComidasRealizadasSemana = 0;
+            let totalAguaSemana = 0;
+            let totalMetaAguaSemana = 0;
+            let diasConMetaAgua = 0;
+            let diasConRegistroAgua = 0;
+
+            const diasDetalle = nutriDias.map((d, idx) => {
+              const rec = nutriProgreso[`${d.id}-${activeWeekNum}`];
+              const totalComidasDia = (d.comidas || []).length;
+              const comidasDoneMap = (rec && typeof rec.comidas_done === "object" && rec.comidas_done !== null) ? rec.comidas_done : {};
+              const realizadasDia = (d.comidas || []).filter(c => Boolean(comidasDoneMap[c.id])).length;
+              const aguaMl = Number(rec?.agua_ml) || 0;
+              const metaAguaDia = Number(rec?.meta_agua_ml) || defaultMetaAgua;
+
+              totalComidasSemana += totalComidasDia;
+              totalComidasRealizadasSemana += realizadasDia;
+              totalAguaSemana += aguaMl;
+              totalMetaAguaSemana += metaAguaDia;
+              if (aguaMl > 0) diasConRegistroAgua++;
+              if (aguaMl >= metaAguaDia && metaAguaDia > 0) diasConMetaAgua++;
+
+              const rawLabel = (d.dia_semana || d.nombre || `Día ${idx + 1}`).trim();
+              const shortTag = rawLabel.slice(0, 3).toUpperCase();
+
+              return {
+                ...d,
+                shortTag,
+                rawLabel,
+                aguaMl,
+                metaAguaDia,
+                aguaPct: metaAguaDia > 0 ? Math.min(Math.round((aguaMl / metaAguaDia) * 100), 100) : 0,
+                totalComidasDia,
+                realizadasDia,
+                comidasPct: totalComidasDia > 0 ? Math.round((realizadasDia / totalComidasDia) * 100) : 0,
+                comidasDoneMap,
+                updatedAt: rec?.updated_at || null
+              };
+            });
+
+            const pctComidasSemana = totalComidasSemana > 0
+              ? Math.round((totalComidasRealizadasSemana / totalComidasSemana) * 100)
+              : 0;
+            const promedioAguaDia = nutriDias.length > 0
+              ? Math.round(totalAguaSemana / nutriDias.length)
+              : 0;
+            const pctAguaSemana = totalMetaAguaSemana > 0
+              ? Math.min(Math.round((totalAguaSemana / totalMetaAguaSemana) * 100), 100)
+              : 0;
+
+            return (
+              <div className="space-y-5">
+                {/* Week Selector Pills */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <div>
+                      <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px]">Semana del Ciclo</div>
+                      <div className="text-xs text-[#6B7A8D] mt-0.5">
+                        Plan de <span className="font-bold text-[#0B1929]">{nutriDias.length} {nutriDias.length === 1 ? "día" : "días"}</span> por semana · El contador se reinicia automáticamente al iniciar cada nueva semana (Lunes 00:00).
+                      </div>
+                    </div>
+                    {activeWeekObj?.rangeStr && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-3 py-1 rounded-full self-start sm:self-auto">
+                        <Calendar className="w-3.5 h-3.5" /> Semana {activeWeekNum}: {activeWeekObj.rangeStr}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {semanasNutri.map(s => {
+                      const isSel = s.weekNum === activeWeekNum;
+                      const hasAnyDataInWeek = nutriDias.some(d => {
+                        const r = nutriProgreso[`${d.id}-${s.weekNum}`];
+                        return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0);
+                      });
+                      return (
+                        <button
+                          key={s.weekNum}
+                          onClick={() => setSelectedNutriWeek(s.weekNum)}
+                          className={`px-3 py-1.5 rounded-xl text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isSel
+                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-sm"
+                              : "bg-gray-50/70 text-[#0B1929] border-[#E2E8F0] font-semibold hover:bg-gray-100"
+                          }`}
+                        >
+                          <span>{s.label}</span>
+                          {s.isCurrent && (
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-extrabold uppercase ${
+                              isSel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              Actual
+                            </span>
+                          )}
+                          {!s.isCurrent && hasAnyDataInWeek && (
+                            <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-white" : "bg-[var(--brand-primary)]"}`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Weekly Summary KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Meal Compliance Card */}
+                  <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <UtensilsCrossed className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Adherencia de Comidas (Sem {activeWeekNum})</div>
+                          <div className="text-lg font-extrabold text-[#0B1929]">
+                            {totalComidasRealizadasSemana} <span className="text-xs font-normal text-[#6B7A8D]">de {totalComidasSemana} comidas cumplidas</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`text-xl font-black font-['Rajdhani'] px-2.5 py-1 rounded-xl ${
+                        pctComidasSemana >= 80 ? "bg-emerald-50 text-emerald-600" : pctComidasSemana >= 50 ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-[#6B7A8D]"
+                      }`}>
+                        {pctComidasSemana}%
+                      </div>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-500"
+                        style={{ width: `${pctComidasSemana}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Water Intake Card */}
+                  <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                          <Droplets className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Hidratación Semanal (Sem {activeWeekNum})</div>
+                          <div className="text-lg font-extrabold text-[#0B1929]">
+                            {(promedioAguaDia / 1000).toFixed(2)} L/día <span className="text-xs font-normal text-[#6B7A8D]">promedio · Meta {(defaultMetaAgua / 1000).toFixed(2)} L ({diasConMetaAgua}/{nutriDias.length} días al 100%)</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`text-xl font-black font-['Rajdhani'] px-2.5 py-1 rounded-xl ${
+                        pctAguaSemana >= 80 ? "bg-sky-50 text-sky-600" : pctAguaSemana >= 50 ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-[#6B7A8D]"
+                      }`}>
+                        {pctAguaSemana}%
+                      </div>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-sky-400 to-blue-600 rounded-full transition-all duration-500"
+                        style={{ width: `${pctAguaSemana}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Daily Breakdown Cards Grid */}
+                <div>
+                  <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-[0.8px] mb-2.5">
+                    Desglose Diario — Semana {activeWeekNum} ({nutriDias.length} {nutriDias.length === 1 ? "día programado" : "días programados"})
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {diasDetalle.map(d => (
+                      <div key={d.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm flex flex-col justify-between gap-3">
+                        <div>
+                          {/* Header */}
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="px-2.5 py-1 rounded-lg bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-extrabold text-xs tracking-wide">
+                                {d.shortTag}
+                              </span>
+                              <span className="font-bold text-sm text-[#0B1929] truncate">{d.nombre || d.rawLabel}</span>
+                            </div>
+                            {d.comidasPct === 100 && d.aguaPct >= 100 && (
+                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                ★ Día al 100%
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Water progress */}
+                          <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-2.5 mb-2.5">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="font-bold text-sky-800 flex items-center gap-1">
+                                <Droplets className="w-3.5 h-3.5 text-sky-500" /> Agua
+                              </span>
+                              <span className="font-bold text-[#0B1929] font-['Rajdhani'] text-sm">
+                                {d.aguaMl} <span className="text-[11px] font-normal text-[#6B7A8D]">/ {d.metaAguaDia} ml ({d.aguaPct}%)</span>
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-sky-100">
+                              <div
+                                className="h-full bg-gradient-to-r from-sky-400 to-blue-500 rounded-full transition-all duration-300"
+                                style={{ width: `${d.aguaPct}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Meals progress */}
+                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-2.5">
+                            <div className="flex items-center justify-between text-xs mb-1.5">
+                              <span className="font-bold text-emerald-800 flex items-center gap-1">
+                                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600" /> Comidas
+                              </span>
+                              <span className="font-bold text-[#0B1929] font-['Rajdhani'] text-sm">
+                                {d.realizadasDia} <span className="text-[11px] font-normal text-[#6B7A8D]">/ {d.totalComidasDia} ({d.comidasPct}%)</span>
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-emerald-100 mb-2">
+                              <div
+                                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-300"
+                                style={{ width: `${d.comidasPct}%` }}
+                              />
+                            </div>
+                            {(d.comidas || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {(d.comidas || []).map((c, ci) => {
+                                  const isDone = Boolean(d.comidasDoneMap[c.id]);
+                                  return (
+                                    <span
+                                      key={c.id || ci}
+                                      className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold border ${
+                                        isDone
+                                          ? "bg-emerald-500 text-white border-emerald-500"
+                                          : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
+                                      }`}
+                                    >
+                                      {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                      {c.tiempo || c.nombre || `Comida ${ci + 1}`}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Multi-Week History Matrix */}
+                {semanasNutri.length > 1 && (
+                  <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-[#E2E8F0] bg-gray-50/60 flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                        Historial Comparativo por Semana del Ciclo
+                      </span>
+                      <span className="text-[11px] text-[#6B7A8D]">Comidas cumplidas · Agua registrada</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="border-collapse text-[11px] min-w-full bg-white">
+                        <thead>
+                          <tr>
+                            <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border-b border-r border-[#E2E8F0] text-left min-w-[130px]">Día del Plan</th>
+                            {semanasNutri.map(s => (
+                              <th
+                                key={s.weekNum}
+                                onClick={() => setSelectedNutriWeek(s.weekNum)}
+                                className={`px-2.5 py-2 border-b border-r border-[#E2E8F0] text-center whitespace-nowrap cursor-pointer transition-colors ${
+                                  s.weekNum === activeWeekNum
+                                    ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-extrabold"
+                                    : "bg-gray-50 text-[#0B1929] hover:bg-gray-100"
+                                }`}
+                              >
+                                <div>{s.label}</div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {nutriDias.map((d, idx) => {
+                            const totalC = (d.comidas || []).length;
+                            return (
+                              <tr key={d.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}>
+                                <td className="px-3 py-2 border-b border-r border-[#E2E8F0] font-bold text-[#0B1929]">
+                                  {d.nombre || d.dia_semana || `Día ${idx + 1}`}
+                                </td>
+                                {semanasNutri.map(s => {
+                                  const r = nutriProgreso[`${d.id}-${s.weekNum}`];
+                                  const agua = Number(r?.agua_ml) || 0;
+                                  const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
+                                  const doneCount = (d.comidas || []).filter(c => Boolean(doneMap[c.id])).length;
+                                  const hasAny = agua > 0 || doneCount > 0;
+                                  return (
+                                    <td
+                                      key={s.weekNum}
+                                      className={`px-2 py-1.5 border-b border-r border-[#E2E8F0] text-center ${
+                                        s.weekNum === activeWeekNum ? "bg-[var(--brand-primary)]/5" : ""
+                                      }`}
+                                    >
+                                      {hasAny ? (
+                                        <div className="flex flex-col items-center gap-0.5 leading-tight">
+                                          <span className="font-bold text-emerald-600">{doneCount}/{totalC} com.</span>
+                                          <span className="text-[10px] font-semibold text-sky-600">{(agua / 1000).toFixed(2)} L</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[#CBD5E1]">—</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

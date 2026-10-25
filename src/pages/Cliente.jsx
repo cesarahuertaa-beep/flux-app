@@ -4,6 +4,7 @@ import { dbGet, dbUpsert, getPendingMutations } from "../lib/supabase";
 import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
+import { getCurrentCycleWeekInfo } from "../utils/helpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
@@ -18,6 +19,9 @@ const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo
 // dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión
 const offlineAwareUpsert = (records) =>
   dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id', records);
+
+const offlineAwareNutriUpsert = (records) =>
+  dbUpsert('nutricion_progreso?on_conflict=cliente_id,dia_id,semana', records);
 
 export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;
@@ -40,6 +44,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [dias, setDias] = useState([]);
   const [rutinas, setRutinas] = useState([]);
   const [progreso, setProgreso] = useState({});
+  const [nutriProgreso, setNutriProgreso] = useState({});
   const [loading, setLoading] = useState(true);
   const [cicloActivo, setCicloActivo] = useState(null);
   const [syncStatus, setSyncStatus] = useState("synced");
@@ -87,6 +92,19 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         setDias([]);
       }
 
+      try {
+        const npRows = await dbGet(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`);
+        if (Array.isArray(npRows)) {
+          const npMap = {};
+          npRows.forEach(r => {
+            if (r?.dia_id && r?.semana != null) {
+              npMap[`${r.dia_id}-${r.semana}`] = r;
+            }
+          });
+          setNutriProgreso(npMap);
+        }
+      } catch (e) {}
+
       const rs = await dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
       const rsFull = rs.map(r => ({ 
         ...r, 
@@ -124,7 +142,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     const onCacheUpdated = () => {
       if (cacheTimer) clearTimeout(cacheTimer);
       cacheTimer = setTimeout(() => {
-        if (Object.keys(pendingSavesRef.current || {}).length === 0) {
+        if (
+          Object.keys(pendingSavesRef.current || {}).length === 0 &&
+          Object.keys(pendingNutriSavesRef.current || {}).length === 0
+        ) {
           loadData();
         }
       }, 300);
@@ -146,6 +167,32 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
   const pendingSavesRef = useRef({});
   const globalSaveTimerRef = useRef(null);
+  const pendingNutriSavesRef = useRef({});
+  const nutriSaveTimerRef = useRef(null);
+
+  const handleNutriProgressChange = (record) => {
+    if (!record?.dia_id || !cliente?.id) return;
+    const key = `${record.dia_id}-${record.semana}`;
+    const fullRecord = {
+      ...record,
+      cliente_id: cliente.id,
+      updated_at: new Date().toISOString(),
+    };
+    setNutriProgreso((prev) => ({ ...prev, [key]: fullRecord }));
+    pendingNutriSavesRef.current[key] = fullRecord;
+
+    if (nutriSaveTimerRef.current) clearTimeout(nutriSaveTimerRef.current);
+    nutriSaveTimerRef.current = setTimeout(async () => {
+      const batch = Object.values(pendingNutriSavesRef.current);
+      if (batch.length === 0) return;
+      pendingNutriSavesRef.current = {};
+      try {
+        await offlineAwareNutriUpsert(batch);
+      } catch (e) {
+        console.error("Error guardando progreso nutricional:", e);
+      }
+    }, 500);
+  };
 
   const handleProgressChange = (ejId, wi, si, tipo, val, variante_id ="original") => {
     const key = `${ejId}-${wi}-${si}-${tipo}-${variante_id}`;
@@ -197,30 +244,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       { id:"citas",    label:"Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
     ] : [])
   ];
-  const { currentCycleWeek, isFuture } = (() => {
-    const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : null);
-    if (!startStr) return { currentCycleWeek: 1, isFuture: false };
-    
-    let t0;
-    if (startStr.includes("T")) {
-      t0 = new Date(startStr);
-    } else {
-      const [y, m, d] = startStr.split("-").map(Number);
-      t0 = new Date(y, m - 1, d);
-    }
-    
-    t0.setHours(0,0,0,0);
-    
-    const now = new Date();
-    now.setHours(0,0,0,0);
-    
-    const diffDays = Math.floor((now.getTime() - t0.getTime()) / (1000 * 60 * 60 * 24));
-    const isFut = diffDays < 0;
-    const wk = isFut ? 1 : Math.floor(diffDays / 7) + 1;
-    return { currentCycleWeek: isNaN(wk) ? 1 : Math.max(1, wk), isFuture: isFut };
-  })();
 
-  const cycleDuration = rutinas.length > 0 ? Math.max(...rutinas.map(r => parseInt(r.semanas) || 4)) : 4;
+  // Cálculo de semana actual en zona horaria local del dispositivo (sin desfase UTC)
+  const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : (nutri?.updated_at || null));
+  const { currentCycleWeek, isFuture } = getCurrentCycleWeekInfo(startStr);
+
+  const cycleWeeksFromName = cicloActivo?.nombre?.includes("|") ? parseInt(cicloActivo.nombre.split("|")[1]) : 0;
+  const cycleDuration = rutinas.length > 0
+    ? Math.max(cycleWeeksFromName || 0, ...rutinas.map(r => parseInt(r.semanas) || 4))
+    : (cycleWeeksFromName || 4);
   const isFinished = !isFuture && currentCycleWeek > cycleDuration;
 
   if (nutriologoBloqueado) {
@@ -266,7 +298,16 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             <>
               
               {tab ==="nutricion" && (
-                <Nutrition dias={dias} cliente={cliente} nutri={nutri} semanaActualCiclo={currentCycleWeek} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
+                <Nutrition
+                  dias={dias}
+                  cliente={cliente}
+                  nutri={nutri}
+                  semanaActualCiclo={currentCycleWeek}
+                  ultimoPeso={ultimoPeso}
+                  nutriProgreso={nutriProgreso}
+                  onNutriProgressChange={handleNutriProgressChange}
+                  isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
+                />
               )}
 
               {tab ==="deporte" && (
