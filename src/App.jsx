@@ -6,6 +6,7 @@ import { syncQueue } from "./lib/offlineQueue";
 import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
 import { AppUpdater } from "./components/ui/AppUpdater";
+import FloatingTimerBubble from "./components/ui/FloatingTimerBubble";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
 import { initPlayBilling } from "./lib/playBilling";
 
@@ -338,6 +339,7 @@ export default function App() {
   return (
     <BrandProvider session={session}>
       <AppUpdater />
+      <FloatingTimerBubble />
       <Router>
         <Suspense fallback={<FullScreenLoader />}>
           <Routes>

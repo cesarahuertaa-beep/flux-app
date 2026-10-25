@@ -1,176 +1,436 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
+import { Play, Pause, RotateCcw, Save, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Dumbbell, Check, CheckCheck, X, Square, Trophy, Sparkles, Flame } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
+import { timerStore } from "../../lib/timerStore";
 
 function TimerCard({ brandColor }) {
-  const [seconds, setSeconds] = useState(90);
-  const [initialSeconds, setInitialSeconds] = useState(90);
-  const [status, setStatus] = useState("IDLE"); // IDLE, RUNNING, ALARMING
-  
-  const timerRef = useRef(null);
-  const audioCtxRef = useRef(null);
-  const oscRef = useRef(null);
+  const [tState, setTState] = useState(() => timerStore.getState());
+  const [editingField, setEditingField] = useState(null); // "min" | "sec" | null
+  const [editText, setEditText] = useState("");
+  const [drumShift, setDrumShift] = useState({ min: 0, sec: 0 });
 
-  const startAlarm = () => {
-    setStatus("ALARMING");
-    if (navigator.vibrate) {
-      const pattern = [];
-      for (let i = 0; i < 20; i++) pattern.push(500, 500);
-      navigator.vibrate(pattern);
-    }
-    
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-      const ctx = audioCtxRef.current;
-      
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      for (let i = 0; i < 20; i++) {
-         gain.gain.setValueAtTime(1, ctx.currentTime + i);
-         gain.gain.setValueAtTime(0, ctx.currentTime + i + 0.5);
+  const touchStateRef = useRef({
+    startY: 0,
+    lastY: 0,
+    accumY: 0,
+    lastTime: 0,
+    moved: false,
+    velocity: 0,
+    inertiaFrame: null,
+  });
+  const longPressTimerRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    timerStore.setInTrainingView(true);
+    return () => {
+      timerStore.setInTrainingView(false);
+      if (touchStateRef.current.inertiaFrame) {
+        cancelAnimationFrame(touchStateRef.current.inertiaFrame);
       }
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      oscRef.current = osc;
-    } catch (e) {
-      console.log("Audio not supported");
-    }
-  };
-
-  const stopAlarm = () => {
-    if (navigator.vibrate) navigator.vibrate(0);
-    if (oscRef.current) {
-      try { oscRef.current.stop(); } catch(e){}
-      oscRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    if (status ==="RUNNING") {
-      timerRef.current = setInterval(() => {
-        setSeconds(s => {
-          if (s <= 1) {
-            clearInterval(timerRef.current);
-            startAlarm();
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [status]);
-
-  useEffect(() => {
-    return () => stopAlarm();
+    };
   }, []);
 
-  const handleAction = () => {
-    if (status ==="IDLE") {
-      if (seconds > 0) setStatus("RUNNING");
-    } else if (status ==="RUNNING") {
-      setStatus("IDLE");
-      setSeconds(initialSeconds);
-    } else if (status ==="ALARMING") {
-      stopAlarm();
-      setSeconds(initialSeconds);
-      setStatus("IDLE");
+  useEffect(() => {
+    if (brandColor) timerStore.setBrandColor(brandColor);
+  }, [brandColor]);
+
+  useEffect(() => {
+    return timerStore.subscribe(setTState);
+  }, []);
+
+  useEffect(() => {
+    if (editingField && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingField]);
+
+  const { seconds, status, presetSeconds, isProgrammingPreset } = tState;
+
+  const triggerDrumPulse = (type, isUp) => {
+    setDrumShift((prev) => ({ ...prev, [type]: isUp ? -7 : 7 }));
+    setTimeout(() => {
+      setDrumShift((prev) => ({ ...prev, [type]: 0 }));
+    }, 90);
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try {
+        navigator.vibrate(6);
+      } catch (e) {}
     }
   };
 
-  const changeTime = (type, isUp) => {
-    if (status !=="IDLE") return;
-    setSeconds(prev => {
-      let mins = Math.floor(prev / 60);
-      let secs = prev % 60;
-      if (type === 'min') {
-        mins = isUp ? mins + 1 : Math.max(0, mins - 1);
-      } else {
-        secs = isUp ? secs + 1 : secs - 1;
-        if (secs > 59) { secs = 0; mins++; }
-        if (secs < 0) { secs = 59; mins = Math.max(0, mins - 1); }
-      }
-      const newVal = mins * 60 + secs;
-      setInitialSeconds(newVal);
-      return newVal;
-    });
+  const changeTime = (type, isUp, steps = 1) => {
+    if (status !== "IDLE") return;
+    const cur = timerStore.getState().seconds;
+    let mins = Math.floor(cur / 60);
+    let secs = cur % 60;
+    const delta = (isUp ? 1 : -1) * steps;
+
+    if (type === "min") {
+      mins = Math.max(0, Math.min(99, mins + delta));
+    } else {
+      let total = mins * 60 + secs + delta;
+      total = Math.max(0, Math.min(5999, total));
+      mins = Math.floor(total / 60);
+      secs = total % 60;
+    }
+    const newVal = mins * 60 + secs;
+    if (newVal !== cur) {
+      timerStore.setSeconds(newVal, true);
+      triggerDrumPulse(type, isUp);
+    }
   };
 
   const handleWheel = (e, type) => {
-    changeTime(type, e.deltaY < 0);
+    if (status !== "IDLE") return;
+    e.preventDefault();
+    changeTime(type, e.deltaY < 0, 1);
   };
 
-  const handleTouchStart = (e) => {
-    e.currentTarget.dataset.startY = e.touches[0].clientY;
-  };
-
-  const handleTouchMove = (e, type) => {
-    if (status !=="IDLE") return;
-    const startY = parseFloat(e.currentTarget.dataset.startY);
-    const currentY = e.touches[0].clientY;
-    const diff = startY - currentY;
-    if (Math.abs(diff) > 20) {
-      e.currentTarget.dataset.startY = currentY;
-      changeTime(type, diff > 0);
+  const stopInertia = () => {
+    if (touchStateRef.current.inertiaFrame) {
+      cancelAnimationFrame(touchStateRef.current.inertiaFrame);
+      touchStateRef.current.inertiaFrame = null;
     }
   };
 
-  const pad = n => String(n).padStart(2, '0');
+  const handleTouchStart = (e) => {
+    if (status !== "IDLE") return;
+    stopInertia();
+    const y = e.touches[0].clientY;
+    touchStateRef.current = {
+      startY: y,
+      lastY: y,
+      accumY: 0,
+      lastTime: performance.now(),
+      moved: false,
+      velocity: 0,
+      inertiaFrame: null,
+    };
+  };
+
+  const handleTouchMove = (e, type) => {
+    if (status !== "IDLE") return;
+    const currentY = e.touches[0].clientY;
+    const now = performance.now();
+    const dy = touchStateRef.current.lastY - currentY; // > 0 means swipe up (increase)
+    const dt = Math.max(1, now - touchStateRef.current.lastTime);
+
+    if (Math.abs(currentY - touchStateRef.current.startY) > 6) {
+      touchStateRef.current.moved = true;
+    }
+
+    touchStateRef.current.velocity = 0.7 * (dy / dt) + 0.3 * touchStateRef.current.velocity;
+    touchStateRef.current.accumY += dy;
+    touchStateRef.current.lastY = currentY;
+    touchStateRef.current.lastTime = now;
+
+    const STEP_PX = 13;
+    if (Math.abs(touchStateRef.current.accumY) >= STEP_PX) {
+      const steps = Math.trunc(Math.abs(touchStateRef.current.accumY) / STEP_PX);
+      const isUp = touchStateRef.current.accumY > 0;
+      touchStateRef.current.accumY -= (isUp ? 1 : -1) * steps * STEP_PX;
+      const speedMult = Math.abs(touchStateRef.current.velocity) > 1.3 ? 2 : 1;
+      changeTime(type, isUp, steps * speedMult);
+    }
+  };
+
+  const handleTouchEnd = (type) => {
+    if (status !== "IDLE") return;
+    if (!touchStateRef.current.moved) {
+      // Tap without dragging -> open inline direct numeric input
+      const cur = timerStore.getState().seconds;
+      const val = type === "min" ? Math.floor(cur / 60) : cur % 60;
+      setEditText(String(val).padStart(2, "0"));
+      setEditingField(type);
+      return;
+    }
+
+    // Smooth Samsung-style drum inertia on fast flick
+    let v = touchStateRef.current.velocity;
+    if (Math.abs(v) > 0.45) {
+      let carry = 0;
+      const stepInertia = () => {
+        v *= 0.88;
+        carry += v * 16;
+        if (Math.abs(carry) >= 13) {
+          const isUp = carry > 0;
+          carry -= (isUp ? 1 : -1) * 13;
+          changeTime(type, isUp, 1);
+        }
+        if (Math.abs(v) > 0.08) {
+          touchStateRef.current.inertiaFrame = requestAnimationFrame(stepInertia);
+        }
+      };
+      touchStateRef.current.inertiaFrame = requestAnimationFrame(stepInertia);
+    }
+  };
+
+  const handleUnitClickDesktop = (type) => {
+    if (status !== "IDLE") return;
+    if (touchStateRef.current.moved) return;
+    const cur = timerStore.getState().seconds;
+    const val = type === "min" ? Math.floor(cur / 60) : cur % 60;
+    setEditText(String(val).padStart(2, "0"));
+    setEditingField(type);
+  };
+
+  const commitEditedValue = () => {
+    if (!editingField) return;
+    const parsed = parseInt(editText.replace(/\D/g, ""), 10);
+    const cur = timerStore.getState().seconds;
+    let mins = Math.floor(cur / 60);
+    let secs = cur % 60;
+
+    if (!isNaN(parsed)) {
+      if (editingField === "min") {
+        mins = Math.max(0, Math.min(99, parsed));
+      } else {
+        if (parsed > 59) {
+          mins = Math.min(99, mins + Math.floor(parsed / 60));
+          secs = parsed % 60;
+        } else {
+          secs = Math.max(0, parsed);
+        }
+      }
+      timerStore.setSeconds(mins * 60 + secs, true);
+    }
+    setEditingField(null);
+  };
+
+  // Quick-access "+" / MIN:SEG button handlers (tap + long-press)
+  const startPresetPress = () => {
+    longPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate(25);
+        } catch (e) {}
+      }
+      timerStore.enterPresetProgramming();
+    }, 450);
+  };
+
+  const endPresetPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePresetClick = () => {
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+    if (editingField) commitEditedValue();
+
+    if (isProgrammingPreset) {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate([12, 40, 12]);
+        } catch (e) {}
+      }
+      timerStore.savePresetFromCurrent();
+      return;
+    }
+
+    if (presetSeconds === null) {
+      timerStore.enterPresetProgramming();
+    } else {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate(10);
+        } catch (e) {}
+      }
+      timerStore.applyPreset();
+    }
+  };
+
+  const pad = (n) => String(n).padStart(2, "0");
 
   let btnIcon = <Play size={16} className="ml-0.5" />;
-  let btnClass ="text-white";
-  let btnBg = brandColor ||"var(--brand-primary)";
-  
-  if (status ==="RUNNING") {
+  let btnClass = "text-white";
+  let btnBg = brandColor || "var(--brand-primary)";
+
+  if (status === "RUNNING") {
     btnIcon = <Square size={14} className="fill-current" />;
-  } else if (status ==="ALARMING") {
+  } else if (status === "ALARMING") {
     btnIcon = <Square size={14} className="fill-current" />;
-    btnClass ="text-white animate-pulse";
-    btnBg ="#ef4444"; // red-500
+    btnClass = "text-white animate-pulse";
+    btnBg = "#ef4444";
   }
 
+  const presetLabel =
+    presetSeconds !== null
+      ? `${pad(Math.floor(presetSeconds / 60))}:${pad(presetSeconds % 60)}`
+      : null;
+
   return (
-    <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3">
+    <div
+      className={`border shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3 transition-all duration-200 ${
+        isProgrammingPreset
+          ? "bg-amber-50/40 border-amber-400 ring-2 ring-amber-400/20"
+          : "bg-white border-[#E2E8F0]"
+      }`}
+    >
       <div>
-        <p className={`text-[10px] font-mono tracking-widest uppercase ${status ==="ALARMING" ?"text-red-500 font-bold" :"text-[#6B7A8D]"}`}>
-          {status ==="ALARMING" ?"¡TIEMPO!" :"Descanso"}
+        <p
+          className={`text-[10px] font-mono tracking-widest uppercase transition-colors ${
+            status === "ALARMING"
+              ? "text-red-500 font-bold"
+              : isProgrammingPreset
+              ? "text-amber-600 font-bold"
+              : "text-[#6B7A8D]"
+          }`}
+        >
+          {status === "ALARMING"
+            ? "¡TIEMPO!"
+            : isProgrammingPreset
+            ? "Guardar Acceso Rápido"
+            : "Descanso"}
         </p>
-        <div className={`flex items-center text-3xl font-mono font-bold mt-1 select-none touch-none ${status ==="ALARMING" ?"text-red-500" :"text-[#0B1929]"}`}>
-          <div 
-            className={`cursor-ns-resize px-1 rounded transition-colors ${status==="IDLE"?'hover:bg-gray-100':'pointer-events-none'}`}
-            onWheel={(e)=>handleWheel(e, 'min')}
-            onTouchStart={handleTouchStart}
-            onTouchMove={(e)=>handleTouchMove(e, 'min')}
-          >
-            {pad(Math.floor(seconds / 60))}
-          </div>
+
+        <div
+          className={`flex items-center text-3xl font-mono font-bold mt-1 select-none touch-none ${
+            status === "ALARMING"
+              ? "text-red-500"
+              : isProgrammingPreset
+              ? "text-amber-600"
+              : "text-[#0B1929]"
+          }`}
+        >
+          {/* MINUTOS */}
+          {editingField === "min" ? (
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onBlur={commitEditedValue}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEditedValue();
+                if (e.key === "Escape") setEditingField(null);
+              }}
+              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold"
+            />
+          ) : (
+            <div
+              style={{
+                transform: `translateY(${drumShift.min}px)`,
+                transition: "transform 90ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+              className={`cursor-ns-resize px-1 rounded transition-colors ${
+                status === "IDLE" ? "hover:bg-gray-100 active:bg-gray-100" : "pointer-events-none"
+              }`}
+              onWheel={(e) => handleWheel(e, "min")}
+              onTouchStart={handleTouchStart}
+              onTouchMove={(e) => handleTouchMove(e, "min")}
+              onTouchEnd={() => handleTouchEnd("min")}
+              onClick={() => handleUnitClickDesktop("min")}
+              title="Desliza para girar o toca para escribir minutos"
+            >
+              {pad(Math.floor(seconds / 60))}
+            </div>
+          )}
+
           <span className="pb-1 opacity-50">:</span>
-          <div 
-            className={`cursor-ns-resize px-1 rounded transition-colors ${status==="IDLE"?'hover:bg-gray-100':'pointer-events-none'}`}
-            onWheel={(e)=>handleWheel(e, 'sec')}
-            onTouchStart={handleTouchStart}
-            onTouchMove={(e)=>handleTouchMove(e, 'sec')}
-          >
-            {pad(seconds % 60)}
-          </div>
+
+          {/* SEGUNDOS */}
+          {editingField === "sec" ? (
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onBlur={commitEditedValue}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEditedValue();
+                if (e.key === "Escape") setEditingField(null);
+              }}
+              className="w-[46px] text-center bg-[#F0F4FA] text-[var(--brand-primary)] rounded px-1 outline-none ring-2 ring-[var(--brand-primary)] text-3xl font-mono font-bold"
+            />
+          ) : (
+            <div
+              style={{
+                transform: `translateY(${drumShift.sec}px)`,
+                transition: "transform 90ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+              className={`cursor-ns-resize px-1 rounded transition-colors ${
+                status === "IDLE" ? "hover:bg-gray-100 active:bg-gray-100" : "pointer-events-none"
+              }`}
+              onWheel={(e) => handleWheel(e, "sec")}
+              onTouchStart={handleTouchStart}
+              onTouchMove={(e) => handleTouchMove(e, "sec")}
+              onTouchEnd={() => handleTouchEnd("sec")}
+              onClick={() => handleUnitClickDesktop("sec")}
+              title="Desliza para girar o toca para escribir segundos"
+            >
+              {pad(seconds % 60)}
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex gap-2 ml-auto">
+
+      <div className="flex items-center gap-2.5 ml-auto">
+        {/* Botón gemelo de Acceso Rápido ("+" inicial -> "MIN:SEG" guardado; mantener presionado para editar) */}
         <button
-          onClick={handleAction}
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${btnClass}`}
+          type="button"
+          onTouchStart={startPresetPress}
+          onTouchEnd={endPresetPress}
+          onTouchCancel={endPresetPress}
+          onMouseDown={startPresetPress}
+          onMouseUp={endPresetPress}
+          onMouseLeave={endPresetPress}
+          onClick={handlePresetClick}
+          onContextMenu={(e) => e.preventDefault()}
+          title={
+            isProgrammingPreset
+              ? "Toca para guardar este tiempo rápido"
+              : presetLabel
+              ? `Toca para cargar ${presetLabel} · Mantén presionado para editar`
+              : "Configurar tiempo de acceso rápido"
+          }
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md select-none ${
+            isProgrammingPreset
+              ? "bg-amber-500 text-white ring-4 ring-amber-400/30 scale-105"
+              : "bg-[#F0F4FA] text-[#0B1929] border border-[#E2E8F0] hover:bg-[#E2E8F0]/70 active:scale-95"
+          }`}
+        >
+          {isProgrammingPreset ? (
+            <Check size={20} strokeWidth={2.8} />
+          ) : presetLabel ? (
+            <span className="text-[11px] font-mono font-extrabold tracking-tighter leading-none">
+              {presetLabel}
+            </span>
+          ) : (
+            <Plus size={20} strokeWidth={2.5} />
+          )}
+        </button>
+
+        {/* Botón Play / Stop */}
+        <button
+          type="button"
+          onClick={() => {
+            if (editingField) commitEditedValue();
+            if (isProgrammingPreset) {
+              timerStore.savePresetFromCurrent();
+            }
+            timerStore.toggleAction();
+          }}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${btnClass}`}
           style={{ background: btnBg }}
         >
           {btnIcon}

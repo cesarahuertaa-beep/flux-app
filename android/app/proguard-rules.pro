@@ -8,11 +8,12 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 
-# Preserve MainActivity bridges and WorkManager sync worker
+# Preserve MainActivity bridges, FloatingTimerService and WorkManager sync worker
 -keep class com.fluxsport.app.MainActivity$* { *; }
+-keep class com.fluxsport.app.FloatingTimerService { *; }
 -keep class com.fluxsport.app.FluxSyncWorker { *; }
 -keep class * extends androidx.work.ListenableWorker {
-    public <init>(android.content.Context, androidx.work.WorkerParameters);
+    public <init>(android.content.Context, android.work.WorkerParameters);
 }
 
 # Preserve Capacitor core and plugin reflection

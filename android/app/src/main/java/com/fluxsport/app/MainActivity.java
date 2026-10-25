@@ -4,8 +4,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -47,6 +49,10 @@ public class MainActivity extends BridgeActivity {
     private static WeakReference<MainActivity> activeInstance;
     private AppUpdateManager appUpdateManager;
 
+    private static volatile long activeTimerEndMs = 0L;
+    private static volatile String activeTimerColor = "#00B4D8";
+    private static volatile boolean isTimerRunning = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -72,6 +78,7 @@ public class MainActivity extends BridgeActivity {
             this.bridge.getWebView().addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
             this.bridge.getWebView().addJavascriptInterface(new PlayUpdateBridge(), "FluxPlayUpdate");
             this.bridge.getWebView().addJavascriptInterface(new FluxNativeSyncBridge(), "FluxNativeSync");
+            this.bridge.getWebView().addJavascriptInterface(new FluxTimerBridge(), "FluxTimerNative");
         }
 
         // Programar sincronización periódica nativa con WorkManager (incluso con la app cerrada)
@@ -90,6 +97,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         activeInstance = new WeakReference<>(this);
+        hideFloatingTimerOverlay();
         if (appUpdateManager != null) {
             try {
                 appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
@@ -113,6 +121,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
+        // Si el cronómetro de descanso está corriendo y el usuario sale de la app, mostrar burbuja estilo DiDi
+        if (isTimerRunning && activeTimerEndMs > System.currentTimeMillis()) {
+            showFloatingTimerOverlay();
+        }
         // Cuando el usuario sale de la app o apaga la pantalla, encolar un trabajo de sincronización
         // sujeto a NetworkType.CONNECTED para subir cambios offline y mantener la caché fresca.
         scheduleNativeSync(true);
@@ -319,6 +331,89 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 return "";
             }
+        }
+    }
+
+    public void showFloatingTimerOverlay() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                return;
+            }
+            Intent intent = new Intent(this, FloatingTimerService.class);
+            intent.setAction(FloatingTimerService.ACTION_SHOW);
+            intent.putExtra(FloatingTimerService.EXTRA_END_TIME_MS, activeTimerEndMs);
+            intent.putExtra(FloatingTimerService.EXTRA_BRAND_COLOR, activeTimerColor);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void hideFloatingTimerOverlay() {
+        try {
+            Intent intent = new Intent(this, FloatingTimerService.class);
+            intent.setAction(FloatingTimerService.ACTION_HIDE);
+            startService(intent);
+        } catch (Exception ignored) {}
+    }
+
+    public static void onOverlayStoppedTimer() {
+        isTimerRunning = false;
+        activeTimerEndMs = 0L;
+        MainActivity act = activeInstance != null ? activeInstance.get() : null;
+        if (act == null) return;
+        act.runOnUiThread(() -> {
+            try {
+                if (act.bridge != null && act.bridge.getWebView() != null) {
+                    act.bridge.getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('flux:overlay-timer-stopped'));",
+                        null
+                    );
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public class FluxTimerBridge {
+        @JavascriptInterface
+        public boolean canDrawOverlays() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                return Settings.canDrawOverlays(MainActivity.this);
+            }
+            return true;
+        }
+
+        @JavascriptInterface
+        public void requestOverlayPermission() {
+            runOnUiThread(() -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(MainActivity.this)) {
+                        Intent intent = new Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName())
+                        );
+                        startActivity(intent);
+                    }
+                } catch (Exception ignored) {}
+            });
+        }
+
+        @JavascriptInterface
+        public void setTimerState(long endTimeMs, int totalSeconds, String brandColorHex, boolean running) {
+            activeTimerEndMs = endTimeMs;
+            if (brandColorHex != null && !brandColorHex.isEmpty()) {
+                activeTimerColor = brandColorHex;
+            }
+            isTimerRunning = running;
+        }
+
+        @JavascriptInterface
+        public void stopTimer() {
+            isTimerRunning = false;
+            activeTimerEndMs = 0L;
+            runOnUiThread(() -> hideFloatingTimerOverlay());
         }
     }
 
