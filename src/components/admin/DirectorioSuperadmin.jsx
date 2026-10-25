@@ -101,10 +101,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const loadNutriologos = async () => {
     setLoading(true);
     try {
-      const data = await dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
-      const currentUser = await dbGet(`profiles?id=eq.${myId}`);
+      const data = await dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
+      const currentUser = await dbGet(`profiles?id=eq.${myId}`).catch(() => []);
       
-      if (currentUser.length > 0) {
+      if (currentUser && currentUser.length > 0) {
         const me = currentUser[0];
         setMyName(me.nombre || "Staff");
         setMyRole(me.role || "superadmin");
@@ -113,8 +113,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         // Si es staff/administrativo, el "dueño" del directorio corporativo es su jefe (el superadmin)
         if (me.role === "staff" || me.role === "administrativo") {
           if (me.nutriologo_id) {
-            const boss = await dbGet(`profiles?id=eq.${me.nutriologo_id}`);
-            if (boss.length > 0) owner = { ...boss[0] };
+            const boss = await dbGet(`profiles?id=eq.${me.nutriologo_id}`).catch(() => []);
+            if (boss && boss.length > 0) owner = { ...boss[0] };
           }
         }
 
@@ -127,12 +127,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           owner.nombre_marca = owner.nombre_marca || "Flux Sports (Tú)";
         }
         
-        setNutriologos([owner, ...data]);
-      } else {
+        setNutriologos([owner, ...(data || [])]);
+      } else if (data && data.length > 0) {
         setNutriologos(data);
       }
     } catch(e) {
-      setMsg("❌ Error cargando nutriólogos");
+      const isOffline = !navigator.onLine || (e?.message || "").toLowerCase().includes("offline");
+      if (!isOffline) setMsg("❌ Error cargando nutriólogos");
     }
     setLoading(false);
   };

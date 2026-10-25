@@ -332,9 +332,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
     try { 
       const [r, allNutris, me, activeCiclosRes, recentProgRes, recentMetricasRes] = await Promise.all([
-        dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)),
-        dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`),
-        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`),
+        dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)).catch(() => []),
+        dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`).catch(() => []),
+        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`).catch(() => []),
         dbGet(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
         dbGet(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`).catch(() => []),
         dbGet(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`).catch(() => [])
@@ -413,9 +413,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               candidates.map(async (cand) => {
                 try {
                   const [cics, ruts, mets] = await Promise.all([
-                    dbGet(`ciclos?cliente_id=eq.${cand.id}&select=id&limit=1`),
-                    dbGet(`rutinas?cliente_id=eq.${cand.id}&select=id&limit=1`),
-                    dbGet(`metricas_progreso?cliente_id=eq.${cand.id}&select=id&limit=1`)
+                    dbGet(`ciclos?cliente_id=eq.${cand.id}&select=id&limit=1`).catch(() => []),
+                    dbGet(`rutinas?cliente_id=eq.${cand.id}&select=id&limit=1`).catch(() => []),
+                    dbGet(`metricas_progreso?cliente_id=eq.${cand.id}&select=id&limit=1`).catch(() => [])
                   ]);
                   const hasData = (cics?.length > 0) || (ruts?.length > 0) || (mets?.length > 0);
                   return { cand, hasData };

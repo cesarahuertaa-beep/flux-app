@@ -9,6 +9,77 @@ const safe = async (p) => {
 };
 
 /**
+ * Precarga el plan completo de un cliente (ciclos, nutrición activa y sin ciclo,
+ * rutinas activas y sin ciclo, más todas las imágenes/GIFs correspondientes).
+ */
+export const prefetchPlanCliente = async (clienteId, mediaUrls = []) => {
+  if (!clienteId) return;
+
+  // 1. Ciclos del cliente
+  const cs = await safe(`ciclos?cliente_id=eq.${clienteId}&order=created_at.desc`);
+  const activeCycle = Array.isArray(cs) ? cs.find((x) => x.activo) : null;
+
+  // 2. Si tiene ciclo activo, precargar su nutrición y rutinas
+  if (activeCycle) {
+    const cycleFilter = `ciclo_id=eq.${activeCycle.id}`;
+    const ns = await safe(`nutricion?cliente_id=eq.${clienteId}&${cycleFilter}`);
+    if (Array.isArray(ns) && ns[0]) {
+      const ds = await safe(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
+      if (Array.isArray(ds)) {
+        ds.forEach((d) => {
+          (d.comidas || []).forEach((m) => {
+            if (m.foto_url) mediaUrls.push(m.foto_url);
+            if (m.imagen_url) mediaUrls.push(m.imagen_url);
+          });
+        });
+      }
+    }
+    const rs = await safe(`rutinas?cliente_id=eq.${clienteId}&${cycleFilter}&select=*,ejercicios(*)&order=orden.asc`);
+    if (Array.isArray(rs)) {
+      rs.forEach((r) => {
+        (r.ejercicios || []).forEach((e) => {
+          if (e.gif_url) mediaUrls.push(e.gif_url);
+          if (Array.isArray(e.alternativas)) {
+            e.alternativas.forEach((alt) => { if (alt.gif_url) mediaUrls.push(alt.gif_url); });
+          }
+        });
+      });
+    }
+  }
+
+  // 3. Precargar también planes sin ciclo (ciclo_id=is.null), usado cuando no hay ciclo
+  const nullFilter = `ciclo_id=is.null`;
+  const nsNull = await safe(`nutricion?cliente_id=eq.${clienteId}&${nullFilter}`);
+  if (Array.isArray(nsNull) && nsNull[0]) {
+    const ds = await safe(`nutricion_dias?nutricion_id=eq.${nsNull[0].id}&select=*,comidas(*)&order=orden.asc`);
+    if (Array.isArray(ds)) {
+      ds.forEach((d) => {
+        (d.comidas || []).forEach((m) => {
+          if (m.foto_url) mediaUrls.push(m.foto_url);
+          if (m.imagen_url) mediaUrls.push(m.imagen_url);
+        });
+      });
+    }
+  }
+  const rsNull = await safe(`rutinas?cliente_id=eq.${clienteId}&${nullFilter}&select=*,ejercicios(*)&order=orden.asc`);
+  if (Array.isArray(rsNull)) {
+    rsNull.forEach((r) => {
+      (r.ejercicios || []).forEach((e) => {
+        if (e.gif_url) mediaUrls.push(e.gif_url);
+        if (Array.isArray(e.alternativas)) {
+          e.alternativas.forEach((alt) => { if (alt.gif_url) mediaUrls.push(alt.gif_url); });
+        }
+      });
+    });
+  }
+
+  // 4. Verificaciones de datos rápidos usadas por Admin.jsx (shadow candidates)
+  await safe(`ciclos?cliente_id=eq.${clienteId}&select=id&limit=1`);
+  await safe(`rutinas?cliente_id=eq.${clienteId}&select=id&limit=1`);
+  await safe(`metricas_progreso?cliente_id=eq.${clienteId}&select=id&limit=1`);
+};
+
+/**
  * Precarga (con internet) TODO lo que las pantallas del paciente/atleta consultan,
  * con las mismas rutas que usan, para que quede disponible sin conexión aunque
  * nunca haya abierto esa pestaña. Se guarda en la base local (IndexedDB)
@@ -110,10 +181,13 @@ export const prefetchCliente = async (cliente) => {
 export const prefetchAdmin = async (profileId, role) => {
   if (!profileId) return false;
   const isSuperadmin = role === "superadmin";
-  const filter = isSuperadmin ? "clientes?order=created_at.asc" : `clientes?nutriologo_id=eq.${profileId}&order=created_at.asc`;
+  const isStaff = role === "staff" || role === "administrativo";
+  const filter = (isSuperadmin || isStaff)
+    ? "clientes?order=created_at.asc"
+    : `clientes?nutriologo_id=eq.${profileId}&order=created_at.asc`;
   const mediaUrls = [];
 
-  // Perfil del admin (para UserProfile y PerfilNutriologo)
+  // 1. Perfil del admin (para UserProfile, PerfilNutriologo y Admin.jsx)
   const profs = await safe(`profiles?id=eq.${profileId}`);
   if (Array.isArray(profs) && profs[0]) {
     const p = profs[0];
@@ -124,32 +198,62 @@ export const prefetchAdmin = async (profileId, role) => {
     }
   }
 
+  // 2. Consultas que Admin.jsx ejecuta en loadClientes
+  await safe(`profiles?id=eq.${profileId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`);
+  await safe(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`);
+  await safe(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`);
+  await safe(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`);
+  await safe(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`);
+  await safe(`biblioteca_ejercicios?order=nombre.asc`);
+
+  // 3. Si es Superadmin o Staff: precargar directorio completo de nutriólogos y sus logos
+  if (isSuperadmin || isStaff) {
+    const dirNutris = await safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
+    if (Array.isArray(dirNutris)) {
+      dirNutris.forEach((n) => {
+        if (n.avatar_url) mediaUrls.push(n.avatar_url);
+        if (n.logo_url) mediaUrls.push(n.logo_url);
+      });
+    }
+    await safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre");
+  }
+
+  // 4. Lista de clientes
   const clientes = await safe(filter);
   if (!Array.isArray(clientes) || !clientes.length) {
     if (mediaUrls.length > 0) precacheMediaList(mediaUrls).catch(() => {});
     return false;
   }
 
-  // Tomar hasta los 12 clientes más recientes/activos
-  const topClientes = clientes.slice(0, 12);
-  topClientes.forEach(c => {
+  // Guardar avatares de todos los clientes
+  clientes.forEach((c) => {
     if (c.avatar_url) mediaUrls.push(c.avatar_url);
   });
 
-  // Precargar ciclos de estos clientes
-  for (const c of topClientes) {
-    const cs = await safe(`ciclos?cliente_id=eq.${c.id}&order=created_at.desc`);
-    const activeCycle = Array.isArray(cs) ? cs.find(x => x.activo) : null;
-    const cicloFilter = activeCycle ? `ciclo_id=eq.${activeCycle.id}` : "ciclo_id=is.null";
+  // 5. Precargar planes y rutinas para:
+  // - Todos los clientes del coach (o hasta 40 para superadmin)
+  // - El expediente propio del coach ("Mi Plan")
+  const shadowCandidate = clientes.find((c) =>
+    (c.nutriologo_id === profileId && c.objetivo === "Mi entrenamiento personal") ||
+    (c.auth_id && c.auth_id === profileId)
+  );
 
-    // Precargar nutrición y rutinas del ciclo activo
-    const ns = await safe(`nutricion?cliente_id=eq.${c.id}&${cicloFilter}`);
-    if (ns && ns.length) {
-      await safe(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
-    }
-    await safe(`rutinas?cliente_id=eq.${c.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
+  const targets = isSuperadmin ? clientes.slice(0, 40) : clientes;
+  const toPrefetch = new Set(targets.map((c) => c.id));
+  if (shadowCandidate) toPrefetch.add(shadowCandidate.id);
+
+  for (const clientId of toPrefetch) {
+    await prefetchPlanCliente(clientId, mediaUrls);
   }
 
+  // Precargar historiales de rutinas y nutrición para los clientes seleccionados
+  const ids = Array.from(toPrefetch).slice(0, 25).join(",");
+  if (ids) {
+    await safe(`rutinas?cliente_id=in.(${ids})`);
+    await safe(`nutricion?cliente_id=in.(${ids})`);
+  }
+
+  // 6. Descargar pasivamente todos los medios recolectados
   if (mediaUrls.length > 0) {
     precacheMediaList(mediaUrls).catch(() => {});
   }
@@ -157,7 +261,7 @@ export const prefetchAdmin = async (profileId, role) => {
   return true;
 };
 
-/** Detecta el rol de la sesión y precarga los datos correspondientes (máx. cada 3 min). */
+/** Detecta el rol de la sesión y precarga los datos correspondientes (máx. cada 45s). */
 export const prefetchSession = async (force = false) => {
   try {
     const last = Number(localStorage.getItem(KEY) || 0);
@@ -189,8 +293,8 @@ export const prefetchSession = async (force = false) => {
       if (!ok) { localStorage.setItem(KEY, "0"); break; }
     }
 
-    // 3. Si es Nutriólogo o Superadmin: precarga de clientes y sus programas
-    if (["superadmin", "nutriologo", "nutriologo_estudiante", "staff"].includes(snap.role)) {
+    // 3. Si es Nutriólogo, Superadmin o Civil (gestor atleta): precarga de clientes y sus programas
+    if (["superadmin", "nutriologo", "nutriologo_estudiante", "staff", "civil"].includes(snap.role)) {
       const pId = snap.profileId || snap.data?.id;
       if (pId) {
         await prefetchAdmin(pId, snap.role).catch(() => {});

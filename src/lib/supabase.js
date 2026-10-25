@@ -187,7 +187,7 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
     let r;
     const t = withTimeout(isGet ? (queryCache.has(path) ? 4000 : 15000) : 30000);
     try {
-      if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("offline");
+      if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("OFFLINE");
       r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers, ...restOpts, signal: t.signal });
       t.done();
       _netDown = false;
@@ -262,9 +262,9 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
   if (isGet) {
     const cached = opts.force ? null : queryCache.get(path);
     if (cached) {
-      // Red conocida como caída: responder al instante con lo guardado y reintentar en segundo plano
-      if (_netDown) {
-        if (Date.now() - _lastRetry > 5000) {
+      // Sin conexión o red caída: responder al instante con lo guardado
+      if (isOfflineNow() || _netDown) {
+        if (!isOfflineNow() && Date.now() - _lastRetry > 5000) {
           _lastRetry = Date.now();
           returnedCache = true;
           fetchNetwork().catch(() => {});

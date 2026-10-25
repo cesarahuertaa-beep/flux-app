@@ -28,6 +28,13 @@ import { CachedImage } from "../../lib/mediaCache";
 const ProgresoCliente = lazy(() => import("./ProgresoCliente").then(m => ({ default: m.ProgresoCliente })));
 const TemplatesManagerModal = lazy(() => import("../ui/TemplatesManagerModal"));
 
+const isOfflineError = (e) => {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+  if (!e) return false;
+  const m = (e.message || String(e)).toLowerCase();
+  return m.includes("offline") || m.includes("failed to fetch") || m.includes("network") || m.includes("aborted");
+};
+
 export function ProgramarCliente({ clientes, selected, setSelected, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
   const brand = useBrand();
   const [subtab, setSubtab] = useState(() => {
@@ -102,21 +109,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       // Revertimos al uso de in.(ids) porque RLS podría requerir el cliente_id
       // o la tabla podría no tener created_at
       const ids = clientes.map(c => c.id).join(",");
-      const hr = await dbGet(`rutinas?cliente_id=in.(${ids})`);
-      setHistorialRutinas(hr);
+      const hr = await dbGet(`rutinas?cliente_id=in.(${ids})`).catch(() => []);
+      if (hr) setHistorialRutinas(hr);
       
-      const hn = await dbGet(`nutricion?cliente_id=in.(${ids})`);
-      if (hn.length > 0) {
+      const hn = await dbGet(`nutricion?cliente_id=in.(${ids})`).catch(() => []);
+      if (hn && hn.length > 0) {
         const nids = hn.map(n => n.id).join(",");
-        const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})`);
-        const hdMapped = hd.map(d => {
-          const nut = hn.find(n => n.id === d.nutricion_id);
-          return { ...d, cliente_id: nut?.cliente_id };
-        });
-        setHistorialDias(hdMapped);
+        const hd = await dbGet(`nutricion_dias?nutricion_id=in.(${nids})`).catch(() => []);
+        if (hd) {
+          const hdMapped = hd.map(d => {
+            const nut = hn.find(n => n.id === d.nutricion_id);
+            return { ...d, cliente_id: nut?.cliente_id };
+          });
+          setHistorialDias(hdMapped);
+        }
       }
     } catch(e) { 
-      if (e.message !== "OFFLINE") {
+      if (!isOfflineError(e)) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando historial: {e.message}</div>); 
       }
     }
@@ -145,7 +154,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         })
       }));
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina cargada del historial</div>);
-    } catch(err) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando rutina</div>); }
+    } catch(err) { 
+      if (!isOfflineError(err)) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando rutina</div>);
+      }
+    }
     setLoading(false);
   };
 
@@ -169,7 +182,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         })
       }));
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día cargado del historial</div>);
-    } catch(err) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando día</div>); }
+    } catch(err) { 
+      if (!isOfflineError(err)) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error cargando día</div>);
+      }
+    }
     setLoading(false);
   };
 
@@ -177,15 +194,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const loadCiclos = useCallback(async (preferCycleId = null) => {
     if (!selected) return null;
     try {
-      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`);
-      setCiclos(cs);
+      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
+      setCiclos(cs || []);
       
-      const activeCycle = cs.find(c => c.activo);
+      const activeCycle = (cs || []).find(c => c.activo);
       let chosen = null;
 
       // 1. Si se pasa un ciclo preferido explícitamente (ej: recién creado o recién aplicado)
       if (preferCycleId) {
-        chosen = cs.find(c => c.id === preferCycleId);
+        chosen = (cs || []).find(c => c.id === preferCycleId);
       }
 
       // 2. Si no, en "Mi Plan", SIEMPRE priorizar el ciclo activo
@@ -197,7 +214,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       if (!chosen) {
         const savedCycleId = sessionStorage.getItem(`flux_programar_ciclo_${selected.id}`);
         if (savedCycleId) {
-          const found = cs.find(c => c.id === savedCycleId);
+          const found = (cs || []).find(c => c.id === savedCycleId);
           // Si el cliente tiene ciclo activo pero el guardado es inactivo, preferir el activo
           if (found && (found.activo || !activeCycle)) {
             chosen = found;
@@ -207,13 +224,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       // 4. Fallback al ciclo activo o al más reciente
       if (!chosen) {
-        chosen = activeCycle || cs[0] || null;
+        chosen = activeCycle || (cs && cs[0]) || null;
       }
 
       setCicloSel(chosen);
       return chosen;
     } catch(e) { 
-      if (e.message !== "OFFLINE") {
+      if (!isOfflineError(e)) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
       }
       return null;
@@ -231,18 +248,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         ? `ciclo_id=eq.${currentCiclo.id}`
         : `ciclo_id=is.null`;
 
-      const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`);
-      if (ns.length) {
+      const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []);
+      if (ns && ns.length) {
         setNutri(ns[0]);
         setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
-        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`);
-        setDias(ds.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) })));
+        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+        if (ds) {
+          setDias(ds.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) })));
+        }
       } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
 
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`);
-      setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
+      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
+      if (rs) {
+        setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
+      }
     } catch(e) { 
-      if (e.message !== "OFFLINE") {
+      if (!isOfflineError(e)) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
       }
     }
@@ -288,7 +309,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       await dbDel(`ciclos?id=eq.${ciclo.id}`);
       await loadCiclos();
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); }
+    } catch(e) { 
+      if (!isOfflineError(e)) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
+      }
+    }
   };
 
   // ── Operaciones de Planes (Ciclos) ──
