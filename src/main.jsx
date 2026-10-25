@@ -22,8 +22,8 @@ const boot = () =>
     </StrictMode>,
   )
 
-// Cargar los últimos datos guardados (IndexedDB) antes de pintar, con tope de 1.2 s
+// Cargar los últimos datos guardados (IndexedDB + caché nativa WorkManager) antes de pintar
 Promise.race([
   hydrateOfflineCache().catch(() => {}),
-  new Promise((r) => setTimeout(r, 1200)),
+  new Promise((r) => setTimeout(r, 3500)),
 ]).then(boot, boot)

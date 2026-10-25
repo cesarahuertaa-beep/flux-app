@@ -1,42 +1,148 @@
-import { loadAllCache, persistCacheKey, clearCacheStore, addMutation, getMutations, removeMutation, countMutations, clearMutations } from "./offlineStore";
+import {
+  loadAllCache,
+  persistCacheKey,
+  persistCacheBatchNow,
+  clearCacheStore,
+  addMutation,
+  getMutations,
+  removeMutation,
+  countMutations,
+  clearMutations,
+  syncNativeFlushedMutations,
+} from "./offlineStore";
+
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Token de autenticación — se activa al hacer login
 let _authToken = null;
+let _profileId = null;
 let _onSessionExpired = null; // callback para redirigir al login
 let _isRefreshing = false;
 let _refreshQueue = []; // promesas pendientes mientras se renueva el token
 
+/** Sincroniza credenciales y metadatos de sesión con el WorkManager nativo de Android */
+export const syncNativeCredentials = () => {
+  try {
+    if (typeof window === "undefined" || !window.FluxNativeSync?.saveCredentials) return;
+    const accessToken = _authToken || localStorage.getItem("flux_token") || "";
+    const refreshToken = localStorage.getItem("flux_refresh_token") || "";
+    const profileId = _profileId || localStorage.getItem("flux_profileId") || "";
+    const role = localStorage.getItem("flux_role") || "";
+    const clientId = localStorage.getItem("flux_client_id") || "";
+    const snapRaw = localStorage.getItem("flux_session_snapshot");
+    const multiRaw = localStorage.getItem("flux_multi_roles");
+    let email = "";
+    let nutriologoId = "";
+    try {
+      const snap = snapRaw ? JSON.parse(snapRaw) : null;
+      email = snap?.data?.email || "";
+      nutriologoId = snap?.data?.nutriologo_id || "";
+    } catch { /* ignore */ }
+
+    if (!accessToken && !refreshToken) return;
+
+    window.FluxNativeSync.saveCredentials(
+      JSON.stringify({
+        supaUrl: SUPA_URL,
+        supaKey: SUPA_KEY,
+        accessToken,
+        refreshToken,
+        profileId,
+        role,
+        clientId,
+        email,
+        nutriologoId,
+        multiRolesJson: multiRaw || "[]",
+      })
+    );
+  } catch { /* ignore */ }
+};
+
 export const setAuthToken = (t) => {
   _authToken = t;
   if (t) localStorage.setItem("flux_token", t);
-  else  localStorage.removeItem("flux_token");
+  else localStorage.removeItem("flux_token");
+  syncNativeCredentials();
 };
 
 /** Guardar refresh_token al hacer login */
 export const saveRefreshToken = (rt) => {
   if (rt) localStorage.setItem("flux_refresh_token", rt);
-  else   localStorage.removeItem("flux_refresh_token");
+  else localStorage.removeItem("flux_refresh_token");
+  syncNativeCredentials();
+};
+
+const withTimeout = (ms) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, done: () => clearTimeout(timer) };
 };
 
 /** Renovar el access_token silenciosamente usando el refresh_token */
 export const refreshSession = async () => {
+  // Primero verificar si el WorkManager nativo ya renovó el token recientemente
+  try {
+    if (typeof window !== "undefined" && window.FluxNativeSync?.getRefreshedTokens) {
+      const raw = window.FluxNativeSync.getRefreshedTokens();
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access_token && parsed.access_token !== _authToken) {
+          setAuthToken(parsed.access_token);
+          if (parsed.refresh_token) saveRefreshToken(parsed.refresh_token);
+          return true;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
   const rt = localStorage.getItem("flux_refresh_token");
-  if (!rt) return false;
+  if (!rt) {
+    // Si hay token actual aunque sea viejo, en modo offline no cerrar la sesión
+    return "OFFLINE";
+  }
+  const t = withTimeout(10000);
   try {
     const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: "POST",
       headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: rt }),
+      signal: t.signal,
     });
-    if (!r.ok) return false;
+    t.done();
+    if (!r.ok) {
+      // Errores de red, servidor (5xx), rate limit (429) o portales cautivos NUNCA deben cerrar sesión
+      if (r.status >= 500 || r.status === 429 || r.status === 408) return "OFFLINE";
+      const errBody = await r.json().catch(() => null);
+      if (!errBody) return "OFFLINE"; // Portal cautivo devolvió HTML
+      const errCode = String(errBody.error || errBody.error_code || errBody.msg || "").toLowerCase();
+      if (errCode.includes("invalid_grant") || errCode.includes("refresh_token_not_found")) {
+        // Verificar por segunda vez si el WorkManager nativo rotó el refresh_token en paralelo
+        try {
+          if (typeof window !== "undefined" && window.FluxNativeSync?.getRefreshedTokens) {
+            const raw = window.FluxNativeSync.getRefreshedTokens();
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.access_token) {
+                setAuthToken(parsed.access_token);
+                if (parsed.refresh_token) saveRefreshToken(parsed.refresh_token);
+                return true;
+              }
+            }
+          }
+        } catch { /* ignore */ }
+        return false;
+      }
+      return "OFFLINE";
+    }
     const d = await r.json();
+    if (!d?.access_token) return "OFFLINE";
     setAuthToken(d.access_token);
-    saveRefreshToken(d.refresh_token);
+    if (d.refresh_token) saveRefreshToken(d.refresh_token);
     return true;
-  } catch { 
-    return "OFFLINE"; 
+  } catch {
+    t.done();
+    return "OFFLINE";
   }
 };
 
@@ -44,81 +150,55 @@ export const getAuthToken = () => _authToken;
 
 /** Restaurar token guardado (llamar al montar App) */
 export const restoreSession = () => {
+  try {
+    if (typeof window !== "undefined" && window.FluxNativeSync?.getRefreshedTokens) {
+      const raw = window.FluxNativeSync.getRefreshedTokens();
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access_token) {
+          localStorage.setItem("flux_token", parsed.access_token);
+        }
+        if (parsed?.refresh_token) {
+          localStorage.setItem("flux_refresh_token", parsed.refresh_token);
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
   const saved = localStorage.getItem("flux_token");
-  if (saved) { _authToken = saved; return saved; }
+  if (saved) {
+    _authToken = saved;
+    syncNativeCredentials();
+    return saved;
+  }
   return null;
 };
 
-// ── Caché de Consultas GET (persistente en IndexedDB, sin expiración) ──
-// Mantiene siempre los últimos datos obtenidos con internet para poder usarlos offline.
+// ── Caché de Consultas GET (Fuente Única de la Verdad Local-First) ─────────
 const queryCache = new Map(); // path -> { data, timestamp, invalidated? }
+let _isHydrated = false;
+let _hydrationPromise = null;
 
 const persistEntry = (path) => {
   const e = queryCache.get(path);
   persistCacheKey(path, e ? { data: e.data, timestamp: e.timestamp, invalidated: !!e.invalidated } : null);
 };
 
-/** Cargar la caché persistida (llamar antes de renderizar la app) */
-export const hydrateOfflineCache = async () => {
+const emitCacheUpdate = (path, table, data) => {
+  if (typeof window === "undefined") return;
   try {
-    // Limpieza del antiguo caché en localStorage (límite 5MB, se borraba al llenarse)
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("flux_query_cache")) localStorage.removeItem(key);
-    });
+    window.dispatchEvent(new CustomEvent("flux:cache-updated", { detail: { path, table, data } }));
   } catch { /* ignore */ }
-  const rows = await loadAllCache();
-  rows.forEach((r) => {
-    if (!queryCache.has(r.key)) queryCache.set(r.key, { data: r.data, timestamp: r.timestamp, invalidated: !!r.invalidated });
-  });
 };
 
-/** Marca como obsoleta (NO borra): así el dato sigue disponible offline pero se vuelve a pedir. */
-export const invalidateCache = (table) => {
-  for (const [key, entry] of queryCache.entries()) {
-    if (!table || key.split("?")[0] === table) {
-      entry.invalidated = true;
-      persistEntry(key);
-    }
-  }
-};
-
-/** Borrar todo el contenido offline (logout / sesión expirada) */
-export const clearOfflineData = async () => {
-  queryCache.clear();
-  await Promise.all([clearCacheStore(), clearMutations()]);
-};
-
-export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
-
-// Estado de red "conocido": se marca caído al primer fallo de fetch y se limpia al primer éxito.
-// Evita esperar timeouts en cada consulta cuando hay wifi pero no hay internet (gimnasio, sótano...).
-let _netDown = false;
-let _lastRetry = 0;
-if (typeof window !== "undefined") {
-  window.addEventListener("online", () => { _netDown = false; });
-  window.addEventListener("offline", () => { _netDown = true; });
-}
-
-const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
-
-// Tablas cuyo POST es seguro de encolar offline (no se necesita el id devuelto por el servidor)
-const QUEUEABLE_POST = ["progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
-
-const isQueueable = (method, table) => {
-  if (table.startsWith("rpc/")) return false;
-  if (method === "PATCH" || method === "DELETE") return true;
-  if (method === "POST") return QUEUEABLE_POST.includes(table);
-  return false;
-};
-
-/** Aplica el cambio de forma optimista sobre la caché para que la UI lo vea sin internet */
+/** Aplica el cambio de forma optimista sobre la caché para que la UI lo vea al milisegundo */
 const applyOptimistic = (method, path, body) => {
   const [table, query = ""] = path.split("?");
   const m = /(?:^|&)id=eq\.([^&]+)/.exec(query);
   if (!m || (method !== "PATCH" && method !== "DELETE")) return;
   const id = decodeURIComponent(m[1]);
   let patch = null;
-  try { patch = body ? JSON.parse(body) : null; } catch { /* ignore */ }
+  try { patch = typeof body === "string" ? JSON.parse(body) : body; } catch { /* ignore */ }
   for (const [key, entry] of queryCache.entries()) {
     if (key.split("?")[0] !== table || !Array.isArray(entry.data)) continue;
     entry.data = method === "DELETE"
@@ -128,7 +208,7 @@ const applyOptimistic = (method, path, body) => {
   }
 };
 
-/** Aplica un upsert (progreso, etc.) sobre las consultas guardadas: lo registrado offline se ve al reabrir */
+/** Aplica un upsert (progreso, etc.) sobre las consultas guardadas: lo registrado se ve al instante */
 const applyOptimisticUpsert = (path, rows) => {
   const [table, query = ""] = path.split("?");
   const oc = /(?:^|&)on_conflict=([^&]+)/.exec(query);
@@ -152,6 +232,150 @@ const applyOptimisticUpsert = (path, rows) => {
   }
 };
 
+/** Reaplica todas las mutaciones pendientes encima de queryCache para proteger ediciones offline ("Push antes de Pull") */
+const reapplyPendingMutations = async (filterTable = null) => {
+  try {
+    const items = await getMutations();
+    for (const m of items) {
+      if (filterTable && m.table !== filterTable) continue;
+      if (m.method === "PATCH" || m.method === "DELETE") {
+        applyOptimistic(m.method, m.path, m.body);
+      } else if (m.method === "POST" && m.table === "progreso") {
+        try {
+          const b = JSON.parse(m.body);
+          applyOptimisticUpsert(m.path, Array.isArray(b) ? b : [b]);
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+};
+
+/** Incorpora en queryCache e IndexedDB cualquier caché descargada por el WorkManager nativo de Android */
+const mergeNativeSyncedCache = async () => {
+  try {
+    if (typeof window === "undefined" || !window.FluxNativeSync?.getSyncedCache) return false;
+    const raw = window.FluxNativeSync.getSyncedCache();
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return false;
+
+    const batchToPersist = new Map();
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (!entry || !Array.isArray(entry.data)) continue;
+      const existing = queryCache.get(key);
+      const nativeTs = Number(entry.timestamp || 0);
+      if (!existing || nativeTs >= Number(existing.timestamp || 0)) {
+        const record = { data: entry.data, timestamp: nativeTs || Date.now(), invalidated: false };
+        queryCache.set(key, record);
+        batchToPersist.set(key, record);
+      }
+    }
+    if (batchToPersist.size > 0) {
+      await persistCacheBatchNow(batchToPersist);
+      return true;
+    }
+  } catch (e) {
+    console.warn("[FLUX native cache merge]", e?.message);
+  }
+  return false;
+};
+
+/** Cargar la caché persistida (se garantiza su resolución antes de cualquier dbGet) */
+export const hydrateOfflineCache = () => {
+  if (_hydrationPromise) return _hydrationPromise;
+  _hydrationPromise = (async () => {
+    try {
+      // Limpieza del antiguo caché en localStorage (límite 5MB)
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("flux_query_cache")) localStorage.removeItem(key);
+      });
+    } catch { /* ignore */ }
+
+    try {
+      // 1. Sincronizar mutaciones ya subidas por el WorkManager nativo con la app cerrada
+      await syncNativeFlushedMutations();
+
+      // 2. Cargar toda la base de datos local desde IndexedDB
+      const rows = await loadAllCache();
+      rows.forEach((r) => {
+        if (!queryCache.has(r.key)) {
+          queryCache.set(r.key, {
+            data: r.data,
+            timestamp: r.timestamp || Date.now(),
+            invalidated: !!r.invalidated,
+          });
+        }
+      });
+
+      // 3. Fusionar los datos más recientes descargados en segundo plano por el WorkManager nativo de Android
+      await mergeNativeSyncedCache();
+
+      // 4. Reaplicar cualquier mutación pendiente local encima para no perder ediciones hechas offline
+      await reapplyPendingMutations();
+    } catch (e) {
+      console.warn("[FLUX hydrate]", e?.message);
+    } finally {
+      _isHydrated = true;
+    }
+  })();
+  return _hydrationPromise;
+};
+
+// Callback global invocado por Android cuando el WorkManager termina una sincronización con la app abierta
+if (typeof window !== "undefined") {
+  window.__onFluxNativeSync = async () => {
+    await syncNativeFlushedMutations();
+    const updated = await mergeNativeSyncedCache();
+    await reapplyPendingMutations();
+    if (updated) {
+      emitCacheUpdate("*", "*", null);
+    }
+  };
+}
+
+/** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms pero se refresca en segundo plano. */
+export const invalidateCache = (table) => {
+  for (const [key, entry] of queryCache.entries()) {
+    if (!table || key.split("?")[0] === table) {
+      entry.invalidated = true;
+      persistEntry(key);
+    }
+  }
+};
+
+/** Borrar todo el contenido offline (SOLO al cerrar sesión explícitamente por el usuario) */
+export const clearOfflineData = async () => {
+  queryCache.clear();
+  try {
+    if (typeof window !== "undefined" && window.FluxNativeSync?.clearCredentials) {
+      window.FluxNativeSync.clearCredentials();
+    }
+  } catch { /* ignore */ }
+  await Promise.all([clearCacheStore(), clearMutations()]);
+};
+
+export const onSessionExpired = (cb) => { _onSessionExpired = cb; };
+
+// Estado de red "conocido": se marca caído al primer fallo de fetch y se limpia al primer éxito.
+let _netDown = false;
+let _lastRetry = 0;
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => { _netDown = false; });
+  window.addEventListener("offline", () => { _netDown = true; });
+}
+
+const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
+
+// Tablas cuyo POST es seguro de encolar offline
+const QUEUEABLE_POST = ["progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
+
+const isQueueable = (method, table) => {
+  if (table.startsWith("rpc/")) return false;
+  if (method === "PATCH" || method === "DELETE") return true;
+  if (method === "POST") return QUEUEABLE_POST.includes(table);
+  return false;
+};
+
 const queueMutation = async (method, path, body, prefer) => {
   const table = path.split("?")[0];
   await addMutation({ method, path, body: body ?? null, prefer: prefer ?? null, table });
@@ -161,17 +385,15 @@ const queueMutation = async (method, path, body, prefer) => {
   }
 };
 
-const withTimeout = (ms) => {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
-  return { signal: ctrl.signal, done: () => clearTimeout(timer) };
-};
+// ── Función base de petición (Arquitectura Local-First / Single Source of Truth) ──
+const q = async (path, opts = {}, onBackgroundUpdate = null) => {
+  if (!_isHydrated) {
+    await hydrateOfflineCache();
+  }
 
-// ── Función base de petición ──
-const q = async (path, opts={}, onBackgroundUpdate=null) => {
   const method = (opts.method || "GET").toUpperCase();
   const isGet = method === "GET";
-  const table = path.split('?')[0];
+  const table = path.split("?")[0];
   let returnedCache = false;
 
   const fetchNetwork = async () => {
@@ -182,53 +404,54 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
       Authorization: `Bearer ${_authToken || SUPA_KEY}`,
       "Content-Type": "application/json",
       Prefer: prefer,
-      ...extraHeaders
+      ...extraHeaders,
     };
     let r;
-    const t = withTimeout(isGet ? (queryCache.has(path) ? 4000 : 15000) : 30000);
+    const t = withTimeout(isGet ? (queryCache.has(path) ? 5000 : 12000) : 25000);
     try {
       if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("OFFLINE");
       r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers, ...restOpts, signal: t.signal });
       t.done();
       _netDown = false;
-    } catch (err) {
+    } catch {
       t.done();
       _netDown = true;
       if (isGet) {
         const cached = queryCache.get(path);
         if (cached && !returnedCache) return cached.data;
       } else if (isQueueable(method, table)) {
-        // Sin internet: guardar para enviar luego y responder como si hubiera funcionado
         await queueMutation(method, path, restOpts.body, headers.Prefer);
         let echo = [];
         try { const b = restOpts.body ? JSON.parse(restOpts.body) : []; echo = Array.isArray(b) ? b : [b]; } catch { /* ignore */ }
         return method === "POST" ? echo : [];
       }
-      if (returnedCache) return; // Ya retornamos caché, morimos silenciosamente
+      if (returnedCache) return;
       throw new Error("OFFLINE");
     }
 
-    // Interceptar 401
+    // Interceptar 401 — renovar token de forma segura sin destruir jamás la caché offline
     if (r.status === 401 && _authToken) {
+      let ok;
       if (!_isRefreshing) {
         _isRefreshing = true;
-        const ok = await refreshSession();
+        ok = await refreshSession();
         _isRefreshing = false;
-        _refreshQueue.forEach(resolve => resolve(ok));
+        _refreshQueue.forEach((resolve) => resolve(ok));
         _refreshQueue = [];
-        if (ok === "OFFLINE") {
-          if (returnedCache) return;
-          if (isGet && queryCache.has(path)) return queryCache.get(path).data;
-          throw new Error("OFFLINE");
-        }
-        if (!ok) {
-          setAuthToken(null); setProfileId(null); saveRefreshToken(null);
-          if (_onSessionExpired) _onSessionExpired();
-          if (returnedCache) return;
-          throw new Error("Sesión expirada — inicia sesión de nuevo");
-        }
       } else {
-        await new Promise(res => _refreshQueue.push(res));
+        ok = await new Promise((res) => _refreshQueue.push(res));
+      }
+
+      if (ok === "OFFLINE" || !ok) {
+        if (returnedCache) return;
+        if (isGet && queryCache.has(path)) return queryCache.get(path).data;
+        if (!isGet && isQueueable(method, table)) {
+          await queueMutation(method, path, restOpts.body, headers.Prefer);
+          let echo = [];
+          try { const b = restOpts.body ? JSON.parse(restOpts.body) : []; echo = Array.isArray(b) ? b : [b]; } catch { /* ignore */ }
+          return method === "POST" ? echo : [];
+        }
+        throw new Error("OFFLINE");
       }
       return fetchNetwork();
     }
@@ -236,25 +459,42 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
     if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
     if (!r.ok) {
       if (returnedCache) return;
-      // Error de servidor en lectura: usar último dato bueno si existe
-      if (isGet && r.status >= 500 && queryCache.has(path)) return queryCache.get(path).data;
-      const e = await r.text(); throw new Error(e);
+      // En lectura, cualquier fallo HTTP devuelve el último dato bueno de la base local si existe
+      if (isGet && queryCache.has(path)) return queryCache.get(path).data;
+      const e = await r.text().catch(() => "Error de red");
+      throw new Error(e);
     }
 
-    const txt = await r.text();
-    const data = txt ? JSON.parse(txt) : [];
+    let data;
+    try {
+      const txt = await r.text();
+      data = txt ? JSON.parse(txt) : [];
+    } catch {
+      // Si un portal cautivo de Wi-Fi devuelve HTML en vez de JSON, tratar como OFFLINE y usar caché local
+      _netDown = true;
+      if (returnedCache) return;
+      if (isGet && queryCache.has(path)) return queryCache.get(path).data;
+      throw new Error("OFFLINE");
+    }
 
     if (isGet) {
       const prevCached = queryCache.get(path);
-      const isDifferent = !prevCached || JSON.stringify(prevCached.data) !== JSON.stringify(data);
+      const prevJson = prevCached ? JSON.stringify(prevCached.data) : null;
 
       queryCache.set(path, { data, timestamp: Date.now(), invalidated: false });
+      // Proteger cambios hechos en offline que aún estén en la cola de salida ("Push antes de Pull")
+      await reapplyPendingMutations(table);
+
+      const finalData = queryCache.get(path)?.data ?? data;
+      const isDifferent = !prevCached || prevJson !== JSON.stringify(finalData);
+
       if (isDifferent || prevCached?.invalidated) persistEntry(path);
 
-      // Si la data es diferente a la caché que ya mostramos, actualizamos la UI en silencio
-      if (returnedCache && onBackgroundUpdate && isDifferent) {
-        onBackgroundUpdate(data);
+      if (returnedCache && isDifferent) {
+        if (onBackgroundUpdate) onBackgroundUpdate(finalData);
+        emitCacheUpdate(path, table, finalData);
       }
+      return finalData;
     }
     return data;
   };
@@ -262,36 +502,36 @@ const q = async (path, opts={}, onBackgroundUpdate=null) => {
   if (isGet) {
     const cached = opts.force ? null : queryCache.get(path);
     if (cached) {
-      // Sin conexión o red caída: responder al instante con lo guardado
-      if (isOfflineNow() || _netDown) {
-        if (!isOfflineNow() && Date.now() - _lastRetry > 5000) {
-          _lastRetry = Date.now();
+      // PATRÓN LOCAL-FIRST (Estilo WhatsApp):
+      // Siempre respondemos en 0 ms desde la base de datos interna del teléfono.
+      // Si hay conexión y la caché tiene > 8 segundos o fue marcada obsoleta, actualizamos en segundo plano.
+      if (!isOfflineNow()) {
+        const age = Date.now() - (cached.timestamp || 0);
+        if (_netDown) {
+          if (Date.now() - _lastRetry > 5000) {
+            _lastRetry = Date.now();
+            returnedCache = true;
+            fetchNetwork().catch(() => {});
+          }
+        } else if (cached.invalidated || age > 8000) {
           returnedCache = true;
           fetchNetwork().catch(() => {});
         }
-        return cached.data;
       }
-      // Caché hiper-reciente (< 15 s) y válida: sin red para no saturar en clics rápidos
-      if (!cached.invalidated && Date.now() - cached.timestamp < 15000) {
-        return cached.data;
-      }
-      // SWR: devolvemos caché instantáneo y consultamos en silencio
-      if (onBackgroundUpdate && !cached.invalidated) {
-        returnedCache = true;
-        fetchNetwork().catch(() => {}); // Fuego y olvido
-        return cached.data;
-      }
+      return cached.data;
     }
   } else {
-    invalidateCache(table); // Mutaciones marcan la caché como obsoleta de inmediato
+    // En mutaciones (PATCH / DELETE), actualizar optimísticamente la caché local de inmediato (online y offline)
+    if (method === "PATCH" || method === "DELETE") {
+      applyOptimistic(method, path, opts.body);
+    }
+    invalidateCache(table);
   }
 
   return fetchNetwork();
 };
 
-
-
-// ── Normalizar llaves en inserciones masivas para evitar error PGRST102 (All object keys must match) ──
+// ── Normalizar llaves en inserciones masivas para evitar error PGRST102 ──
 const normalizeBatchKeys = (data) => {
   if (!Array.isArray(data) || data.length <= 1) return data;
   const allKeys = new Set();
@@ -311,26 +551,33 @@ const normalizeBatchKeys = (data) => {
 };
 
 // ── Operaciones de base de datos ──
-export const dbGet    = (p, onBgUpdate) => q(p, {}, onBgUpdate);
-export const dbPost   = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
-export const dbPatch  = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b), headers: { Prefer: "return=representation" } });
+export const dbGet = (p, onBgUpdate) => q(p, {}, onBgUpdate);
+export const dbPost = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
+export const dbPatch = (p, b) => q(p, { method: "PATCH", body: JSON.stringify(b), headers: { Prefer: "return=representation" } });
 export const dbGetFresh = (p) => q(p, { force: true });
-export const dbDel    = (p)   => q(p, { method: "DELETE" });
+export const dbDel = (p) => q(p, { method: "DELETE" });
+
 export const dbUpsert = async (p, b) => {
+  if (!_isHydrated) {
+    await hydrateOfflineCache();
+  }
   const normalizedBody = normalizeBatchKeys(b);
-  const table = p.split('?')[0];
-  invalidateCache(table); // Marcar caché obsoleta en upsert
+  const rows = Array.isArray(normalizedBody) ? normalizedBody : [normalizedBody];
+  const table = p.split("?")[0];
+
+  // Actualización Optimista Inmediata en la base local (tanto online como offline)
+  applyOptimisticUpsert(p, rows);
+  invalidateCache(table);
+
   const prefer = "resolution=merge-duplicates,return=representation";
   const body = JSON.stringify(normalizedBody);
   const queueIt = async () => {
     await addMutation({ method: "POST", path: p, body, prefer, table });
-    const rows = Array.isArray(normalizedBody) ? normalizedBody : [normalizedBody];
-    applyOptimisticUpsert(p, rows);
     return rows;
   };
   if (isOfflineNow() || _netDown) return queueIt();
   let r;
-  const t = withTimeout(30000);
+  const t = withTimeout(25000);
   try {
     r = await fetch(`${SUPA_URL}/rest/v1/${p}`, {
       method: "POST",
@@ -338,149 +585,185 @@ export const dbUpsert = async (p, b) => {
         apikey: SUPA_KEY,
         Authorization: `Bearer ${_authToken || SUPA_KEY}`,
         "Content-Type": "application/json",
-        "Prefer": prefer
+        Prefer: prefer,
       },
       body,
-      signal: t.signal
+      signal: t.signal,
     });
     t.done();
+    _netDown = false;
   } catch {
     t.done();
-    return queueIt(); // Sin conexión: se enviará al recuperarla
+    _netDown = true;
+    return queueIt(); // Sin conexión: queda en cola para enviarse al recuperar señal
   }
-  // Interceptar 401 en upsert — renovar token silenciosamente
+  // Interceptar 401 en upsert — renovar token silenciosamente; si falla, encolar para no perder jamás el registro
   if (r.status === 401 && _authToken) {
     const ok = await refreshSession();
-    if (ok === "OFFLINE") return queueIt();
-    if (!ok) {
-      setAuthToken(null); setProfileId(null); saveRefreshToken(null);
-      if (_onSessionExpired) _onSessionExpired();
-      throw new Error("Sesión expirada — inicia sesión de nuevo");
-    }
-    // Reintentar con token nuevo
+    if (ok !== true) return queueIt();
     return dbUpsert(p, normalizedBody);
   }
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
-  const txt = await r.text(); return txt ? JSON.parse(txt) : [];
+  if (!r.ok) {
+    if (r.status >= 500 || r.status === 408 || r.status === 429) return queueIt();
+    const e = await r.text();
+    throw new Error(e);
+  }
+  const txt = await r.text();
+  try {
+    return txt ? JSON.parse(txt) : [];
+  } catch {
+    return queueIt();
+  }
 };
 
-// ── Sincronización en segundo plano ──
-let _flushing = false;
+// ── Sincronización en segundo plano ("Push antes de Pull") ──
+let _flushingPromise = null;
 
-/** Envía a Supabase las escrituras guardadas sin internet (en orden). */
+/** Envía a Supabase las escrituras guardadas sin internet (en estricto orden FIFO). */
 export const flushMutations = async () => {
-  if (_flushing || isOfflineNow()) return 0;
-  _flushing = true;
-  let sent = 0;
-  const touched = new Set();
-  try {
-    const items = await getMutations();
-    for (const m of items) {
-      let r;
-      try {
-        const send = () => fetch(`${SUPA_URL}/rest/v1/${m.path}`, {
-          method: m.method,
-          headers: {
-            apikey: SUPA_KEY,
-            Authorization: `Bearer ${_authToken || SUPA_KEY}`,
-            "Content-Type": "application/json",
-            ...(m.prefer ? { Prefer: m.prefer } : {})
-          },
-          body: m.body ?? undefined
-        });
-        r = await send();
-        if (r.status === 401) {
-          const ok = await refreshSession();
-          if (ok !== true) break; // sin sesión válida / sin red: reintentar luego
+  if (!_isHydrated) await hydrateOfflineCache();
+  if (isOfflineNow()) return 0;
+  if (_flushingPromise) return _flushingPromise;
+
+  _flushingPromise = (async () => {
+    let sent = 0;
+    const touched = new Set();
+    try {
+      const items = await getMutations();
+      for (const m of items) {
+        let r;
+        const t = withTimeout(20000);
+        try {
+          const send = () =>
+            fetch(`${SUPA_URL}/rest/v1/${m.path}`, {
+              method: m.method,
+              headers: {
+                apikey: SUPA_KEY,
+                Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+                "Content-Type": "application/json",
+                ...(m.prefer ? { Prefer: m.prefer } : {}),
+              },
+              body: m.body ?? undefined,
+              signal: t.signal,
+            });
           r = await send();
+          if (r.status === 401) {
+            const ok = await refreshSession();
+            if (ok !== true) {
+              t.done();
+              break; // sin sesión renovada o sin red: conservar en cola para reintentar luego
+            }
+            r = await send();
+          }
+          t.done();
+        } catch {
+          t.done();
+          _netDown = true;
+          break; // sin red: conservar en cola para reintentar luego
         }
-      } catch {
-        break; // sin red: reintentar luego
+        _netDown = false;
+        if (r.status === 401 || r.status === 408 || r.status === 429 || r.status >= 500) break;
+        if (!r.ok) console.warn("[FLUX offline] Mutación descartada:", r.status, m.method, m.path);
+        await removeMutation(m.id);
+        touched.add(m.table);
+        sent++;
       }
-      // Errores temporales: conservar y reintentar luego
-      _netDown = false;
-      if (r.status === 401 || r.status === 408 || r.status === 429 || r.status >= 500) break;
-      if (!r.ok) console.warn("[FLUX offline] Mutación descartada:", r.status, m.method, m.path);
-      await removeMutation(m.id);
-      touched.add(m.table);
-      sent++;
+    } finally {
+      _flushingPromise = null;
     }
-  } finally {
-    _flushing = false;
-  }
-  if (sent) {
-    touched.forEach((t) => invalidateCache(t));
-    try { window.dispatchEvent(new CustomEvent("flux:synced", { detail: { tables: [...touched] } })); } catch { /* ignore */ }
-  }
-  return sent;
+    if (sent) {
+      touched.forEach((t) => invalidateCache(t));
+      try {
+        window.dispatchEvent(new CustomEvent("flux:synced", { detail: { tables: [...touched] } }));
+      } catch { /* ignore */ }
+    }
+    return sent;
+  })();
+
+  return _flushingPromise;
 };
 
 /** Refresca en segundo plano las consultas guardadas que ya están viejas (mantiene el dato "al día"). */
-export const refreshStaleCache = async (maxAgeMs = 120000, limit = 25) => {
+export const refreshStaleCache = async (maxAgeMs = 90000, limit = 30) => {
   if (!_authToken || isOfflineNow()) return;
+  if (_flushingPromise) await _flushingPromise;
   const stale = [...queryCache.entries()]
     .filter(([k, v]) => !k.startsWith("rpc/") && (v.invalidated || Date.now() - v.timestamp > maxAgeMs))
     .sort((a, b) => a[1].timestamp - b[1].timestamp)
     .slice(0, limit);
   for (const [path] of stale) {
-    try { await q(path, { force: true }); } catch { if (isOfflineNow()) break; }
+    try {
+      await q(path, { force: true });
+    } catch {
+      if (isOfflineNow() || _netDown) break;
+    }
   }
 };
 
 export const getPendingMutations = countMutations;
 
-
-
 export const storageUpload = async (bucket, path, file) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
-    method:"POST",
-    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":file.type },
-    body:file
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": file.type },
+    body: file,
   });
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  if (!r.ok) {
+    const e = await r.text();
+    throw new Error(e);
+  }
   return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
 };
 
 export const storageDelete = async (bucket, path) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
-    method:"DELETE",
-    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}` }
+    method: "DELETE",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}` },
   });
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  if (!r.ok) {
+    const e = await r.text();
+    throw new Error(e);
+  }
 };
 
 export const storageListFolder = async (bucket, prefix) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/list/${bucket}`, {
-    method:"POST",
-    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":"application/json" },
-    body: JSON.stringify({ prefix })
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix }),
   });
-  if (!r.ok) { return []; }
+  if (!r.ok) return [];
   return await r.json();
 };
 
 export const storageRemoveMany = async (bucket, prefixes) => {
   const r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
-    method:"DELETE",
-    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${_authToken||SUPA_KEY}`, "Content-Type":"application/json" },
-    body: JSON.stringify({ prefixes })
+    method: "DELETE",
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes }),
   });
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  if (!r.ok) {
+    const e = await r.text();
+    throw new Error(e);
+  }
 };
 
 // ── Multi-tenancy: Profile del usuario logueado ──
-let _profileId = null;
-export const setProfileId   = (id) => {
+export const setProfileId = (id) => {
   _profileId = id;
   if (id) localStorage.setItem("flux_profileId", id);
-  else  localStorage.removeItem("flux_profileId");
+  else localStorage.removeItem("flux_profileId");
+  syncNativeCredentials();
 };
-export const getProfileId   = ()   => _profileId;
+export const getProfileId = () => _profileId;
 
 /** Restaurar profileId guardado */
 export const restoreProfileId = () => {
   const saved = localStorage.getItem("flux_profileId");
-  if (saved) { _profileId = saved; return saved; }
+  if (saved) {
+    _profileId = saved;
+    return saved;
+  }
   return null;
 };
 
@@ -489,17 +772,17 @@ export const getNutriologos = () =>
   dbGet("profiles?role=eq.nutriologo&select=id,nombre,nombre_marca,email,telefono,color_primario,logo_url,activo&order=nombre.asc");
 
 // Actualizar perfil (nombre, marca, color, rol)
-export const updateProfile  = (id, data) => dbPatch(`profiles?id=eq.${id}`, data);
+export const updateProfile = (id, data) => dbPatch(`profiles?id=eq.${id}`, data);
 
 // ── Autenticación ──
 export const authSignIn = async (email, password) => {
   const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
-    method:"POST", headers:{apikey:SUPA_KEY,"Content-Type":"application/json"},
-    body:JSON.stringify({email,password})
+    method: "POST",
+    headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error_description || d.msg || "Error de autenticación");
-  // Guardar refresh_token para renovación automática de sesión
   if (d.refresh_token) saveRefreshToken(d.refresh_token);
   return d;
 };
@@ -514,7 +797,7 @@ export const authSignUp = async (email, password, nombre) => {
   const r = await fetch(`${SUPA_URL}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`, {
     method: "POST",
     headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, data: { nombre } })
+    body: JSON.stringify({ email, password, data: { nombre } }),
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.msg || d.error_description || d.message || "Error registrando cuenta");
@@ -526,12 +809,11 @@ export const authSignUp = async (email, password, nombre) => {
   return d;
 };
 
-// Invitar usuario — extraData: { role, nombre, nombre_marca, color_primario }
 export const authInvite = async (email, extraData = {}) => {
   const r = await fetch(`${SUPA_URL}/functions/v1/invite-user`, {
     method: "POST",
     headers: { apikey: SUPA_KEY, Authorization: `Bearer ${_authToken || SUPA_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, ...extraData })
+    body: JSON.stringify({ email, ...extraData }),
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "Error al invitar usuario");
@@ -545,10 +827,10 @@ export const authResetPassword = async (email) => {
       ? `${window.location.origin}/login`
       : "https://flux-sport.com/login";
 
-  const r = await fetch(`${SUPA_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectUrl)}`, {
+  const r = await fetch(`${SUPA_URL}/auth/v1/recover`, {
     method: "POST",
     headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, redirect_to: redirectUrl })
+    body: JSON.stringify({ email, redirect_to: redirectUrl }),
   });
   if (!r.ok) {
     const errData = await r.json().catch(() => ({}));
@@ -567,7 +849,7 @@ export const authUpdatePassword = async (token, password) => {
   const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
     method: "PUT",
     headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ password })
+    body: JSON.stringify({ password }),
   });
   if (!r.ok) {
     const errData = await r.json().catch(() => ({}));
@@ -583,11 +865,6 @@ export const authUpdatePassword = async (token, password) => {
   return await r.json().catch(() => ({}));
 };
 
-/**
- * Intercepta de forma SÍNCRONA cualquier hash/query de autenticación de Supabase
- * (invitación, recuperación de contraseña, confirmación de correo o error de token expirado)
- * ANTES de que React Router (HashRouter o BrowserRouter) monte o redirija.
- */
 export const captureAuthHashSynchronously = (isAppMode = false) => {
   if (typeof window === "undefined") return false;
 
@@ -604,7 +881,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
 
   if (!hasAuthCallback) return false;
 
-  // Extraer parámetros incluso si hay prefijos de HashRouter como #/login#access_token=...
   const hashQuery = rawHash
     .replace(/^#\/[^#?]*[#?]?/, "")
     .replace(/^#/, "");
@@ -619,7 +895,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
   const errorCode = params.get("error_code");
   const errorType = params.get("error");
 
-  // 1. SIEMPRE cerrar cualquier sesión previa abierta para evitar colisión de cuentas
   setAuthToken(null);
   setProfileId(null);
   saveRefreshToken(null);
@@ -632,7 +907,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
   sessionStorage.removeItem("flux_programar_subtab");
   sessionStorage.removeItem("flux_admin_selected_client");
 
-  // 2. Procesar token válido
   if (token) {
     let decodedEmail = "";
     try {
@@ -648,7 +922,7 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
         const payload = JSON.parse(jsonPayload);
         if (payload.email) decodedEmail = payload.email;
       }
-    } catch (e) {}
+    } catch { /* ignore */ }
 
     if (decodedEmail) {
       sessionStorage.setItem("flux_login_email", decodedEmail);
@@ -656,7 +930,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
     sessionStorage.removeItem("flux_pending_auth_error");
 
     if (type === "signup") {
-      // Confirmación de correo de usuario que ya eligió su contraseña al registrarse
       sessionStorage.removeItem("flux_pending_auth_token");
       sessionStorage.removeItem("flux_pending_auth_type");
       sessionStorage.setItem(
@@ -665,7 +938,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
       );
       sessionStorage.setItem("flux_login_mode", "login");
     } else {
-      // Invitación (type=invite) o Recuperación de contraseña (type=recovery / magiclink)
       sessionStorage.setItem("flux_pending_auth_token", token);
       sessionStorage.setItem("flux_pending_auth_type", type);
       if (refreshToken) {
@@ -675,7 +947,6 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
       sessionStorage.setItem("flux_login_mode", "set_password");
     }
   } else if (errorDesc || errorCode || errorType) {
-    // 3. Procesar enlace expirado o ya consumido
     sessionStorage.removeItem("flux_pending_auth_token");
     sessionStorage.removeItem("flux_pending_auth_type");
     sessionStorage.removeItem("flux_pending_auth_info");
@@ -686,14 +957,13 @@ export const captureAuthHashSynchronously = (isAppMode = false) => {
     sessionStorage.setItem("flux_login_mode", "reset");
   }
 
-  // 4. Limpiar la URL de inmediato sin recargar la página para que el Router abra directo en /login
   try {
     if (isAppMode) {
       window.history.replaceState(null, "", window.location.pathname + "#/login");
     } else {
       window.history.replaceState(null, "", "/login");
     }
-  } catch (e) {}
+  } catch { /* ignore */ }
 
   return true;
 };
@@ -703,20 +973,19 @@ export const dbPostMinimal = (p, b) => q(p, { method: "POST", body: JSON.stringi
 /** Sincroniza datos personales universales en todas las identidades del usuario */
 export const syncPersonalData = async (email, data) => {
   if (!email) return;
-  
+
   const profileFields = ["nombre", "telefono", "email", "avatar_url", "firma_url", "fecha_nacimiento", "genero", "pais", "estado_provincia"];
   const clienteFields = ["nombre", "telefono", "email", "avatar_url", "fecha_nacimiento", "genero", "pais", "estado_provincia", "objetivo"];
-  
+
   const dataForProfile = {};
   const dataForCliente = {};
-  
-  // Sanitización profunda de datos: Postgres rechaza "" en columnas de fecha (DATE) o numéricas.
+
   const sanitizedData = { ...data };
   if (sanitizedData.fecha_nacimiento === "") {
     sanitizedData.fecha_nacimiento = null;
   }
-  
-  Object.keys(sanitizedData).forEach(k => {
+
+  Object.keys(sanitizedData).forEach((k) => {
     if (profileFields.includes(k)) dataForProfile[k] = sanitizedData[k];
     if (clienteFields.includes(k)) dataForCliente[k] = sanitizedData[k];
   });

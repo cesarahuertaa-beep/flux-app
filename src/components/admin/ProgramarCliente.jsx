@@ -273,6 +273,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
 
+  useEffect(() => {
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      if (saving || showDiaModal || showRutinaModal || showPlanModal) return;
+      const table = ev?.detail?.table;
+      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (table === "ciclos") loadCiclos();
+        else if (cicloSel !== undefined) loadData();
+      }, 400);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel]);
+
   // ── (Ciclos se crean ahora desde los modales de Día/Rutina) ──
 
   // ── Eliminar ciclo (solo si está vacío) ──

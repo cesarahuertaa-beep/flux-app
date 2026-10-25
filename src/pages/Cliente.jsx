@@ -115,17 +115,32 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
   useEffect(() => {
     loadData();
+    let cacheTimer = null;
 
     const onFocus = () => {
       if (document.visibilityState === 'visible') loadData();
     };
 
+    const onCacheUpdated = () => {
+      if (cacheTimer) clearTimeout(cacheTimer);
+      cacheTimer = setTimeout(() => {
+        if (Object.keys(pendingSavesRef.current || {}).length === 0) {
+          loadData();
+        }
+      }, 300);
+    };
+
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
     
     return () => {
+      if (cacheTimer) clearTimeout(cacheTimer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
     };
   }, [cliente.id]);
 

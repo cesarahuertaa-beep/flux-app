@@ -120,6 +120,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useEffect(() => {
     const checkPago = async () => {
       if (role !=="nutriologo" && role !=="nutriologo_estudiante" && role !=="civil") return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
       try {
         const today = new Date();
@@ -387,7 +388,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
         const candidates = findShadowCandidates(r, myEmailNorm);
 
-        if (candidates.length === 0) {
+        if (candidates.length === 0 && (typeof navigator === "undefined" || navigator.onLine) && r.length > 0) {
           try {
             const created = await dbPost("clientes", {
               nombre: me[0].nombre,
@@ -404,7 +405,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           } catch (err) {
             console.error("Error auto-creando perfil atleta:", err);
           }
-        } else {
+        } else if (candidates.length > 0) {
           // Si hay más de un candidato (ej. el original con datos + un clon vacío reciente),
           // verificamos cuál tiene datos y limpiamos los duplicados vacíos.
           let primaryClone = candidates[0];
@@ -468,6 +469,23 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useEffect(() => { 
     loadClientes(); 
     loadBiblioteca(); 
+    let syncDebounce = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["clientes", "profiles", "ciclos", "biblioteca_ejercicios"].includes(table)) return;
+      if (syncDebounce) clearTimeout(syncDebounce);
+      syncDebounce = setTimeout(() => {
+        loadClientes();
+        if (!table || table === "biblioteca_ejercicios") loadBiblioteca();
+      }, 450);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (syncDebounce) clearTimeout(syncDebounce);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
   }, [loadClientes, loadBiblioteca]);
 
   useEffect(() => {

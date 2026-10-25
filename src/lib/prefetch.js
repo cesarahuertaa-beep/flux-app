@@ -1,4 +1,4 @@
-import { dbGetFresh } from "./supabase";
+import { dbGetFresh, syncNativeCredentials } from "./supabase";
 import { precacheMediaList } from "./mediaCache";
 
 const KEY = "flux_last_prefetch";
@@ -94,16 +94,21 @@ export const prefetchCliente = async (cliente) => {
   // 1. Avatar propio del cliente
   if (cliente.avatar_url) mediaUrls.push(cliente.avatar_url);
 
-  // 2. Consultas de perfil del cliente por email y por ID (usadas por UserProfile.jsx)
+  // 2. Consultas de perfil del cliente por email y por ID (usadas por UserProfile.jsx y App.jsx)
   if (cliente.email) {
     await safe(`clientes?email=ilike.${encodeURIComponent(cliente.email)}`);
   }
   await safe(`clientes?id=eq.${id}`);
+  await safe(`clientes?id=eq.${id}&activo=eq.true`);
+  await safe(`clientes?id=eq.${id}&select=premium_origen`);
+  await safe(`recibos_pago_civil?cliente_id=eq.${id}&order=created_at.desc`);
 
-  // 3. Nutriólogo asignado: avatar, logo y datos completos
+  // 3. Nutriólogo asignado y marca global: avatar, logo y datos completos
+  await safe(`profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1`);
   if (nutriId) {
     const first = await safe(`profiles?id=eq.${nutriId}&select=bloqueado`);
     if (first === null) return false; // sin conexión: no seguir
+    await safe(`profiles?id=eq.${nutriId}&select=nombre_marca,color_primario,logo_url`);
     const profs = await safe(`profiles?id=eq.${nutriId}`);
     if (Array.isArray(profs) && profs[0]) {
       const p = profs[0];
@@ -155,6 +160,9 @@ export const prefetchCliente = async (cliente) => {
     });
   }
 
+  // También precargar ciclo completo para civiles que usan ProgramarCliente
+  await prefetchPlanCliente(id, mediaUrls);
+
   // Pestaña Progreso
   await safe(`rutinas?cliente_id=eq.${id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`);
   await safe(`progreso?cliente_id=eq.${id}&limit=3000`);
@@ -187,8 +195,10 @@ export const prefetchAdmin = async (profileId, role) => {
     : `clientes?nutriologo_id=eq.${profileId}&order=created_at.asc`;
   const mediaUrls = [];
 
-  // 1. Perfil del admin (para UserProfile, PerfilNutriologo y Admin.jsx)
+  // 1. Perfil del admin (para UserProfile, PerfilNutriologo, BrandContext y Admin.jsx)
   const profs = await safe(`profiles?id=eq.${profileId}`);
+  await safe(`profiles?id=eq.${profileId}&select=nombre_marca,color_primario,logo_url`);
+  await safe(`profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1`);
   if (Array.isArray(profs) && profs[0]) {
     const p = profs[0];
     if (p.avatar_url) mediaUrls.push(p.avatar_url);
@@ -198,9 +208,11 @@ export const prefetchAdmin = async (profileId, role) => {
     }
   }
 
-  // 2. Consultas que Admin.jsx ejecuta en loadClientes
+  // 2. Consultas que Admin.jsx ejecuta en loadClientes y checkPago
   await safe(`profiles?id=eq.${profileId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`);
   await safe(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`);
+  await safe(`clientes?nutriologo_id=eq.${profileId}&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1`);
+  await safe(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`);
   await safe(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`);
   await safe(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`);
   await safe(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`);
@@ -264,6 +276,7 @@ export const prefetchAdmin = async (profileId, role) => {
 /** Detecta el rol de la sesión y precarga los datos correspondientes (máx. cada 45s). */
 export const prefetchSession = async (force = false) => {
   try {
+    syncNativeCredentials();
     const last = Number(localStorage.getItem(KEY) || 0);
     if (!force && Date.now() - last < MIN_INTERVAL) return;
 

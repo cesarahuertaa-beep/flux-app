@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously, clearOfflineData } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
 import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
@@ -67,6 +67,7 @@ const saveSessionMeta = (s) => {
   } else {
     localStorage.removeItem("flux_multi_roles");
   }
+  syncNativeCredentials();
 };
 
 const clearSessionMeta = () => {
@@ -128,61 +129,67 @@ export default function App() {
         try { savedMultiRoles = JSON.parse(savedMultiRolesRaw); } catch(e) { /* ignore */ }
       }
 
-      if (token && savedRole) {
-        // --- OPTIMISTIC RESTORE ---
+      if (savedRole) {
+        // --- OPTIMISTIC RESTORE (Local-First: funciona en 0 ms con o sin internet) ---
         let optimisticData = null;
-          if (savedMultiRoles) {
-            const searchRole = savedRole ==="civil" ?"cliente" : savedRole;
-            const matchingRole = savedMultiRoles.find(r => {
-              if (r.role !== searchRole) return false;
-              if (searchRole ==="cliente" && savedClientId) {
-                return String(r.data?.id) === String(savedClientId);
-              }
-              return true;
-            });
-            if (matchingRole) optimisticData = matchingRole.data;
-          }
+        if (savedMultiRoles) {
+          const searchRole = savedRole === "civil" ? "cliente" : savedRole;
+          const matchingRole = savedMultiRoles.find(r => {
+            if (r.role !== searchRole) return false;
+            if (searchRole === "cliente" && savedClientId) {
+              return String(r.data?.id) === String(savedClientId);
+            }
+            return true;
+          });
+          if (matchingRole) optimisticData = matchingRole.data;
+        }
         
         if (!optimisticData) {
           try {
             const snap = JSON.parse(localStorage.getItem("flux_session_snapshot") || "null");
-            if (snap && snap.role === savedRole && snap.data) optimisticData = snap.data;
+            if (snap && snap.data) optimisticData = snap.data;
           } catch (e) { /* ignore */ }
         }
 
         if (optimisticData) {
-          setSession({ role: savedRole, data: optimisticData, token, profileId, multiRoles: savedMultiRoles });
+          setSession({ role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles });
           setRestoring(false);
-          // Revalidate in background
+          syncNativeCredentials();
+          // Revalidar en segundo plano SOLO si hay conexión real y la cuenta fue explícitamente desactivada
           setTimeout(async () => {
+            if (typeof navigator !== "undefined" && !navigator.onLine) return;
             try {
               if (profileId && Array.isArray(savedMultiRoles) && savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role))) {
                 const profiles = await dbGet(`profiles?id=eq.${profileId}`);
-                if (!profiles.length || (profiles[0].activo === false && profiles[0].role !=="superadmin")) {
+                if (Array.isArray(profiles) && profiles.length > 0 && profiles[0].activo === false && profiles[0].role !== "superadmin") {
                   setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
                 }
               } else if ((savedRole === "cliente" || savedRole === "civil") && savedClientId) {
-                const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
-                if (!rows.length) { setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null); }
+                const rows = await dbGet(`clientes?id=eq.${savedClientId}`);
+                if (Array.isArray(rows) && rows.length > 0 && rows[0].activo === false) {
+                  setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
+                }
               }
-            } catch(e) { /* sin internet o error temporal: conservar la sesión */ }
-          }, 100);
+            } catch(e) { /* sin internet o error temporal: conservar siempre la sesión local */ }
+          }, 800);
           return;
         }
 
         try {
-          // Fallback al modo lento si no hay datos optimistas
+          // Fallback si no había snapshot en localStorage
           const hasAdminRole = Array.isArray(savedMultiRoles) &&
             savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
 
           if (!hasAdminRole && (savedRole ==="cliente" || savedRole ==="civil") && savedClientId) {
-            const rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`);
+            let rows = await dbGet(`clientes?id=eq.${savedClientId}&activo=eq.true`).catch(() => []);
+            if (!rows.length) rows = await dbGet(`clientes?id=eq.${savedClientId}`).catch(() => []);
             if (rows.length) {
-              // Preserve"civil" if no nutriólogo,"cliente" if has one
               const restoredRole = savedRole ==="civil" ?"civil" :
                                    (rows[0].nutriologo_id ?"cliente" :"civil");
-              setSession({ role: restoredRole, data: rows[0], token, profileId, multiRoles: savedMultiRoles });
-            } else {
+              const sObj = { role: restoredRole, data: rows[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
+              saveSessionMeta(sObj);
+              setSession(sObj);
+            } else if (typeof navigator !== "undefined" && navigator.onLine) {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
           } else if (profileId) {
@@ -200,9 +207,11 @@ export default function App() {
               if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role) && profiles[0].activo === false) {
                 setAuthToken(null); setProfileId(null); clearSessionMeta();
               } else {
-                setSession({ role, data: profiles[0], token, profileId, multiRoles: savedMultiRoles });
+                const sObj = { role, data: profiles[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
+                saveSessionMeta(sObj);
+                setSession(sObj);
               }
-            } else {
+            } else if (typeof navigator !== "undefined" && navigator.onLine) {
               setAuthToken(null); setProfileId(null); clearSessionMeta();
             }
           } else {
@@ -210,13 +219,12 @@ export default function App() {
           }
         } catch (e) {
           if (e.message ==="OFFLINE") {
-            // sin internet: conservar datos de sesión para reintentar luego
-          } else {
+            // sin internet: conservar datos de sesión
+          } else if (typeof navigator !== "undefined" && navigator.onLine) {
             clearSessionMeta();
           }
         }
       } else {
-         // No saved role, clean up
          clearSessionMeta();
       }
       setRestoring(false);
@@ -224,7 +232,8 @@ export default function App() {
     restore();
 
     onSessionExpired(() => {
-      clearOfflineData();
+      // Solo cerrar sesión si el servidor revocó explícitamente el refresh_token;
+      // NUNCA borrar IndexedDB automáticamente para no perder registros pendientes.
       setSession(null);
       setAtletaData(null);
       clearSessionMeta();
