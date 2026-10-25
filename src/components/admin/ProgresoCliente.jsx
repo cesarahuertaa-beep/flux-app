@@ -9,7 +9,7 @@ import { parseFotos, getSemanasConFecha } from"../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, Apple
+  UtensilsCrossed, Droplets, Check, Apple, ChevronDown
 } from"lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -131,6 +131,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [nutriDias,    setNutriDias]    = useState([]);
   const [nutriProgreso,setNutriProgreso]= useState({});
   const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
+  const [showPastWeeks, setShowPastWeeks] = useState(false);
   const [ciclos,       setCiclos]       = useState([]);
   const [cicloSel,     setCicloSel]     = useState(null); // ciclo activo por defecto
   const [progreso,     setProgreso]     = useState({});
@@ -464,16 +465,24 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   return (
     <div className="pb-2">
       {/* Sub-nav */}
-      <div className="bg-[#F0F4FA] rounded-xl p-1 inline-flex flex-wrap gap-1 mb-5">
-        <button onClick={()=>setSub("evaluaciones")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="evaluaciones" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
-          <BarChart2 className="w-4 h-4" /> Evaluaciones
-        </button>
-        <button onClick={()=>setSub("rutinas")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="rutinas" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
-          <Dumbbell className="w-4 h-4" /> {(isMiPlan || isCivil) ? "Bitácora de Rutinas" : "Rutinas del cliente"}
-        </button>
-        <button onClick={()=>setSub("nutricion")} className={`flex items-center gap-2 px-5 py-2 rounded-[10px] text-[13px] transition-colors ${sub==="nutricion" ?"bg-white shadow-sm text-[var(--brand-primary)] font-bold" :"text-[#6B7A8D] font-normal hover:text-[#0B1929]"}`}>
-          <UtensilsCrossed className="w-4 h-4" /> {(isMiPlan || isCivil) ? "Hábitos y Dieta" : "Nutrición y Agua"}
-        </button>
+      <div className="flex gap-1 mb-5 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
+        {[
+          { k: "evaluaciones", ic: <BarChart2 className="w-4 h-4 shrink-0" />, lb: "Evaluaciones" },
+          { k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Rutinas" },
+          { k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Nutrición" }
+        ].map(({ k, ic, lb }) => (
+          <button
+            key={k}
+            onClick={() => setSub(k)}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none shrink-0 ${
+              sub === k
+                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+            }`}
+          >
+            {ic} {lb}
+          </button>
+        ))}
       </div>
 
       {/* ── EVALUACIONES ── */}
@@ -758,9 +767,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             </div>
           ) : (() => {
             const semanasNutri = getSemanasConFecha(rutinas[0] || null, cicloSel);
-            const currentWeekObj = semanasNutri.find(s => s.isCurrent) || semanasNutri[0];
-            const activeWeekNum = selectedNutriWeek || currentWeekObj?.weekNum || 1;
-            const activeWeekObj = semanasNutri.find(s => s.weekNum === activeWeekNum) || semanasNutri[0];
+            const currentWeekIndex = semanasNutri.findIndex(s => s.isCurrent);
+            const hasCurrent = currentWeekIndex !== -1;
+            const currentWeekObj = hasCurrent ? semanasNutri[currentWeekIndex] : (semanasNutri[0] || null);
+            const currentWeekNum = currentWeekObj?.weekNum || 1;
+
+            // Filtrar semanas futuras: solo semanas hasta la actual ("el actual si se muestra y los futuros no")
+            const validWeeks = hasCurrent 
+              ? semanasNutri.filter(s => s.weekNum <= currentWeekNum)
+              : semanasNutri;
+
+            const pastWeeks = validWeeks.filter(s => s.weekNum < currentWeekNum);
+            const activeWeekNum = selectedNutriWeek || currentWeekNum;
+            const activeWeekObj = validWeeks.find(s => s.weekNum === activeWeekNum) || currentWeekObj;
 
             const pesoRef = Number(metricas[0]?.peso || selected?.peso) || 0;
             const defaultMetaAgua = pesoRef > 0 ? Math.round((pesoRef * 35) / 50) * 50 : 2500;
@@ -819,50 +838,81 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               <div className="space-y-5">
                 {/* Week Selector Pills */}
                 <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <div className="flex items-center justify-between gap-2 mb-3">
                     <div>
                       <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px]">Semana del Ciclo</div>
                       <div className="text-xs text-[#6B7A8D] mt-0.5">
-                        Plan de <span className="font-bold text-[#0B1929]">{nutriDias.length} {nutriDias.length === 1 ? "día" : "días"}</span> por semana · El contador se reinicia automáticamente al iniciar cada nueva semana (Lunes 00:00).
+                        Plan de <span className="font-bold text-[#0B1929]">{nutriDias.length} {nutriDias.length === 1 ? "día" : "días"}</span> por semana · Reinicio automático cada nuevo Lunes (00:00).
                       </div>
                     </div>
-                    {activeWeekObj?.rangeStr && (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-3 py-1 rounded-full self-start sm:self-auto">
-                        <Calendar className="w-3.5 h-3.5" /> Semana {activeWeekNum}: {activeWeekObj.rangeStr}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {semanasNutri.map(s => {
-                      const isSel = s.weekNum === activeWeekNum;
-                      const hasAnyDataInWeek = nutriDias.some(d => {
-                        const r = nutriProgreso[`${d.id}-${s.weekNum}`];
-                        return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0);
-                      });
-                      return (
+                    <div className="flex items-center gap-2">
+                      {pastWeeks.length > 0 && (
                         <button
-                          key={s.weekNum}
-                          onClick={() => setSelectedNutriWeek(s.weekNum)}
-                          className={`px-3 py-1.5 rounded-xl text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isSel
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-sm"
-                              : "bg-gray-50/70 text-[#0B1929] border-[#E2E8F0] font-semibold hover:bg-gray-100"
-                          }`}
+                          onClick={() => setShowPastWeeks(p => !p)}
+                          className="flex items-center justify-center p-2 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
+                          title={showPastWeeks ? "Ocultar semanas anteriores" : "Ver semanas anteriores"}
                         >
-                          <span>{s.label}</span>
-                          {s.isCurrent && (
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-extrabold uppercase ${
-                              isSel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
-                            }`}>
-                              Actual
-                            </span>
-                          )}
-                          {!s.isCurrent && hasAnyDataInWeek && (
-                            <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-white" : "bg-[var(--brand-primary)]"}`} />
-                          )}
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showPastWeeks ? "rotate-180" : ""}`} />
                         </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(() => {
+                      const renderPill = (s) => {
+                        const isSel = s.weekNum === activeWeekNum;
+                        const hasAnyDataInWeek = nutriDias.some(d => {
+                          const r = nutriProgreso[`${d.id}-${s.weekNum}`];
+                          return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0);
+                        });
+                        return (
+                          <button
+                            key={s.weekNum}
+                            onClick={() => setSelectedNutriWeek(s.weekNum)}
+                            className={`px-3 py-1.5 rounded-xl text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSel
+                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-sm"
+                                : "bg-gray-50/70 text-[#0B1929] border-[#E2E8F0] font-semibold hover:bg-gray-100"
+                            }`}
+                          >
+                            <span>{s.label}</span>
+                            {s.isCurrent && (
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-extrabold uppercase ${
+                                isSel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                Actual
+                              </span>
+                            )}
+                            {!s.isCurrent && hasAnyDataInWeek && (
+                              <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-white" : "bg-[var(--brand-primary)]"}`} />
+                            )}
+                          </button>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {/* Semanas pasadas (desplegables con acordeón como Mis Planes) */}
+                          {showPastWeeks && pastWeeks.map(s => (
+                            <div key={s.weekNum} className="animate-in fade-in slide-in-from-left-2">
+                              {renderPill(s)}
+                            </div>
+                          ))}
+
+                          {/* Semana pasada seleccionada si está colapsado, para no perder visibilidad */}
+                          {!showPastWeeks && activeWeekNum !== currentWeekNum && (
+                            (() => {
+                              const selPastObj = pastWeeks.find(s => s.weekNum === activeWeekNum);
+                              return selPastObj ? renderPill(selPastObj) : null;
+                            })()
+                          )}
+
+                          {/* Semana actual (siempre visible) */}
+                          {currentWeekObj && renderPill(currentWeekObj)}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
 
@@ -1011,7 +1061,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                 </div>
 
                 {/* Multi-Week History Matrix */}
-                {semanasNutri.length > 1 && (
+                {validWeeks.length > 1 && (
                   <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
                     <div className="px-4 py-3 border-b border-[#E2E8F0] bg-gray-50/60 flex items-center justify-between">
                       <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
@@ -1024,7 +1074,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                         <thead>
                           <tr>
                             <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border-b border-r border-[#E2E8F0] text-left min-w-[130px]">Día del Plan</th>
-                            {semanasNutri.map(s => (
+                            {validWeeks.map(s => (
                               <th
                                 key={s.weekNum}
                                 onClick={() => setSelectedNutriWeek(s.weekNum)}
@@ -1047,7 +1097,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                                 <td className="px-3 py-2 border-b border-r border-[#E2E8F0] font-bold text-[#0B1929]">
                                   {d.nombre || d.dia_semana || `Día ${idx + 1}`}
                                 </td>
-                                {semanasNutri.map(s => {
+                                {validWeeks.map(s => {
                                   const r = nutriProgreso[`${d.id}-${s.weekNum}`];
                                   const agua = Number(r?.agua_ml) || 0;
                                   const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
