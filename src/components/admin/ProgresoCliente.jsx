@@ -5,7 +5,7 @@ import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../.
 import { useBrand } from"../BrandContext";
 import { useBackButton } from"../../lib/backButtonHandler";
 import { generateProgresoPDF } from"../../utils/pdf";
-import { parseFotos, getSemanasConFecha } from"../../utils/helpers";
+import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from"../../utils/helpers";
 import { 
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
@@ -337,8 +337,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       // Upload new photos
       const uploadedUrls = [];
       for (const file of pendingFotos) {
-        const path = `${selected.id}/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
-        const url = await storageUpload("progress-photos", path, file);
+        const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${selected.id}/${Date.now()}_${cleanName}`;
+        const compressedFile = await compressImageIfNeeded(file);
+        const url = await storageUpload("progress-photos", path, compressedFile);
         uploadedUrls.push(url);
       }
       // Merge existing + new photos

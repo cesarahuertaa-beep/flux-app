@@ -100,3 +100,76 @@ export const getSemanasConFecha = (item, ciclo = null) => {
     return { label: `${fmt(start)}-${fmt(end)}`, idx: i, weekNum: i + 1, isCurrent };
   });
 };
+
+/**
+ * Comprime y redimensiona una imagen antes de subirla para evitar timeouts,
+ * optimizar ancho de banda móvil y acelerar la carga en la galería.
+ * Si el archivo no es imagen o falla el procesamiento, retorna el archivo original.
+ */
+export const compressImageIfNeeded = async (file, maxDimension = 1920, quality = 0.82) => {
+  if (!file || typeof window === "undefined" || !file.type?.startsWith("image/")) {
+    return file;
+  }
+  // Si es GIF o SVG, no recomprimir para preservar animación o vectores
+  if (file.type === "image/gif" || file.type === "image/svg+xml") {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width <= maxDimension && height <= maxDimension && file.size < 1024 * 1024) {
+          // Ya es pequeña (<1MB y dimensiones moderadas), subir directa
+          return resolve(file);
+        }
+
+        if (width > height && width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(file);
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              try {
+                const compressedFile = new File([blob], file.name || "foto.jpg", {
+                  type: "image/jpeg",
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } catch {
+                resolve(blob);
+              }
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    } catch (e) {
+      resolve(file);
+    }
+  });
+};
+

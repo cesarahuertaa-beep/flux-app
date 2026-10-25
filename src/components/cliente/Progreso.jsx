@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Model from "@phelian/react-body-highlighter";
 import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
 import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X, ChevronDown, Layers } from "lucide-react";
-import { parseFotos } from "../../utils/helpers";
+import { parseFotos, compressImageIfNeeded } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -258,8 +258,10 @@ export default function Progreso({ cliente, isSelfManaged }) {
     try {
       const newUrls = [];
       for (const file of Array.from(files)) {
-        const path = `${cliente.id}/personal/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
-        const url = await storageUpload("progress-photos", path, file);
+        const cleanName = (file.name || "foto.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${cliente.id}/personal/${Date.now()}_${cleanName}`;
+        const compressedFile = await compressImageIfNeeded(file);
+        const url = await storageUpload("progress-photos", path, compressedFile);
         newUrls.push(url);
       }
       
@@ -268,10 +270,11 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setPersonalPhotos(updatedUrls);
     } catch (error) {
       console.error(error);
-      showFluxAlert("Error subiendo fotos", "No se pudieron subir las fotos personales. Intenta de nuevo.");
+      const msg = error?.message || "No se pudieron subir las fotos personales. Intenta de nuevo.";
+      showFluxAlert("Error subiendo fotos", msg);
     } finally {
       setUploadingPersonal(false);
-      if (fileInputRef.current) fileInputRef.current.value ="";
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
