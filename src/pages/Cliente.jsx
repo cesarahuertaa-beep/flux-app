@@ -16,12 +16,42 @@ const Progreso = lazy(() => import("../components/cliente/Progreso"));
 const UserProfile = lazy(() => import("../components/UserProfile"));
 const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
 
-// dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión
-const offlineAwareUpsert = (records) =>
-  dbUpsert('progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id', records);
+// dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión con retorno mínimo para máxima velocidad
+const offlineAwareUpsert = async (records) => {
+  const recordsClean = (Array.isArray(records) ? records : [records]).map((r) => ({
+    ...r,
+    variante_id: r.variante_id || "original",
+  }));
+
+  try {
+    return await dbUpsert(
+      "progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id",
+      recordsClean,
+      { headers: { Prefer: "resolution=merge-duplicates,return=minimal" } }
+    );
+  } catch (err) {
+    const errStr = String(err?.message || err || "");
+    if (
+      errStr.includes("57014") ||
+      errStr.includes("statement timeout") ||
+      errStr.includes("on_conflict") ||
+      errStr.includes("constraint")
+    ) {
+      // Fallback al índice único base de 5 columnas
+      return await dbUpsert(
+        "progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo",
+        recordsClean,
+        { headers: { Prefer: "resolution=merge-duplicates,return=minimal" } }
+      );
+    }
+    throw err;
+  }
+};
 
 const offlineAwareNutriUpsert = (records) =>
-  dbUpsert('nutricion_progreso?on_conflict=cliente_id,dia_id,semana', records);
+  dbUpsert("nutricion_progreso?on_conflict=cliente_id,dia_id,semana", records, {
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+  });
 
 export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;

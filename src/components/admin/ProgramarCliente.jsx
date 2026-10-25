@@ -251,7 +251,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         ? `ciclo_id=eq.${currentCiclo.id}`
         : `ciclo_id=is.null`;
 
-      const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []);
+      const [ns, rs] = await Promise.all([
+        dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []),
+        dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
+      ]);
+
+      if (rs) {
+        setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
+      }
+
       if (ns && ns.length) {
         setNutri(ns[0]);
         setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
@@ -260,11 +268,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           setDias(ds.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) })));
         }
       } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
-
-      const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
-      if (rs) {
-        setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
-      }
     } catch(e) { 
       if (!isOfflineError(e)) {
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
@@ -696,8 +699,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }
         });
 
-        if (toUpdate.length > 0) await dbUpsert("comidas", toUpdate);
-        if (toInsert.length > 0) await dbPost("comidas", toInsert);
+        if (toUpdate.length > 0) {
+          await dbUpsert("comidas?on_conflict=id", toUpdate, {
+            headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          });
+        }
+        if (toInsert.length > 0) {
+          await dbPost("comidas", toInsert, {
+            headers: { Prefer: "return=minimal" },
+          });
+        }
       } else { 
         // Creación masiva optimizada (Bulk Insert)
         const dSeleccionados = diaForm.diasSeleccionados || [];
@@ -735,7 +746,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
 
         if (comidasData.length > 0) {
-          await dbPost("comidas", comidasData);
+          await dbPost("comidas", comidasData, {
+            headers: { Prefer: "return=minimal" },
+          });
         }
       }
       setShowDiaModal(false); setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>); await loadData();
@@ -934,8 +947,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           }
         });
 
-        if (toUpdate.length > 0) await dbUpsert("ejercicios", toUpdate);
-        if (toInsert.length > 0) await dbPost("ejercicios", toInsert);
+        if (toUpdate.length > 0) {
+          await dbUpsert("ejercicios?on_conflict=id", toUpdate, {
+            headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          });
+        }
+        if (toInsert.length > 0) {
+          await dbPost("ejercicios", toInsert, {
+            headers: { Prefer: "return=minimal" },
+          });
+        }
       } else {
         // Creación masiva optimizada (Bulk Insert)
         const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
@@ -980,7 +1001,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         });
 
         if (ejerciciosData.length > 0) {
-          await dbPost("ejercicios", ejerciciosData);
+          await dbPost("ejercicios", ejerciciosData, {
+            headers: { Prefer: "return=minimal" },
+          });
         }
       }
       

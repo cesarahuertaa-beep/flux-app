@@ -3,6 +3,7 @@ import { updateProfile, authInvite, authResetPassword, storageUpload, storageLis
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
+import BrandColorPicker from "../ui/BrandColorPicker";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 
@@ -766,8 +767,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               value={formNutri.role || "nutriologo"}
               onChange={(v) => setFormNutri((p) => ({ ...p, role: v }))}
               options={[
-                { value: "nutriologo", label: "Nutriólogo Titular (Cobro por paciente)" },
-                { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante (Mensualidad fija)" },
+                { value: "nutriologo", label: "Nutriólogo Titular" },
+                { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante" },
               ]}
             />
           </Field>
@@ -777,29 +778,22 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Email">
             <input className={InputClass} type="email" value={formNutri.email} onChange={e => setFormNutri(p=>({...p,email:e.target.value}))}/>
           </Field>
-          <Field label="Teléfono (WhatsApp)">
+          <Field label="Teléfono">
             <input className={InputClass} type="tel" value={formNutri.telefono} onChange={e => setFormNutri(p=>({...p,telefono:e.target.value}))}/>
           </Field>
-          <Field label="Nombre de marca (opcional)">
+          <Field label="Nombre de marca">
             <input className={InputClass} value={formNutri.nombre_marca} onChange={e => setFormNutri(p=>({...p,nombre_marca:e.target.value}))}/>
           </Field>
           <div className="grid grid-cols-2 gap-4 items-start">
-            <Field label="Logo de marca (opcional)">
+            <Field label="Logo de marca">
               <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} uploading={uploadingLogo}/>
             </Field>
             <div className="flex flex-col items-end">
               <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>
-              <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
-                <span className="text-xs font-mono text-[#6B7A8D] px-2">
-                  {(formNutri.color_primario || "#1A6FD4").toUpperCase()}
-                </span>
-                <input
-                  type="color"
-                  value={formNutri.color_primario || "#1A6FD4"}
-                  onChange={e => setFormNutri(p => ({ ...p, color_primario: e.target.value }))}
-                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
-                />
-              </div>
+              <BrandColorPicker
+                value={formNutri.color_primario || "#1A6FD4"}
+                onChange={val => setFormNutri(p => ({ ...p, color_primario: val }))}
+              />
             </div>
           </div>
           <div className="flex gap-2.5 justify-end mt-4">
@@ -832,8 +826,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 value={editFormNutri.role || "nutriologo"}
                 onChange={(v) => setEditFormNutri((p) => ({ ...p, role: v }))}
                 options={[
-                  { value: "nutriologo", label: "Nutriólogo Titular (Cobro por paciente)" },
-                  { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante (Mensualidad fija)" },
+                  { value: "nutriologo", label: "Nutriólogo Titular" },
+                  { value: "nutriologo_estudiante", label: "Nutriólogo Estudiante" },
                 ]}
               />
             </Field>
@@ -841,7 +835,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Nombre completo">
             <input className={InputClass} value={editFormNutri.nombre} onChange={e => setEditFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
-          <Field label="Teléfono (WhatsApp)">
+          <Field label="Teléfono">
             <input className={InputClass} type="tel" value={editFormNutri.telefono} onChange={e => setEditFormNutri(p=>({...p,telefono:e.target.value}))}/>
           </Field>
           <Field label="Nombre de marca">
@@ -853,17 +847,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             </Field>
             <div className="flex flex-col items-end">
               <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>
-              <div className="inline-flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0] mt-1">
-                <span className="text-xs font-mono text-[#6B7A8D] px-2">
-                  {(editFormNutri.color_primario || "#1A6FD4").toUpperCase()}
-                </span>
-                <input
-                  type="color"
-                  value={editFormNutri.color_primario || "#1A6FD4"}
-                  onChange={e => setEditFormNutri(p => ({ ...p, color_primario: e.target.value }))}
-                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
-                />
-              </div>
+              <BrandColorPicker
+                value={editFormNutri.color_primario || "#1A6FD4"}
+                onChange={val => setEditFormNutri(p => ({ ...p, color_primario: val }))}
+              />
             </div>
           </div>
 

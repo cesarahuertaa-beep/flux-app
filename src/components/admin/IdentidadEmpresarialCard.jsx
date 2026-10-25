@@ -3,6 +3,7 @@ import { Building2, Image as ImageIcon } from "lucide-react";
 import { storageUpload, storageDelete } from "../../lib/supabase";
 import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
 import { showFluxAlert } from "../ui/ConfirmModal";
+import BrandColorPicker from "../ui/BrandColorPicker";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
   const fileInputRef = useRef(null);
@@ -33,8 +34,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
     setUploading(false);
   };
 
-  const handleColorChange = (e) => {
-    const newColor = e.target.value;
+  const handleColorChange = (newColor) => {
     setForm({ ...form, color_primario: newColor });
     onSave({ ...form, color_primario: newColor });
   };
@@ -83,10 +83,10 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
         <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
           <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Color de Marca</label>
-          <div className="flex items-center gap-2 bg-[#F0F4FA] rounded-xl p-1.5 border border-[#E2E8F0]">
-            <input type="color" value={form.color_primario ||"#1A6FD4"} onChange={handleColorChange} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none" />
-            <span className="text-xs font-mono text-[#6B7A8D] px-2">{(form.color_primario ||"#1A6FD4").toUpperCase()}</span>
-          </div>
+          <BrandColorPicker
+            value={form.color_primario || "#1A6FD4"}
+            onChange={handleColorChange}
+          />
         </div>
       </div>
 

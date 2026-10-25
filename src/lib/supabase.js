@@ -14,12 +14,24 @@ import {
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Token de autenticación — se activa al hacer login
-let _authToken = null;
+// Token de autenticación — se activa al hacer login o se restaura desde localStorage
+let _authToken = (typeof window !== "undefined" && localStorage.getItem("flux_token")) || null;
 let _profileId = null;
 let _onSessionExpired = null; // callback para redirigir al login
 let _isRefreshing = false;
 let _refreshQueue = []; // promesas pendientes mientras se renueva el token
+
+export const getValidToken = () => {
+  if (_authToken) return _authToken;
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("flux_token");
+    if (saved) {
+      _authToken = saved;
+      return saved;
+    }
+  }
+  return null;
+};
 
 /** Sincroniza credenciales y metadatos de sesión con el WorkManager nativo de Android */
 export const syncNativeCredentials = () => {
@@ -456,12 +468,21 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
       return fetchNetwork();
     }
 
-    if (opts.headers?.Prefer === "return=minimal" && r.ok) return [];
+    if ((opts.headers?.Prefer?.includes("return=minimal") || headers.Prefer?.includes("return=minimal")) && r.ok) return [];
     if (!r.ok) {
       if (returnedCache) return;
       // En lectura, cualquier fallo HTTP devuelve el último dato bueno de la base local si existe
       if (isGet && queryCache.has(path)) return queryCache.get(path).data;
       const e = await r.text().catch(() => "Error de red");
+
+      // Si el servidor dio timeout (57014 / 504) durante una mutación en progreso/entrenamiento, guardarla en cola offline local
+      if (!isGet && isQueueable(method, table) && (e.includes("57014") || e.includes("statement timeout") || r.status === 504)) {
+        await queueMutation(method, path, restOpts.body, headers.Prefer);
+        let echo = [];
+        try { const b = restOpts.body ? JSON.parse(restOpts.body) : []; echo = Array.isArray(b) ? b : [b]; } catch { /* ignore */ }
+        return method === "POST" ? echo : [];
+      }
+
       throw new Error(e);
     }
 
@@ -710,6 +731,9 @@ const parseStorageError = (rawText, status) => {
     if (status === 544 || code === "DatabaseTimeout" || msg.includes("timed out")) {
       return "El servidor tardó en responder. Por favor intenta subir la foto de nuevo.";
     }
+    if (msg.includes("row-level security") || msg.includes("Unauthorized") || status === 403) {
+      return "Permiso denegado al subir imagen. Por favor vuelve a intentarlo o verifica tu sesión.";
+    }
     if (msg) return msg;
   } catch {}
   if (status === 544 || status === 504 || status === 502 || status === 503) {
@@ -725,12 +749,13 @@ export const storageUpload = async (bucket, path, file) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
+    const token = getValidToken();
     try {
       let r = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
         method: "POST",
         headers: {
           apikey: SUPA_KEY,
-          Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+          Authorization: `Bearer ${token || SUPA_KEY}`,
           "Content-Type": file.type || "image/jpeg",
           "x-upsert": "true",
         },
@@ -738,10 +763,13 @@ export const storageUpload = async (bucket, path, file) => {
         signal: controller.signal,
       });
 
-      if (r.status === 401 && _refreshToken && attempt === 1) {
+      const hasRt = typeof window !== "undefined" && !!localStorage.getItem("flux_refresh_token");
+      const isAuthIssue = r.status === 401 || r.status === 403;
+
+      if (isAuthIssue && hasRt && attempt === 1) {
         clearTimeout(timer);
         const refreshed = await refreshSession();
-        if (refreshed) {
+        if (refreshed === true) {
           attempt--; // Retry with fresh token
           continue;
         }
