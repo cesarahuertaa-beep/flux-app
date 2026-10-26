@@ -131,11 +131,11 @@ async function recordStorePurchaseInSupabase({ role, userId, clienteId, productI
     }).catch(() => {});
 
     return recibo;
-  } else if (role === "nutriologo_estudiante" || role === "nutriologo") {
+  } else if (role === "nutriologo_estudiante") {
     // 1. Insertar recibo en recibos_pago
     const recibo = await dbPost("recibos_pago", {
       nutriologo_id: targetId,
-      monto: 239,
+      monto: 300,
       fecha_corte_mes: expirationDateStr,
       comprobante_url: comprobanteNota,
       estado: "aprobado",
