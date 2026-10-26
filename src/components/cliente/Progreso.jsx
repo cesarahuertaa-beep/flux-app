@@ -334,6 +334,122 @@ export default function Progreso({ cliente, isSelfManaged }) {
     });
   };
 
+  const extractDateFromUrl = (url) => {
+    if (!url || typeof url !== "string") return { fecha: null, timestamp: 0 };
+    try {
+      const match = url.match(/personal\/(\d{10,13})/);
+      if (match && match[1]) {
+        const ts = parseInt(match[1]);
+        if (!isNaN(ts) && ts > 1500000000000 && ts < 2500000000000) {
+          return {
+            fecha: new Date(ts).toISOString().split("T")[0],
+            timestamp: ts,
+          };
+        }
+      }
+    } catch {}
+    return { fecha: null, timestamp: 0 };
+  };
+
+  const unifiedPhotos = useMemo(() => {
+    const list = [];
+    // 1. Fotos registradas por el nutriólogo / evaluaciones
+    metricas.forEach((m) => {
+      const urls = parseFotos(m.fotos).filter(Boolean);
+      urls.forEach((url, fIdx) => {
+        list.push({
+          id: `eval-${m.id || m.fecha}-${fIdx}`,
+          url,
+          type: "evaluacion",
+          sourceLabel: isSelfManaged ? "Evaluación Física" : "Nutriólogo",
+          fecha: m.fecha,
+          label: m.fecha ? fmtDate(m.fecha) : "Evaluación",
+          peso: m.peso,
+          grasa_pct: m.grasa_pct,
+          musculo_pct: m.inbody_smm || m.calc_masa_muscular || m.musculo_pct || null,
+          imc: m.imc || null,
+          notas: m.notas || null,
+          timestamp: m.fecha ? new Date(m.fecha + "T12:00:00").getTime() : 0,
+        });
+      });
+    });
+
+    // 2. Fotos personales subidas por el usuario
+    personalPhotos.forEach((url, pIdx) => {
+      if (!url) return;
+      const { fecha, timestamp } = extractDateFromUrl(url);
+      list.push({
+        id: `pers-${pIdx}-${url.slice(-20)}`,
+        url,
+        type: "personal",
+        sourceLabel: "Foto Personal Privada",
+        fecha,
+        label: fecha ? fmtDate(fecha) : `Foto #${personalPhotos.length - pIdx}`,
+        peso: null,
+        grasa_pct: null,
+        musculo_pct: null,
+        imc: null,
+        notas: null,
+        timestamp: timestamp || (Date.now() - pIdx * 1000),
+      });
+    });
+
+    // Ordenar de más reciente a más antigua (Instagram style)
+    return list.sort((a, b) => b.timestamp - a.timestamp);
+  }, [metricas, personalPhotos, isSelfManaged]);
+
+  const evalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "evaluacion").length, [unifiedPhotos]);
+  const personalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "personal").length, [unifiedPhotos]);
+
+  const filteredPhotos = useMemo(() => {
+    if (galleryFilter === "evaluaciones") return unifiedPhotos.filter((p) => p.type === "evaluacion");
+    if (galleryFilter === "personales") return unifiedPhotos.filter((p) => p.type === "personal");
+    return unifiedPhotos;
+  }, [unifiedPhotos, galleryFilter]);
+
+  const handleStartComparisonWithPhoto = (photoItem) => {
+    const idx = unifiedPhotos.findIndex((p) => p.url === photoItem.url);
+    if (idx !== -1) {
+      if (idx === 0 && unifiedPhotos.length > 1) {
+        setComparatorAfterIdx(0);
+        setComparatorBeforeIdx(unifiedPhotos.length - 1);
+      } else {
+        setComparatorBeforeIdx(idx);
+        setComparatorAfterIdx(0);
+      }
+    }
+    setShowComparator(true);
+    setLightboxIndex(null);
+    setTimeout(() => {
+      comparatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  };
+
+  const handlePrevLightbox = useCallback(() => {
+    setLightboxIndex((prev) => {
+      if (prev === null) return null;
+      return prev > 0 ? prev - 1 : filteredPhotos.length - 1;
+    });
+  }, [filteredPhotos.length]);
+
+  const handleNextLightbox = useCallback(() => {
+    setLightboxIndex((prev) => {
+      if (prev === null) return null;
+      return prev < filteredPhotos.length - 1 ? prev + 1 : 0;
+    });
+  }, [filteredPhotos.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") handlePrevLightbox();
+      if (e.key === "ArrowRight") handleNextLightbox();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxIndex, handlePrevLightbox, handleNextLightbox]);
+
   if (loading) {
     return (
       <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
@@ -460,123 +576,6 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
     return data;
   };
-
-
-  const extractDateFromUrl = (url) => {
-    if (!url || typeof url !== "string") return { fecha: null, timestamp: 0 };
-    try {
-      const match = url.match(/personal\/(\d{10,13})/);
-      if (match && match[1]) {
-        const ts = parseInt(match[1]);
-        if (!isNaN(ts) && ts > 1500000000000 && ts < 2500000000000) {
-          return {
-            fecha: new Date(ts).toISOString().split("T")[0],
-            timestamp: ts,
-          };
-        }
-      }
-    } catch {}
-    return { fecha: null, timestamp: 0 };
-  };
-
-  const unifiedPhotos = useMemo(() => {
-    const list = [];
-    // 1. Fotos registradas por el nutriólogo / evaluaciones
-    metricas.forEach((m) => {
-      const urls = parseFotos(m.fotos).filter(Boolean);
-      urls.forEach((url, fIdx) => {
-        list.push({
-          id: `eval-${m.id || m.fecha}-${fIdx}`,
-          url,
-          type: "evaluacion",
-          sourceLabel: isSelfManaged ? "Evaluación Física" : "Nutriólogo",
-          fecha: m.fecha,
-          label: m.fecha ? fmtDate(m.fecha) : "Evaluación",
-          peso: m.peso,
-          grasa_pct: m.grasa_pct,
-          musculo_pct: m.inbody_smm || m.calc_masa_muscular || m.musculo_pct || null,
-          imc: m.imc || null,
-          notas: m.notas || null,
-          timestamp: m.fecha ? new Date(m.fecha + "T12:00:00").getTime() : 0,
-        });
-      });
-    });
-
-    // 2. Fotos personales subidas por el usuario
-    personalPhotos.forEach((url, pIdx) => {
-      if (!url) return;
-      const { fecha, timestamp } = extractDateFromUrl(url);
-      list.push({
-        id: `pers-${pIdx}-${url.slice(-20)}`,
-        url,
-        type: "personal",
-        sourceLabel: "Foto Personal Privada",
-        fecha,
-        label: fecha ? fmtDate(fecha) : `Foto #${personalPhotos.length - pIdx}`,
-        peso: null,
-        grasa_pct: null,
-        musculo_pct: null,
-        imc: null,
-        notas: null,
-        timestamp: timestamp || (Date.now() - pIdx * 1000),
-      });
-    });
-
-    // Ordenar de más reciente a más antigua (Instagram style)
-    return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [metricas, personalPhotos, isSelfManaged]);
-
-  const evalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "evaluacion").length, [unifiedPhotos]);
-  const personalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "personal").length, [unifiedPhotos]);
-
-  const filteredPhotos = useMemo(() => {
-    if (galleryFilter === "evaluaciones") return unifiedPhotos.filter((p) => p.type === "evaluacion");
-    if (galleryFilter === "personales") return unifiedPhotos.filter((p) => p.type === "personal");
-    return unifiedPhotos;
-  }, [unifiedPhotos, galleryFilter]);
-
-  const handleStartComparisonWithPhoto = (photoItem) => {
-    const idx = unifiedPhotos.findIndex((p) => p.url === photoItem.url);
-    if (idx !== -1) {
-      if (idx === 0 && unifiedPhotos.length > 1) {
-        setComparatorAfterIdx(0);
-        setComparatorBeforeIdx(unifiedPhotos.length - 1);
-      } else {
-        setComparatorBeforeIdx(idx);
-        setComparatorAfterIdx(0);
-      }
-    }
-    setShowComparator(true);
-    setLightboxIndex(null);
-    setTimeout(() => {
-      comparatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-  };
-
-  const handlePrevLightbox = useCallback(() => {
-    setLightboxIndex((prev) => {
-      if (prev === null) return null;
-      return prev > 0 ? prev - 1 : filteredPhotos.length - 1;
-    });
-  }, [filteredPhotos.length]);
-
-  const handleNextLightbox = useCallback(() => {
-    setLightboxIndex((prev) => {
-      if (prev === null) return null;
-      return prev < filteredPhotos.length - 1 ? prev + 1 : 0;
-    });
-  }, [filteredPhotos.length]);
-
-  useEffect(() => {
-    if (lightboxIndex === null) return;
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") setLightboxIndex(null);
-      if (e.key === "ArrowLeft") handlePrevLightbox();
-      if (e.key === "ArrowRight") handleNextLightbox();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [lightboxIndex, handlePrevLightbox, handleNextLightbox]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
