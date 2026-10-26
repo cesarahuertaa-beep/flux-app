@@ -236,10 +236,13 @@ export async function startGooglePlaySubscription(productId, userContext = {}) {
     // 1. Primero intentamos por Offerings (recomendado por RevenueCat)
     try {
       const offerings = await Purchases.getOfferings();
-      if (offerings.current && offerings.current.availablePackages) {
+      if (offerings?.current?.availablePackages) {
         foundPackage = offerings.current.availablePackages.find((pkg) => {
           const ident = pkg.product?.identifier;
-          return productIdsToTry.includes(ident) || pkg.identifier === "$rc_monthly" || pkg.identifier === "nutri_estudiante";
+          if (productIdsToTry.includes(ident)) return true;
+          if (productId === PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM && pkg.identifier === "$rc_monthly") return true;
+          if (productId === PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE && pkg.identifier === "nutri_estudiante") return true;
+          return false;
         });
       }
     } catch (e) {

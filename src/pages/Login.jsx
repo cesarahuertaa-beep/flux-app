@@ -54,13 +54,6 @@ export default function Login({ onLogin }) {
     return saved;
   });
 
-  // Solo interceptar botón físico en Android nativo. En Web/PWA el usuario cuenta con el botón visual 'Inicio'
-  // y evitamos alterar la pila de historial del navegador para prevenir cualquier desincronización tras iniciar sesión.
-  useBackButton(
-    Capacitor.isNativePlatform() && mode !== "welcome" && mode !== "set_password" && !loading,
-    () => setMode("welcome"),
-    5
-  );
   const [nombre, setNombre] = useState(() => sessionStorage.getItem('flux_login_nombre') || "");
   const [email, setEmail] = useState(() => sessionStorage.getItem('flux_login_email') || "");
   const [pass, setPass] = useState("");
@@ -84,6 +77,14 @@ export default function Login({ onLogin }) {
   const [fadeSplash, setFadeSplash] = useState(false);
   const [avisoAceptado, setAvisoAceptado] = useState(() => sessionStorage.getItem('flux_aviso') === 'true');
   const [nutriPool, setNutriPool] = useState([]);
+
+  // Solo interceptar botón físico en Android nativo. En Web/PWA el usuario cuenta con el botón visual 'Inicio'
+  // y evitamos alterar la pila de historial del navegador para prevenir cualquier desincronización tras iniciar sesión.
+  useBackButton(
+    Capacitor.isNativePlatform() && mode !== "welcome" && mode !== "set_password" && !loading,
+    () => setMode("welcome"),
+    5
+  );
 
   // Sincronizar color de barras del sistema en Android y PWA en blanco con iconos oscuros
   useEffect(() => {
