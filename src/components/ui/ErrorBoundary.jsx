@@ -13,6 +13,26 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("[FLUX ErrorBoundary]", error, errorInfo);
+
+    // Auto-recuperación si falla la carga dinámica de un módulo/chunk tras un despliegue reciente
+    const msg = String(error?.message || "");
+    const isChunkError =
+      error?.name === "ChunkLoadError" ||
+      msg.includes("Failed to fetch dynamically imported module") ||
+      msg.includes("dynamically imported module") ||
+      msg.includes("Importing a module script failed") ||
+      msg.includes("error loading dynamically imported module");
+
+    if (isChunkError) {
+      try {
+        const lastReload = sessionStorage.getItem("flux_chunk_retry");
+        const now = Date.now();
+        if (!lastReload || now - Number(lastReload) > 10000) {
+          sessionStorage.setItem("flux_chunk_retry", String(now));
+          window.location.reload();
+        }
+      } catch {}
+    }
   }
 
   handleReload = () => {
