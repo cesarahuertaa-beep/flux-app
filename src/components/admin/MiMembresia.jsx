@@ -12,12 +12,9 @@ import {
   ShieldCheck,
   Copy,
   Check,
-  Sparkles,
   Users,
   GraduationCap,
-  Calendar,
-  Clock,
-  ArrowRight
+  Clock
 } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
 import {
@@ -30,10 +27,13 @@ import {
 
 /**
  * MiMembresia — Pantalla de suscripción para Nutriólogos (Titulados y Estudiantes).
- * Delimita con exactitud el modelo de cobro según el perfil:
- * - nutriologo_estudiante: Tarifa fija ($300 MXN/mes). Google Play en Android, SPEI en Web.
- * - nutriologo (titulado): Facturación por volumen de pacientes activos ($50, $45, $40/pac).
- *   Estrictamente por SPEI tanto en Android como en Web (Google Play no soporta B2B dinámico).
+ * Cumple al 100% con las políticas de Google Play Store:
+ * - En Android (isPlayApp):
+ *     • nutriologo_estudiante: Suscripción oficial de Google Play Billing ($239 MXN/mes).
+ *     • nutriologo (titulado): Facturación empresarial por volumen administrada vía Web.
+ *       No se muestra información de transferencia bancaria ni subida de comprobantes en Play Store.
+ * - En Web (!isPlayApp):
+ *     • Se muestran todos los datos SPEI, CLABE con copiado a 1 clic, concepto y subida de comprobantes.
  */
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const isPlayApp = isNativePlayApp();
@@ -46,7 +46,6 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   const [patrocinios, setPatrocinios] = useState([]);
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [copiedConcepto, setCopiedConcepto] = useState(false);
-  const [preferSpei, setPreferSpei] = useState(false);
   const brand = useBrand();
 
   const loadData = async () => {
@@ -145,7 +144,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
       const refDate = expDate && today >= expDate ? expDate : today;
       const ratesForStudent = getRatesForCutoff(rawCfg, refDate);
-      const tarifaEstudiante = Number(ratesForStudent.nutri_estudiante ?? 300);
+      const tarifaEstudiante = Number(ratesForStudent.nutri_estudiante ?? 239);
 
       let remainingStr = null;
       if (expDate) {
@@ -415,7 +414,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     }
   };
 
-  // Renderizador de la tarjeta de transferencia SPEI
+  // Renderizador de la tarjeta de transferencia SPEI (EXCLUSIVA para versión Web)
   const renderSpeiCard = (customSubtitle) => (
     <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
       <div>
@@ -561,13 +560,16 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-6">
-      <input
-        type="file"
-        id="comprobanteUploadNutri"
-        accept="image/*,.pdf"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
+      {/* Input de archivo: SOLO en Web para no infringir normas de Google Play en Android */}
+      {!isPlayApp && (
+        <input
+          type="file"
+          id="comprobanteUploadNutri"
+          accept="image/*,.pdf"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
+      )}
 
       {/* ── BANNER DE ESTADO COMPACTO Y PROFESIONAL ── */}
       <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -591,7 +593,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             {hasPendingPayment
               ? "Hemos recibido tu comprobante. Nuestro equipo lo validará a la brevedad."
               : isEstudiante
-              ? (diasRestantesText ? `${diasRestantesText} · Vencimiento: ${expirationDate ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" }) : fechaCorteText}` : "Mensualidad fija de estudiante sin costo por paciente.")
+              ? (diasRestantesText ? `${diasRestantesText} · Vencimiento: ${expirationDate ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" }) : fechaCorteText}` : "Mensualidad fija preferencial para estudiantes sin cobro por paciente.")
               : `Tienes ${activeCount} paciente${activeCount !== 1 ? "s" : ""} activo${activeCount !== 1 ? "s" : ""} en Nivel ${currentTier} ($${currentRate}/pac). Próximo corte: ${fechaCorteText}.`}
           </p>
         </div>
@@ -619,7 +621,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       {/* ── CUERPO PRINCIPAL SEGÚN PERFIL ── */}
       {isEstudiante ? (
         /* ══════════════════════════════════════════════════════════
-           PERFIL: NUTRIÓLOGO ESTUDIANTE (Tarifa fija $300 MXN / mes)
+           PERFIL: NUTRIÓLOGO ESTUDIANTE (Tarifa fija $239 MXN / mes)
            ══════════════════════════════════════════════════════════ */
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Columna Izquierda: Plan y Beneficios (5 cols) */}
@@ -670,8 +672,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
           {/* Columna Derecha: Método de Pago (7 cols) */}
           <div className="md:col-span-7">
-            {isPlayApp && !preferSpei ? (
-              /* Google Play Subscription (Android Oficial) */
+            {isPlayApp ? (
+              /* Google Play Subscription (Android Oficial — Sin transferencias para cumplir políticas de Google) */
               <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between h-full">
                 <div>
                   <div className="flex items-center gap-2.5 mb-2">
@@ -704,7 +706,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   </div>
 
                   <p className="text-xs text-[#6B7A8D] leading-relaxed">
-                    Las suscripciones se gestionan y cancelan directamente desde Google Play Store. Tu comprobante se valida al instante sin esperas.
+                    Las suscripciones se procesan oficialmente mediante <strong>Google Play Billing</strong>. Puedes gestionar o cancelar tu suscripción desde la sección Pagos y Suscripciones de tu cuenta de Google Play.
                   </p>
                 </div>
 
@@ -720,7 +722,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                           {
                             role: "nutriologo_estudiante",
                             nutriologoId: profileId,
-                            nombre: perfil?.nombre
+                            nombre: perfil?.nombre,
+                            monto: Number(currentRate) || 239
                           }
                         );
                         if (res.status === "purchased") {
@@ -757,7 +760,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     <span>{uploading ? "Conectando con Google Play..." : "Suscribirme con Google Play"}</span>
                   </button>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2">
+                  <div className="text-center pt-1">
                     <button
                       type="button"
                       disabled={uploading || loading}
@@ -767,7 +770,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                           const res = await restoreGooglePlayPurchases({
                             role: "nutriologo_estudiante",
                             nutriologoId: profileId,
-                            nombre: perfil?.nombre
+                            nombre: perfil?.nombre,
+                            monto: Number(currentRate) || 239
                           });
                           if (res.hasActiveEntitlement) {
                             setMsg(
@@ -801,32 +805,13 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     >
                       Restaurar compras
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPreferSpei(true)}
-                      className="text-xs text-[#6B7A8D] hover:text-[#0B1929] py-1.5 font-semibold underline transition-colors cursor-pointer"
-                    >
-                      Pagar por transferencia SPEI
-                    </button>
                   </div>
                 </div>
               </div>
             ) : (
-              /* SPEI Transfer Card (Web o preferencia manual en Android) */
+              /* SPEI Transfer Card (Exclusivo versión Web) */
               <div>
-                {renderSpeiCard("Tarifa fija de $300.00 MXN para nutriólogos estudiantes.")}
-                {isPlayApp && (
-                  <div className="text-center mt-3">
-                    <button
-                      type="button"
-                      onClick={() => setPreferSpei(false)}
-                      className="text-xs text-[var(--brand-primary)] font-bold hover:underline cursor-pointer"
-                    >
-                      ← Volver a Suscripción Google Play
-                    </button>
-                  </div>
-                )}
+                {renderSpeiCard(`Tarifa fija preferencial de $${Number(currentRate).toFixed(2)} MXN para nutriólogos estudiantes.`)}
               </div>
             )}
           </div>
@@ -1023,7 +1008,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     </div>
                   )}
                   <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                    <span className="text-base md:text-lg font-black text-[#0B1929]">Total a Liquidar</span>
+                    <span className="text-base md:text-lg font-black text-[#0B1929]">Total del Corte</span>
                     <span className="text-xl md:text-2xl font-black text-[var(--brand-primary)]">
                       ${totalAmount.toFixed(2)} <span className="text-xs font-semibold text-[#6B7A8D]">MXN</span>
                     </span>
@@ -1033,15 +1018,64 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             </div>
           </div>
 
-          {/* Columna Derecha: Pago Bancario SPEI Obligatorio (5 cols) */}
+          {/* Columna Derecha:
+              - En Android (isPlayApp): Tarjeta informativa de facturación empresarial (100% compliant con Play Store)
+              - En Web (!isPlayApp): Tarjeta completa de transferencia SPEI con subida de comprobante
+          */}
           <div className="lg:col-span-5 space-y-4">
-            {isPlayApp && (
-              <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs text-blue-900 leading-relaxed">
-                <span className="font-bold block mb-0.5">ℹ️ Facturación por Transferencia SPEI</span>
-                Dado que tu tarifa mensual se calcula con base en tu volumen exacto de pacientes activos, la liquidación de tu corte se realiza por transferencia interbancaria (SPEI).
+            {isPlayApp ? (
+              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#0B1929]">
+                        Suscripción Profesional por Volumen
+                      </h3>
+                      <p className="text-xs text-[#6B7A8D]">
+                        Facturación mensual para clínicas y especialistas
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="my-5 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#6B7A8D] font-medium">Nivel de tarifa:</span>
+                      <span className="font-bold text-[#0B1929]">Nivel {currentTier} (${currentRate} MXN / pac)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#6B7A8D] font-medium">Pacientes activos:</span>
+                      <span className="font-bold text-[#0B1929]">{activeCount} paciente{activeCount !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#6B7A8D] font-medium">Corte de ciclo:</span>
+                      <span className="font-bold text-[#0B1929]">{fechaCorteText}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2.5 border-t border-gray-200">
+                      <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Total del Periodo:</span>
+                      <span className="text-xl font-black text-[var(--brand-primary)]">
+                        ${totalAmount.toFixed(2)} <span className="text-xs font-semibold text-[#6B7A8D]">MXN</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#6B7A8D] leading-relaxed mb-4">
+                    Tu suscripción opera bajo un modelo dinámico adaptado al tamaño de tu práctica. La gestión, conciliación y comprobantes de tu cuenta se administran a través del portal web de FLUX.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-[#0B1929] space-y-1">
+                  <span className="font-bold block text-slate-800">📌 Gestión de tu Cuenta Web</span>
+                  <p className="text-[#6B7A8D] leading-relaxed">
+                    Para consultar facturas anteriores o conciliar saldos de tu corte, inicia sesión con tu misma cuenta desde cualquier navegador web en tu computadora o dispositivo.
+                  </p>
+                </div>
               </div>
+            ) : (
+              renderSpeiCard("Corte mensual con fecha límite de pago al día 10.")
             )}
-            {renderSpeiCard("Corte mensual con fecha límite de pago al día 10.")}
           </div>
         </div>
       )}

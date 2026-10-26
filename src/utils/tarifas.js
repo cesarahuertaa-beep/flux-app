@@ -8,7 +8,7 @@ export const DEFAULT_RATES = {
   nutri_tier1: 50,
   nutri_tier2: 45,
   nutri_tier3: 40,
-  nutri_estudiante: 300,
+  nutri_estudiante: 239,
   civil_premium: 75,
   admin_premium: 50,
   comision_pct: 35,

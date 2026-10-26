@@ -91,7 +91,7 @@ export function openPlayStoreSubscriptions(sku = "") {
  * Registra automáticamente el recibo de compra aprobado en Supabase
  * para mantener la sincronización y vigencia interna de la app.
  */
-async function recordStorePurchaseInSupabase({ role, userId, clienteId, productId, customerInfo }) {
+async function recordStorePurchaseInSupabase({ role, userId, clienteId, productId, customerInfo, monto }) {
   const targetId = clienteId || userId;
   if (!targetId) return null;
 
@@ -117,7 +117,7 @@ async function recordStorePurchaseInSupabase({ role, userId, clienteId, productI
     // 1. Insertar recibo en recibos_pago_civil
     const recibo = await dbPost("recibos_pago_civil", {
       cliente_id: targetId,
-      monto: 75,
+      monto: Number(monto) || 75,
       fecha_corte_mes: expirationDateStr,
       comprobante_url: comprobanteNota,
       estado: "aprobado",
@@ -135,7 +135,7 @@ async function recordStorePurchaseInSupabase({ role, userId, clienteId, productI
     // 1. Insertar recibo en recibos_pago
     const recibo = await dbPost("recibos_pago", {
       nutriologo_id: targetId,
-      monto: 300,
+      monto: Number(monto) || 239,
       fecha_corte_mes: expirationDateStr,
       comprobante_url: comprobanteNota,
       estado: "aprobado",
@@ -197,6 +197,7 @@ export async function startGooglePlaySubscription(productId, userContext = {}) {
         clienteId: userContext.clienteId || resolvedUserId,
         productId,
         customerInfo: purchaseResult.customerInfo,
+        monto: userContext.monto,
       });
 
       return {
@@ -226,6 +227,7 @@ export async function startGooglePlaySubscription(productId, userContext = {}) {
       clienteId: userContext.clienteId || resolvedUserId,
       productId,
       customerInfo: purchaseResult.customerInfo,
+      monto: userContext.monto,
     });
 
     return {
@@ -269,6 +271,7 @@ export async function restoreGooglePlayPurchases(userContext = {}) {
         clienteId: userContext.clienteId || resolvedUserId,
         productId: hasPremium ? PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM : PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE,
         customerInfo,
+        monto: userContext.monto,
       });
 
       return { status: "restored", hasActiveEntitlement: true, customerInfo };
