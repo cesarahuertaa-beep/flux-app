@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Model from "@phelian/react-body-highlighter";
 import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
-import { Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown, Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X, ChevronDown, Layers } from "lucide-react";
+import {
+  Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown,
+  Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X,
+  ChevronDown, ChevronLeft, ChevronRight, Layers, Sparkles, Filter,
+  Stethoscope, Download, ArrowLeftRight, Check, Eye, Calendar
+} from "lucide-react";
 import { parseFotos, compressImageIfNeeded } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
@@ -85,11 +90,17 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [personalPhotos, setPersonalPhotos] = useState([]);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [uploadingPersonal, setUploadingPersonal] = useState(false);
-  const [fullImage, setFullImage] = useState(null);
   const [showAllMetrics, setShowAllMetrics] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState('todas'); // 'todas' | 'evaluaciones' | 'personales'
+  const [showComparator, setShowComparator] = useState(false);
+  const [comparatorBeforeIdx, setComparatorBeforeIdx] = useState(null);
+  const [comparatorAfterIdx, setComparatorAfterIdx] = useState(null);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const fileInputRef = useRef(null);
+  const comparatorRef = useRef(null);
+  const touchStartXRef = useRef(null);
 
-  useBackButton(!!fullImage, () => setFullImage(null), 100);
+  useBackButton(lightboxIndex !== null, () => setLightboxIndex(null), 100);
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
@@ -451,27 +462,121 @@ export default function Progreso({ cliente, isSelfManaged }) {
   };
 
 
-  const nutriPhotos = metricas.flatMap(m => parseFotos(m.fotos)).filter(Boolean);
-  const allComparablePhotos = [
-    ...metricas.flatMap(m =>
-      parseFotos(m.fotos)
-        .filter(Boolean)
-        .map((url, idx) => ({
+  const extractDateFromUrl = (url) => {
+    if (!url || typeof url !== "string") return { fecha: null, timestamp: 0 };
+    try {
+      const match = url.match(/personal\/(\d{10,13})/);
+      if (match && match[1]) {
+        const ts = parseInt(match[1]);
+        if (!isNaN(ts) && ts > 1500000000000 && ts < 2500000000000) {
+          return {
+            fecha: new Date(ts).toISOString().split("T")[0],
+            timestamp: ts,
+          };
+        }
+      }
+    } catch {}
+    return { fecha: null, timestamp: 0 };
+  };
+
+  const unifiedPhotos = useMemo(() => {
+    const list = [];
+    // 1. Fotos registradas por el nutriólogo / evaluaciones
+    metricas.forEach((m) => {
+      const urls = parseFotos(m.fotos).filter(Boolean);
+      urls.forEach((url, fIdx) => {
+        list.push({
+          id: `eval-${m.id || m.fecha}-${fIdx}`,
           url,
+          type: "evaluacion",
+          sourceLabel: isSelfManaged ? "Evaluación Física" : "Nutriólogo",
           fecha: m.fecha,
-          label: `Eval. ${fmtDate(m.fecha)}`,
+          label: m.fecha ? fmtDate(m.fecha) : "Evaluación",
           peso: m.peso,
           grasa_pct: m.grasa_pct,
-        }))
-    ),
-    ...personalPhotos.map((url, idx) => ({
-      url,
-      fecha: null,
-      label: `Personal #${personalPhotos.length - idx}`,
-      peso: null,
-      grasa_pct: null,
-    })),
-  ];
+          musculo_pct: m.inbody_smm || m.calc_masa_muscular || m.musculo_pct || null,
+          imc: m.imc || null,
+          notas: m.notas || null,
+          timestamp: m.fecha ? new Date(m.fecha + "T12:00:00").getTime() : 0,
+        });
+      });
+    });
+
+    // 2. Fotos personales subidas por el usuario
+    personalPhotos.forEach((url, pIdx) => {
+      if (!url) return;
+      const { fecha, timestamp } = extractDateFromUrl(url);
+      list.push({
+        id: `pers-${pIdx}-${url.slice(-20)}`,
+        url,
+        type: "personal",
+        sourceLabel: "Foto Personal Privada",
+        fecha,
+        label: fecha ? fmtDate(fecha) : `Foto #${personalPhotos.length - pIdx}`,
+        peso: null,
+        grasa_pct: null,
+        musculo_pct: null,
+        imc: null,
+        notas: null,
+        timestamp: timestamp || (Date.now() - pIdx * 1000),
+      });
+    });
+
+    // Ordenar de más reciente a más antigua (Instagram style)
+    return list.sort((a, b) => b.timestamp - a.timestamp);
+  }, [metricas, personalPhotos, isSelfManaged]);
+
+  const evalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "evaluacion").length, [unifiedPhotos]);
+  const personalCount = useMemo(() => unifiedPhotos.filter((p) => p.type === "personal").length, [unifiedPhotos]);
+
+  const filteredPhotos = useMemo(() => {
+    if (galleryFilter === "evaluaciones") return unifiedPhotos.filter((p) => p.type === "evaluacion");
+    if (galleryFilter === "personales") return unifiedPhotos.filter((p) => p.type === "personal");
+    return unifiedPhotos;
+  }, [unifiedPhotos, galleryFilter]);
+
+  const handleStartComparisonWithPhoto = (photoItem) => {
+    const idx = unifiedPhotos.findIndex((p) => p.url === photoItem.url);
+    if (idx !== -1) {
+      if (idx === 0 && unifiedPhotos.length > 1) {
+        setComparatorAfterIdx(0);
+        setComparatorBeforeIdx(unifiedPhotos.length - 1);
+      } else {
+        setComparatorBeforeIdx(idx);
+        setComparatorAfterIdx(0);
+      }
+    }
+    setShowComparator(true);
+    setLightboxIndex(null);
+    setTimeout(() => {
+      comparatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  };
+
+  const handlePrevLightbox = useCallback(() => {
+    setLightboxIndex((prev) => {
+      if (prev === null) return null;
+      return prev > 0 ? prev - 1 : filteredPhotos.length - 1;
+    });
+  }, [filteredPhotos.length]);
+
+  const handleNextLightbox = useCallback(() => {
+    setLightboxIndex((prev) => {
+      if (prev === null) return null;
+      return prev < filteredPhotos.length - 1 ? prev + 1 : 0;
+    });
+  }, [filteredPhotos.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") handlePrevLightbox();
+      if (e.key === "ArrowRight") handleNextLightbox();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxIndex, handlePrevLightbox, handleNextLightbox]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
@@ -761,134 +866,413 @@ export default function Progreso({ cliente, isSelfManaged }) {
         )}
 
         {view === 'galeria' && (
-          <div className="space-y-10">
-            {allComparablePhotos.length >= 2 && (
-              <BeforeAfterComparator
-                photos={allComparablePhotos}
-                brand={brand}
-                clienteNombre={cliente?.nombre}
-              />
-            )}
+          <div className="space-y-6">
+            {/* ── BARRA DE HERRAMIENTAS Y FILTROS ESTILO INSTAGRAM ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E2E8F0] shadow-xs">
+              {/* Filtros por pestaña/píldora */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
+                <button
+                  onClick={() => setGalleryFilter('todas')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    galleryFilter === 'todas'
+                      ? 'bg-[#0B1929] text-white shadow-xs'
+                      : 'bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929]'
+                  }`}
+                >
+                  Todas ({unifiedPhotos.length})
+                </button>
 
-            {/* Sección Evaluaciones */}
-            {nutriPhotos.length > 0 && (
-              <div>
-                <div className="flex items-center gap-3 mb-6 border-b border-[#E2E8F0] pb-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#1A6FD4' }}>
-                    <ImageIcon size={18} />
-                  </div>
-                  <h3 className="text-lg font-bold text-[#0B1929]">{isSelfManaged ? "Fotos de Evaluaciones" : "Fotos de tu Nutriólogo"}</h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {nutriPhotos.map((url, i) => (
-                    <div 
-                      key={i} 
-                      className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
-                      onClick={() => setFullImage(url)}
-                    >
-                      <CachedImage
-                        src={url}
-                        alt={`Progreso evaluación ${i}`}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        fallback={<ImageIcon size={32} className="text-[#9BA5B0] m-auto" />}
-                      />
-                      <div className="absolute inset-0 bg-[#0B1929]/0 group-hover:bg-[#0B1929]/20 transition-colors" />
-                    </div>
-                  ))}
-                </div>
+                {evalCount > 0 && (
+                  <button
+                    onClick={() => setGalleryFilter('evaluaciones')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      galleryFilter === 'evaluaciones'
+                        ? 'bg-[var(--brand-primary)] text-white shadow-xs'
+                        : 'bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929]'
+                    }`}
+                  >
+                    <Stethoscope size={13} />
+                    <span>{isSelfManaged ? 'Evaluaciones' : 'Nutriólogo'} ({evalCount})</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setGalleryFilter('personales')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    galleryFilter === 'personales'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929]'
+                  }`}
+                >
+                  <Lock size={13} />
+                  <span>Mis Fotos ({personalCount})</span>
+                </button>
               </div>
-            )}
 
-            {/* Sección Personal */}
-            <div>
-              <div className="flex items-center justify-between mb-6 border-b border-[#E2E8F0] pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#ecfdf5', color: brand?.color_primario || '#059669' }}>
-                    <Lock size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-[#0B1929]">Galería Personal (Privada)</h3>
-                    <p className="text-xs text-[#6B7A8D]">Solo tú puedes ver estas fotos</p>
-                  </div>
-                </div>
+              {/* Botones de acción principales */}
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                {unifiedPhotos.length >= 2 && (
+                  <button
+                    onClick={() => setShowComparator(prev => !prev)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      showComparator
+                        ? 'bg-[var(--brand-primary)] text-white shadow-sm'
+                        : 'bg-white border border-[#E2E8F0] text-[#0B1929] hover:bg-gray-50'
+                    }`}
+                  >
+                    <Sparkles size={14} className={showComparator ? 'text-white' : 'text-[var(--brand-primary)]'} />
+                    <span>{showComparator ? 'Ocultar Comparador' : 'Comparar'}</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingPersonal}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 hover:opacity-80"
-                  style={{ backgroundColor: brand?.color_primario ? `${brand.color_primario}15` : '#F0F4FA', color: brand?.color_primario || '#0B1929' }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B1929] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-sm"
                 >
-                  <Camera size={16} />
-                  {uploadingPersonal ?"Subiendo..." :"Agregar fotos"}
+                  <Camera size={14} />
+                  <span>{uploadingPersonal ? 'Subiendo...' : 'Subir Foto'}</span>
                 </button>
-                <input 
-                  type="file" 
-                  multiple 
-                  accept="image/*" 
-                  className="hidden" 
-                  ref={fileInputRef} 
-                  onChange={handlePersonalUpload} 
+
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handlePersonalUpload}
                 />
               </div>
+            </div>
 
-              {personalPhotos.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {personalPhotos.map((url, i) => (
-                    <div 
-                      key={i} 
-                      className="aspect-square rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-sm group relative"
-                      onClick={() => setFullImage(url)}
-                    >
-                      <CachedImage 
-                        src={url} 
-                        alt={`Progreso personal ${i}`} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                        fallback={<Camera size={32} className="text-[#9BA5B0] m-auto" />}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handlePersonalDelete(url); }}
-                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+            {/* ── BANNER DE SUBIDA OPTIMISTA ── */}
+            {uploadingPersonal && (
+              <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
+                <UploadCloud size={17} className="animate-bounce" />
+                <span>Subiendo y comprimiendo tus fotos de forma segura en tu galería privada...</span>
+              </div>
+            )}
+
+            {/* ── SECCIÓN COMPARADOR ANTES VS DESPUÉS ── */}
+            {showComparator && unifiedPhotos.length >= 2 && (
+              <div ref={comparatorRef} className="animate-fadeIn">
+                <BeforeAfterComparator
+                  photos={unifiedPhotos}
+                  brand={brand}
+                  clienteNombre={cliente?.nombre}
+                  initialBeforeIdx={comparatorBeforeIdx}
+                  initialAfterIdx={comparatorAfterIdx}
+                  onClose={() => setShowComparator(false)}
+                />
+              </div>
+            )}
+
+            {/* Banner teaser si el comparador está cerrado pero hay fotos suficientes */}
+            {!showComparator && unifiedPhotos.length >= 2 && (
+              <div
+                onClick={() => setShowComparator(true)}
+                className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--brand-primary)]/50 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-blue-200 flex items-center justify-center text-[var(--brand-primary)] shrink-0 group-hover:scale-105 transition-transform">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-[#0B1929]">
+                      Herramienta de Comparación Antes vs. Después
+                    </h4>
+                    <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                      Desliza la cortina interactiva, analiza fotos lado a lado o con transparencia para medir tu progreso.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-blue-200 text-xs font-bold text-[var(--brand-primary)] rounded-xl shadow-2xs group-hover:bg-[var(--brand-primary)] group-hover:text-white transition-colors shrink-0"
+                >
+                  Abrir Comparador
+                </button>
+              </div>
+            )}
+
+            {/* ── GRID DE FOTOS ESTILO INSTAGRAM ── */}
+            {filteredPhotos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4.5">
+                {filteredPhotos.map((p, idx) => (
+                  <div
+                    key={p.id}
+                    onClick={() => setLightboxIndex(idx)}
+                    className="relative aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer border border-[#E2E8F0] shadow-2xs hover:shadow-lg transition-all duration-300 group bg-gray-100"
+                  >
+                    <CachedImage
+                      src={p.url}
+                      alt={p.label}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      fallback={
+                        p.type === 'evaluacion' ? (
+                          <ImageIcon size={32} className="text-[#9BA5B0] m-auto" />
+                        ) : (
+                          <Camera size={32} className="text-[#9BA5B0] m-auto" />
+                        )
+                      }
+                    />
+
+                    {/* Gradiente oscuro inferior y superior para legibilidad */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-85 group-hover:opacity-95 transition-opacity pointer-events-none" />
+
+                    {/* Insignias superiores */}
+                    <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-1.5 z-10">
+                      {/* Tipo de foto */}
+                      {p.type === 'evaluacion' ? (
+                        <span className="bg-blue-600/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                          <Stethoscope size={10} />
+                          <span>{isSelfManaged ? 'Evaluación' : 'Nutriólogo'}</span>
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                          <Lock size={10} />
+                          <span>Privada</span>
+                        </span>
+                      )}
+
+                      {/* Acciones flotantes en hover */}
+                      <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartComparisonWithPhoto(p);
+                          }}
+                          title="Comparar esta foto"
+                          className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-[#0B1929] flex items-center justify-center shadow-md transition-all cursor-pointer"
                         >
-                          <Trash2 size={14} />
+                          <Sparkles size={12} className="text-[var(--brand-primary)]" />
                         </button>
+                        {p.type === 'personal' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePersonalDelete(p.url);
+                            }}
+                            title="Eliminar foto"
+                            className="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md transition-all cursor-pointer"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-[#F8FAFC] border border-dashed rounded-2xl p-12 text-center flex flex-col items-center" style={{ borderColor: brand?.color_primario ? `${brand.color_primario}40` : '#CBD5E1' }}>
-                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-4" style={{ color: brand?.color_primario || '#9BA5B0' }}>
-                    <Camera size={24} />
+
+                    {/* Información inferior */}
+                    <div className="absolute bottom-2.5 inset-x-2.5 z-10 text-white">
+                      <p className="text-xs font-bold truncate drop-shadow-xs">
+                        {p.fecha ? fmtDate(p.fecha) : p.label}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {p.peso && (
+                          <span className="text-[10px] font-bold bg-white/20 backdrop-blur-xs px-1.5 py-0.2 rounded text-slate-100">
+                            {p.peso} kg
+                          </span>
+                        )}
+                        {p.grasa_pct && (
+                          <span className="text-[10px] font-semibold text-slate-200">
+                            {p.grasa_pct}% grasa
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-bold text-[#0B1929] mb-1">Galería vacía</h4>
-                  <p className="text-xs text-[#6B7A8D] max-w-[200px] mb-4">Sube fotos para registrar tu progreso. Solo tú podrás verlas.</p>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-6 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 shadow-sm"
-                    style={{ backgroundColor: brand?.color_primario || '#0B1929', color: '#fff' }}
-                  >
-                    Subir mi primera foto
-                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Estado vacío elegante */
+              <div className="bg-white border border-[#E2E8F0] rounded-3xl p-10 text-center max-w-md mx-auto shadow-sm">
+                <div className="w-14 h-14 bg-[#F0F4FA] rounded-2xl flex items-center justify-center mx-auto mb-3.5 text-[#6B7A8D]">
+                  {galleryFilter === 'personales' ? <Lock size={26} /> : <Camera size={26} />}
                 </div>
-              )}
-            </div>
-            
+                <h4 className="text-sm font-bold text-[#0B1929] mb-1">
+                  {galleryFilter === 'personales'
+                    ? 'No tienes fotos personales'
+                    : galleryFilter === 'evaluaciones'
+                    ? 'Sin fotos de evaluaciones'
+                    : 'Galería sin fotos registradas'}
+                </h4>
+                <p className="text-xs text-[#6B7A8D] mb-5">
+                  {galleryFilter === 'personales'
+                    ? 'Registra fotos privadas para monitorear tu propio cambio físico con total privacidad.'
+                    : galleryFilter === 'evaluaciones'
+                    ? 'Tu nutriólogo o entrenador agregará fotos en tus consultas físicas.'
+                    : 'Comienza subiendo tus fotos para ver tu evolución en el comparador.'}
+                </p>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 shadow-sm cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Camera size={14} />
+                  <span>Subir mi primera foto</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Full Image Modal */}
-      {fullImage && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setFullImage(null)}>
-          <button 
-            onClick={() => setFullImage(null)}
-            className="absolute top-6 right-6 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors"
+      {/* ── MODAL LIGHTBOX FULLSCREEN ESTILO INSTAGRAM ── */}
+      {lightboxIndex !== null && filteredPhotos[lightboxIndex] && (() => {
+        const currentPhoto = filteredPhotos[lightboxIndex];
+        return (
+          <div
+            className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md flex flex-col justify-between animate-fadeIn select-none"
+            onClick={() => setLightboxIndex(null)}
           >
-            <X size={24} />
-          </button>
-          <CachedImage src={fullImage} className="max-w-full max-h-[90vh] object-contain rounded-lg" alt="Vista ampliada" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
+            {/* Barra superior del visor */}
+            <div
+              className="px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between text-white border-b border-white/10 z-20 bg-black/40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 sm:gap-3">
+                {currentPhoto.type === 'evaluacion' ? (
+                  <span className="bg-blue-600 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                    <Stethoscope size={13} />
+                    <span>{isSelfManaged ? 'Evaluación Física' : 'Evaluación Nutricional'}</span>
+                  </span>
+                ) : (
+                  <span className="bg-emerald-600 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                    <Lock size={13} />
+                    <span>Foto Personal Privada</span>
+                  </span>
+                )}
+                <span className="text-xs text-slate-300 font-semibold hidden sm:inline">
+                  {currentPhoto.fecha ? fmtDate(currentPhoto.fecha) : currentPhoto.label}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xs text-slate-300 font-bold bg-white/10 px-2 py-0.5 rounded-md">
+                  {lightboxIndex + 1} / {filteredPhotos.length}
+                </span>
+                <button
+                  onClick={() => setLightboxIndex(null)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Viewport Central con botones Anterior / Siguiente y Swipe táctil */}
+            <div
+              className="flex-1 relative flex items-center justify-center p-2 sm:p-6 overflow-hidden"
+              onTouchStart={(e) => {
+                touchStartXRef.current = e.touches[0].clientX;
+              }}
+              onTouchEnd={(e) => {
+                if (touchStartXRef.current === null) return;
+                const diff = touchStartXRef.current - e.changedTouches[0].clientX;
+                if (diff > 50) handleNextLightbox();
+                else if (diff < -50) handlePrevLightbox();
+                touchStartXRef.current = null;
+              }}
+            >
+              {/* Botón Anterior */}
+              {filteredPhotos.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrevLightbox();
+                  }}
+                  className="absolute left-3 sm:left-6 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/85 text-white border border-white/20 flex items-center justify-center transition-all cursor-pointer shadow-lg"
+                  title="Foto anterior"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              )}
+
+              {/* Botón Siguiente */}
+              {filteredPhotos.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNextLightbox();
+                  }}
+                  className="absolute right-3 sm:right-6 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/85 text-white border border-white/20 flex items-center justify-center transition-all cursor-pointer shadow-lg"
+                  title="Foto siguiente"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              )}
+
+              {/* Imagen activa */}
+              <CachedImage
+                src={currentPhoto.url}
+                alt="Foto ampliada"
+                className="max-h-[70vh] sm:max-h-[75vh] w-auto max-w-[95vw] object-contain rounded-2xl shadow-2xl transition-all"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Barra inferior de detalles y acciones rápidas */}
+            <div
+              className="px-4 py-3 sm:px-8 sm:py-4 bg-[#0B1929]/90 border-t border-white/10 text-white flex flex-col sm:flex-row items-center justify-between gap-3 z-20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
+                <div>
+                  <p className="text-xs sm:text-sm font-bold text-white">
+                    {currentPhoto.fecha ? fmtDate(currentPhoto.fecha) : currentPhoto.label}
+                  </p>
+                  {currentPhoto.notas && (
+                    <p className="text-[11px] text-slate-300 max-w-md truncate">
+                      {currentPhoto.notas}
+                    </p>
+                  )}
+                </div>
+
+                {(currentPhoto.peso || currentPhoto.grasa_pct || currentPhoto.musculo_pct) && (
+                  <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/15 text-xs font-semibold">
+                    {currentPhoto.peso && <span>{currentPhoto.peso} kg</span>}
+                    {currentPhoto.grasa_pct && <span>• {currentPhoto.grasa_pct}% grasa</span>}
+                    {currentPhoto.musculo_pct && <span>• {currentPhoto.musculo_pct} kg músculo</span>}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleStartComparisonWithPhoto(currentPhoto)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                >
+                  <Sparkles size={14} />
+                  <span>Comparar esta foto</span>
+                </button>
+
+                <a
+                  href={currentPhoto.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="p-2 rounded-xl text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
+                  title="Abrir imagen completa"
+                >
+                  <Download size={16} />
+                </a>
+
+                {currentPhoto.type === 'personal' && (
+                  <button
+                    onClick={() => {
+                      setLightboxIndex(null);
+                      handlePersonalDelete(currentPhoto.url);
+                    }}
+                    className="p-2 rounded-xl text-rose-300 hover:text-rose-100 bg-rose-500/20 hover:bg-rose-500/30 transition-colors cursor-pointer"
+                    title="Eliminar foto personal"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <ConfirmModal
         isOpen={Boolean(confirmDelete)}
