@@ -208,6 +208,43 @@ export default function Login({ onLogin }) {
     };
   }, []);
 
+  const formatAuthError = (err) => {
+    if (!err) return "Ocurrió un error inesperado. Intenta de nuevo.";
+    let rawMsg = typeof err === "string" ? err : err.message || "";
+    rawMsg = rawMsg.replace(/^ERR_CATCH:\s*/i, "").trim();
+
+    try {
+      if (rawMsg.startsWith("{") && rawMsg.endsWith("}")) {
+        const parsed = JSON.parse(rawMsg);
+        if (parsed.message) rawMsg = parsed.message;
+      }
+    } catch {}
+
+    const m = rawMsg.toLowerCase();
+    if (m.includes("invalid login credentials") || m.includes("invalid_grant") || m.includes("invalid password") || m.includes("credenciales")) {
+      return "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.";
+    }
+    if (m.includes("email not confirmed")) {
+      return "Tu correo electrónico aún no ha sido confirmado. Revisa tu bandeja de entrada o spam.";
+    }
+    if (m.includes("already registered") || m.includes("already been registered") || m.includes("already exists")) {
+      return "Este correo ya tiene una cuenta registrada. Inicia sesión o usa '¿Olvidaste tu contraseña?'.";
+    }
+    if (m.includes("password should be at least")) {
+      return "La contraseña debe tener al menos 6 caracteres.";
+    }
+    if (m.includes("failed to fetch") || m.includes("network") || m.includes("offline")) {
+      return "Error de conexión. Verifica tu acceso a internet e intenta de nuevo.";
+    }
+    if (m.includes("rate limit") || m.includes("too many requests")) {
+      return "Demasiados intentos seguidos. Espera unos momentos antes de reintentar.";
+    }
+    if (m.includes("violates row-level security") || m.includes("schema cache") || m.includes("pgrst")) {
+      return "No se pudo registrar la solicitud en este momento. Por favor contacta a soporte.";
+    }
+    return rawMsg;
+  };
+
   const submit = async (overrideEmail, overridePass) => {
     const loginEmail = (typeof overrideEmail === "string" ? overrideEmail : email).trim();
     const loginPass = typeof overridePass === "string" ? overridePass : pass;
@@ -242,7 +279,7 @@ export default function Login({ onLogin }) {
         multiRoles: availableRoles
       });
     } catch (e) {
-      setErr("ERR_CATCH:" + (e.message || "Credenciales incorrectas"));
+      setErr(formatAuthError(e));
     }
     setLoading(false);
   };
@@ -262,7 +299,7 @@ export default function Login({ onLogin }) {
     }
     setLoading(true); setErr(""); setInfo("");
     try {
-      await dbPost("solicitudes_registro", {
+      await dbPost("solicitudes_profesionales", {
         nombre: nombre.trim(),
         email: email.trim(),
         tipo: signupType,
@@ -274,7 +311,7 @@ export default function Login({ onLogin }) {
       setInfo("¡Solicitud enviada con éxito! Revisaremos tus credenciales y te enviaremos un correo de activación pronto.");
       setMode("login");
     } catch (e) {
-      setErr(e.message || "Error al enviar la solicitud");
+      setErr(formatAuthError(e));
     }
     setLoading(false);
   };
@@ -330,13 +367,7 @@ export default function Login({ onLogin }) {
       setMode("login");
       setLoading(false);
     } catch (e) {
-      const msg = e.message || "Error al crear cuenta";
-      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already exists")) {
-        setErr("Este correo ya está registrado. Inicia sesión o usa '¿Olvidaste tu contraseña?'.");
-        setMode("login");
-      } else {
-        setErr(msg);
-      }
+      setErr(formatAuthError(e));
       setLoading(false);
     }
   };
@@ -349,7 +380,7 @@ export default function Login({ onLogin }) {
       setInfo("Te enviamos un enlace a tu correo para crear o restablecer tu contraseña. Revisa también tu carpeta de Spam.");
       setMode("login");
     } catch (e) {
-      setErr(e.message || "Error al enviar correo de recuperación");
+      setErr(formatAuthError(e));
     }
     setLoading(false);
   };
@@ -383,7 +414,7 @@ export default function Login({ onLogin }) {
       setInfo("¡Contraseña establecida con éxito! Ya puedes iniciar sesión.");
       setMode("login");
     } catch (e) {
-      setErr(e.message || "Error al guardar la contraseña");
+      setErr(formatAuthError(e));
     }
     setLoading(false);
   };

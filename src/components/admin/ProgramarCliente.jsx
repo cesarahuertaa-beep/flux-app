@@ -22,7 +22,7 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
-import { dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache } from "../../lib/supabase";
+import { dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
@@ -107,6 +107,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   useBackButton(!!showPlanModal, () => setShowPlanModal(false), 20);
   
   const getClientName = (id) => clientes?.find(c => c.id === id)?.nombre ||"Desconocido";
+
+  const notifyPlanUpdate = (table) => {
+    if (table) invalidateCache(table);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("flux:plan-updated", {
+        detail: { clienteId: selected?.id, table }
+      }));
+    }
+  };
 
   const loadHistorial = useCallback(async () => {
     if (!clientes || clientes.length === 0 || historialLoadedRef.current) return;
@@ -346,6 +355,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           await Promise.all(delPromises);
           loadCiclos();
           loadData(undefined, { silent: true, forceFresh: true });
+          notifyPlanUpdate("ciclos");
         } catch(err) {
           if (!isOfflineError(err)) {
             setCiclos(prevCiclos);
@@ -406,6 +416,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setCicloSel(cRes[0]);
       if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cRes[0].id);
       await loadData(cRes[0], { silent: true, forceFresh: true });
+      notifyPlanUpdate("ciclos");
       
       // Notify the patient (non-blocking)
       if (!isMiPlan && selected.auth_id) {
@@ -502,6 +513,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       }
 
       await loadData(activeCiclo, { silent: true, forceFresh: true });
+      notifyPlanUpdate("nutricion");
       setMsg(
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 text-green-500" /> Plantilla "{tpl.nombre}" aplicada con éxito
@@ -590,6 +602,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       setCicloSel(activeCiclo);
       if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, activeCiclo.id);
       await loadData(activeCiclo, { silent: true, forceFresh: true });
+      notifyPlanUpdate("rutinas");
       if (!isMiPlan && selected?.auth_id) {
         dbPost("notificaciones", {
           profile_id: selected.auth_id,
@@ -860,6 +873,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       }
 
       loadData(cicloSel, { silent: true, forceFresh: true });
+      notifyPlanUpdate("nutricion_dias");
 
       if (!isMiPlan && selected?.auth_id) {
         const throttleKey = `flux_notif_nutri_${selected.id}`;
@@ -901,6 +915,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           Array.isArray(list) ? list.filter(x => x.id !== d.id) : list
         );
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Día eliminado</div>);
+        notifyPlanUpdate("nutricion_dias");
         if (String(d.id).startsWith("temp_")) return;
         try {
           await dbDel(`nutricion_dias?id=eq.${d.id}`);
@@ -1249,6 +1264,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       }
 
       loadData(activeCiclo, { silent: true, forceFresh: true });
+      notifyPlanUpdate("rutinas");
 
       if (!isMiPlan && selected?.auth_id) {
         const throttleKey = `flux_notif_rutina_${selected.id}`;
@@ -1290,6 +1306,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           Array.isArray(list) ? list.filter(x => x.id !== r.id) : list
         );
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Rutina eliminada</div>);
+        notifyPlanUpdate("rutinas");
         if (String(r.id).startsWith("temp_")) return;
         try {
           await dbDel(`rutinas?id=eq.${r.id}`);
@@ -1355,6 +1372,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             d.orden = idx;
           }
         });
+        notifyPlanUpdate("nutricion_dias");
         return newItems;
       });
     }
@@ -1385,6 +1403,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
             r.orden = idx;
           }
         });
+        notifyPlanUpdate("rutinas");
         return newItems;
       });
     }

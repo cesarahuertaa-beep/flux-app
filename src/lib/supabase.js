@@ -346,11 +346,12 @@ if (typeof window !== "undefined") {
 }
 
 const RELATED_TABLES = {
-  ejercicios: ["ejercicios", "rutinas"],
-  rutinas: ["rutinas", "ejercicios"],
-  comidas: ["comidas", "nutricion_dias", "nutricion"],
-  nutricion_dias: ["nutricion_dias", "comidas", "nutricion"],
-  nutricion: ["nutricion", "nutricion_dias"],
+  ejercicios: ["ejercicios", "rutinas", "ciclos"],
+  rutinas: ["rutinas", "ejercicios", "ciclos"],
+  comidas: ["comidas", "nutricion_dias", "nutricion", "ciclos"],
+  nutricion_dias: ["nutricion_dias", "comidas", "nutricion", "ciclos"],
+  nutricion: ["nutricion", "nutricion_dias", "ciclos"],
+  ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias", "ejercicios"],
 };
 
 /** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms pero se refresca en segundo plano. */
@@ -363,6 +364,7 @@ export const invalidateCache = (table) => {
       persistEntry(key);
     }
   }
+  emitCacheUpdate("*", table || "*", null);
 };
 
 /** Actualiza de forma síncrona las entradas en caché de una tabla para mantener UI optimista en 0ms */
@@ -403,7 +405,7 @@ if (typeof window !== "undefined") {
 const isOfflineNow = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 // Tablas cuyo POST es seguro de encolar offline
-const QUEUEABLE_POST = ["progreso", "nutricion_progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento"];
+const QUEUEABLE_POST = ["progreso", "nutricion_progreso", "citas_ratings", "notificaciones", "metricas_progreso", "solicitudes_entrenamiento", "solicitudes_profesionales"];
 
 const isQueueable = (method, table) => {
   if (table.startsWith("rpc/")) return false;

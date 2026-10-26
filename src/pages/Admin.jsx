@@ -422,9 +422,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         lastActivityMap: activityMap
       });
 
-      // Auto-sanar perfil de atleta sombra (máximo una vez por sesión para evitar bucles)
-      if (!isCivil && role !== "staff" && role !== "administrativo" && !hasHealedShadowRef.current) {
-        hasHealedShadowRef.current = true;
+      // Auto-sanar perfil de atleta sombra (reintentar hasta asegurar que myShadowClient existe)
+      if (!isCivil && role !== "staff" && role !== "administrativo" && (!hasHealedShadowRef.current || !myShadowClient)) {
         const jwtEmail = getJwtEmail();
         const meProfile = (me && me.length > 0) ? me[0] : (session?.data || {});
         const trueEmail = (meProfile.email || jwtEmail || "").trim();
@@ -464,6 +463,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             });
             if (created && created.length > 0) {
               setMyShadowClient(created[0]);
+              hasHealedShadowRef.current = true;
             }
           } catch (err) {
             console.error("Error auto-creando perfil atleta:", err);
@@ -515,11 +515,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
 
           setMyShadowClient(primaryClone);
+          hasHealedShadowRef.current = true;
         }
       }
     } catch(e) { console.error("Error cargando clientes:", e); }
     setLoading(false);
   }, [clientesFilter, myId, isCivil, role, session?.token]);
+
+  useEffect(() => {
+    if (!isCivil && !myShadowClient && ["mi_entrenamiento", "nutricion", "entrenamiento", "progreso_atleta"].includes(tab)) {
+      loadClientes({ silent: true });
+    }
+  }, [tab, isCivil, myShadowClient, loadClientes]);
 
   const loadBiblioteca = useCallback(async () => {
     try { 

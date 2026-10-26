@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
-import { dbGet, dbUpsert, getPendingMutations } from "../lib/supabase";
+import { dbGet, dbGetFresh, dbUpsert, getPendingMutations } from "../lib/supabase";
 import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
@@ -104,13 +104,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   
   const [biblioteca, setBiblioteca] = useState([]);
 
-  const loadData = async ({ silent = false } = {}) => {
+  const loadData = async ({ silent = false, forceFresh = false } = {}) => {
     if (!silent && dias.length === 0 && rutinas.length === 0) {
       setLoading(true);
     }
+    const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       if (!isEmbedded && cliente?.nutriologo_id) {
-        const nutriProfile = await dbGet(`profiles?id=eq.${cliente.nutriologo_id}&select=bloqueado`);
+        const nutriProfile = await fetcher(`profiles?id=eq.${cliente.nutriologo_id}&select=bloqueado`);
         if (nutriProfile && nutriProfile[0]?.bloqueado) {
           setNutriologoBloqueado(true);
           setLoading(false);
@@ -120,9 +121,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       // Consultas paralelas iniciales
       const [cs, met, npRows] = await Promise.all([
-        dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`).catch(() => []),
-        dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`).catch(() => []),
-        dbGet(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`).catch(() => [])
+        fetcher(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`).catch(() => []),
+        fetcher(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`).catch(() => []),
+        fetcher(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`).catch(() => [])
       ]);
 
       const ciclo = cs.length ? cs[0] : null;
@@ -146,13 +147,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       // Consultas paralelas de nutrición y rutinas
       const [ns, rs] = await Promise.all([
-        dbGet(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`).catch(() => []),
-        dbGet(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => [])
+        fetcher(`nutricion?cliente_id=eq.${cliente.id}&${cicloFilter}`).catch(() => []),
+        fetcher(`rutinas?cliente_id=eq.${cliente.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => [])
       ]);
 
       if (ns && ns.length) {
         setNutri(ns[0]);
-        const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+        const ds = await fetcher(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
         if (ds) {
           setDias(ds.map(d => ({ 
             ...d, 
@@ -172,7 +173,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
+        const ps = await fetcher(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
         if (ps && Array.isArray(ps)) {
           const pm = {};
           ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
@@ -196,7 +197,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     let cacheTimer = null;
 
     const onFocus = () => {
-      if (document.visibilityState === 'visible') loadData({ silent: true });
+      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: true });
     };
 
     const onCacheUpdated = () => {
@@ -206,15 +207,23 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           Object.keys(pendingSavesRef.current || {}).length === 0 &&
           Object.keys(pendingNutriSavesRef.current || {}).length === 0
         ) {
-          loadData({ silent: true });
+          loadData({ silent: true, forceFresh: true });
         }
       }, 300);
+    };
+
+    const onPlanUpdated = (e) => {
+      const targetId = e?.detail?.clienteId;
+      if (!targetId || targetId === cliente?.id) {
+        loadData({ silent: true, forceFresh: true });
+      }
     };
 
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onFocus);
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
+    window.addEventListener("flux:plan-updated", onPlanUpdated);
     
     return () => {
       if (cacheTimer) clearTimeout(cacheTimer);
@@ -222,8 +231,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       window.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
+      window.removeEventListener("flux:plan-updated", onPlanUpdated);
     };
-  }, [cliente.id]);
+  }, [cliente?.id]);
+
+  // Si está embebido en el panel de Admin (nutriólogo viendo sus pestañas de atleta),
+  // recargar inmediatamente al alternar a Nutrición o Entrenamiento
+  useEffect(() => {
+    if (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) {
+      loadData({ silent: true, forceFresh: true });
+    }
+  }, [isEmbedded, embeddedTab]);
 
   const pendingSavesRef = useRef({});
   const globalSaveTimerRef = useRef(null);
