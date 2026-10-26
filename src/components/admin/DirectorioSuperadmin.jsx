@@ -92,8 +92,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [expandedNutri, setExpandedNutri] = useState(null);
 
   // Forms
-  const [formNutri, setFormNutri] = useState({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
-  const [editFormNutri, setEditFormNutri] = useState({ nombre: "", nombre_marca: "", color_primario: "", email: "", telefono: "", logo_url: "", role: "nutriologo" });
+  const [formNutri, setFormNutri] = useState({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo", cedula: "" });
+  const [editFormNutri, setEditFormNutri] = useState({ nombre: "", nombre_marca: "", color_primario: "", email: "", telefono: "", logo_url: "", role: "nutriologo", cedula: "" });
   const [formClient, setFormClient] = useState({ nombre: "", email: "", objetivo: "", telefono: "" });
 
   const [resolvedOwnerId, setResolvedOwnerId] = useState(myId);
@@ -191,7 +191,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       }
 
       const targetRole = formNutri.role || "nutriologo";
-      const authUser = await authInvite(cleanEmail, { role: targetRole, nombre: cleanNombre, nombre_marca: formNutri.nombre_marca });
+      const finalCedula = targetRole === "nutriologo" ? (formNutri.cedula?.trim() || null) : null;
+      const authUser = await authInvite(cleanEmail, { 
+        role: targetRole, 
+        nombre: cleanNombre, 
+        nombre_marca: formNutri.nombre_marca,
+        cedula: finalCedula
+      });
       await updateProfile(authUser.id, {
         role: targetRole,
         nombre: cleanNombre,
@@ -199,11 +205,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         nombre_marca: formNutri.nombre_marca,
         logo_url: formNutri.logo_url,
         color_primario: formNutri.color_primario,
+        cedula: finalCedula,
         creado_por_nombre: myName,
         activo: true
       });
       setShowInviteNutri(false);
-      setFormNutri({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo" });
+      setFormNutri({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo", cedula: "" });
       loadNutriologos();
       setMsg("✅ Invitación enviada al nutriólogo");
     } catch (e) {
@@ -239,6 +246,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       const payload = { ...editFormNutri };
       delete payload.email;
       if (showEditNutri?.isSuperadmin) delete payload.role;
+      if (payload.role === "nutriologo_estudiante") {
+        payload.cedula = null;
+      } else if (payload.cedula !== undefined) {
+        payload.cedula = payload.cedula?.trim() || null;
+      }
       await updateProfile(showEditNutri.id, payload);
       setShowEditNutri(null);
       loadNutriologos();
@@ -412,6 +424,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             nombre_marca: useNewData ? conflictUser.typedData.nombre_marca : p.nombre_marca,
             logo_url: useNewData ? conflictUser.typedData.logo_url : p.logo_url,
             color_primario: useNewData ? conflictUser.typedData.color_primario : p.color_primario,
+            cedula: targetRole === "nutriologo" ? (conflictUser.typedData.cedula || p.cedula || null) : null,
             creado_por_nombre: myName,
             activo: true
           });
@@ -425,6 +438,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             nombre_marca: conflictUser.typedData.nombre_marca || finalNombre,
             logo_url: conflictUser.typedData.logo_url || "",
             color_primario: conflictUser.typedData.color_primario || "#1A6FD4",
+            cedula: targetRole === "nutriologo" ? (conflictUser.typedData.cedula || null) : null,
             creado_por_nombre: myName,
             activo: true
           });
@@ -496,8 +510,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 </span>
               </div>
               <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span>{n.nombre}</span>
+                  {n.cedula && (
+                    <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                      Céd: {n.cedula}
+                    </span>
+                  )}
                   {n.telefono && (
                     <a href={`https://wa.me/${n.telefono.replace(/\D/g,'').length === 10 ? '52' + n.telefono.replace(/\D/g,'') : n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
                       <MessageCircle size={12} /> WhatsApp
@@ -525,7 +544,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
               <Btn small outline onClick={() => {
                 setShowEditNutri(n);
-                setEditFormNutri({ nombre: n.nombre || "", nombre_marca: n.nombre_marca || "", color_primario: n.color_primario || "#1A6FD4", email: n.email || "", telefono: n.telefono || "", logo_url: n.logo_url || "", role: n.role || "nutriologo" });
+                setEditFormNutri({ nombre: n.nombre || "", nombre_marca: n.nombre_marca || "", color_primario: n.color_primario || "#1A6FD4", email: n.email || "", telefono: n.telefono || "", logo_url: n.logo_url || "", role: n.role || "nutriologo", cedula: n.cedula || "" });
               }}>Editar</Btn>
               {!n.isSuperadmin && (
                 <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
@@ -775,6 +794,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Nombre completo">
             <input className={InputClass} value={formNutri.nombre} onChange={e => setFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
+          {formNutri.role !== "nutriologo_estudiante" && (
+            <Field label="Cédula profesional">
+              <input 
+                className={InputClass} 
+                placeholder="Ej. 12345678" 
+                value={formNutri.cedula || ""} 
+                onChange={e => setFormNutri(p=>({...p, cedula: e.target.value}))}
+              />
+            </Field>
+          )}
           <Field label="Email">
             <input className={InputClass} type="email" value={formNutri.email} onChange={e => setFormNutri(p=>({...p,email:e.target.value}))}/>
           </Field>
@@ -835,6 +864,16 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           <Field label="Nombre completo">
             <input className={InputClass} value={editFormNutri.nombre} onChange={e => setEditFormNutri(p=>({...p,nombre:e.target.value}))}/>
           </Field>
+          {!showEditNutri.isSuperadmin && editFormNutri.role !== "nutriologo_estudiante" && (
+            <Field label="Cédula profesional">
+              <input 
+                className={InputClass} 
+                placeholder="Ej. 12345678" 
+                value={editFormNutri.cedula || ""} 
+                onChange={e => setEditFormNutri(p=>({...p, cedula: e.target.value}))}
+              />
+            </Field>
+          )}
           <Field label="Teléfono">
             <input className={InputClass} type="tel" value={editFormNutri.telefono} onChange={e => setEditFormNutri(p=>({...p,telefono:e.target.value}))}/>
           </Field>
