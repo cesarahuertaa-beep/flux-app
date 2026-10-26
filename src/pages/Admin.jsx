@@ -121,7 +121,23 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [filtroRetencion, setFiltroRetencion] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
   const [selectedWaClient, setSelectedWaClient] = useState(null);
 
-  const [myShadowClient, setMyShadowClient] = useState(null);
+  const [myShadowClient, setMyShadowClient] = useState(() => {
+    try {
+      const s = sessionStorage.getItem(`flux_shadow_client_${myId}`);
+      return s ? JSON.parse(s) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (myShadowClient && myId) {
+      try {
+        sessionStorage.setItem(`flux_shadow_client_${myId}`, JSON.stringify(myShadowClient));
+      } catch {}
+    }
+  }, [myShadowClient, myId]);
+
   const [bloqueado, setBloqueado] = useState(false);
   const [diasGracia, setDiasGracia] = useState(false); // true = días 11-12, mostrar alerta
 
@@ -305,10 +321,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     };
 
     const findShadowCandidates = (list, myEmailNorm) => {
-      return list.filter(c =>
+      return (Array.isArray(list) ? list : []).filter(c =>
         (c.nutriologo_id === myId && c.objetivo === "Mi entrenamiento personal") ||
-        (c.auth_id && c.auth_id === myId && c.nutriologo_id === myId) ||
-        (myEmailNorm && (c.email || "").trim().toLowerCase() === myEmailNorm && c.nutriologo_id === myId)
+        (c.auth_id && c.auth_id === myId) ||
+        (myEmailNorm && (c.email || "").trim().toLowerCase() === myEmailNorm && (c.nutriologo_id === myId || !c.nutriologo_id))
       );
     };
 
@@ -407,23 +423,39 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       });
 
       // Auto-sanar perfil de atleta sombra (máximo una vez por sesión para evitar bucles)
-      if (!isCivil && role !== "staff" && role !== "administrativo" && me.length > 0 && !hasHealedShadowRef.current) {
+      if (!isCivil && role !== "staff" && role !== "administrativo" && !hasHealedShadowRef.current) {
         hasHealedShadowRef.current = true;
         const jwtEmail = getJwtEmail();
-        const trueEmail = (me[0].email || jwtEmail || "").trim();
+        const meProfile = (me && me.length > 0) ? me[0] : (session?.data || {});
+        const trueEmail = (meProfile.email || jwtEmail || "").trim();
         const myEmailNorm = trueEmail.toLowerCase();
 
-        if (!me[0].email && trueEmail) {
+        if (!meProfile.email && trueEmail && myId) {
           dbPatch(`profiles?id=eq.${myId}`, { email: trueEmail }).catch(() => {});
         }
 
-        const candidates = findShadowCandidates(r, myEmailNorm);
+        let candidates = findShadowCandidates(r, myEmailNorm);
 
-        if (candidates.length === 0 && (typeof navigator === "undefined" || navigator.onLine) && r.length > 0) {
+        // Si no está en r (ej. cuando el nutriólogo no tiene pacientes y r está vacío, o no vino por el filtro de nutriologo_id)
+        if (candidates.length === 0 && myId) {
+          try {
+            let directDb = await dbGet(`clientes?or=(auth_id.eq.${myId},and(nutriologo_id.eq.${myId},objetivo.eq.Mi%20entrenamiento%20personal))&order=created_at.desc`).catch(() => []);
+            if ((!directDb || directDb.length === 0) && myEmailNorm) {
+              directDb = await dbGet(`clientes?email=ilike.${encodeURIComponent(myEmailNorm)}&order=created_at.desc`).catch(() => []);
+            }
+            if (directDb && directDb.length > 0) {
+              candidates = directDb;
+            }
+          } catch (e) {
+            console.warn("Error buscando shadow client directo:", e);
+          }
+        }
+
+        if (candidates.length === 0 && (typeof navigator === "undefined" || navigator.onLine) && myId) {
           try {
             const created = await dbPost("clientes", {
-              nombre: me[0].nombre,
-              email: trueEmail,
+              nombre: meProfile.nombre || "Mi Plan",
+              email: trueEmail || `${myId}@flux.app`,
               auth_id: myId,
               objetivo: "Mi entrenamiento personal",
               nutriologo_id: myId,
@@ -468,7 +500,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           const patchPayload = {};
           if (trueEmail && primaryClone.email !== trueEmail) patchPayload.email = trueEmail;
           if (myId && primaryClone.auth_id !== myId) patchPayload.auth_id = myId;
+          if (primaryClone.nutriologo_id !== myId) patchPayload.nutriologo_id = myId;
           if (primaryClone.plan_tipo !== "premium") patchPayload.plan_tipo = "premium";
+          if (!primaryClone.activo) patchPayload.activo = true;
+          if (primaryClone.objetivo !== "Mi entrenamiento personal") patchPayload.objetivo = "Mi entrenamiento personal";
 
           if (Object.keys(patchPayload).length > 0) {
             try {
@@ -1728,18 +1763,23 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
     
       {((tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ||
-        visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('progreso_atleta')) && 
-        (isCivil ? clienteData : myShadowClient) && (
+        visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('progreso_atleta')) && (
         <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ? "flex-1 flex flex-col min-h-full" : "hidden"}>
-          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-            <ClienteView 
-              session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
-              isAtletaMode={false}
-              isEmbedded={true}
-              embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
-              onLogout={onLogout}
-            />
-          </Suspense>
+          {(isCivil ? clienteData : myShadowClient) ? (
+            <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+              <ClienteView 
+                session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
+                isAtletaMode={false}
+                isEmbedded={true}
+                embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
+                onLogout={onLogout}
+              />
+            </Suspense>
+          ) : (
+            <div className="p-6 md:p-8 max-w-5xl w-full mx-auto">
+              <ListSkeleton rows={4} />
+            </div>
+          )}
         </div>
       )}
 </AppLayout>
