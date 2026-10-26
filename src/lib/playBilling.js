@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
-import { dbPost, dbPatch } from "./supabase";
+import { dbGet, dbPost, dbPatch } from "./supabase";
 
 /**
  * Clave pública de RevenueCat para el proyecto Android en Google Play Store.
@@ -35,8 +35,44 @@ export function isNativePlayApp() {
 }
 
 /**
- * Inicializa RevenueCat Purchases en el cliente nativo con la API Key pública
- * y asocia opcionalmente el UID del usuario de Supabase.
+ * Consulta el estado actual de las suscripciones en Google Play vía RevenueCat
+ * y actualiza Supabase automáticamente si la suscripción se renovó o está activa.
+ */
+export async function syncPlayBillingStatus(userContext = {}) {
+  if (!isNativePlayApp()) return null;
+
+  try {
+    const resolvedUserId = userContext.clienteId || userContext.nutriologoId || userContext.userId || localStorage.getItem("flux_client_id") || localStorage.getItem("flux_profileId");
+    const resolvedRole = userContext.role || localStorage.getItem("flux_role") || "civil";
+
+    if (!resolvedUserId) return null;
+
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    const hasPremium = Boolean(customerInfo?.entitlements?.active?.[ENTITLEMENTS.PREMIUM]);
+    const hasEstudiante = Boolean(customerInfo?.entitlements?.active?.[ENTITLEMENTS.NUTRI_ESTUDIANTE]);
+
+    if (hasPremium || hasEstudiante) {
+      const activeProductId = hasPremium ? PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM : PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE;
+      await recordStorePurchaseInSupabase({
+        role: resolvedRole,
+        userId: resolvedUserId,
+        clienteId: userContext.clienteId || resolvedUserId,
+        productId: activeProductId,
+        customerInfo,
+        monto: userContext.monto,
+      });
+      return { active: true, customerInfo };
+    }
+    return { active: false, customerInfo };
+  } catch (e) {
+    console.warn("[RevenueCat] No se pudo sincronizar status en segundo plano:", e);
+    return null;
+  }
+}
+
+/**
+ * Inicializa RevenueCat Purchases en el cliente nativo con la API Key pública,
+ * asocia opcionalmente el UID del usuario de Supabase y sincroniza renovaciones activas.
  */
 export async function initPlayBilling(userId = null) {
   if (!isNativePlayApp()) {
@@ -63,6 +99,13 @@ export async function initPlayBilling(userId = null) {
       } catch (err) {
         console.warn("[RevenueCat] Error al sincronizar appUserID:", err);
       }
+    }
+
+    // Sincronizar en segundo plano si hay renovaciones activas de Google Play
+    if (userId) {
+      setTimeout(() => {
+        syncPlayBillingStatus({ userId, clienteId: userId }).catch(() => {});
+      }, 1500);
     }
 
     return { supported: true, configured: true };
@@ -114,6 +157,13 @@ async function recordStorePurchaseInSupabase({ role, userId, clienteId, productI
   const comprobanteNota = `[Google Play] Pedido oficial procesado vía RevenueCat (ID: ${transactionId})`;
 
   if (role === "civil" || (!role && clienteId)) {
+    // Evitar insertar recibos duplicados con la misma fecha de corte aprobada
+    const existing = await dbGet(`recibos_pago_civil?cliente_id=eq.${targetId}&fecha_corte_mes=eq.${expirationDateStr}&estado=eq.aprobado`).catch(() => []);
+    if (existing && existing.length > 0) {
+      await dbPatch(`clientes?id=eq.${targetId}`, { plan_tipo: "premium", activo: true, deactivated_at: null }).catch(() => {});
+      return existing[0];
+    }
+
     // 1. Insertar recibo en recibos_pago_civil
     const recibo = await dbPost("recibos_pago_civil", {
       cliente_id: targetId,
@@ -132,6 +182,13 @@ async function recordStorePurchaseInSupabase({ role, userId, clienteId, productI
 
     return recibo;
   } else if (role === "nutriologo_estudiante") {
+    // Evitar insertar recibos duplicados con la misma fecha de corte aprobada
+    const existing = await dbGet(`recibos_pago?nutriologo_id=eq.${targetId}&fecha_corte_mes=eq.${expirationDateStr}&estado=eq.aprobado`).catch(() => []);
+    if (existing && existing.length > 0) {
+      await dbPatch(`profiles?id=eq.${targetId}`, { bloqueado: false }).catch(() => {});
+      return existing[0];
+    }
+
     // 1. Insertar recibo en recibos_pago
     const recibo = await dbPost("recibos_pago", {
       nutriologo_id: targetId,

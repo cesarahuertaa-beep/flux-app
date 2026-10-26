@@ -14,7 +14,8 @@ import {
   Check,
   Users,
   GraduationCap,
-  Clock
+  Clock,
+  Sparkles
 } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
 import {
@@ -111,7 +112,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     expirationDate,
     diasRestantesText,
     yaPagado,
-    hasPendingPayment
+    hasPendingPayment,
+    isTrial,
+    trialDaysRemaining,
+    firstClientDate
   } = useMemo(() => {
     const today = new Date();
     const pendingPayment = historial.some(r => r.estado === "pendiente");
@@ -121,10 +125,49 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const lastValid = historial.find(r => r.estado === "aprobado" || r.estado === "pendiente");
       let targetCutoff, expDate = null;
 
+      // Calcular primer paciente para el periodo de prueba de 30 días
+      const myClients = (clientes || []).filter(c => c.nutriologo_id === profileId && c.objetivo !== "Mi entrenamiento personal");
+      let firstClientDateObj = null;
+      if (myClients.length > 0) {
+        const sorted = [...myClients].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        firstClientDateObj = new Date(sorted[0].created_at);
+      }
+
+      let isTrialPeriod = false;
+      let trialDaysRemainingCalc = null;
+
       if (!lastValid) {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        targetCutoff = d;
+        if (!firstClientDateObj) {
+          // Aún no registra a su primer paciente: periodo de prueba no ha iniciado (acceso total de cortesía)
+          isTrialPeriod = true;
+          const d = new Date();
+          d.setDate(d.getDate() + 30);
+          targetCutoff = d;
+          expDate = null;
+        } else {
+          // El periodo de prueba vence 30 días después del primer paciente (+ 2 días de gracia)
+          const trialExp = new Date(firstClientDateObj);
+          trialExp.setDate(trialExp.getDate() + 30);
+          trialExp.setHours(23, 59, 59, 999);
+          const trialGrace = new Date(trialExp);
+          trialGrace.setDate(trialGrace.getDate() + 2);
+
+          if (today <= trialGrace) {
+            isTrialPeriod = true;
+            expDate = trialExp;
+            targetCutoff = trialExp;
+            const now0 = new Date();
+            now0.setHours(0, 0, 0, 0);
+            const exp0 = new Date(trialExp);
+            exp0.setHours(0, 0, 0, 0);
+            trialDaysRemainingCalc = Math.max(0, Math.round((exp0 - now0) / (1000 * 60 * 60 * 24)));
+          } else {
+            expDate = trialExp;
+            const d = new Date();
+            d.setDate(d.getDate() + 30);
+            targetCutoff = d;
+          }
+        }
       } else {
         const lastExp = new Date(lastValid.fecha_corte_mes + "T23:59:59");
         const blockDate = new Date(lastExp);
@@ -147,7 +190,19 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const tarifaEstudiante = Number(ratesForStudent.nutri_estudiante ?? 239);
 
       let remainingStr = null;
-      if (expDate) {
+      if (isTrialPeriod) {
+        if (!firstClientDateObj) {
+          remainingStr = "Prueba de bienvenida activa (30 días de cortesía a partir de tu 1er paciente)";
+        } else if (trialDaysRemainingCalc > 1) {
+          remainingStr = `Prueba gratuita activa: ${trialDaysRemainingCalc} días restantes`;
+        } else if (trialDaysRemainingCalc === 1) {
+          remainingStr = "Prueba gratuita activa: vence mañana";
+        } else if (trialDaysRemainingCalc === 0) {
+          remainingStr = "Prueba gratuita activa: vence hoy";
+        } else {
+          remainingStr = "Prueba gratuita en días de gracia";
+        }
+      } else if (expDate) {
         const target = new Date(expDate);
         target.setHours(0, 0, 0, 0);
         const now0 = new Date();
@@ -162,7 +217,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const activePatientsCount = (clientes || []).filter(c => c.nutriologo_id === profileId && c.activo).length;
       const strCorte = targetCutoff.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
 
-      const isStudentPaid = expDate ? today <= new Date(new Date(expDate).setDate(expDate.getDate() + 2)) : false;
+      const isStudentPaid = isTrialPeriod || (expDate ? today <= new Date(new Date(expDate).setDate(expDate.getDate() + 2)) : false);
 
       return {
         desglose: [],
@@ -180,7 +235,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         expirationDate: expDate,
         diasRestantesText: remainingStr,
         yaPagado: isStudentPaid,
-        hasPendingPayment: pendingPayment
+        hasPendingPayment: pendingPayment,
+        isTrial: isTrialPeriod,
+        trialDaysRemaining: trialDaysRemainingCalc,
+        firstClientDate: firstClientDateObj
       };
     }
 
@@ -330,7 +388,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       expirationDate: null,
       diasRestantesText: null,
       yaPagado: isTitledPaid,
-      hasPendingPayment: pendingPayment
+      hasPendingPayment: pendingPayment,
+      isTrial: false,
+      trialDaysRemaining: null,
+      firstClientDate: firstClientDate
     };
   }, [clientes, perfil, loading, rawCfg, historial, isEstudiante, profileId, patrocinios]);
 
@@ -581,6 +642,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <h2 className="text-lg md:text-xl font-bold text-[#0B1929]">
               {hasPendingPayment
                 ? "Comprobante en Revisión"
+                : isEstudiante && isTrial
+                ? "Periodo de Prueba Gratuito Activo"
                 : isEstudiante
                 ? (yaPagado ? "Plan Estudiante Activo" : "Plan Estudiante — Pendiente de Renovación")
                 : (yaPagado ? "Servicio Profesional Activo" : "Corte de Facturación Pendiente")}
@@ -593,7 +656,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             {hasPendingPayment
               ? "Hemos recibido tu comprobante. Nuestro equipo lo validará a la brevedad."
               : isEstudiante
-              ? (diasRestantesText ? `${diasRestantesText} · Vencimiento: ${expirationDate ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" }) : fechaCorteText}` : "Mensualidad fija preferencial para estudiantes sin cobro por paciente.")
+              ? (diasRestantesText
+                  ? `${diasRestantesText} · ${expirationDate ? `Vencimiento: ${expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })}` : `Corte estimado: ${fechaCorteText}`}`
+                  : "Mensualidad fija preferencial para estudiantes sin cobro por paciente.")
               : `Tienes ${activeCount} paciente${activeCount !== 1 ? "s" : ""} activo${activeCount !== 1 ? "s" : ""} en Nivel ${currentTier} ($${currentRate}/pac). Próximo corte: ${fechaCorteText}.`}
           </p>
         </div>
@@ -603,6 +668,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <div className="bg-amber-50 text-amber-700 px-3.5 py-2 rounded-xl border border-amber-200 flex items-center gap-1.5 text-xs font-bold">
               <AlertCircle size={15} />
               <span>En Revisión</span>
+            </div>
+          ) : isEstudiante && isTrial ? (
+            <div className="bg-blue-50 text-[var(--brand-primary)] px-3.5 py-2 rounded-xl border border-blue-200 flex items-center gap-1.5 text-xs font-bold">
+              <Sparkles size={15} className="text-amber-500" />
+              <span>Prueba de Cortesía</span>
             </div>
           ) : yaPagado ? (
             <div className="bg-emerald-50 text-emerald-700 px-3.5 py-2 rounded-xl border border-emerald-200 flex items-center gap-1.5 text-xs font-bold">
@@ -661,7 +731,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             </div>
 
             <div className="pt-6 mt-6 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
-              <span>Próximo Vencimiento</span>
+              <span>{isTrial ? "Término de Cortesía" : "Próximo Vencimiento"}</span>
               <span className="font-bold text-amber-300">
                 {expirationDate
                   ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })
@@ -671,7 +741,34 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           </div>
 
           {/* Columna Derecha: Método de Pago (7 cols) */}
-          <div className="md:col-span-7">
+          <div className="md:col-span-7 space-y-4">
+            {isTrial && (
+              <div className="p-4 rounded-3xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-3 shadow-xs">
+                <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+                  <Sparkles size={18} />
+                </div>
+                <div className="text-xs text-amber-900 leading-relaxed">
+                  <span className="font-bold block text-sm text-amber-950 mb-0.5">
+                    🎉 Acceso de Cortesía Activo
+                  </span>
+                  {firstClientDate ? (
+                    <span>
+                      Cuentas con 30 días de acceso total sin costo. Te quedan{" "}
+                      <strong>{trialDaysRemaining ?? 30} días de prueba</strong> antes de tu primera mensualidad de ${Number(currentRate).toFixed(2)} MXN.
+                    </span>
+                  ) : (
+                    <span>
+                      ¡Bienvenido a FLUX! Tienes acceso total de cortesía. Tu periodo de prueba de 30 días comenzará de forma automática en cuanto des de alta a tu primer paciente.
+                    </span>
+                  )}
+                  <span className="block mt-1 text-amber-800/90">
+                    {isPlayApp
+                      ? "Puedes iniciar tu suscripción con antelación para que empiece a cobrarse al terminar tu periodo de prueba."
+                      : "No requieres subir ningún pago mientras tu prueba gratuita esté vigente."}
+                  </span>
+                </div>
+              </div>
+            )}
             {isPlayApp ? (
               /* Google Play Subscription (Android Oficial — Sin transferencias para cumplir políticas de Google) */
               <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between h-full">
@@ -757,7 +854,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <CreditCard size={18} />
-                    <span>{uploading ? "Conectando con Google Play..." : "Suscribirme con Google Play"}</span>
+                    <span>{uploading ? "Conectando con Google Play..." : (isTrial ? "Activar Suscripción Anticipada" : "Suscribirme con Google Play")}</span>
                   </button>
 
                   <div className="text-center pt-1">
