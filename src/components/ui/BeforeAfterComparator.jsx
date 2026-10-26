@@ -118,17 +118,6 @@ export function BeforeAfterComparator({
     setAfterIdx(temp);
   };
 
-  const handlePresetFirstVsLast = () => {
-    setBeforeIdx(photos.length - 1);
-    setAfterIdx(0);
-  };
-
-  const handlePresetRecent = () => {
-    if (photos.length >= 2) {
-      setBeforeIdx(1);
-      setAfterIdx(0);
-    }
-  };
 
   const loadImage = (url) =>
     new Promise((resolve, reject) => {
@@ -302,67 +291,23 @@ export function BeforeAfterComparator({
   return (
     <div className="bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] my-6 transition-all">
       {/* ── TOP HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
-              <Sparkles size={17} />
-            </div>
-            <h3 className="text-base md:text-lg font-bold text-[#0B1929]">
-              Comparador de Evolución Física
-            </h3>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+            <Sparkles size={17} />
           </div>
-          <p className="text-xs text-[#6B7A8D] mt-1">
-            Compara cualquier par de fotos de tu proceso: desliza la cortina, visualízalas lado a lado o desvanece la opacidad
-          </p>
+          <h3 className="text-base font-bold text-[#0B1929] truncate">
+            Comparador de Progreso
+          </h3>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          {/* Comparison Mode Selector */}
-          <div className="bg-[#F0F4FA] p-1 rounded-xl inline-flex gap-1">
-            <button
-              onClick={() => setMode("slider")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                mode === "slider"
-                  ? "bg-white text-[var(--brand-primary)] shadow-sm"
-                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-              }`}
-              title="Cortina deslizable"
-            >
-              <SlidersHorizontal size={13} />
-              <span>Cortina</span>
-            </button>
-            <button
-              onClick={() => setMode("split")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                mode === "split"
-                  ? "bg-white text-[var(--brand-primary)] shadow-sm"
-                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-              }`}
-              title="Lado a lado"
-            >
-              <Columns size={13} />
-              <span>Lado a Lado</span>
-            </button>
-            <button
-              onClick={() => setMode("fade")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                mode === "fade"
-                  ? "bg-white text-[var(--brand-primary)] shadow-sm"
-                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-              }`}
-              title="Superposición con transparencia"
-            >
-              <Layers size={13} />
-              <span>Desvanecer</span>
-            </button>
-          </div>
-
+        <div className="flex items-center gap-2 shrink-0">
           {/* Export PNG */}
           <button
             onClick={handleExportImage}
             disabled={exporting}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B1929] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shrink-0 shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B1929] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-xs"
+            title="Descargar imagen comparativa"
           >
             <Download size={14} />
             <span className="hidden sm:inline">
@@ -373,12 +318,53 @@ export function BeforeAfterComparator({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 text-[#6B7A8D] hover:text-[#0B1929] rounded-xl hover:bg-gray-100 transition-colors"
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] hover:text-[#0B1929] flex items-center justify-center transition-colors cursor-pointer"
+              title="Cerrar comparador"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           )}
         </div>
+      </div>
+
+      {/* ── SEGMENTED CONTROL: 3 MODOS DE COMPARACIÓN ── */}
+      <div className="grid grid-cols-3 gap-1 bg-[#F0F4FA] p-1 rounded-2xl mb-5 w-full">
+        <button
+          onClick={() => setMode("slider")}
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mode === "slider"
+              ? "bg-white text-[var(--brand-primary)] shadow-xs"
+              : "text-[#6B7A8D] hover:text-[#0B1929]"
+          }`}
+          title="Cortina deslizable"
+        >
+          <SlidersHorizontal size={14} className="shrink-0" />
+          <span>Cortina</span>
+        </button>
+        <button
+          onClick={() => setMode("split")}
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mode === "split"
+              ? "bg-white text-[var(--brand-primary)] shadow-xs"
+              : "text-[#6B7A8D] hover:text-[#0B1929]"
+          }`}
+          title="Lado a lado"
+        >
+          <Columns size={14} className="shrink-0" />
+          <span>Lado a Lado</span>
+        </button>
+        <button
+          onClick={() => setMode("fade")}
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mode === "fade"
+              ? "bg-white text-[var(--brand-primary)] shadow-xs"
+              : "text-[#6B7A8D] hover:text-[#0B1929]"
+          }`}
+          title="Superposición con transparencia"
+        >
+          <Layers size={14} className="shrink-0" />
+          <span>Desvanecer</span>
+        </button>
       </div>
 
       {/* ── PHOTO SELECTION CONTROLLER SLOTS ── */}
@@ -459,27 +445,6 @@ export function BeforeAfterComparator({
             <span className="text-xs font-bold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2.5 py-1 rounded-lg shrink-0 group-hover:bg-[var(--brand-primary)] group-hover:text-white transition-colors">
               Cambiar
             </span>
-          </div>
-        </div>
-
-        {/* Quick Presets row */}
-        <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-[#E2E8F0]/80">
-          <span className="text-[11px] font-semibold text-[#6B7A8D]">Atajos rápidos:</span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={handlePresetFirstVsLast}
-              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929] hover:bg-gray-50 transition-colors cursor-pointer"
-            >
-              ⭐ Inicio vs. Actual
-            </button>
-            {photos.length > 2 && (
-              <button
-                onClick={handlePresetRecent}
-                className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929] hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                📅 Último Mes
-              </button>
-            )}
           </div>
         </div>
       </div>

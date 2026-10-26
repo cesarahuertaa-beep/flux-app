@@ -966,34 +966,6 @@ export default function Progreso({ cliente, isSelfManaged }) {
               </div>
             )}
 
-            {/* Banner teaser si el comparador está cerrado pero hay fotos suficientes */}
-            {!showComparator && unifiedPhotos.length >= 2 && (
-              <div
-                onClick={() => setShowComparator(true)}
-                className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--brand-primary)]/50 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-blue-200 flex items-center justify-center text-[var(--brand-primary)] shrink-0 group-hover:scale-105 transition-transform">
-                    <Sparkles size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-[#0B1929]">
-                      Herramienta de Comparación Antes vs. Después
-                    </h4>
-                    <p className="text-[11px] text-[#6B7A8D] mt-0.5">
-                      Desliza la cortina interactiva, analiza fotos lado a lado o con transparencia para medir tu progreso.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-blue-200 text-xs font-bold text-[var(--brand-primary)] rounded-xl shadow-2xs group-hover:bg-[var(--brand-primary)] group-hover:text-white transition-colors shrink-0"
-                >
-                  Abrir Comparador
-                </button>
-              </div>
-            )}
-
             {/* ── GRID DE FOTOS ESTILO INSTAGRAM ── */}
             {filteredPhotos.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4.5">
