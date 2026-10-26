@@ -213,7 +213,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
             if (raw) {
               const parsed = JSON.parse(raw);
               const comidasList = d.comidas || [];
-              const doneCount = comidasList.filter((_, cIdx) => !!parsed?.comidasDone?.[cIdx]).length;
+              const doneMap = (parsed && typeof parsed.comidasDone === "object" && parsed.comidasDone !== null) ? parsed.comidasDone : {};
+              let doneCount = comidasList.filter((c, cIdx) => Boolean(
+                (c.id && doneMap[c.id]) ||
+                doneMap[cIdx] ||
+                doneMap[String(cIdx)] ||
+                (c.orden != null && doneMap[c.orden])
+              )).length;
               if ((Number(parsed?.agua) > 0) || doneCount > 0) {
                 npMap[mapKey] = {
                   cliente_id: selected.id,
@@ -828,7 +834,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
               const rec = nutriProgreso[`${d.id}-${activeWeekNum}`];
               const totalComidasDia = (d.comidas || []).length;
               const comidasDoneMap = (rec && typeof rec.comidas_done === "object" && rec.comidas_done !== null) ? rec.comidas_done : {};
-              const realizadasDia = (d.comidas || []).filter(c => Boolean(comidasDoneMap[c.id])).length;
+              let realizadasDia = (d.comidas || []).filter((c, ci) => Boolean(
+                (c.id && comidasDoneMap[c.id]) ||
+                comidasDoneMap[ci] ||
+                comidasDoneMap[String(ci)] ||
+                (c.orden != null && comidasDoneMap[c.orden])
+              )).length;
+              if (realizadasDia === 0 && Number(rec?.comidas_realizadas) > 0) {
+                realizadasDia = Math.min(Number(rec.comidas_realizadas), totalComidasDia);
+              }
               const aguaMl = Number(rec?.agua_ml) || 0;
               const metaAguaDia = Number(rec?.meta_agua_ml) || defaultMetaAgua;
 
@@ -897,7 +911,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                         const isSel = s.weekNum === activeWeekNum;
                         const hasAnyDataInWeek = nutriDias.some(d => {
                           const r = nutriProgreso[`${d.id}-${s.weekNum}`];
-                          return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0);
+                          return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0 || Object.values(r.comidas_done || {}).some(Boolean));
                         });
                         return (
                           <button
@@ -1069,7 +1083,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                             {(d.comidas || []).length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {(d.comidas || []).map((c, ci) => {
-                                  const isDone = Boolean(d.comidasDoneMap[c.id]);
+                                  const isDone = Boolean(
+                                    (c.id && d.comidasDoneMap[c.id]) ||
+                                    d.comidasDoneMap[ci] ||
+                                    d.comidasDoneMap[String(ci)] ||
+                                    (c.orden != null && d.comidasDoneMap[c.orden]) ||
+                                    (ci < d.realizadasDia && Object.keys(d.comidasDoneMap).length === 0)
+                                  );
                                   return (
                                     <span
                                       key={c.id || ci}
@@ -1134,7 +1154,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                                   const r = nutriProgreso[`${d.id}-${s.weekNum}`];
                                   const agua = Number(r?.agua_ml) || 0;
                                   const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
-                                  const doneCount = (d.comidas || []).filter(c => Boolean(doneMap[c.id])).length;
+                                  let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
+                                    (c.id && doneMap[c.id]) ||
+                                    doneMap[ci] ||
+                                    doneMap[String(ci)] ||
+                                    (c.orden != null && doneMap[c.orden])
+                                  )).length;
+                                  if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
+                                    doneCount = Math.min(Number(r.comidas_realizadas), totalC);
+                                  }
                                   const hasAny = agua > 0 || doneCount > 0;
                                   return (
                                     <td

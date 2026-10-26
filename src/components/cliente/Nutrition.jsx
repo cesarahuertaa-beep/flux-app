@@ -117,7 +117,12 @@ export default function Nutrition({
       // Si había datos en localStorage que aún no estaban en Supabase, sincronizarlos automáticamente
       const hasLocalData = (Number(local.agua) > 0) || Object.values(local.comidasDone || {}).some(Boolean);
       if (hasLocalData && diaId && typeof onNutriProgressChange === "function") {
-        const doneCount = comidas.filter((_, idx) => !!local.comidasDone?.[idx]).length;
+        const doneCount = comidas.filter((m, idx) => Boolean(
+          (m?.id && local.comidasDone?.[m.id]) ||
+          local.comidasDone?.[idx] ||
+          local.comidasDone?.[String(idx)] ||
+          (m?.orden != null && local.comidasDone?.[m.orden])
+        )).length;
         onNutriProgressChange({
           dia_id: diaId,
           semana: Number(semanaActualCiclo) || 1,
@@ -133,6 +138,16 @@ export default function Nutrition({
     }
   }, [habitStorageKey, diaId, semanaActualCiclo, serverRec?.updated_at]);
 
+  const isMealDone = (meal, idx, doneObj = habitsData?.comidasDone) => {
+    if (!doneObj || typeof doneObj !== "object") return false;
+    return Boolean(
+      (meal?.id && doneObj[meal.id]) ||
+      doneObj[idx] ||
+      doneObj[String(idx)] ||
+      (meal?.orden != null && doneObj[meal.orden])
+    );
+  };
+
   // Persistir cambios en localStorage + Supabase (Local-First)
   const updateHabits = (updater) => {
     setHabitsData((prev) => {
@@ -143,7 +158,12 @@ export default function Nutrition({
         console.error(e);
       }
       if (diaId && typeof onNutriProgressChange === "function") {
-        const doneCount = comidas.filter((_, idx) => !!next.comidasDone?.[idx]).length;
+        const doneCount = comidas.filter((m, idx) => Boolean(
+          (m?.id && next.comidasDone?.[m.id]) ||
+          next.comidasDone?.[idx] ||
+          next.comidasDone?.[String(idx)] ||
+          (m?.orden != null && next.comidasDone?.[m.orden])
+        )).length;
         onNutriProgressChange({
           dia_id: diaId,
           semana: Number(semanaActualCiclo) || 1,
@@ -168,15 +188,26 @@ export default function Nutrition({
     }));
   };
 
-  const toggleComidaDone = (mealId, e) => {
+  const toggleComidaDone = (meal, idx, e) => {
     if (e) e.stopPropagation();
-    updateHabits((prev) => ({
-      ...prev,
-      comidasDone: {
-        ...(prev.comidasDone || {}),
-        [mealId]: !prev.comidasDone?.[mealId]
+    const isDone = isMealDone(meal, idx);
+    const nextVal = !isDone;
+
+    updateHabits((prev) => {
+      const nextDone = { ...(prev.comidasDone || {}) };
+      nextDone[idx] = nextVal;
+      nextDone[String(idx)] = nextVal;
+      if (meal?.id) {
+        nextDone[meal.id] = nextVal;
       }
-    }));
+      if (meal?.orden != null) {
+        nextDone[meal.orden] = nextVal;
+      }
+      return {
+        ...prev,
+        comidasDone: nextDone
+      };
+    });
   };
 
   if (!dias || dias.length === 0) {
@@ -351,7 +382,7 @@ export default function Nutrition({
           {/* Adherencia de Comidas del Día */}
           <div className="w-full md:w-64 flex flex-col gap-2">
             {(() => {
-              const realizadasCount = comidas.filter((_, idx) => !!habitsData?.comidasDone?.[idx]).length;
+              const realizadasCount = comidas.filter((m, idx) => isMealDone(m, idx)).length;
               const pctComidas = comidas.length > 0 ? Math.round((realizadasCount / comidas.length) * 100) : 0;
               return (
                 <>
@@ -391,7 +422,7 @@ export default function Nutrition({
 
         {comidas.map((meal, idx) => {
           const isExpanded = expandedMeal === idx;
-          const isDone = !!habitsData?.comidasDone?.[idx];
+          const isDone = isMealDone(meal, idx);
           // Etiqueta visual: usamos meal.nombre como label principal
           const label = meal.nombre || `Comida ${idx + 1}`;
           const hora  = meal.hora || "";
@@ -416,7 +447,7 @@ export default function Nutrition({
                 {/* Botón de Check de Comida Realizada */}
                 <button
                   type="button"
-                  onClick={(e) => toggleComidaDone(idx, e)}
+                  onClick={(e) => toggleComidaDone(meal, idx, e)}
                   title={isDone ? "Comida cumplida (clic para desmarcar)" : "Marcar como comida realizada"}
                   className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                     isDone
