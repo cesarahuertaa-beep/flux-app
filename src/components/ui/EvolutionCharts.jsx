@@ -376,13 +376,9 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
                 </p>
               </div>
 
-              {activeSomato ? (
+              {activeSomato && (
                 <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">
                   {classifySomatotype(activeSomato.x, activeSomato.y)}
-                </span>
-              ) : (
-                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-2.5 py-0.5 rounded-md whitespace-nowrap">
-                  Antropometría Manual
                 </span>
               )}
             </div>
@@ -465,23 +461,23 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
 
                   {/* Etiquetas de los 3 polos */}
                   <g>
-                    <rect x="115" y="4" width="90" height="18" rx="9" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="1" />
+                    <rect x="122" y="4" width="76" height="18" rx="9" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="1" />
                     <text x="160" y="16" textAnchor="middle" className="text-[9px] font-bold fill-emerald-700">
-                      MESOMORFO (Músculo)
+                      MESOMORFO
                     </text>
                   </g>
 
                   <g>
-                    <rect x="8" y="244" width="95" height="18" rx="9" fill="#FFFBEB" stroke="#FDE68A" strokeWidth="1" />
+                    <rect x="17" y="244" width="76" height="18" rx="9" fill="#FFFBEB" stroke="#FDE68A" strokeWidth="1" />
                     <text x="55" y="256" textAnchor="middle" className="text-[9px] font-bold fill-amber-700">
-                      ENDOMORFO (Adiposo)
+                      ENDOMORFO
                     </text>
                   </g>
 
                   <g>
-                    <rect x="217" y="244" width="95" height="18" rx="9" fill="#EFF6FF" stroke="#BFDBFE" strokeWidth="1" />
+                    <rect x="226" y="244" width="76" height="18" rx="9" fill="#EFF6FF" stroke="#BFDBFE" strokeWidth="1" />
                     <text x="264" y="256" textAnchor="middle" className="text-[9px] font-bold fill-blue-700">
-                      ECTOMORFO (Delgado)
+                      ECTOMORFO
                     </text>
                   </g>
 
