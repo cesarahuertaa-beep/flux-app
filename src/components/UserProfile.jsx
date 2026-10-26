@@ -9,13 +9,16 @@ import RoleSwitcher from "./RoleSwitcher";
 import { useBackButton } from "../lib/backButtonHandler";
 import { CachedImage } from "../lib/mediaCache";
 import { showFluxAlert } from "./ui/ConfirmModal";
+import { refreshUserRoles } from "../lib/authRoles";
 
-export default function UserProfile({ session, onLogout, onChangeRole, multiRoles }) {
+export default function UserProfile({ session, onLogout, onChangeRole, onRolesUpdated, multiRoles }) {
   const navigate = useNavigate();
   const user = session?.data || session; // Cliente o Admin
   const isCliente = session?.role === "cliente" || session?.role === "civil";
   const isSuperadmin = session?.role === "superadmin" || user?.role === "superadmin";
   
+  const [currentMultiRoles, setCurrentMultiRoles] = useState(multiRoles || []);
+
   const [form, setForm] = useState({
     nombre: user?.nombre || "",
     telefono: user?.telefono || "",
@@ -44,6 +47,29 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       }).catch(()=>{});
     }
   }, [isCliente, user?.nutriologo_id]);
+
+  useEffect(() => {
+    if (multiRoles && multiRoles.length > 0) {
+      setCurrentMultiRoles(multiRoles);
+    }
+  }, [multiRoles]);
+
+  // Sincronizar roles disponibles desde Supabase para detectar invitaciones recientes sin requerir cerrar sesión
+  useEffect(() => {
+    const emailToLookup = form.email || user?.email;
+    const authIdToLookup = session?.profileId || user?.auth_id;
+    if (!emailToLookup && !authIdToLookup) return;
+
+    refreshUserRoles(authIdToLookup, emailToLookup).then(roles => {
+      if (roles && roles.length > 0) {
+        setCurrentMultiRoles(roles);
+        try { localStorage.setItem("flux_multi_roles", JSON.stringify(roles)); } catch {}
+        if (typeof onRolesUpdated === "function") {
+          onRolesUpdated(roles);
+        }
+      }
+    }).catch(e => console.error("Error refreshing roles in UserProfile:", e));
+  }, [user?.email, form.email, session?.profileId]);
 
   // Refrescar datos frescos desde la BD al montar, para no depender del caché del localStorage
   useEffect(() => {
@@ -75,11 +101,11 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
       if (user) {
         Object.assign(user, formData); // Actualizar cache local de sesión
       }
-      if (multiRoles) {
-        multiRoles.forEach(r => {
+      if (currentMultiRoles && currentMultiRoles.length > 0) {
+        currentMultiRoles.forEach(r => {
           if (r.data) Object.assign(r.data, formData);
         });
-        localStorage.setItem("flux_multi_roles", JSON.stringify(multiRoles));
+        localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
       }
     } catch (e) {
       console.error("Error saving profile", e);
@@ -159,7 +185,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, multiRole
 
       <div className="max-w-4xl mx-auto w-full pb-8 px-4 sm:px-6 md:px-8 pt-6">
 
-      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={multiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
+      <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={currentMultiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 
       <DatosPersonalesCard 
         form={form} 

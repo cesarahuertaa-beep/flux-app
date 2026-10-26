@@ -8,8 +8,9 @@ import IdentidadEmpresarialCard from"./IdentidadEmpresarialCard";
 import RoleSwitcher from"../RoleSwitcher";
 import { syncPersonalData } from"../../lib/supabase";
 import { isNativePlayApp } from "../../lib/playBilling";
+import { refreshUserRoles } from "../../lib/authRoles";
 
-export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, multiRoles }) {
+export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, onRolesUpdated, multiRoles }) {
   const navigate = useNavigate();
   const isPlayApp = isNativePlayApp();
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,8 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
   const isSuperadmin = role ==="superadmin";
   const isTeam = role ==="staff" || role ==="administrativo";
+
+  const [currentMultiRoles, setCurrentMultiRoles] = useState(multiRoles || []);
 
   const [personalForm, setPersonalForm] = useState({
     nombre:"", telefono:"", email:"", avatar_url:"", fecha_nacimiento:"", genero:"", pais:"México", estado_provincia:""
@@ -109,15 +112,34 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (multiRoles && multiRoles.length > 0) {
+      setCurrentMultiRoles(multiRoles);
+    }
+  }, [multiRoles]);
+
+  useEffect(() => {
+    if (!profileId && !personalForm.email) return;
+    refreshUserRoles(profileId, personalForm.email).then(roles => {
+      if (roles && roles.length > 0) {
+        setCurrentMultiRoles(roles);
+        try { localStorage.setItem("flux_multi_roles", JSON.stringify(roles)); } catch {}
+        if (typeof onRolesUpdated === "function") {
+          onRolesUpdated(roles);
+        }
+      }
+    }).catch(e => console.error("Error refreshing roles in PerfilNutriologo:", e));
+  }, [profileId, personalForm.email]);
+
   const handleSavePersonal = async (formData) => {
     setSavingPersonal(true);
     try {
       await syncPersonalData(personalForm.email, formData);
-      if (multiRoles) {
-        multiRoles.forEach(r => {
+      if (currentMultiRoles && currentMultiRoles.length > 0) {
+        currentMultiRoles.forEach(r => {
           if (r.data) Object.assign(r.data, formData);
         });
-        localStorage.setItem("flux_multi_roles", JSON.stringify(multiRoles));
+        localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
       }
     } catch (e) {
       setErr("Error guardando datos personales: " + (e.message || ""));
@@ -203,7 +225,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </div>
       )}
 
-      <RoleSwitcher currentRole={role} multiRoles={multiRoles} onChangeRole={onChangeRole} />
+      <RoleSwitcher currentRole={role} multiRoles={currentMultiRoles} onChangeRole={onChangeRole} />
 
       <DatosPersonalesCard form={personalForm} setForm={setPersonalForm} onSave={handleSavePersonal} loading={loading} isSaving={savingPersonal} />
       <IdentidadEmpresarialCard 

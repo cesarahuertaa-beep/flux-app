@@ -53,7 +53,7 @@ const offlineAwareNutriUpsert = (records) =>
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
   });
 
-export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, multiRoles, isEmbedded, embeddedTab }) {
+export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, onRolesUpdated, multiRoles, isEmbedded, embeddedTab }) {
   const { data: cliente } = session;
   const brand = useBrand();
 
@@ -408,7 +408,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               {isAtletaMode ? (
                 <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
               ) : (
-                <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+                <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} onRolesUpdated={onRolesUpdated} multiRoles={multiRoles} />
               )}
             </div>
           )}

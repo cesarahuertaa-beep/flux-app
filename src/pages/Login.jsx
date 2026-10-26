@@ -9,6 +9,7 @@ import {
   setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal, dbPatch,
   captureAuthHashSynchronously
 } from "../lib/supabase";
+import { refreshUserRoles } from "../lib/authRoles";
 import { useBackButton } from "../lib/backButtonHandler";
 
 const FALLBACK_SHOWCASE = [
@@ -202,112 +203,16 @@ export default function Login({ onLogin }) {
       setAuthToken(data.access_token);
       setProfileId(data.user.id);
 
-      let availableRoles = [];
-
-      // 1. Fetch from profiles
-      const profiles = await dbGet(`profiles?id=eq.${data.user.id}`);
-      let adminRole = profiles.length ? profiles[0].role : null;
-      if (adminRole === "administrativo" && profiles[0].nutriologo_id) {
-        const boss = await dbGet(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-        if (boss.length && boss[0].role === "superadmin") {
-          adminRole = "staff";
-        }
-      }
-
-      if (adminRole && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole)) {
-        if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
-          // Suspended admin account (skip to allow client login if any)
-        } else {
-          availableRoles.push({
-            role: adminRole,
-            data: profiles[0]
-          });
-        }
-      }
-
-      // 2. Fetch from clientes
-      const clientRows = await dbGet(`clientes?email=ilike.${encodeURIComponent(loginEmail)}`);
-      for (const clientData of clientRows) {
-        if (!clientData.auth_id && data.user?.id) {
-          try {
-            await dbPatch(`clientes?id=eq.${clientData.id}`, { auth_id: data.user.id });
-            clientData.auth_id = data.user.id;
-          } catch (e) {}
-        }
-        if (clientData.nutriologo_id) {
-          const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre,nombre_marca`);
-          if (nut.length) {
-            if (nut[0].activo === false) {
-              continue; // Suspended clinic, skip this client profile
-            }
-            clientData.nombre_clinica = nut[0].nombre_marca || "Consultorio";
-            clientData.nutriologo_nombre = nut[0].nombre;
-          }
-        }
-        availableRoles.push({
-          role: "cliente",
-          data: clientData
-        });
-      }
-
-      // 3. AUTO-CREACIÓN DE ATLETA INDEPENDIENTE
-      const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
-
-      if (!isNutriOrSuper) {
-        const hasIndep = clientRows.some(c => c.nutriologo_id === null);
-        if (!hasIndep) {
-          try {
-            const nombreMeta = data.user?.user_metadata?.nombre || (profiles.length ? profiles[0].nombre : loginEmail.split("@")[0]);
-            await dbPostMinimal("clientes", {
-              nombre: nombreMeta,
-              email: loginEmail,
-              auth_id: data.user.id,
-              activo: true,
-              nutriologo_id: null
-            });
-            const recienCreado = await dbGet(`clientes?auth_id=eq.${data.user.id}&nutriologo_id=is.null`);
-            if (recienCreado && recienCreado.length > 0) {
-              availableRoles.push({
-                role: "cliente",
-                data: recienCreado[0]
-              });
-            }
-          } catch (postErr) {
-            console.error("Failed to auto-create independent profile:", postErr);
-          }
-        }
-      }
+      const availableRoles = await refreshUserRoles(data.user.id, loginEmail);
 
       if (availableRoles.length === 0) {
-        if (adminRole && profiles.length && profiles[0].activo === false) {
-          setErr("Tu cuenta de especialista se encuentra suspendida o en revisión.");
-        } else {
-          setErr("No se encontró un perfil activo asociado a este correo.");
-        }
+        setErr("No se encontró un perfil activo asociado a este correo.");
         setLoading(false);
         return;
       }
 
-      const priority = {
-        superadmin: 1,
-        staff: 2,
-        nutriologo: 3,
-        nutriologo_estudiante: 4,
-        administrativo: 5,
-        cliente: 6
-      };
-
-      availableRoles.sort((a, b) => {
-        if (a.role === "cliente" && b.role === "cliente") {
-          if (a.data.nutriologo_id && !b.data.nutriologo_id) return -1;
-          if (!a.data.nutriologo_id && b.data.nutriologo_id) return 1;
-          return 0;
-        }
-        return (priority[a.role] || 99) - (priority[b.role] || 99);
-      });
-
       const primary = availableRoles[0];
-      const isCivilUser = primary.role === "cliente" && !primary.data.nutriologo_id;
+      const isCivilUser = primary.role === "cliente" && !primary.data?.nutriologo_id;
       const finalPrimaryRole = isCivilUser ? "civil" : primary.role;
 
       onLogin({

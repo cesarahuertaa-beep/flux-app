@@ -57,7 +57,7 @@ const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Ad
   </div>
 );
 
-export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, multiRoles, clienteData, session }) {
+export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoAtleta, onChangeRole, onRolesUpdated, multiRoles, clienteData, session }) {
   const isCivil = role ==="civil";
   const brand = useBrand();
   const { setBrandColor } = brand;
@@ -617,18 +617,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       if (e.message?.includes("already been registered") || e.message?.includes("already exists")) {
         try {
           const cleanEmailFallback = newClient.email.trim().toLowerCase();
+          const existingCli = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmailFallback)}&auth_id=not.is.null`).catch(() => []);
+          const existingProf = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmailFallback)}`).catch(() => []);
+          const fallbackAuthId = existingCli[0]?.auth_id || existingProf[0]?.id || null;
+
           await dbPost("clientes", {
             nombre: newClient.nombre.trim(),
             objetivo: newClient.objetivo,
             email: cleanEmailFallback,
             telefono: newClient.telefono,
+            auth_id: fallbackAuthId,
             activo: true,
             nutriologo_id: myId
           });
-          await authResetPassword(cleanEmailFallback).catch(() => {});
           setShowNewClient(false); setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
           await loadClientes();
-          setMsg("✅ Paciente vinculado y se le envió un nuevo enlace a su correo para configurar su contraseña.");
+          setMsg("✅ Paciente vinculado con éxito a tu lista. Como ya tiene cuenta, podrá acceder o alternar su perfil directamente.");
         } catch (fallbackErr) {
           setMsg("❌ " + fallbackErr.message);
         }
@@ -648,6 +652,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       const finalNombre = useNewData ? conflictClient.typedData.nombre : (c?.nombre || p?.nombre || conflictClient.typedData.nombre);
       const finalTelefono = useNewData ? conflictClient.typedData.telefono : (c?.telefono || p?.telefono || conflictClient.typedData.telefono);
 
+      let resolvedAuthId = p?.id || c?.auth_id;
+      if (!resolvedAuthId) {
+        const cliAuth = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictClient.email)}&auth_id=not.is.null`).catch(() => []);
+        const profAuth = await dbGet(`profiles?email=ilike.${encodeURIComponent(conflictClient.email)}`).catch(() => []);
+        resolvedAuthId = cliAuth[0]?.auth_id || profAuth[0]?.id || null;
+      }
+
       // Evitar duplicado si ya existiera bajo este nutriólogo
       const existingCheck = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictClient.email)}&nutriologo_id=eq.${myId}`);
       if (existingCheck.length === 0) {
@@ -656,10 +667,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           objetivo: conflictClient.typedData.objetivo || "Mejorar salud",
           email: conflictClient.email,
           telefono: finalTelefono,
-          auth_id: p?.id || c?.auth_id,
+          auth_id: resolvedAuthId,
           activo: true,
           nutriologo_id: myId
         });
+      }
+
+      // Si el cliente original no tenía auth_id vinculado y encontramos uno, actualizarlo
+      if (resolvedAuthId && c?.id && !c.auth_id) {
+        await dbPatch(`clientes?id=eq.${c.id}`, { auth_id: resolvedAuthId }).catch(() => {});
       }
 
       // Sincronizar datos si eligió actualizarlos
@@ -1646,7 +1662,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {!isCivil && (tab === "perfil" || visitedTabs.has("perfil")) && (
         <div className={tab === "perfil" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
-            <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} multiRoles={multiRoles} />
+            <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} onRolesUpdated={onRolesUpdated} multiRoles={multiRoles} />
           </Suspense>
         </div>
       )}
@@ -1699,9 +1715,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <div className={tab === "perfil" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
             <UserProfile
-              session={{ role:"civil", data: clienteData }}
+              session={{ role:"civil", data: clienteData, profileId: profileId || clienteData?.auth_id }}
               onLogout={onLogout}
               onChangeRole={onChangeRole}
+              onRolesUpdated={onRolesUpdated}
               multiRoles={multiRoles}
             />
           </Suspense>

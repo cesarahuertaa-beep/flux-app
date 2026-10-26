@@ -10,6 +10,7 @@ import FloatingTimerBubble from "./components/ui/FloatingTimerBubble";
 import NotificationManager from "./components/ui/NotificationManager";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
 import { initPlayBilling } from "./lib/playBilling";
+import { refreshUserRoles } from "./lib/authRoles";
 
 const detectIsAppMode = () => {
   if (typeof window === "undefined") return false;
@@ -165,11 +166,23 @@ export default function App() {
                 const profiles = await dbGet(`profiles?id=eq.${profileId}`);
                 if (Array.isArray(profiles) && profiles.length > 0 && profiles[0].activo === false && profiles[0].role !== "superadmin") {
                   setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
+                  return;
                 }
               } else if ((savedRole === "cliente" || savedRole === "civil") && savedClientId) {
                 const rows = await dbGet(`clientes?id=eq.${savedClientId}`);
                 if (Array.isArray(rows) && rows.length > 0 && rows[0].activo === false) {
                   setAuthToken(null); setProfileId(null); clearSessionMeta(); setSession(null);
+                  return;
+                }
+              }
+
+              // Sincronizar roles disponibles en segundo plano para reflejar invitaciones o nuevos perfiles
+              const emailToLookup = optimisticData?.email;
+              if (profileId || emailToLookup) {
+                const latestRoles = await refreshUserRoles(profileId, emailToLookup);
+                if (latestRoles && latestRoles.length > 0) {
+                  localStorage.setItem("flux_multi_roles", JSON.stringify(latestRoles));
+                  setSession(prev => prev ? { ...prev, multiRoles: latestRoles } : prev);
                 }
               }
             } catch(e) { /* sin internet o error temporal: conservar siempre la sesión local */ }
@@ -291,15 +304,16 @@ export default function App() {
     setSession(null);
   };
 
-  const handleRoleSelect = (roleObj) => {
+  const handleRoleSelect = (roleObj, latestRoles) => {
     const isCivilUser = roleObj.role === 'cliente' && !roleObj.data?.nutriologo_id;
     const finalRole = isCivilUser ? 'civil' : roleObj.role;
+    const rolesToKeep = latestRoles || session?.multiRoles || [];
     const s = {
       role: finalRole,
       data: roleObj.data,
-      token: session.token,
-      profileId: session.profileId,
-      multiRoles: session.multiRoles
+      token: session?.token,
+      profileId: session?.profileId,
+      multiRoles: rolesToKeep
     };
     // Clear saved tabs so the new role always starts on its own default tab
     sessionStorage.removeItem('flux_admin_tab');
@@ -310,6 +324,12 @@ export default function App() {
     setAtletaData(null);
     saveSessionMeta(s);
     setSession(s);
+  };
+
+  const handleRolesUpdated = (newRoles) => {
+    if (!newRoles || !Array.isArray(newRoles) || newRoles.length === 0) return;
+    try { localStorage.setItem("flux_multi_roles", JSON.stringify(newRoles)); } catch {}
+    setSession(prev => prev ? { ...prev, multiRoles: newRoles } : prev);
   };
 
   const handleModoAtleta  = (clienteRecord) => setAtletaData(clienteRecord);
@@ -327,10 +347,10 @@ export default function App() {
     );
     const sessionKey = `${session.role}-${session.data?.id || session.profileId}`;
     if (session.role==="superadmin" || session.role==="nutriologo" || session.role==="nutriologo_estudiante" || session.role==="administrativo" || session.role==="staff")
-      return <Admin key={sessionKey} role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} session={session} />;
+      return <Admin key={sessionKey} role={session.role} isSuperadmin={session.role==="superadmin"} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={handleRoleSelect} onRolesUpdated={handleRolesUpdated} multiRoles={session.multiRoles} session={session} />;
     if (session.role ==="civil")
-      return <Admin key={sessionKey} role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} clienteData={session.data} session={session} />;
-    return <ClienteView key={sessionKey} session={session} onLogout={handleLogout} onChangeRole={session.multiRoles && session.multiRoles.length > 1 ? handleRoleSelect : null} multiRoles={session.multiRoles} />;
+      return <Admin key={sessionKey} role="civil" isSuperadmin={false} profileId={session.profileId} onLogout={handleLogout} onModoAtleta={handleModoAtleta} onChangeRole={handleRoleSelect} onRolesUpdated={handleRolesUpdated} multiRoles={session.multiRoles} clienteData={session.data} session={session} />;
+    return <ClienteView key={sessionKey} session={session} onLogout={handleLogout} onChangeRole={handleRoleSelect} onRolesUpdated={handleRolesUpdated} multiRoles={session.multiRoles} />;
   };
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
