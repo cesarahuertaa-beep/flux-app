@@ -11,6 +11,16 @@ import NotificationManager from "./components/ui/NotificationManager";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
 import { initPlayBilling } from "./lib/playBilling";
 import { refreshUserRoles } from "./lib/authRoles";
+import { ErrorBoundary } from "./components/ui/ErrorBoundary";
+
+const isNativePlatform = () => {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.protocol === "file:" ||
+    window.location.protocol === "app:" ||
+    Capacitor.isNativePlatform()
+  );
+};
 
 const detectIsAppMode = () => {
   if (typeof window === "undefined") return false;
@@ -18,16 +28,19 @@ const detectIsAppMode = () => {
     window.matchMedia("(display-mode: standalone)").matches ||
     window.navigator.standalone === true ||
     window.location.search.includes("pwa=true");
-  return (
-    window.location.protocol === "file:" ||
-    window.location.protocol === "app:" ||
-    Capacitor.isNativePlatform() ||
-    isStandalone
-  );
+  return isNativePlatform() || isStandalone;
 };
 
+// Si se abre la PWA o web con un hash antiguo (#/app o #/login), migrar limpiamente a ruta estándar
+if (typeof window !== "undefined" && !isNativePlatform() && window.location.hash?.startsWith("#/")) {
+  try {
+    const hashRoute = window.location.hash.slice(1);
+    window.history.replaceState(null, "", hashRoute);
+  } catch {}
+}
+
 // Interceptar cualquier token de invitación / recuperación ANTES de montar el Router
-captureAuthHashSynchronously(detectIsAppMode());
+captureAuthHashSynchronously(isNativePlatform());
 
 // Precargar la pantalla que se va a necesitar en paralelo a la restauración de sesión
 try {
@@ -82,7 +95,7 @@ const clearSessionMeta = () => {
 
 export default function App() {
   // Asegurar intercepción también en cada render inicial por si cambió el hash
-  captureAuthHashSynchronously(detectIsAppMode());
+  captureAuthHashSynchronously(isNativePlatform());
 
   const [session,    setSession]    = useState(null);
   const [atletaData, setAtletaData] = useState(() => {
@@ -102,7 +115,7 @@ export default function App() {
   useEffect(() => {
     initBackButtonHandler();
     const handleHashChange = () => {
-      if (captureAuthHashSynchronously(detectIsAppMode())) {
+      if (captureAuthHashSynchronously(isNativePlatform())) {
         setSession(null);
         setAtletaData(null);
         setRestoring(false);
@@ -353,9 +366,14 @@ export default function App() {
     return <ClienteView key={sessionKey} session={session} onLogout={handleLogout} onChangeRole={handleRoleSelect} onRolesUpdated={handleRolesUpdated} multiRoles={session.multiRoles} />;
   };
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('pwa=true');
-  const isAppMode = window.location.protocol === 'file:' || window.location.protocol === 'app:' || Capacitor.isNativePlatform() || isStandalone;
-  const Router = isAppMode ? HashRouter : BrowserRouter;
+  const isNative = isNativePlatform();
+  const isStandalone = typeof window !== "undefined" && (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true ||
+    window.location.search.includes('pwa=true')
+  );
+  const isAppMode = isNative || isStandalone;
+  const Router = isNative ? HashRouter : BrowserRouter;
 
   return (
     <BrandProvider session={session}>
@@ -363,36 +381,38 @@ export default function App() {
       <FloatingTimerBubble />
       <NotificationManager session={session} />
       <Router>
-        <Suspense fallback={<FullScreenLoader />}>
-          <Routes>
-            <Route path="/privacidad" element={<Privacidad />} />
-            <Route path="/terminos" element={<Terminos />} />
-            <Route path="/" element={
-              isAppMode
-                ? <Navigate to={session ? "/app" : "/login"} replace />
-                : <Landing session={session} onLogout={handleLogout} />
-            } />
-            <Route path="/login" element={
-              restoring ? (
-                <FullScreenLoader />
-              ) : session ? (
-                <Navigate to="/app" replace />
-              ) : (
-                <Login onLogin={handleLogin} />
-              )
-            } />
-            <Route path="/app/*" element={
-              restoring ? (
-                <FullScreenLoader />
-              ) : !session ? (
-                <Navigate to="/login" replace />
-              ) : (
-                renderMain()
-              )
-            } />
-            <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<FullScreenLoader />}>
+            <Routes>
+              <Route path="/privacidad" element={<Privacidad />} />
+              <Route path="/terminos" element={<Terminos />} />
+              <Route path="/" element={
+                isAppMode
+                  ? <Navigate to={session ? "/app" : "/login"} replace />
+                  : <Landing session={session} onLogout={handleLogout} />
+              } />
+              <Route path="/login" element={
+                restoring ? (
+                  <FullScreenLoader />
+                ) : session ? (
+                  <Navigate to="/app" replace />
+                ) : (
+                  <Login onLogin={handleLogin} />
+                )
+              } />
+              <Route path="/app/*" element={
+                restoring ? (
+                  <FullScreenLoader />
+                ) : !session ? (
+                  <Navigate to="/login" replace />
+                ) : (
+                  renderMain()
+                )
+              } />
+              <Route path="*" element={<Navigate to={isAppMode ? "/login" : "/"} replace />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </Router>
     </BrandProvider>
   );

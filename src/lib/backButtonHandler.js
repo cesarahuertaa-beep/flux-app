@@ -62,7 +62,7 @@ function showToast(message = "Presiona atrás de nuevo para salir") {
  * Register an action to be executed when the hardware/gesture back button is pressed.
  * Returns an unregister function.
  */
-export function registerBackAction(handler, priority = 10) {
+export function registerBackAction(handler, priority = 10, pushBrowserHistory = false) {
   const id = `back_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const order = nextOrder++;
 
@@ -70,7 +70,8 @@ export function registerBackAction(handler, priority = 10) {
   actionStack.push(item);
 
   // In PWA/Web: push dummy history state so mobile browser swipe/back can be intercepted
-  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
+  // ONLY if explicitly requested (e.g. for full-screen modals/lightboxes)
+  if (pushBrowserHistory && typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     try {
       window.history.pushState({ flux_back_id: id }, "");
       item.pushedHistory = true;
@@ -180,8 +181,9 @@ export function initBackButtonHandler() {
  * @param {boolean} isOpen Whether the modal/overlay/subview is active
  * @param {Function} onClose Callback to close the modal/overlay/subview
  * @param {number} priority Priority level (default: 10). Modals usually 10-50, subviews 5.
+ * @param {boolean} pushBrowserHistory Whether to push dummy state in browser history (default: false)
  */
-export function useBackButton(isOpen, onClose, priority = 10) {
+export function useBackButton(isOpen, onClose, priority = 10, pushBrowserHistory = false) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -192,10 +194,11 @@ export function useBackButton(isOpen, onClose, priority = 10) {
       if (onCloseRef.current) {
         onCloseRef.current();
       }
-    }, priority);
+    }, priority, pushBrowserHistory);
 
     return () => {
       unregister();
     };
-  }, [isOpen, priority]);
+  }, [isOpen, priority, pushBrowserHistory]);
 }
+

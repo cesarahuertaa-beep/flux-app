@@ -11,6 +11,7 @@ import {
 } from "../lib/supabase";
 import { refreshUserRoles } from "../lib/authRoles";
 import { useBackButton } from "../lib/backButtonHandler";
+import { Capacitor } from "@capacitor/core";
 
 const FALLBACK_SHOWCASE = [
   { id: "fb-1", name: "FLUX Clinical", specialty: "Nutrición Clínica", logo_url: "/flux_logo.jpeg", verified: true, badge: "Especialistas" },
@@ -53,7 +54,13 @@ export default function Login({ onLogin }) {
     return saved;
   });
 
-  useBackButton(mode !== "welcome" && mode !== "set_password", () => setMode("welcome"), 5);
+  // Solo interceptar botón físico en Android nativo. En Web/PWA el usuario cuenta con el botón visual 'Inicio'
+  // y evitamos alterar la pila de historial del navegador para prevenir cualquier desincronización tras iniciar sesión.
+  useBackButton(
+    Capacitor.isNativePlatform() && mode !== "welcome" && mode !== "set_password" && !loading,
+    () => setMode("welcome"),
+    5
+  );
   const [nombre, setNombre] = useState(() => sessionStorage.getItem('flux_login_nombre') || "");
   const [email, setEmail] = useState(() => sessionStorage.getItem('flux_login_email') || "");
   const [pass, setPass] = useState("");
@@ -147,6 +154,16 @@ export default function Login({ onLogin }) {
     sessionStorage.setItem('flux_login_cedula', cedula);
     sessionStorage.setItem('flux_aviso', avisoAceptado ? 'true' : 'false');
   }, [mode, signupType, nombre, email, cedula, avisoAceptado]);
+
+  // Precargar las vistas autenticadas en segundo plano mientras el usuario está en el login
+  // para que la transición tras autenticarse sea instantánea y sin riesgo de fallo de red
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import("./Admin").catch(() => {});
+      import("./Cliente").catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const syncPendingAuthState = () => {
