@@ -80,6 +80,17 @@ export class ErrorBoundary extends React.Component {
                 Volver al inicio
               </button>
             </div>
+
+            {this.state.error && (
+              <details className="mt-4 text-left bg-red-50/80 border border-red-200/80 rounded-2xl p-3 text-xs text-red-900">
+                <summary className="font-bold cursor-pointer text-red-700">
+                  Detalles del error técnico
+                </summary>
+                <pre className="mt-2 text-[10px] font-mono whitespace-pre-wrap break-all overflow-x-auto text-red-800">
+                  {String(this.state.error?.stack || this.state.error?.message || this.state.error)}
+                </pre>
+              </details>
+            )}
           </div>
         </div>
       );
