@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGet, dbGetFresh, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGetFresh, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials, hydrateOfflineCache } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
 import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
@@ -180,117 +180,124 @@ export default function App() {
     window.addEventListener("hashchange", handleHashChange);
 
     const restore = async () => {
-      // Si hay un flujo pendiente de invitación, recuperación o error de correo, NO restaurar sesión previa
-      if (
-        sessionStorage.getItem("flux_pending_auth_token") ||
-        sessionStorage.getItem("flux_pending_auth_error") ||
-        sessionStorage.getItem("flux_pending_auth_info")
-      ) {
-        clearSessionMeta();
-        setRestoring(false);
-        return;
-      }
-
-      const token = restoreSession();
-      const profileId = restoreProfileId();
-      const savedRole = localStorage.getItem("flux_role");
-      const savedClientId = localStorage.getItem("flux_client_id");
-      const savedMultiRolesRaw = localStorage.getItem("flux_multi_roles");
-      let savedMultiRoles = null;
-      if (savedMultiRolesRaw) {
-        try { savedMultiRoles = JSON.parse(savedMultiRolesRaw); } catch(e) { /* ignore */ }
-      }
-
-      if (savedRole) {
-        // --- OPTIMISTIC RESTORE (Local-First: funciona en 0 ms con o sin internet) ---
-        let optimisticData = null;
-        if (savedMultiRoles) {
-          const searchRole = savedRole === "civil" ? "cliente" : savedRole;
-          const matchingRole = savedMultiRoles.find(r => {
-            if (r.role !== searchRole) return false;
-            if (searchRole === "cliente" && savedClientId) {
-              return String(r.data?.id) === String(savedClientId);
-            }
-            return true;
-          });
-          if (matchingRole) optimisticData = matchingRole.data;
-        }
-        
-        if (!optimisticData) {
-          try {
-            const snap = JSON.parse(localStorage.getItem("flux_session_snapshot") || "null");
-            if (snap && snap.data) optimisticData = snap.data;
-          } catch (e) { /* ignore */ }
-        }
-
-        if (optimisticData) {
-          await Promise.race([
-            hydrateOfflineCache(),
-            new Promise((r) => setTimeout(r, 800)),
-          ]).catch(() => {});
-          const sObj = { role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles };
-          setSession(sObj);
+      try {
+        // Si hay un flujo pendiente de invitación, recuperación o error de correo, NO restaurar sesión previa
+        if (
+          sessionStorage.getItem("flux_pending_auth_token") ||
+          sessionStorage.getItem("flux_pending_auth_error") ||
+          sessionStorage.getItem("flux_pending_auth_info")
+        ) {
+          clearSessionMeta();
           setRestoring(false);
-          syncNativeCredentials();
-          setTimeout(() => {
-            validateSessionLiveness(sObj);
-          }, 400);
           return;
         }
 
-        try {
-          // Fallback si no había snapshot en localStorage
-          const hasAdminRole = Array.isArray(savedMultiRoles) &&
-            savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
+        const token = restoreSession();
+        const profileId = restoreProfileId();
+        const savedRole = localStorage.getItem("flux_role");
+        const savedClientId = localStorage.getItem("flux_client_id");
+        const savedMultiRolesRaw = localStorage.getItem("flux_multi_roles");
+        let savedMultiRoles = null;
+        if (savedMultiRolesRaw) {
+          try { savedMultiRoles = JSON.parse(savedMultiRolesRaw); } catch(e) { /* ignore */ }
+        }
 
-          if (!hasAdminRole && (savedRole ==="cliente" || savedRole ==="civil") && savedClientId) {
-            let rows = await dbGetFresh(`clientes?id=eq.${savedClientId}&activo=eq.true`).catch(() => []);
-            if (!rows.length) rows = await dbGetFresh(`clientes?id=eq.${savedClientId}`).catch(() => []);
-            if (rows.length && rows[0].activo !== false) {
-              const restoredRole = savedRole ==="civil" ?"civil" :
-                                   (rows[0].nutriologo_id ?"cliente" :"civil");
-              const sObj = { role: restoredRole, data: rows[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
-              saveSessionMeta(sObj);
-              setSession(sObj);
-            } else if (typeof navigator !== "undefined" && navigator.onLine) {
-              handleLogout("Esta cuenta ya no existe o fue dada de baja.");
-            }
-          } else if (profileId) {
-            const profiles = await dbGetFresh(`profiles?id=eq.${profileId}`);
-            let role = profiles.length ? profiles[0].role : null;
-            
-            if (role ==="administrativo" && profiles[0].nutriologo_id) {
-              const boss = await dbGetFresh(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-              if (boss.length && boss[0].role ==="superadmin") {
-                role ="staff";
+        if (savedRole) {
+          // --- OPTIMISTIC RESTORE (Local-First: funciona en 0 ms con o sin internet) ---
+          let optimisticData = null;
+          if (savedMultiRoles) {
+            const searchRole = savedRole === "civil" ? "cliente" : savedRole;
+            const matchingRole = savedMultiRoles.find(r => {
+              if (r.role !== searchRole) return false;
+              if (searchRole === "cliente" && savedClientId) {
+                return String(r.data?.id) === String(savedClientId);
               }
-            }
+              return true;
+            });
+            if (matchingRole) optimisticData = matchingRole.data;
+          }
+          
+          if (!optimisticData) {
+            try {
+              const snap = JSON.parse(localStorage.getItem("flux_session_snapshot") || "null");
+              if (snap && snap.data) optimisticData = snap.data;
+            } catch (e) { /* ignore */ }
+          }
 
-            if (role && ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role)) {
-              if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role) && profiles[0].activo === false) {
-                handleLogout("Esta cuenta profesional ha sido desactivada.");
-              } else {
-                const sObj = { role, data: profiles[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
+          if (optimisticData) {
+            try {
+              await Promise.race([
+                hydrateOfflineCache(),
+                new Promise((r) => setTimeout(r, 800)),
+              ]);
+            } catch (e) { /* ignore */ }
+            const sObj = { role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles };
+            setSession(sObj);
+            setRestoring(false);
+            syncNativeCredentials();
+            setTimeout(() => {
+              validateSessionLiveness(sObj);
+            }, 400);
+            return;
+          }
+
+          try {
+            // Fallback si no había snapshot en localStorage
+            const hasAdminRole = Array.isArray(savedMultiRoles) &&
+              savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
+
+            if (!hasAdminRole && (savedRole ==="cliente" || savedRole ==="civil") && savedClientId) {
+              let rows = await dbGetFresh(`clientes?id=eq.${savedClientId}&activo=eq.true`).catch(() => []);
+              if (!rows.length) rows = await dbGetFresh(`clientes?id=eq.${savedClientId}`).catch(() => []);
+              if (rows.length && rows[0].activo !== false) {
+                const restoredRole = savedRole ==="civil" ?"civil" :
+                                     (rows[0].nutriologo_id ?"cliente" :"civil");
+                const sObj = { role: restoredRole, data: rows[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
                 saveSessionMeta(sObj);
                 setSession(sObj);
+              } else if (typeof navigator !== "undefined" && navigator.onLine) {
+                handleLogout("Esta cuenta ya no existe o fue dada de baja.");
               }
-            } else if (typeof navigator !== "undefined" && navigator.onLine) {
-              handleLogout("Esta cuenta profesional ya no existe.");
+            } else if (profileId) {
+              const profiles = await dbGetFresh(`profiles?id=eq.${profileId}`);
+              let role = profiles.length ? profiles[0].role : null;
+              
+              if (role ==="administrativo" && profiles[0].nutriologo_id) {
+                const boss = await dbGetFresh(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
+                if (boss.length && boss[0].role ==="superadmin") {
+                  role ="staff";
+                }
+              }
+
+              if (role && ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role)) {
+                if (["nutriologo","nutriologo_estudiante","administrativo","staff"].includes(role) && profiles[0].activo === false) {
+                  handleLogout("Esta cuenta profesional ha sido desactivada.");
+                } else {
+                  const sObj = { role, data: profiles[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
+                  saveSessionMeta(sObj);
+                  setSession(sObj);
+                }
+              } else if (typeof navigator !== "undefined" && navigator.onLine) {
+                handleLogout("Esta cuenta profesional ya no existe.");
+              }
+            } else {
+              clearSessionMeta();
             }
-          } else {
-            clearSessionMeta();
+          } catch (e) {
+            if (e.message ==="OFFLINE") {
+              // sin internet: conservar datos de sesión
+            } else if (typeof navigator !== "undefined" && navigator.onLine) {
+              clearSessionMeta();
+            }
           }
-        } catch (e) {
-          if (e.message ==="OFFLINE") {
-            // sin internet: conservar datos de sesión
-          } else if (typeof navigator !== "undefined" && navigator.onLine) {
-            clearSessionMeta();
-          }
+        } else {
+          clearSessionMeta();
         }
-      } else {
-         clearSessionMeta();
+      } catch (err) {
+        console.error("[Restore] Error inesperado restaurando sesión:", err);
+      } finally {
+        setRestoring(false);
       }
-      setRestoring(false);
     };
     restore();
 
