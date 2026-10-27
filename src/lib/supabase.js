@@ -480,6 +480,11 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
         ok = await new Promise((res) => _refreshQueue.push(res));
       }
 
+      if (ok === false) {
+        if (typeof _onSessionExpired === "function") _onSessionExpired();
+        throw new Error("SESSION_EXPIRED");
+      }
+
       if (ok === "OFFLINE" || !ok) {
         if (returnedCache) return;
         if (isGet && queryCache.has(path)) return queryCache.get(path).data;

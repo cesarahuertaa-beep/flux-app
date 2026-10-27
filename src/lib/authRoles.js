@@ -1,10 +1,10 @@
-import { dbGet, dbPatch, dbPostMinimal } from "./supabase";
+import { dbGet, dbGetFresh, dbPatch } from "./supabase";
 
 /**
  * Consulta en Supabase todos los perfiles asociados a un usuario (Admin/Especialista,
  * Paciente de consultorio y Atleta Independiente) a partir de su auth_id y su email.
  * Si detecta que faltaba vincular el auth_id en clientes, lo actualiza silenciosamente.
- * Garantiza que siempre exista el perfil de Atleta Independiente si no es nutriólogo.
+ * Si la cuenta fue eliminada de la base de datos, devuelve un arreglo vacío sin auto-crear cuentas fantasma.
  */
 export async function refreshUserRoles(authUserId, userEmail) {
   const cleanEmail = (userEmail || "").trim().toLowerCase();
@@ -12,14 +12,14 @@ export async function refreshUserRoles(authUserId, userEmail) {
 
   let availableRoles = [];
 
-  // 1. Perfiles de administración / especialista (profiles)
+  // 1. Perfiles de administración / especialista (profiles) - Consulta fresca a la BD
   let profiles = [];
   try {
     if (authUserId) {
-      profiles = await dbGet(`profiles?id=eq.${authUserId}`).catch(() => []);
+      profiles = await dbGetFresh(`profiles?id=eq.${authUserId}`).catch(() => []);
     }
     if ((!profiles || profiles.length === 0) && cleanEmail) {
-      profiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
+      profiles = await dbGetFresh(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
     }
   } catch (e) {
     console.error("Error consultando profiles:", e);
@@ -50,11 +50,11 @@ export async function refreshUserRoles(authUserId, userEmail) {
   let clientRows = [];
   try {
     if (cleanEmail) {
-      const byEmail = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
+      const byEmail = await dbGetFresh(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
       if (Array.isArray(byEmail)) clientRows.push(...byEmail);
     }
     if (authUserId) {
-      const byAuth = await dbGet(`clientes?auth_id=eq.${authUserId}`).catch(() => []);
+      const byAuth = await dbGetFresh(`clientes?auth_id=eq.${authUserId}`).catch(() => []);
       if (Array.isArray(byAuth)) {
         for (const c of byAuth) {
           if (!clientRows.some(x => x.id === c.id)) {
@@ -83,7 +83,7 @@ export async function refreshUserRoles(authUserId, userEmail) {
 
     if (clientData.nutriologo_id) {
       try {
-        const nut = await dbGet(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre,nombre_marca`).catch(() => []);
+        const nut = await dbGetFresh(`profiles?id=eq.${clientData.nutriologo_id}&select=activo,nombre,nombre_marca`).catch(() => []);
         if (nut && nut.length) {
           if (nut[0].activo === false) continue; // Clínica suspendida
           clientData.nombre_clinica = nut[0].nombre_marca || "Consultorio";
@@ -98,34 +98,7 @@ export async function refreshUserRoles(authUserId, userEmail) {
     });
   }
 
-  // 3. Auto-creación / garantía de Atleta Independiente si no es Nutriólogo/Admin
-  const isNutriOrSuper = adminRole && ["nutriologo", "nutriologo_estudiante", "superadmin"].includes(adminRole);
-  if (!isNutriOrSuper) {
-    const hasIndep = clientRows.some(c => c.nutriologo_id === null && c.activo !== false);
-    if (!hasIndep && cleanEmail && authUserId) {
-      try {
-        const nombreMeta = profiles.length ? profiles[0].nombre : cleanEmail.split("@")[0];
-        await dbPostMinimal("clientes", {
-          nombre: nombreMeta,
-          email: cleanEmail,
-          auth_id: authUserId,
-          activo: true,
-          nutriologo_id: null
-        });
-        const recien = await dbGet(`clientes?auth_id=eq.${authUserId}&nutriologo_id=is.null`).catch(() => []);
-        if (recien && recien.length > 0) {
-          availableRoles.push({
-            role: "cliente",
-            data: recien[0]
-          });
-        }
-      } catch (err) {
-        console.error("Error auto-creando perfil atleta independiente:", err);
-      }
-    }
-  }
-
-  // 4. Ordenar con prioridad
+  // 3. Ordenar con prioridad
   const priority = {
     superadmin: 1,
     staff: 2,
