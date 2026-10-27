@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
+import { dbPeek, dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { ListSkeleton } from "../ui/Skeleton";
 import { useBackButton } from"../../lib/backButtonHandler";
@@ -139,10 +139,15 @@ const ESTADO_COLOR = {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 export function AgendaAdmin({ setMsg, profileId }) {
-  const [citas, setCitas]                   = useState([]);
-  const [disponibilidad, setDisponibilidad] = useState([]);
-  const [clientes, setClientes]             = useState([]);
-  const [loading, setLoading]               = useState(true);
+  const myId = profileId || getProfileId();
+  const _peekCitas = myId ? dbPeek(`citas?nutriologo_id=eq.${myId}&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`) : null;
+  const _peekDisp = myId ? dbPeek(`disponibilidad?nutriologo_id=eq.${myId}&order=dia_semana.asc,hora_inicio.asc`) : null;
+  const _peekClis = myId ? (dbPeek(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono&order=nombre.asc`) || dbPeek(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc`)) : null;
+
+  const [citas, setCitas]                   = useState(() => Array.isArray(_peekCitas) ? _peekCitas : []);
+  const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
+  const [clientes, setClientes]             = useState(() => Array.isArray(_peekClis) ? _peekClis : []);
+  const [loading, setLoading]               = useState(() => _peekCitas === null);
   const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
   const [filtro, setFiltro]                 = useState("todos");   // "todos" | "pendiente" | "confirmada" | "rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
@@ -178,8 +183,6 @@ export function AgendaAdmin({ setMsg, profileId }) {
   }, 20);
   useBackButton(showNuevaCita, () => setShowNuevaCita(false), 20);
   useBackButton(!!selectedWaCita, () => setSelectedWaCita(null), 25);
-
-  const myId = profileId || getProfileId();
 
   // ── Carga de datos ──
   const loadProfile = useCallback(async () => {
@@ -242,7 +245,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   }, [myId]);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (citas.length === 0 && _peekCitas === null) setLoading(true);
     await Promise.all([loadCitas(), loadDisponibilidad(), loadClientes(), loadProfile()]);
     setLoading(false);
   }, [loadCitas, loadDisponibilidad, loadClientes, loadProfile]);

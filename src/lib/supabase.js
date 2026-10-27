@@ -333,16 +333,34 @@ export const hydrateOfflineCache = () => {
   return _hydrationPromise;
 };
 
-// Callback global invocado por Android cuando el WorkManager termina una sincronización con la app abierta
+// Callback global invocado por Android cuando el WorkManager termina una sincronización o la app vuelve al primer plano
 if (typeof window !== "undefined") {
+  let _syncingNative = false;
   window.__onFluxNativeSync = async () => {
-    await syncNativeFlushedMutations();
-    const updated = await mergeNativeSyncedCache();
-    await reapplyPendingMutations();
-    if (updated) {
-      emitCacheUpdate("*", "*", null);
+    if (_syncingNative) return;
+    _syncingNative = true;
+    try {
+      await syncNativeFlushedMutations();
+      const updated = await mergeNativeSyncedCache();
+      await reapplyPendingMutations();
+      if (updated) {
+        emitCacheUpdate("*", "*", null);
+      }
+    } catch { /* ignore */ } finally {
+      _syncingNative = false;
     }
   };
+  window.addEventListener("flux:native-sync-complete", () => {
+    window.__onFluxNativeSync?.();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      window.__onFluxNativeSync?.();
+    }
+  });
+  window.addEventListener("focus", () => {
+    window.__onFluxNativeSync?.();
+  });
 }
 
 const RELATED_TABLES = {
@@ -603,6 +621,11 @@ const normalizeBatchKeys = (data) => {
 };
 
 // ── Operaciones de base de datos ──
+/** Lectura 100% síncrona en 0 ms desde la memoria RAM (queryCache) para inicializar estados sin "Cargando..." */
+export const dbPeek = (p) => {
+  const entry = queryCache.get(p);
+  return entry && entry.data !== undefined ? entry.data : null;
+};
 export const dbGet = (p, onBgUpdate) => q(p, {}, onBgUpdate);
 export const dbPost = (p, b, opts = {}) => q(p, { method: "POST", body: JSON.stringify(normalizeBatchKeys(b)), ...opts });
 export const dbPatch = (p, b, opts = {}) => q(p, { method: "PATCH", body: JSON.stringify(b), ...opts, headers: { Prefer: "return=minimal", ...(opts?.headers || {}) } });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
+import { dbPeek, dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import {
   CreditCard,
   Upload,
@@ -31,11 +31,17 @@ import {
  */
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const isPlayApp = isNativePlayApp();
-  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
-  const [rawCfg, setRawCfg] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
+  const _peekRecibos = clienteData?.id ? dbPeek(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`) : null;
+
+  const [configPago, setConfigPago] = useState(() => {
+    const c = Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null;
+    return { clabe: c?.clabe || "", banco: c?.banco || "", beneficiario: c?.beneficiario || "" };
+  });
+  const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
+  const [loading, setLoading] = useState(() => _peekCfg === null && _peekRecibos === null);
   const [uploading, setUploading] = useState(false);
-  const [historial, setHistorial] = useState([]);
+  const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [origen, setOrigen] = useState(clienteData?.premium_origen || null);
   const [patrocinador, setPatrocinador] = useState("");
   const [copiedClabe, setCopiedClabe] = useState(false);
@@ -92,7 +98,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   }, [expirationDate, isPremium]);
 
   const loadData = async () => {
-    setLoading(true);
+    if (!rawCfg && _peekCfg === null) setLoading(true);
     try {
       const [cfg, recibos] = await Promise.all([
         dbGet("configuracion_plataforma?id=eq.1"),

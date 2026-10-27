@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { dbGet, dbPost, storageUpload } from "../../lib/supabase";
+import { dbPeek, dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import {
   CreditCard,
@@ -38,12 +38,19 @@ import {
  */
 export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
   const isPlayApp = isNativePlayApp();
-  const [perfil, setPerfil] = useState(null);
-  const [configPago, setConfigPago] = useState({ clabe: "", banco: "", beneficiario: "" });
-  const [rawCfg, setRawCfg] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const _peekPerfil = profileId ? dbPeek(`profiles?id=eq.${profileId}`) : null;
+  const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
+  const _peekRecibos = profileId ? dbPeek(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`) : null;
+
+  const [perfil, setPerfil] = useState(() => Array.isArray(_peekPerfil) && _peekPerfil.length > 0 ? _peekPerfil[0] : null);
+  const [configPago, setConfigPago] = useState(() => {
+    const c = Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null;
+    return { clabe: c?.clabe || "", banco: c?.banco || "", beneficiario: c?.beneficiario || "" };
+  });
+  const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
+  const [loading, setLoading] = useState(() => _peekPerfil === null && _peekCfg === null);
   const [uploading, setUploading] = useState(false);
-  const [historial, setHistorial] = useState([]);
+  const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [patrocinios, setPatrocinios] = useState([]);
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [copiedConcepto, setCopiedConcepto] = useState(false);
@@ -51,7 +58,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   const loadData = async () => {
     if (!profileId) return;
-    setLoading(true);
+    if (!perfil && _peekPerfil === null) setLoading(true);
     try {
       const [data, cfg, recibos] = await Promise.all([
         dbGet(`profiles?id=eq.${profileId}`),

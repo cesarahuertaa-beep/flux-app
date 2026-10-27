@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { AppLayout } from "../components/ui/AppLayout";
-import { dbGet, dbGetFresh, dbUpsert, getPendingMutations } from "../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, dbUpsert, getPendingMutations } from "../lib/supabase";
 import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
@@ -9,12 +9,12 @@ import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
-const CitasCliente = lazy(() => import("../components/CitasCliente").then(m => ({ default: m.CitasCliente })));
-const Nutrition = lazy(() => import("../components/cliente/Nutrition"));
-const Training = lazy(() => import("../components/cliente/Training"));
-const Progreso = lazy(() => import("../components/cliente/Progreso"));
-const UserProfile = lazy(() => import("../components/UserProfile"));
-const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
+import { CitasCliente } from "../components/CitasCliente";
+import Nutrition from "../components/cliente/Nutrition";
+import Training from "../components/cliente/Training";
+import Progreso from "../components/cliente/Progreso";
+import UserProfile from "../components/UserProfile";
+import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 
 // dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión con retorno mínimo para máxima velocidad
 const offlineAwareUpsert = async (records) => {
@@ -90,22 +90,49 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
   }, [isEmbedded]);
 
-  const [nutri, setNutri] = useState(null);
-  const [dias, setDias] = useState([]);
-  const [rutinas, setRutinas] = useState([]);
+  const _peekCiclos = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`) : null;
+  const _peekCiclo = Array.isArray(_peekCiclos) && _peekCiclos.length ? _peekCiclos[0] : null;
+  const _peekCicloFilter = _peekCiclo ? `ciclo_id=eq.${_peekCiclo.id}` : `ciclo_id=is.null`;
+  const _peekNs = cliente?.id ? dbPeek(`nutricion?cliente_id=eq.${cliente.id}&${_peekCicloFilter}`) : null;
+  const _peekNutri = Array.isArray(_peekNs) && _peekNs.length ? _peekNs[0] : null;
+  const _peekDs = _peekNutri ? dbPeek(`nutricion_dias?nutricion_id=eq.${_peekNutri.id}&select=*,comidas(*)&order=orden.asc`) : null;
+  const _peekRs = cliente?.id ? dbPeek(`rutinas?cliente_id=eq.${cliente.id}&${_peekCicloFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
+
+  const [nutri, setNutri] = useState(() => _peekNutri);
+  const [dias, setDias] = useState(() =>
+    Array.isArray(_peekDs)
+      ? _peekDs.map(d => ({ ...d, comidas: (d.comidas || []).sort((a, b) => a.orden - b.orden) }))
+      : []
+  );
+  const [rutinas, setRutinas] = useState(() =>
+    Array.isArray(_peekRs)
+      ? _peekRs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a, b) => a.orden - b.orden) }))
+      : []
+  );
   const [progreso, setProgreso] = useState({});
-  const [nutriProgreso, setNutriProgreso] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [cicloActivo, setCicloActivo] = useState(null);
+  const [nutriProgreso, setNutriProgreso] = useState(() => {
+    const npRows = cliente?.id ? dbPeek(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`) : null;
+    if (!Array.isArray(npRows)) return {};
+    const npMap = {};
+    npRows.forEach(r => {
+      if (r?.dia_id && r?.semana != null) npMap[`${r.dia_id}-${r.semana}`] = r;
+    });
+    return npMap;
+  });
+  const [loading, setLoading] = useState(() => !(_peekCiclos !== null || _peekRs !== null || _peekNs !== null));
+  const [cicloActivo, setCicloActivo] = useState(() => _peekCiclo);
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
-  const [ultimoPeso, setUltimoPeso] = useState(null);
+  const [ultimoPeso, setUltimoPeso] = useState(() => {
+    const met = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) : null;
+    return Array.isArray(met) && met.length > 0 && met[0].peso ? parseFloat(met[0].peso) : null;
+  });
   
   
-  const [biblioteca, setBiblioteca] = useState([]);
+  const [biblioteca, setBiblioteca] = useState(() => dbPeek("biblioteca_ejercicios?order=nombre.asc") || []);
 
   const loadData = async ({ silent = false, forceFresh = false } = {}) => {
-    if (!silent && dias.length === 0 && rutinas.length === 0) {
+    if (!silent && dias.length === 0 && rutinas.length === 0 && _peekCiclos === null) {
       setLoading(true);
     }
     const fetcher = forceFresh ? dbGetFresh : dbGet;
@@ -193,11 +220,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   };
 
   useEffect(() => {
-    loadData();
+    loadData({ silent: !loading });
     let cacheTimer = null;
 
     const onFocus = () => {
-      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: true });
+      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: false });
     };
 
     const onCacheUpdated = () => {
@@ -207,7 +234,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           Object.keys(pendingSavesRef.current || {}).length === 0 &&
           Object.keys(pendingNutriSavesRef.current || {}).length === 0
         ) {
-          loadData({ silent: true, forceFresh: true });
+          loadData({ silent: true, forceFresh: false });
         }
       }, 300);
     };

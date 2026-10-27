@@ -16,7 +16,7 @@ export default defineConfig({
         name: 'FLUX - Sport Supplements',
         short_name: 'FLUX',
         description: 'Plataforma de nutrición y entrenamiento personalizado',
-        theme_color: '#04080f',
+        theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/?pwa=true',

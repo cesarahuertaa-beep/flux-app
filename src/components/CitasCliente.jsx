@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from"react";
-import { dbGet, dbPost, dbPatch } from"../lib/supabase";
+import { dbPeek, dbGet, dbPost, dbPatch } from"../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
   AlertCircle, Plus, CheckCircle2, ChevronRight, Star
@@ -81,10 +81,16 @@ export function CitasCliente({ cliente }) {
   const clienteId = cliente?.id;
   const nutriologoId = cliente?.nutriologo_id;
 
-  const [citas, setCitas] = useState([]);
-  const [disponibilidad, setDisponibilidad] = useState([]);
+  const _peekCitas = clienteId
+    ? (dbPeek(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`) ||
+       dbPeek(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`))
+    : null;
+  const _peekDisp = nutriologoId ? dbPeek(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`) : null;
+
+  const [citas, setCitas] = useState(() => Array.isArray(_peekCitas) ? _peekCitas : []);
+  const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
   const [ratedCitas, setRatedCitas] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => _peekCitas === null);
   
   // Estados del Modal de Agendar
   const [showModal, setShowModal] = useState(false);
@@ -110,7 +116,7 @@ export function CitasCliente({ cliente }) {
   const [nutriologoDuracion, setNutriologoDuracion] = useState(60);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (citas.length === 0 && _peekCitas === null) setLoading(true);
     try {
       const [c, d, r, nProf] = await Promise.all([
         dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`).catch(() => 

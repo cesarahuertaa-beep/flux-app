@@ -131,10 +131,14 @@ public class FluxSyncWorker extends Worker {
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?email=ilike." + encEmail);
         }
 
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "configuracion_plataforma?id=eq.1");
+
         if (nutriId != null && !nutriId.isEmpty()) {
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=bloqueado");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=nombre_marca,color_primario,logo_url");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId);
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=id,nombre,duracion_cita");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?cliente_id=eq." + clientId + "&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?cliente_id=eq." + clientId + "&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "disponibilidad?nutriologo_id=eq." + nutriId + "&order=dia_semana.asc");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas_ratings?cliente_id=eq." + clientId + "&select=cita_id,puntuacion");
@@ -217,6 +221,7 @@ public class FluxSyncWorker extends Worker {
             ? "clientes?order=created_at.asc"
             : "clientes?nutriologo_id=eq." + profileId + "&order=created_at.asc";
 
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "configuracion_plataforma?id=eq.1");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId);
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId + "&select=nombre_marca,color_primario,logo_url");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId + "&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url");
@@ -224,18 +229,25 @@ public class FluxSyncWorker extends Worker {
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?nutriologo_id=eq." + profileId + "&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago?nutriologo_id=eq." + profileId + "&order=created_at.desc");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "biblioteca_ejercicios?order=nombre.asc");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?nutriologo_id=eq." + profileId + "&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "disponibilidad?nutriologo_id=eq." + profileId + "&order=dia_semana.asc,hora_inicio.asc");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?nutriologo_id=eq." + profileId + "&select=id,auth_id,nombre,email,telefono&order=nombre.asc");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc");
 
         if (isSuperOrStaff) {
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago?order=created_at.desc");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago_civil?order=created_at.desc");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "nomina_colaboradores");
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, "productos?order=created_at.desc");
         }
 
         JSONArray clientes = fetchAndStore(cacheMap, supaUrl, supaKey, token, clientFilter);
         if (clientes != null) {
-            int maxToSync = isSuperOrStaff ? Math.min(clientes.length(), 25) : Math.min(clientes.length(), 30);
+            int maxToSync = isSuperOrStaff ? Math.min(clientes.length(), 15) : Math.min(clientes.length(), 20);
             for (int i = 0; i < maxToSync; i++) {
                 JSONObject c = clientes.optJSONObject(i);
                 if (c != null) {

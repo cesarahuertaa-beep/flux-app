@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
+import { dbPeek, dbGet, dbPatch, dbPost } from"../../lib/supabase";
 import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle } from"lucide-react";
 import { useBrand } from"../BrandContext";
 import DatosPersonalesCard from"./DatosPersonalesCard";
@@ -13,7 +13,12 @@ import { refreshUserRoles } from "../../lib/authRoles";
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, onRolesUpdated, multiRoles }) {
   const navigate = useNavigate();
   const isPlayApp = isNativePlayApp();
-  const [loading, setLoading] = useState(true);
+  const _peekRows = profileId ? dbPeek(`profiles?id=eq.${profileId}`) : null;
+  const _peekP = Array.isArray(_peekRows) && _peekRows.length > 0 ? _peekRows[0] : null;
+  const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
+  const _peekC = Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null;
+
+  const [loading, setLoading] = useState(() => !_peekP);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [msg, setMsg] = useState("");
@@ -24,18 +29,35 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
   const [currentMultiRoles, setCurrentMultiRoles] = useState(multiRoles || []);
 
-  const [personalForm, setPersonalForm] = useState({
-    nombre:"", telefono:"", email:"", avatar_url:"", fecha_nacimiento:"", genero:"", pais:"México", estado_provincia:""
-  });
+  const [personalForm, setPersonalForm] = useState(() => ({
+    nombre: _peekP?.nombre ||"",
+    telefono: _peekP?.telefono ||"",
+    email: _peekP?.email ||"",
+    avatar_url: _peekP?.avatar_url ||"",
+    fecha_nacimiento: _peekP?.fecha_nacimiento ||"",
+    genero: _peekP?.genero ||"",
+    pais: _peekP?.pais ||"México",
+    estado_provincia: _peekP?.estado_provincia ||""
+  }));
 
-  const [businessForm, setBusinessForm] = useState({
-    nombre_marca:"", especialidad:"", ubicacion_texto:"", cedula:"", mapa_url:"", color_primario:"#1A6FD4", logo_url:""
-  });
+  const [businessForm, setBusinessForm] = useState(() => ({
+    nombre_marca: _peekP?.nombre_marca ||"",
+    especialidad: _peekP?.especialidad ||"",
+    ubicacion_texto: _peekP?.ubicacion_texto ||"",
+    cedula: _peekP?.cedula ||"",
+    mapa_url: _peekP?.mapa_url ||"",
+    color_primario: _peekP?.color_primario ||"#1A6FD4",
+    logo_url: _peekP?.logo_url ||""
+  }));
 
   const [bossId, setBossId] = useState(null);
 
   // Config de cobro (solo superadmin)
-  const [configPago, setConfigPago] = useState({ clabe:"", banco:"", beneficiario:"" });
+  const [configPago, setConfigPago] = useState(() => ({
+    clabe: _peekC?.clabe ||"",
+    banco: _peekC?.banco ||"",
+    beneficiario: _peekC?.beneficiario ||""
+  }));
   const [savingConfig, setSavingConfig] = useState(false);
   const [configSuccess, setConfigSuccess] = useState(false);
   const [configError, setConfigError] = useState(false);

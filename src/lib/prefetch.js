@@ -168,11 +168,16 @@ export const prefetchCliente = async (cliente) => {
   await safe(`rutinas?cliente_id=eq.${id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`);
   await safe(`progreso?cliente_id=eq.${id}&limit=3000`);
 
-  // Pestaña Citas
+  // Pestaña Membresía Civil y Citas
+  await safe("configuracion_plataforma?id=eq.1");
   if (nutriId) {
-    await safe(`citas?cliente_id=eq.${id}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`);
-    await safe(`disponibilidad?nutriologo_id=eq.${nutriId}&order=dia_semana.asc`);
-    await safe(`citas_ratings?cliente_id=eq.${id}&select=cita_id,puntuacion`);
+    await Promise.all([
+      safe(`citas?cliente_id=eq.${id}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`),
+      safe(`citas?cliente_id=eq.${id}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`),
+      safe(`disponibilidad?nutriologo_id=eq.${nutriId}&order=dia_semana.asc`),
+      safe(`citas_ratings?cliente_id=eq.${id}&select=cita_id,puntuacion`),
+      safe(`profiles?id=eq.${nutriId}&select=id,nombre,duracion_cita`),
+    ]);
   }
 
   // Descargar GIFs, fotos de comidas, avatares y logos a la caché local permanente en segundo plano
@@ -184,8 +189,8 @@ export const prefetchCliente = async (cliente) => {
 };
 
 /**
- * Precarga datos del nutriólogo / coach (clientes activos, sus perfiles y rutinas)
- * para que al entrar sin internet todo esté disponible.
+ * Precarga datos del nutriólogo / coach (todas las pestañas + clientes activos)
+ * para que al cambiar de pestaña o entrar sin internet todo abra en 0 ms.
  */
 export const prefetchAdmin = async (profileId, role) => {
   if (!profileId) return false;
@@ -196,10 +201,13 @@ export const prefetchAdmin = async (profileId, role) => {
     : `clientes?nutriologo_id=eq.${profileId}&order=created_at.asc`;
   const mediaUrls = [];
 
-  // 1. Perfil del admin (para UserProfile, PerfilNutriologo, BrandContext y Admin.jsx)
-  const profs = await safe(`profiles?id=eq.${profileId}`);
-  await safe(`profiles?id=eq.${profileId}&select=nombre_marca,color_primario,logo_url`);
-  await safe(`profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1`);
+  // 1. Perfil del admin y configuración global en paralelo
+  const [profs] = await Promise.all([
+    safe(`profiles?id=eq.${profileId}`),
+    safe(`profiles?id=eq.${profileId}&select=nombre_marca,color_primario,logo_url`),
+    safe(`profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1`),
+    safe("configuracion_plataforma?id=eq.1"),
+  ]);
   if (Array.isArray(profs) && profs[0]) {
     const p = profs[0];
     if (p.avatar_url) mediaUrls.push(p.avatar_url);
@@ -209,26 +217,37 @@ export const prefetchAdmin = async (profileId, role) => {
     }
   }
 
-  // 2. Consultas que Admin.jsx ejecuta en loadClientes y checkPago
-  await safe(`profiles?id=eq.${profileId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`);
-  await safe(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`);
-  await safe(`clientes?nutriologo_id=eq.${profileId}&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1`);
-  await safe(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`);
-  await safe(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`);
-  await safe(`progreso?select=cliente_id,updated_at&order=updated_at.desc&limit=3000`);
-  await safe(`metricas_progreso?select=cliente_id,fecha,created_at&order=created_at.desc&limit=1000`);
-  await safe(`biblioteca_ejercicios?order=nombre.asc`);
+  // 2. Consultas de todas las pestañas principales en paralelo (Pacientes, Biblioteca, Agenda, Membresía, Equipo)
+  await Promise.all([
+    safe(`profiles?id=eq.${profileId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`),
+    safe(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`),
+    safe(`clientes?nutriologo_id=eq.${profileId}&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1`),
+    safe(`recibos_pago?nutriologo_id=eq.${profileId}&order=created_at.desc`),
+    safe(`ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo`),
+    safe(`biblioteca_ejercicios?order=nombre.asc`),
+    safe(`citas?nutriologo_id=eq.${profileId}&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`),
+    safe(`disponibilidad?nutriologo_id=eq.${profileId}&order=dia_semana.asc,hora_inicio.asc`),
+    safe(`clientes?nutriologo_id=eq.${profileId}&select=id,auth_id,nombre,email,telefono&order=nombre.asc`),
+    safe(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`),
+  ]);
 
-  // 3. Si es Superadmin o Staff: precargar directorio completo de nutriólogos y sus logos
+  // 3. Si es Superadmin o Staff: precargar Directorio, Aprobaciones, Control de Pagos y Tienda
   if (isSuperadmin || isStaff) {
-    const dirNutris = await safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
+    const [dirNutris] = await Promise.all([
+      safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc"),
+      safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre"),
+      safe("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc"),
+      safe("recibos_pago?order=created_at.desc"),
+      safe("recibos_pago_civil?order=created_at.desc"),
+      safe("nomina_colaboradores"),
+      safe("productos?order=created_at.desc"),
+    ]);
     if (Array.isArray(dirNutris)) {
       dirNutris.forEach((n) => {
         if (n.avatar_url) mediaUrls.push(n.avatar_url);
         if (n.logo_url) mediaUrls.push(n.logo_url);
       });
     }
-    await safe("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre");
   }
 
   // 4. Lista de clientes
@@ -243,27 +262,33 @@ export const prefetchAdmin = async (profileId, role) => {
     if (c.avatar_url) mediaUrls.push(c.avatar_url);
   });
 
-  // 5. Precargar planes y rutinas para:
-  // - Todos los clientes del coach (o hasta 40 para superadmin)
-  // - El expediente propio del coach ("Mi Plan")
+  // 5. Precargar planes y rutinas de manera controlada (sin saturar la red)
   const shadowCandidate = clientes.find((c) =>
     (c.nutriologo_id === profileId && c.objetivo === "Mi entrenamiento personal") ||
     (c.auth_id && c.auth_id === profileId)
   );
 
-  const targets = isSuperadmin ? clientes.slice(0, 40) : clientes;
-  const toPrefetch = new Set(targets.map((c) => c.id));
-  if (shadowCandidate) toPrefetch.add(shadowCandidate.id);
+  const activeClients = clientes.filter((c) => c.activo !== false);
+  const targets = isSuperadmin ? activeClients.slice(0, 12) : activeClients.slice(0, 15);
+  const toPrefetch = [];
+  if (shadowCandidate?.id) toPrefetch.push(shadowCandidate.id);
+  for (const c of targets) {
+    if (c.id && !toPrefetch.includes(c.id)) toPrefetch.push(c.id);
+  }
 
-  for (const clientId of toPrefetch) {
-    await prefetchPlanCliente(clientId, mediaUrls);
+  // Ejecutar en pequeños lotes de 3 clientes a la vez
+  for (let i = 0; i < toPrefetch.length; i += 3) {
+    const batch = toPrefetch.slice(i, i + 3);
+    await Promise.all(batch.map((clientId) => prefetchPlanCliente(clientId, mediaUrls)));
   }
 
   // Precargar historiales de rutinas y nutrición para los clientes seleccionados
-  const ids = Array.from(toPrefetch).slice(0, 25).join(",");
+  const ids = toPrefetch.slice(0, 20).join(",");
   if (ids) {
-    await safe(`rutinas?cliente_id=in.(${ids})`);
-    await safe(`nutricion?cliente_id=in.(${ids})`);
+    await Promise.all([
+      safe(`rutinas?cliente_id=in.(${ids})`),
+      safe(`nutricion?cliente_id=in.(${ids})`),
+    ]);
   }
 
   // 6. Descargar pasivamente todos los medios recolectados

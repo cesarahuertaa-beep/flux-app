@@ -215,10 +215,13 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception ignored) {}
         }
         hideFloatingTimerOverlay();
+        notifyWebViewSyncComplete();
         if (appUpdateManager != null) {
             try {
                 appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
-                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
+                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
+                            || (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                                && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE))) {
                         try {
                             appUpdateManager.startUpdateFlowForResult(
                                 appUpdateInfo,
@@ -227,7 +230,7 @@ public class MainActivity extends BridgeActivity {
                                 RC_APP_UPDATE
                             );
                         } catch (Exception e) {
-                            Log.w(TAG, "Failed to resume in-progress update: " + e.getMessage());
+                            Log.w(TAG, "Failed to resume/start update: " + e.getMessage());
                         }
                     }
                 });
@@ -263,7 +266,7 @@ public class MainActivity extends BridgeActivity {
             WorkManager wm = WorkManager.getInstance(getApplicationContext());
             wm.enqueueUniquePeriodicWork(
                 "FluxPeriodicSync",
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 periodicSync
             );
 

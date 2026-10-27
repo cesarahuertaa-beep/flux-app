@@ -8,25 +8,25 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
-import { authInvite, authResetPassword, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany, updateQueryCache, invalidateCache } from "../lib/supabase";
+import { authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany, updateQueryCache, invalidateCache } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 import { useBackButton } from "../lib/backButtonHandler";
 
-const Biblioteca = lazy(() => import("../components/admin/Biblioteca").then(m => ({ default: m.Biblioteca })));
-const ProgramarCliente = lazy(() => import("../components/admin/ProgramarCliente").then(m => ({ default: m.ProgramarCliente })));
-const MiMembresiaCivil = lazy(() => import("../components/admin/MiMembresiaCivil"));
-const GestionEquipo = lazy(() => import("../components/admin/GestionEquipo").then(m => ({ default: m.GestionEquipo })));
-const AgendaAdmin = lazy(() => import("../components/admin/AgendaAdmin").then(m => ({ default: m.AgendaAdmin })));
-const ClienteView = lazy(() => import("./Cliente"));
-const UserProfile = lazy(() => import("../components/UserProfile"));
-const PerfilNutriologo = lazy(() => import("../components/admin/PerfilNutriologo"));
-const Aprobaciones = lazy(() => import("../components/admin/Aprobaciones"));
-const GestorTienda = lazy(() => import("../components/admin/GestorTienda"));
-const MiMembresia = lazy(() => import("../components/admin/MiMembresia"));
-const ControlPagos = lazy(() => import("../components/admin/ControlPagos"));
-const MisComisiones = lazy(() => import("../components/admin/MisComisiones"));
-const DirectorioSuperadmin = lazy(() => import("../components/admin/DirectorioSuperadmin").then(m => ({ default: m.DirectorioSuperadmin })));
+import { Biblioteca } from "../components/admin/Biblioteca";
+import { ProgramarCliente } from "../components/admin/ProgramarCliente";
+import MiMembresiaCivil from "../components/admin/MiMembresiaCivil";
+import { GestionEquipo } from "../components/admin/GestionEquipo";
+import { AgendaAdmin } from "../components/admin/AgendaAdmin";
+import ClienteView from "./Cliente";
+import UserProfile from "../components/UserProfile";
+import PerfilNutriologo from "../components/admin/PerfilNutriologo";
+import Aprobaciones from "../components/admin/Aprobaciones";
+import GestorTienda from "../components/admin/GestorTienda";
+import MiMembresia from "../components/admin/MiMembresia";
+import ControlPagos from "../components/admin/ControlPagos";
+import MisComisiones from "../components/admin/MisComisiones";
+import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -90,7 +90,19 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
   }, []);
   
-  const [clientes, setClientes] = useState([]);
+  const myId = profileId || getProfileId();
+  const _initClientesFilter = (isSuperadmin || role === "staff")
+    ? "clientes?order=created_at.asc"
+    : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
+  const _peekClientes = dbPeek(_initClientesFilter);
+  const _peekBiblio = dbPeek("biblioteca_ejercicios?order=nombre.asc");
+  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
+
+  const [clientes, setClientes] = useState(() =>
+    Array.isArray(_peekClientes)
+      ? _peekClientes.filter(c => c.objetivo !== "Mi entrenamiento personal")
+      : []
+  );
   const [selected, setSelected] = useState(() => {
     try {
       const s = sessionStorage.getItem("flux_admin_selected_client");
@@ -103,20 +115,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     else sessionStorage.removeItem("flux_admin_selected_client");
   }, [selected]);
 
-  const [loading, setLoading]               = useState(true);
+  const [loading, setLoading]               = useState(() => _peekClientes === null);
   const [showNewClient, setShowNewClient]   = useState(false);
   const [newClient, setNewClient]           = useState({ nombre:"", email:"", objetivo:"", telefono:"" });
   const [editClient, setEditClient]         = useState(null);
   const [editClientForm, setEditClientForm] = useState({ nombre:"", telefono:"", objetivo:"" });
   const [saving, setSaving]                 = useState(false);
   const [msg, setMsg]                       = useState("");
-  const [biblioteca, setBiblioteca]         = useState([]);
+  const [biblioteca, setBiblioteca]         = useState(() => Array.isArray(_peekBiblio) ? _peekBiblio : []);
   const [nutriologoMap, setNutrioMap]       = useState({});
   const [searchClientes, setSearchClientes] = useState("");
 
-  const myId = profileId || getProfileId();
-
-  const [myProfile, setMyProfile]           = useState(null);
+  const [myProfile, setMyProfile]           = useState(() => (Array.isArray(_peekMe) && _peekMe.length > 0 ? _peekMe[0] : null));
   const [retentionData, setRetentionData]   = useState({ activeCiclos: [], lastActivityMap: {} });
   const [filtroRetencion, setFiltroRetencion] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
   const [selectedWaClient, setSelectedWaClient] = useState(null);

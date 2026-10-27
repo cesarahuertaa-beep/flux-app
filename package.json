@@ -13,8 +13,7 @@
     "electron:build": "vite build --mode development && electron-builder --win",
     "android:sync": "vite build && npx cap sync android",
     "android:bundle": "vite build && npx cap sync android && cd android && .\\gradlew.bat bundleRelease",
-    "android:apk": "vite build && npx cap sync android && cd android && .\\gradlew.bat assembleRelease",
-    "version": "node sync-version.cjs && git add android/app/build.gradle"
+    "android:apk": "vite build && npx cap sync android && cd android && .\\gradlew.bat assembleRelease"
   },
   "build": {
     "appId": "com.fluxsport.app",

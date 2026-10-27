@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
-import { dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
+import { dbPeek, dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 
 export default function Aprobaciones({ setMsg }) {
-  const [solicitudes, setSolicitudes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const _peekSols = dbPeek("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
+  const [solicitudes, setSolicitudes] = useState(() => Array.isArray(_peekSols) ? _peekSols : []);
+  const [loading, setLoading] = useState(() => _peekSols === null);
   const [confirmAction, setConfirmAction] = useState(null);
 
   const loadData = async () => {
-    setLoading(true);
+    if (solicitudes.length === 0 && _peekSols === null) setLoading(true);
     try {
       const data = await dbGet("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
       setSolicitudes(data || []);

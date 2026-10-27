@@ -22,13 +22,13 @@ import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
-import { dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpload, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 
-const ProgresoCliente = lazy(() => import("./ProgresoCliente").then(m => ({ default: m.ProgresoCliente })));
-const TemplatesManagerModal = lazy(() => import("../ui/TemplatesManagerModal"));
+import { ProgresoCliente } from "./ProgresoCliente";
+import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -51,9 +51,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [searchProg, setSearchProg] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
+  const _peekActiveCiclo = Array.isArray(_peekCiclos) ? (_peekCiclos.find(c => c.activo) || _peekCiclos[0] || null) : null;
+  const _peekFilter = _peekActiveCiclo ? `ciclo_id=eq.${_peekActiveCiclo.id}` : `ciclo_id=is.null`;
+  const _peekNs = selected?.id ? dbPeek(`nutricion?cliente_id=eq.${selected.id}&${_peekFilter}`) : null;
+  const _peekNutri = Array.isArray(_peekNs) && _peekNs.length ? _peekNs[0] : null;
+  const _peekDs = _peekNutri ? dbPeek(`nutricion_dias?nutricion_id=eq.${_peekNutri.id}&select=*,comidas(*)&order=orden.asc`) : null;
+  const _peekRs = selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
+
   // ── Ciclos ──
-  const [ciclos, setCiclos] = useState([]);
-  const [cicloSel, setCicloSel] = useState(null);
+  const [ciclos, setCiclos] = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
+  const [cicloSel, setCicloSel] = useState(() => _peekActiveCiclo);
   const [showPastCycles, setShowPastCycles] = useState(false);
   useEffect(() => { 
     if (cicloSel && !cicloSel.activo) setShowPastCycles(true); 
@@ -61,12 +69,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   }, [cicloSel, selected?.id]); // ciclo seleccionado para ver/editar
 
   // ── Datos del ciclo seleccionado ──
-  const [nutri, setNutri] = useState(null);
-  const [dias, setDias] = useState([]);
-  const [rutinas, setRutinas] = useState([]);
+  const [nutri, setNutri] = useState(() => _peekNutri);
+  const [dias, setDias] = useState(() =>
+    Array.isArray(_peekDs)
+      ? _peekDs.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) }))
+      : []
+  );
+  const [rutinas, setRutinas] = useState(() =>
+    Array.isArray(_peekRs)
+      ? _peekRs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) }))
+      : []
+  );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [macros, setMacros] = useState({ calorias:"", proteina:"", carbohidratos:"", grasas:"" });
+  const [macros, setMacros] = useState(() => ({
+    calorias: _peekNutri?.calorias || "",
+    proteina: _peekNutri?.proteina || "",
+    carbohidratos: _peekNutri?.carbohidratos || "",
+    grasas: _peekNutri?.grasas || ""
+  }));
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [planForm, setPlanForm] = useState({ fecha_inicio: new Date().toISOString().split("T")[0], semanas: 4 });
   const [showDiaModal, setShowDiaModal] = useState(false);
@@ -252,12 +273,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const loadData = useCallback(async (targetCiclo = cicloSel, opts = {}) => {
     if (!selected) return;
     const { silent = false, forceFresh = false } = opts;
-    if (!silent) setLoading(true);
+    const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
+    const cicloFilter = currentCiclo
+      ? `ciclo_id=eq.${currentCiclo.id}`
+      : `ciclo_id=is.null`;
+    const hasCached = dbPeek(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`) !== null ||
+                      dbPeek(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`) !== null;
+    if (!silent && !hasCached && dias.length === 0 && rutinas.length === 0) setLoading(true);
     try {
-      const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
-      const cicloFilter = currentCiclo
-        ? `ciclo_id=eq.${currentCiclo.id}`
-        : `ciclo_id=is.null`;
 
       const fetchFn = forceFresh ? dbGetFresh : dbGet;
 

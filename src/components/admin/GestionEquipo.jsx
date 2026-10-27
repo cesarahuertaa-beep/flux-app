@@ -1,7 +1,7 @@
 import { useBrand } from "../BrandContext";
 import { useState, useEffect, useCallback } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2, Crown } from "lucide-react";
-import { authInvite, authResetPassword, dbGet, dbGetFresh, dbPost, dbPatch, getProfileId, updateQueryCache, invalidateCache } from "../../lib/supabase";
+import { authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, getProfileId, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
 
@@ -11,8 +11,14 @@ import { getLatestConfiguredRates } from "../../utils/tarifas";
 // ────────────────────────────────────────────────────────────────────────────
 
 export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
-  const [equipo, setEquipo]         = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const myId = profileId || getProfileId();
+  const _peekRows = dbPeek("profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc");
+  const [equipo, setEquipo]         = useState(() =>
+    Array.isArray(_peekRows)
+      ? _peekRows.filter(r => (r.role === "administrativo" && r.nutriologo_id === myId) || (isSuperadmin && r.role === "staff"))
+      : []
+  );
+  const [loading, setLoading]       = useState(() => _peekRows === null);
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving]         = useState(false);
   const [form, setForm]             = useState({ nombre:"", email:"", telefono:"" });
@@ -35,10 +41,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   useBackButton(!!editUser, () => setEditUser(null), 20);
   useBackButton(!!confirmPremium, () => setConfirmPremium(null), 30);
 
-  const myId = profileId || getProfileId();
-
   const load = useCallback(async ({ forceFresh = false } = {}) => {
-    if (equipo.length === 0) setLoading(true);
+    if (equipo.length === 0 && _peekRows === null) setLoading(true);
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       const rows = await fetcher(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);

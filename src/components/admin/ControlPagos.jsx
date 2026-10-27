@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { dbGet, dbPatch, dbPost, invalidateCache } from "../../lib/supabase";
+import { dbPeek, dbGet, dbPatch, dbPost, invalidateCache } from "../../lib/supabase";
 import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save, Zap } from "lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
 import { ListSkeleton } from"../ui/Skeleton";
@@ -15,10 +15,14 @@ const StatusBadge = ({ s }) => {
 };
 
 export default function ControlPagos({ setMsg }) {
+  const _peekRecibos = dbPeek("recibos_pago?order=created_at.desc");
+  const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
+  const _peekRecibosCivil = dbPeek("recibos_pago_civil?order=created_at.desc");
+
   // ── Estado nutriólogos ──────────────────────────────────────────────────
-  const [recibos, setRecibos] = useState([]);
+  const [recibos, setRecibos] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [nutriologos, setNutriologos] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => _peekRecibos === null);
   const [modalImg, setModalImg] = useState(null);
 
   useBackButton(!!modalImg, () => setModalImg(null), 50);
@@ -29,13 +33,13 @@ export default function ControlPagos({ setMsg }) {
   const [nominasEstado, setNominasEstado] = useState({});
 
   // ── Estado atletas independientes ───────────────────────────────────────
-  const [recibosCivil, setRecibosCivil] = useState([]);
+  const [recibosCivil, setRecibosCivil] = useState(() => Array.isArray(_peekRecibosCivil) ? _peekRecibosCivil : []);
   const [clientesCivil, setClientesCivil] = useState({});
-  const [loadingCivil, setLoadingCivil] = useState(true);
+  const [loadingCivil, setLoadingCivil] = useState(() => _peekRecibosCivil === null);
   const [filtroEstadoCivil, setFiltroEstadoCivil] = useState("pendiente");
 
   // ── Estado Configuración de Tarifas y Planes (Opción A) ─────────────────
-  const [rawCfg, setRawCfg] = useState(null);
+  const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
   const [showRatesPanel, setShowRatesPanel] = useState(false);
   const [savingRates, setSavingRates] = useState(false);
   const [ratesForm, setRatesForm] = useState({
@@ -49,7 +53,7 @@ export default function ControlPagos({ setMsg }) {
   });
 
   const loadData = async () => {
-    setLoading(true);
+    if (recibos.length === 0 && _peekRecibos === null) setLoading(true);
     try {
       const [dataRecibos, profiles, dataNominas, cfg] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),

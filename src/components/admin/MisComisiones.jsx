@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useMemo } from"react";
-import { dbGet, dbPatch } from"../../lib/supabase";
+import { dbPeek, dbGet, dbPatch } from"../../lib/supabase";
 import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
 import { getRatesForCutoff } from"../../utils/tarifas";
 import { CustomSelect } from "../ui/CustomSelect";
 
 export default function MisComisiones({ myId, setMsg }) {
-  const [myName, setMyName] = useState(null);
+  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=nombre`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
+  const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
+  const [myName, setMyName] = useState(() => Array.isArray(_peekMe) && _peekMe.length > 0 ? (_peekMe[0].nombre || "") : null);
   const [recibos, setRecibos] = useState([]);
   const [nominas, setNominas] = useState([]);
-  const [rawCfg, setRawCfg] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
+  const [loading, setLoading] = useState(() => _peekMe === null);
   const [filtroMes, setFiltroMes] = useState("todos");
 
   const loadData = async () => {
-    setLoading(true);
+    if (_peekMe === null && recibos.length === 0) setLoading(true);
     try {
       // Obtener el nombre propio del colaborador y config de plataforma
       const [me, cfg] = await Promise.all([

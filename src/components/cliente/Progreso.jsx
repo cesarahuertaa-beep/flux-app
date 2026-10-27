@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Model from "@phelian/react-body-highlighter";
-import { dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
+import { dbPeek, dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
 import {
   Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown,
   Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X,
@@ -79,9 +79,10 @@ const getRank = (xp) => {
 };
 
 export default function Progreso({ cliente, isSelfManaged }) {
-  const [metricas, setMetricas] = useState([]);
+  const _peekMetricas = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) : null;
+  const [metricas, setMetricas] = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas : []);
   const [groupAvg, setGroupAvg] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => _peekMetricas === null);
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium' && cliente.objetivo !== 'Mi entrenamiento personal';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
@@ -104,7 +105,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
-    setLoading(true);
+    if (metricas.length === 0 && dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) === null) {
+      setLoading(true);
+    }
     try {
       // 1. Cargar métricas de composición
       const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`);

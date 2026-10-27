@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbGetFresh, dbPost, dbPatch, updateQueryCache, invalidateCache } from "../../lib/supabase";
+import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -70,8 +70,16 @@ const LogoPicker = ({ value, onChange, uploading }) => {
 };
 
 export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, setSelected, setTab, setEditClient, toggleActivo }) {
-  const [nutriologos, setNutriologos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const _peekNutris = dbPeek("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
+  const _peekMe = myId ? dbPeek(`profiles?id=eq.${myId}`) : null;
+  const [nutriologos, setNutriologos] = useState(() => {
+    if (Array.isArray(_peekMe) && _peekMe.length > 0 && Array.isArray(_peekNutris)) {
+      const owner = { ..._peekMe[0], isSuperadmin: true, nombre_marca: _peekMe[0].nombre_marca || "Flux Sports (Tú)" };
+      return [owner, ..._peekNutris];
+    }
+    return Array.isArray(_peekNutris) ? _peekNutris : [];
+  });
+  const [loading, setLoading] = useState(() => _peekNutris === null);
   const [search, setSearch] = useState("");
   
   // Modals state

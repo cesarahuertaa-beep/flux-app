@@ -43,20 +43,12 @@ if (typeof window !== "undefined" && !isNativePlatform() && window.location.hash
 // Interceptar cualquier token de invitación / recuperación ANTES de montar el Router
 captureAuthHashSynchronously(isNativePlatform());
 
-// Precargar la pantalla que se va a necesitar en paralelo a la restauración de sesión
-try {
-  const _r = localStorage.getItem("flux_role");
-  if (!_r) import("./pages/Login");
-  else if (_r === "cliente") import("./pages/Cliente");
-  else import("./pages/Admin");
-} catch (e) { /* ignore */ }
-
-const Landing = lazy(() => import("./pages/Landing"));
-const Login = lazy(() => import("./pages/Login"));
-const Admin = lazy(() => import("./pages/Admin"));
-const ClienteView = lazy(() => import("./pages/Cliente"));
-const Privacidad = lazy(() => import("./pages/Privacidad"));
-const Terminos = lazy(() => import("./pages/Terminos"));
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Admin from "./pages/Admin";
+import ClienteView from "./pages/Cliente";
+import Privacidad from "./pages/Privacidad";
+import Terminos from "./pages/Terminos";
 
 const FullScreenLoader = () => (
   <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
@@ -232,9 +224,10 @@ export default function App() {
         }
 
         if (optimisticData) {
-          setSession({ role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles });
-          setRestoring(false);
-          syncNativeCredentials();
+          await Promise.race([
+            hydrateOfflineCache(),
+            new Promise((r) => setTimeout(r, 800)),
+          ]).catch(() => {});
           const sObj = { role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles };
           setSession(sObj);
           setRestoring(false);

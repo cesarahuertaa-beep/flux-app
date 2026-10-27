@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from"react";
 import { calculateBodyComposition } from"../../lib/bodyComposition";
 import { createPortal } from"react-dom";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../../lib/supabase";
+import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
 import { useBackButton } from"../../lib/backButtonHandler";
 import { generateProgresoPDF } from"../../utils/pdf";
@@ -127,15 +127,25 @@ const fmtDate = (d) => new Date(d +"T12:00:00").toLocaleDateString("es-MX", { ye
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
+  const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
+  const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
+  const _peekActiveCiclo = Array.isArray(_peekCiclos) ? (_peekCiclos.find(c => c.activo) || _peekCiclos[0] || null) : null;
+  const _peekFilter = _peekActiveCiclo ? `ciclo_id=eq.${_peekActiveCiclo.id}` : `ciclo_id=is.null`;
+  const _peekRs = selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
+
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [metricas,     setMetricas]     = useState([]);
-  const [rutinas,      setRutinas]      = useState([]);
+  const [metricas,     setMetricas]     = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas : []);
+  const [rutinas,      setRutinas]      = useState(() =>
+    Array.isArray(_peekRs)
+      ? _peekRs.map(r => ({ ...r, ejercicios: Array.isArray(r.ejercicios) ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0)) : [] }))
+      : []
+  );
   const [nutriDias,    setNutriDias]    = useState([]);
   const [nutriProgreso,setNutriProgreso]= useState({});
   const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
   const [showPastWeeks, setShowPastWeeks] = useState(false);
-  const [ciclos,       setCiclos]       = useState([]);
-  const [cicloSel,     setCicloSel]     = useState(null); // ciclo activo por defecto
+  const [ciclos,       setCiclos]       = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
+  const [cicloSel,     setCicloSel]     = useState(() => _peekActiveCiclo); // ciclo activo por defecto
   const [progreso,     setProgreso]     = useState({});
   const [loading,      setLoading]      = useState(false);
   const [saving,       setSaving]       = useState(false);
@@ -242,7 +252,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
   const load = useCallback(async () => {
     if (!selected) return;
-    setLoading(true);
+    if (metricas.length === 0 && rutinas.length === 0 && _peekMetricas === null && _peekCiclos === null) {
+      setLoading(true);
+    }
     try {
       const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`).catch(() => []);
       setMetricas(ms || []);

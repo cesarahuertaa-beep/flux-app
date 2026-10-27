@@ -1,13 +1,14 @@
 import { useState, useEffect } from"react";
-import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
+import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload } from"../../lib/supabase";
 import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, ShoppingBag } from"lucide-react";
 import { useBackButton } from"../../lib/backButtonHandler";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 
 export default function GestorTienda({ setMsg }) {
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const _peekProds = dbPeek("productos?order=created_at.desc");
+  const [productos, setProductos] = useState(() => Array.isArray(_peekProds) ? _peekProds : []);
+  const [loading, setLoading] = useState(() => _peekProds === null);
   const [showModal, setShowModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -24,7 +25,7 @@ export default function GestorTienda({ setMsg }) {
   const [busqueda, setBusqueda] = useState("");
 
   const loadProductos = async () => {
-    setLoading(true);
+    if (productos.length === 0 && _peekProds === null) setLoading(true);
     try {
       const rows = await dbGet('productos?order=created_at.desc');
       if (Array.isArray(rows)) setProductos(rows);
