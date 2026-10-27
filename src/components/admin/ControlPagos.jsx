@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from"react";
-import { dbGet, dbPatch, dbPost } from"../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save } from"lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { dbGet, dbPatch, dbPost, invalidateCache } from "../../lib/supabase";
+import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save, Zap } from "lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
 import { ListSkeleton } from"../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -86,7 +86,7 @@ export default function ControlPagos({ setMsg }) {
     setLoading(false);
   };
 
-  const handleSaveRates = async () => {
+  const handleSaveRates = async (applyNow = false) => {
     setSavingRates(true);
     try {
       const history = parseTarifasHistory(rawCfg);
@@ -99,25 +99,34 @@ export default function ControlPagos({ setMsg }) {
         civil_premium: Number(ratesForm.civil_premium) || 0,
         admin_premium: Number(ratesForm.admin_premium) || 0,
         comision_pct: Number(ratesForm.comision_pct) || 0,
-        effective_from: nextCutoffStr,
+        effective_from: applyNow ? "2020-01-01" : nextCutoffStr,
         updated_at: new Date().toISOString()
       };
 
-      // Si ya existía una entrada programada para ese mismo próximo corte, la actualizamos; si no, la agregamos al historial
-      const filteredHistory = history.filter(h => h.effective_from !== nextCutoffStr);
-      const updatedHistory = [...filteredHistory, newEntry].sort((a, b) =>
-        (a.effective_from || "").localeCompare(b.effective_from || "")
-      );
+      let updatedHistory;
+      if (applyNow) {
+        // Al aplicar de inmediato, actualizamos la tarifa base desde 2020-01-01 y limpiamos overrides futuros redundantes
+        updatedHistory = [newEntry];
+      } else {
+        const filteredHistory = history.filter(h => h.effective_from !== nextCutoffStr);
+        updatedHistory = [...filteredHistory, newEntry].sort((a, b) =>
+          (a.effective_from || "").localeCompare(b.effective_from || "")
+        );
+      }
 
       const updatedRows = await dbPatch("configuracion_plataforma?id=eq.1", {
         tarifas_config: updatedHistory
       });
+      invalidateCache("configuracion_plataforma");
       if (updatedRows && updatedRows.length > 0) {
         setRawCfg(updatedRows[0]);
       } else {
         setRawCfg(prev => ({ ...(prev || {}), tarifas_config: updatedHistory }));
       }
-      setMsg(`✓ Tarifas guardadas. Entrarán en vigor en el próximo corte (${nextCutoffStr}) respetando adeudos anteriores.`);
+      setMsg(applyNow
+        ? "✓ Tarifas aplicadas de inmediato como tarifa base vigente hoy."
+        : `✓ Tarifas guardadas. Entrarán en vigor en el próximo corte (${nextCutoffStr}) respetando adeudos anteriores.`
+      );
       setShowRatesPanel(false);
     } catch (e) {
       setMsg("❌ Error guardando tarifas: " + e.message);
@@ -481,18 +490,35 @@ export default function ControlPagos({ setMsg }) {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-[#E2E8F0]">
-              <p className="text-xs text-[#6B7A8D]">
-                🔒 <strong>Protección Histórica Activa:</strong> Al guardar cambios, entrarán en vigor para el <strong>próximo corte ({getNextCutoffDateStr()})</strong>. Los adeudos pendientes de cortes pasados conservarán su costo anterior.
-              </p>
-              <button
-                onClick={handleSaveRates}
-                disabled={savingRates}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm shrink-0"
-              >
-                <Save size={15} />
-                {savingRates ? "Guardando..." : "Guardar Tarifas"}
-              </button>
+            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 pt-3 border-t border-[#E2E8F0]">
+              <div className="text-xs text-[#6B7A8D] space-y-1">
+                <p>
+                  🔒 <strong>Programar ({getNextCutoffDateStr()}):</strong> Entrará en vigor el próximo día 10, protegiendo adeudos pendientes.
+                </p>
+                <p>
+                  ⚡ <strong>Aplicar Inmediatamente Hoy:</strong> Actualiza la tarifa base desde hoy mismo (para ajustes iniciales como $239 MXN en estudiantes).
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleSaveRates(false)}
+                  disabled={savingRates}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E2E8F0] hover:bg-gray-50 text-[#0B1929] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <Save size={14} />
+                  <span>{savingRates ? "Guardando..." : `Programar (${getNextCutoffDateStr()})`}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveRates(true)}
+                  disabled={savingRates}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm cursor-pointer"
+                >
+                  <Zap size={14} />
+                  <span>{savingRates ? "Aplicando..." : "Aplicar Inmediatamente Hoy"}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

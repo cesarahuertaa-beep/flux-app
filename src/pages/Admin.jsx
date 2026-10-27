@@ -242,7 +242,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             expirationDate = new Date(lastApproved.fecha_corte_mes + "T23:59:59");
           } else {
             expirationDate = new Date(firstClientDate);
-            expirationDate.setDate(expirationDate.getDate() + 30);
+            expirationDate.setDate(expirationDate.getDate() + 7);
             expirationDate.setHours(23, 59, 59, 999);
           }
 

@@ -141,13 +141,13 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           // Aún no registra a su primer paciente: periodo de prueba no ha iniciado (acceso total de cortesía)
           isTrialPeriod = true;
           const d = new Date();
-          d.setDate(d.getDate() + 30);
+          d.setDate(d.getDate() + 7);
           targetCutoff = d;
           expDate = null;
         } else {
-          // El periodo de prueba vence 30 días después del primer paciente (+ 2 días de gracia)
+          // El periodo de prueba vence 7 días después del primer paciente (+ 2 días de gracia)
           const trialExp = new Date(firstClientDateObj);
-          trialExp.setDate(trialExp.getDate() + 30);
+          trialExp.setDate(trialExp.getDate() + 7);
           trialExp.setHours(23, 59, 59, 999);
           const trialGrace = new Date(trialExp);
           trialGrace.setDate(trialGrace.getDate() + 2);
@@ -185,14 +185,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         }
       }
 
-      const refDate = expDate && today >= expDate ? expDate : today;
+      const refDate = targetCutoff || (expDate && today >= expDate ? expDate : today);
       const ratesForStudent = getRatesForCutoff(rawCfg, refDate);
       const tarifaEstudiante = Number(ratesForStudent.nutri_estudiante ?? 239);
 
       let remainingStr = null;
       if (isTrialPeriod) {
         if (!firstClientDateObj) {
-          remainingStr = "Prueba de bienvenida activa (30 días de cortesía a partir de tu 1er paciente)";
+          remainingStr = "Prueba de bienvenida activa (7 días de cortesía a partir de tu 1er paciente)";
         } else if (trialDaysRemainingCalc > 1) {
           remainingStr = `Prueba gratuita activa: ${trialDaysRemainingCalc} días restantes`;
         } else if (trialDaysRemainingCalc === 1) {
@@ -753,12 +753,12 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   </span>
                   {firstClientDate ? (
                     <span>
-                      Cuentas con 30 días de acceso total sin costo. Te quedan{" "}
-                      <strong>{trialDaysRemaining ?? 30} días de prueba</strong> antes de tu primera mensualidad de ${Number(currentRate).toFixed(2)} MXN.
+                      Cuentas con 7 días de acceso total sin costo. Te quedan{" "}
+                      <strong>{trialDaysRemaining ?? 7} días de prueba</strong> antes de tu primera mensualidad de ${Number(currentRate).toFixed(2)} MXN.
                     </span>
                   ) : (
                     <span>
-                      ¡Bienvenido a FLUX! Tienes acceso total de cortesía. Tu periodo de prueba de 30 días comenzará de forma automática en cuanto des de alta a tu primer paciente.
+                      ¡Bienvenido a FLUX! Tienes acceso total de cortesía. Tu periodo de prueba de 7 días comenzará de forma automática en cuanto des de alta a tu primer paciente.
                     </span>
                   )}
                   <span className="block mt-1 text-amber-800/90">
@@ -771,7 +771,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             )}
             {isPlayApp ? (
               /* Google Play Subscription (Android Oficial — Sin transferencias para cumplir políticas de Google) */
-              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between h-full">
+              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-2">
                     <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -1121,7 +1121,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           */}
           <div className="lg:col-span-5 space-y-4">
             {isPlayApp ? (
-              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between h-full">
+              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
