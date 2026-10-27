@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbPost, dbPatch } from "../../lib/supabase";
+import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbGet, dbGetFresh, dbPost, dbPatch, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -100,11 +100,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [myName, setMyName] = useState("");
   const [myRole, setMyRole] = useState("superadmin");
 
-  const loadNutriologos = async () => {
+  const loadNutriologos = async ({ forceFresh = false } = {}) => {
     if (nutriologos.length === 0) setLoading(true);
+    const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
-      const data = await dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
-      const currentUser = await dbGet(`profiles?id=eq.${myId}`).catch(() => []);
+      const data = await fetcher("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
+      const currentUser = await fetcher(`profiles?id=eq.${myId}`).catch(() => []);
       
       if (currentUser && currentUser.length > 0) {
         const me = currentUser[0];
@@ -262,22 +263,41 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   };
 
   const toggleActivoNutri = async (n) => {
+    if (n.isSuperadmin) return;
+    const nextActivo = n.activo === false ? true : false;
+    setNutriologos(prev => prev.map(item => item.id === n.id ? { ...item, activo: nextActivo } : item));
+    updateQueryCache("profiles", (list) => Array.isArray(list) ? list.map(item => item.id === n.id ? { ...item, activo: nextActivo } : item) : list);
     try {
-      await updateProfile(n.id, { activo: n.activo === false ? true : false });
-      loadNutriologos();
-      setMsg(`✅ Nutriólogo ${n.activo === false ? "activado" : "suspendido"}`);
+      await updateProfile(n.id, { activo: nextActivo });
+      invalidateCache("profiles");
+      setMsg(`✅ Nutriólogo ${nextActivo ? "activado" : "suspendido"}`);
     } catch (e) {
       setMsg("❌ Error: " + e.message);
+      loadNutriologos({ forceFresh: true });
     }
   };
 
   const deleteNutriologo = async () => {
     if (confirmDeleteNutriText !== "ELIMINAR" || !showEditNutri || showEditNutri.isSuperadmin) return;
+    const targetId = showEditNutri.id;
+    const prevNutris = nutriologos;
+
+    // 1. Cierre inmediato de modal y actualización optimista instantánea (0 ms)
+    setNutriologos(prev => prev.filter(n => n.id !== targetId));
+    setShowEditNutri(null);
+    setShowConfirmDeleteNutri(false);
+    setConfirmDeleteNutriText("");
+    updateQueryCache("profiles", (list) => Array.isArray(list) ? list.filter(n => n.id !== targetId) : list);
+    updateQueryCache("clientes", (list) => Array.isArray(list) ? list.filter(c => c.nutriologo_id !== targetId) : list);
+    invalidateCache("profiles");
+    invalidateCache("clientes");
+    setMsg("✅ Nutriólogo y sus expedientes eliminados permanentemente.");
+
     setSaving(true);
     try {
       // 1. Limpiar fotos de progreso en Storage de todos los pacientes asignados a este nutriólogo
-      const nutriClients = await dbGet(`clientes?nutriologo_id=eq.${showEditNutri.id}&select=id`);
-      for (const c of nutriClients) {
+      const nutriClients = await dbGet(`clientes?nutriologo_id=eq.${targetId}&select=id`);
+      for (const c of (nutriClients || [])) {
         try {
           const files = await storageListFolder("progress-photos", c.id);
           if (files && files.length > 0) {
@@ -290,15 +310,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       }
 
       // 2. Ejecutar borrado en cascada en BD vía RPC
-      await dbPost("rpc/eliminar_nutriologo_definitivo", { p_nutriologo_id: showEditNutri.id });
-
-      setMsg("✅ Nutriólogo y sus expedientes eliminados permanentemente.");
-      setShowEditNutri(null);
-      setShowConfirmDeleteNutri(false);
-      setConfirmDeleteNutriText("");
-      await loadNutriologos();
-      await loadClientes();
+      await dbPost("rpc/eliminar_nutriologo_definitivo", { p_nutriologo_id: targetId });
+      loadNutriologos({ forceFresh: true });
+      loadClientes();
     } catch (e) {
+      setNutriologos(prevNutris);
       setMsg("❌ Error eliminando nutriólogo: " + e.message);
     }
     setSaving(false);

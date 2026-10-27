@@ -1,7 +1,7 @@
 import { useBrand } from "../BrandContext";
 import { useState, useEffect, useCallback } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2, Crown } from "lucide-react";
-import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, getProfileId } from "../../lib/supabase";
+import { authInvite, authResetPassword, dbGet, dbGetFresh, dbPost, dbPatch, getProfileId, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
 
@@ -37,10 +37,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
   const myId = profileId || getProfileId();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ forceFresh = false } = {}) => {
+    if (equipo.length === 0) setLoading(true);
+    const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
-      const rows = await dbGet(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);
+      const rows = await fetcher(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);
       const myTeam = rows.filter(r => 
         (r.role ==="administrativo" && r.nutriologo_id === myId) || 
         (isSuperadmin && r.role ==="staff")
@@ -51,8 +52,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       if (!isSuperadmin) {
         try {
           const [pats, cfg] = await Promise.all([
-            dbGet(`premium_patrocinado?patrocinador_id=eq.${myId}&desactivado_en=is.null`),
-            dbGet("configuracion_plataforma?id=eq.1")
+            fetcher(`premium_patrocinado?patrocinador_id=eq.${myId}&desactivado_en=is.null`),
+            fetcher("configuracion_plataforma?id=eq.1")
           ]);
           const m = {};
           (pats || []).forEach(x => { m[x.miembro_profile_id] = x; });
@@ -62,7 +63,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       }
     } catch { }
     setLoading(false);
-  }, [myId, isSuperadmin]);
+  }, [myId, isSuperadmin, equipo.length]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -212,46 +213,68 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   };
 
   const toggleActivo = async (p) => {
+    const nextActivo = !p.activo;
+    setEquipo(prev => prev.map(item => item.id === p.id ? { ...item, activo: nextActivo } : item));
+    updateQueryCache("profiles", (list) => Array.isArray(list) ? list.map(item => item.id === p.id ? { ...item, activo: nextActivo } : item) : list);
+    setMsg(nextActivo ? "🟢 Acceso activado" : "🔴 Acceso suspendido");
     try {
-      await dbPatch(`profiles?id=eq.${p.id}`, { activo: !p.activo });
-      setMsg(p.activo ?"🔴 Acceso suspendido" :"🟢 Acceso activado");
-      load();
-    } catch (e) { setMsg("❌ " + e.message); }
+      await dbPatch(`profiles?id=eq.${p.id}`, { activo: nextActivo });
+      invalidateCache("profiles");
+    } catch (e) {
+      setMsg("❌ " + e.message);
+      load({ forceFresh: true });
+    }
   };
 
   const saveEdit = async () => {
     setSaving(true);
+    const targetId = editUser.id;
+    const { nombre, telefono } = editForm;
+    setEquipo(prev => prev.map(item => item.id === targetId ? { ...item, nombre, telefono } : item));
+    setMsg("✅ Colaborador actualizado");
+    setEditUser(null);
+    setShowConfirmDelete(false);
+    setConfirmDeleteText("");
     try {
-      await dbPatch(`profiles?id=eq.${editUser.id}`, { nombre: editForm.nombre, telefono: editForm.telefono });
-      setMsg("✅ Colaborador actualizado");
-      setEditUser(null);
-      setShowConfirmDelete(false);
-      setConfirmDeleteText("");
-      load();
-    } catch (e) { setMsg("❌ " + e.message); }
+      await dbPatch(`profiles?id=eq.${targetId}`, { nombre, telefono });
+      invalidateCache("profiles");
+      load({ forceFresh: true });
+    } catch (e) {
+      setMsg("❌ " + e.message);
+      load({ forceFresh: true });
+    }
     setSaving(false);
   };
 
   const deleteCollaborator = async () => {
     if (confirmDeleteText !== "ELIMINAR" || !editUser) return;
+    const targetId = editUser.id;
+    const prevEquipo = equipo;
+
+    // 1. Cierre inmediato y actualización optimista instantánea (0 ms)
+    setEquipo(prev => prev.filter(c => c.id !== targetId));
+    setEditUser(null);
+    setShowConfirmDelete(false);
+    setConfirmDeleteText("");
+    updateQueryCache("profiles", (list) => Array.isArray(list) ? list.filter(p => p.id !== targetId) : list);
+    invalidateCache("profiles");
+    setMsg("✅ Colaborador eliminado permanentemente del equipo.");
+
     setSaving(true);
     try {
       try {
-        await dbPost("rpc/eliminar_colaborador_definitivo", { p_profile_id: editUser.id });
+        await dbPost("rpc/eliminar_colaborador_definitivo", { p_profile_id: targetId });
       } catch (rpcErr) {
         // Fallback inmediato si aún no se ha corrido el RPC en Supabase: revocar rol y desvincular
-        await dbPatch(`profiles?id=eq.${editUser.id}`, {
+        await dbPatch(`profiles?id=eq.${targetId}`, {
           role: "cliente",
           nutriologo_id: null,
           activo: true
         });
       }
-      setMsg("✅ Colaborador eliminado permanentemente del equipo.");
-      setEditUser(null);
-      setShowConfirmDelete(false);
-      setConfirmDeleteText("");
-      load();
+      load({ forceFresh: true });
     } catch (e) {
+      setEquipo(prevEquipo);
       setMsg("❌ Error eliminando colaborador: " + e.message);
     }
     setSaving(false);

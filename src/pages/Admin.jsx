@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
-import { authInvite, authResetPassword, dbGet, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany } from "../lib/supabase";
+import { authInvite, authResetPassword, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany, updateQueryCache, invalidateCache } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 import { useBackButton } from "../lib/backButtonHandler";
@@ -304,7 +304,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
   const bibliotecaFilter ="biblioteca_ejercicios?order=nombre.asc";
 
-  const loadClientes = useCallback(async ({ silent = false } = {}) => {
+  const loadClientes = useCallback(async ({ silent = false, forceFresh = false } = {}) => {
     if (!silent && clientes.length === 0) setLoading(true);
     let _allNutris = [];
     let _me = [];
@@ -357,11 +357,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       );
     };
 
+    const fetcher = forceFresh ? dbGetFresh : dbGet;
     try { 
       const [r, allNutris, me] = await Promise.all([
-        dbGet(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)).catch(() => []),
-        dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`).catch(() => []),
-        dbGet(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`).catch(() => []),
+        fetcher(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)).catch(() => []),
+        fetcher(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`).catch(() => []),
+        fetcher(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`).catch(() => []),
       ]);
       _allNutris = allNutris;
       _me = me;
@@ -748,17 +749,26 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   };
 
   const toggleActivo = async (c) => {
+    const nextActivo = !c.activo;
+    const payload = { activo: nextActivo };
+    if (!nextActivo) {
+      payload.deactivated_at = new Date().toISOString();
+    } else {
+      payload.deactivated_at = null; // Limpiar si se vuelve a activar
+    }
+
+    // 1. Optimista instantáneo en 0ms
+    setClientes(prev => prev.map(item => item.id === c.id ? { ...item, ...payload } : item));
+    updateQueryCache("clientes", (list) => Array.isArray(list) ? list.map(item => item.id === c.id ? { ...item, ...payload } : item) : list);
+    setMsg(`✓ Cliente ${nextActivo ? "activado" : "desactivado"}`);
+
     try {
-      const payload = { activo: !c.activo };
-      if (c.activo) {
-        payload.deactivated_at = new Date().toISOString();
-      } else {
-        payload.deactivated_at = null; // Limpiar si se vuelve a activar
-      }
       await dbPatch(`clientes?id=eq.${c.id}`, payload);
-      await loadClientes();
-      setMsg(`✓ Cliente ${!c.activo ? "activado" : "desactivado"}`);
-    } catch (e) { setMsg("❌ Error:" + e.message); }
+      invalidateCache("clientes");
+    } catch (e) {
+      setMsg("❌ Error:" + e.message);
+      loadClientes({ silent: true, forceFresh: true });
+    }
   };
 
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
@@ -780,32 +790,41 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       await dbPatch(`clientes?id=eq.${editClient.id}`, editClientForm);
       setMsg("✓ Cliente actualizado");
       setEditClient(null);
-      loadClientes();
+      loadClientes({ forceFresh: true });
     } catch (e) { setMsg("❌" + e.message); }
     setSaving(false);
   };
 
   const deleteClient = async () => {
-    if (confirmDeleteText !=="ELIMINAR") return;
+    if (confirmDeleteText !=="ELIMINAR" || !editClient) return;
+    const targetId = editClient.id;
+    const targetAuthId = editClient.auth_id;
+    const prevClientes = clientes;
+
+    // 1. Cierre inmediato y actualización optimista instantánea (0 ms)
+    setClientes(prev => prev.filter(c => c.id !== targetId));
+    if (selected?.id === targetId) setSelected(null);
+    setEditClient(null);
+    setShowConfirmDelete(false);
+    setConfirmDeleteText("");
+    updateQueryCache("clientes", (list) => Array.isArray(list) ? list.filter(c => c.id !== targetId) : list);
+    invalidateCache("clientes");
+    setMsg("✓ Paciente eliminado permanentemente.");
+
     setSaving(true);
     try {
       // Borrar fotos de storage (progress-photos)
-      const files = await storageListFolder("progress-photos", editClient.id);
+      const files = await storageListFolder("progress-photos", targetId);
       if (files && files.length > 0) {
-        const paths = files.map(f => `${editClient.id}/${f.name}`);
+        const paths = files.map(f => `${targetId}/${f.name}`);
         await storageRemoveMany("progress-photos", paths);
       }
       
       // Ejecutar borrado en BD vía RPC usando dbPost
-      await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: editClient.id, p_auth_id: editClient.auth_id });
-      
-      setMsg("✓ Paciente eliminado permanentemente.");
-      setEditClient(null);
-      setShowConfirmDelete(false);
-      setConfirmDeleteText("");
-      if (selected?.id === editClient.id) setSelected(null);
-      loadClientes();
+      await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: targetId, p_auth_id: targetAuthId });
+      loadClientes({ silent: true, forceFresh: true });
     } catch(e) {
+      setClientes(prevClientes);
       setMsg("❌ Error eliminando:" + e.message);
     }
     setSaving(false);

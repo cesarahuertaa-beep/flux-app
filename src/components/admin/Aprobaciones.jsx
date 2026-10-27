@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
-import { dbGet, dbPatch, dbDel, authInvite, authResetPassword } from "../../lib/supabase";
+import { dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 
 export default function Aprobaciones({ setMsg }) {
@@ -82,12 +82,15 @@ export default function Aprobaciones({ setMsg }) {
             }
           }
 
-          await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
-          setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
+          setSolicitudes(prev => prev.filter(s => s.id !== sol.id));
           setConfirmAction(null);
-          loadData();
+          await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'aprobada' });
+          invalidateCache("solicitudes_profesionales");
+          invalidateCache("profiles");
+          setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
         } catch (e) {
           setMsg("❌ Error al aprobar: " + e.message);
+          loadData();
         }
       }
     });
@@ -101,13 +104,15 @@ export default function Aprobaciones({ setMsg }) {
       danger: true,
       icon: "alert",
       onConfirm: async () => {
+        setSolicitudes(prev => prev.filter(s => s.id !== sol.id));
+        setConfirmAction(null);
         try {
           await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'rechazada' });
+          invalidateCache("solicitudes_profesionales");
           setMsg("⚠️ Solicitud rechazada.");
-          setConfirmAction(null);
-          loadData();
         } catch (e) {
           setMsg("❌ Error al rechazar: " + e.message);
+          loadData();
         }
       }
     });
@@ -121,12 +126,15 @@ export default function Aprobaciones({ setMsg }) {
       danger: true,
       icon: "trash",
       onConfirm: async () => {
+        setSolicitudes(prev => prev.filter(s => s.id !== id));
+        setConfirmAction(null);
         try {
           await dbDel(`solicitudes_profesionales?id=eq.${id}`);
-          setConfirmAction(null);
-          loadData();
+          invalidateCache("solicitudes_profesionales");
+          setMsg("✅ Registro eliminado.");
         } catch (e) {
           setMsg("❌ Error al eliminar: " + e.message);
+          loadData();
         }
       }
     });
