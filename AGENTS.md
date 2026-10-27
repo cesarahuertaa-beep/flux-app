@@ -57,9 +57,17 @@ En Windows PowerShell, las políticas de ejecución pueden restringir scripts di
 5. **Después de limpiar**: `npm run build` (0 errores) → `npx cap sync android` → commit → push. Usar `cmd.exe /c` para npm y mensajes de commit entre comillas simples en PowerShell.
 6. **Versiones**: guardar versiones con tags de git (`vX.Y.Z-playstore`), no con copias de archivos. Nunca subir archivos de >100 MB a GitHub.
 
-### Reglas de limpieza de `FLUX-Release/`
-- **Conservar**: la versión actual y la anterior (`.aab`, `.apk`, `FLUX Setup X.Y.Z.exe` + `.blockmap`), `latest.yml` (lo usa el auto-updater de Electron), `flux-upload-key.jks`, iconos/gráficos de Play Store y carpeta de capturas.
-- **Borrar**: instaladores `.exe`/`.apk`/`.aab` de versiones anteriores a la previa, `win-unpacked/`, `builder-debug.yml`.
+### Reglas de limpieza de `FLUX-Release/` y Versionado
+- **Enfoque actual (Solo Móvil + Web/PWA)**: **NO compilar el instalador de Windows (`.exe` / `electron:build`)** a menos que el usuario lo pida explícitamente. Solo compilar Web/PWA (`npm run build`), sincronizar Android (`npx cap sync android`) y generar `.aab` y `.apk`.
+- **Esquema de Versionado Semántico (`X.Y.Z`)**:
+  - Hasta la versión `1.0.30` (`versionCode 10030`), se mantiene la serie `1.0.x`.
+  - A partir de la siguiente versión posterior a `1.0.30`, se pasa a **`1.2.0`** (`versionCode 10200`) usando formato semántico `MAJOR.MINOR.PATCH`:
+    - **1er número (`MAJOR`)**: Cambios arquitectónicos o de producto muy importantes.
+    - **2do número (`MINOR`)**: Nuevas funciones o mejoras medianas (`1.2.0`, `1.3.0`...).
+    - **3er número (`PATCH`)**: Correcciones de errores o parches rápidos (`1.2.1`, `1.2.2`...).
+  - Fórmula de `versionCode` en `android/app/build.gradle`: `MAJOR * 10000 + MINOR * 100 + PATCH` (ej. `1.0.29` → `10029`, `1.0.30` → `10030`, `1.2.0` → `10200`, `1.2.1` → `10201`).
+- **Conservar en `FLUX-Release/`**: la versión actual y la anterior (`.aab`, `.apk`), `flux-upload-key.jks`, iconos/gráficos de Play Store y carpeta de capturas.
+- **Borrar**: instaladores `.apk`/`.aab` de versiones anteriores a la previa.
 - Al publicar la v(N+1), borrar la v(N-1).
 
 ### Llaves de firma (CRÍTICO)
