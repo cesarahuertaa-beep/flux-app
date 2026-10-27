@@ -1,5 +1,6 @@
 import { escapeHtml, parseFotos } from "./helpers";
 import { registerBackAction } from "../lib/backButtonHandler";
+import { enrichMetrica, getMetodoLabel } from "../lib/bodyComposition";
 
 // Darkens a hex color by reducing RGB values
 const darken = (hex, amt = 60) => {
@@ -745,7 +746,16 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   <div class="client-info"><strong style="font-size:16px">${clienteNombre}</strong><br>
   <span style="color:#666;font-size:13px">Objetivo: ${clienteObjetivo}</span>
   <span style="float:right;color:#999;font-size:12px">${fechaHoy}</span></div>
-  
+  ${
+    nutri && (Number(nutri.calorias) > 0 || Number(nutri.proteina) > 0 || Number(nutri.carbohidratos) > 0 || Number(nutri.grasas) > 0)
+      ? `<div class="macros">
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.calorias || 0)}</div><div class="macro-lbl">Calor&iacute;as (kcal)</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.proteina || 0)}g</div><div class="macro-lbl">Prote&iacute;na</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.carbohidratos || 0)}g</div><div class="macro-lbl">Carbohidratos</div></div>
+    <div class="macro-box"><div class="macro-val">${escapeHtml(nutri.grasas || 0)}g</div><div class="macro-lbl">Grasas</div></div>
+  </div>`
+      : ""
+  }
   ${(dias || [])
     .map((d) => {
       const comidas = d.comidas || [];
@@ -782,9 +792,10 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   });
 };
 
-export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
+export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
   if (!cliente) return;
 
+  const metricas = (rawMetricas || []).map((m) => enrichMetrica(m, cliente));
   const logoUrl = brand?.logo_url && brand.logo_url !== "/flux_logo.jpeg" ? safeUrl(brand.logo_url) : null;
   const nombre = escapeHtml(brand?.nombre_marca || "FLUX");
   const accent = brand?.color_primario || "#38bdf8";
@@ -958,15 +969,15 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
   ${
     latest
       ? `
-    <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)})</div>
+    <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)} · ${escapeHtml(getMetodoLabel(latest.metodo))})</div>
     <div class="macros">
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.peso || "--")}</div><div class="macro-lbl">Peso (kg)</div></div>
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.imc || "--")}</div><div class="macro-lbl">IMC</div></div>
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.grasa_pct || "--")}</div><div class="macro-lbl">Grasa (%)</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.musculo_pct || "--")}</div><div class="macro-lbl">Músculo (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.masa_libre_grasa || latest.musculo_pct || "--")}</div><div class="macro-lbl">${latest.masa_libre_grasa ? "Masa Magra MLG (kg)" : "Músculo (%)"}</div></div>
     </div>
     <div class="macros" style="grid-template-columns:repeat(4,1fr);margin-bottom:30px">
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.agua_pct || "--")}</div><div class="macro-lbl">Agua (%)</div></div>
+      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.icc || latest.agua_pct || "--")}</div><div class="macro-lbl">${latest.icc ? "ICC" : "Agua (%)"}</div></div>
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.cintura || "--")}</div><div class="macro-lbl">Cintura (cm)</div></div>
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.glucosa || "--")}</div><div class="macro-lbl">Glucosa (mg/dL)</div></div>
       <div class="macro-box"><div class="macro-val">${escapeHtml(latest.presion_arterial || "--")}</div><div class="macro-lbl">Presión</div></div>
@@ -982,15 +993,16 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
     <table>
       <thead><tr>
         <th style="text-align:left">Fecha</th>
-        <th>Peso (kg)</th><th>IMC</th><th>Grasa (%)</th><th>Músculo (%)</th><th>Agua (%)</th>
+        <th>Protocolo</th><th>Peso (kg)</th><th>IMC</th><th>Grasa (%)</th><th>MLG (kg)</th><th>Músculo (%)</th>
       </tr></thead>
       <tbody>
         ${metricas
           .map(
             (m) => `<tr>
           <td class="date-col">${fmtDate(m.fecha)}</td>
+          <td>${escapeHtml(getMetodoLabel(m.metodo))}</td>
           <td>${escapeHtml(m.peso || "--")}</td><td>${escapeHtml(m.imc || "--")}</td>
-          <td>${escapeHtml(m.grasa_pct || "--")}</td><td>${escapeHtml(m.musculo_pct || "--")}</td><td>${escapeHtml(m.agua_pct || "--")}</td>
+          <td>${escapeHtml(m.grasa_pct || "--")}</td><td>${escapeHtml(m.masa_libre_grasa || "--")}</td><td>${escapeHtml(m.musculo_pct || "--")}</td>
         </tr>`
           )
           .join("")}
@@ -1001,7 +1013,7 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
     <table>
       <thead><tr>
         <th style="text-align:left">Fecha</th>
-        <th>Cintura (cm)</th><th>Cadera (cm)</th><th>Glucosa</th><th>Colesterol</th><th>Presión</th>
+        <th>Cintura (cm)</th><th>Cadera (cm)</th><th>ICC / ICE</th><th>Glucosa</th><th>Colesterol</th><th>Presión</th>
       </tr></thead>
       <tbody>
         ${metricas
@@ -1009,6 +1021,7 @@ export const generateProgresoPDF = (cliente, metricas = [], brand = {}) => {
             (m) => `<tr>
           <td class="date-col">${fmtDate(m.fecha)}</td>
           <td>${escapeHtml(m.cintura || "--")}</td><td>${escapeHtml(m.cadera || "--")}</td>
+          <td>${escapeHtml(m.icc || "--")} / ${escapeHtml(m.ice || "--")}</td>
           <td>${escapeHtml(m.glucosa || "--")}</td><td>${escapeHtml(m.colesterol || "--")}</td><td>${escapeHtml(m.presion_arterial || "--")}</td>
         </tr>`
           )

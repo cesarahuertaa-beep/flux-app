@@ -15,6 +15,7 @@ import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
 import { ConfirmModal, showFluxAlert } from "../ui/ConfirmModal";
+import { enrichMetrica } from "../../lib/bodyComposition";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -80,7 +81,7 @@ const getRank = (xp) => {
 
 export default function Progreso({ cliente, isSelfManaged }) {
   const _peekMetricas = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) : null;
-  const [metricas, setMetricas] = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas : []);
+  const [metricas, setMetricas] = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(() => _peekMetricas === null);
   const brand = useBrand();
@@ -111,7 +112,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
     try {
       // 1. Cargar métricas de composición
       const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`);
-      setMetricas(ms);
+      setMetricas(Array.isArray(ms) ? ms.map(enrichMetrica) : []);
 
       // 2. Calcular progreso muscular
       const [ciclosActivos, rutinas, progs] = await Promise.all([
@@ -476,6 +477,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
     { key:"peso", label:"PESO", unit:"kg" },
     { key:"grasa_pct", label:"GRASA CORPORAL", unit:"%" },
     { key:"calc_masa_grasa", label:"MASA GRASA", unit:"kg" },
+    { key:"masa_libre_grasa", label:"MASA MAGRA (MLG)", unit:"kg" },
     { key:"musculo_pct", label:"MASA MUSCULAR", unit:"%" },
     { key:"calc_masa_muscular", label:"MASA MUSCULAR", unit:"kg" },
     { key:"inbody_smm", label:"MASA MUSCULAR (SMM)", unit:"kg" },
@@ -490,6 +492,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
     { key:"cintura", label:"CINTURA", unit:"cm" },
     { key:"cadera", label:"CADERA", unit:"cm" },
     { key:"icc", label:"ICC", unit:"" },
+    { key:"ice", label:"ICE", unit:"" },
     { key:"pecho", label:"PECHO", unit:"cm" },
     { key:"brazo", label:"BRAZO", unit:"cm" },
     { key:"brazo_relajado", label:"BRAZO", unit:"cm" },

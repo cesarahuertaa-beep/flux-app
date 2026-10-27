@@ -21,6 +21,7 @@ import {
 const CHART_METRICS = [
   { key: "peso", label: "Peso", unit: "kg", color: "#1A6FD4", inverseGood: false },
   { key: "grasa_pct", label: "% Grasa", unit: "%", color: "#F59E0B", inverseGood: true },
+  { key: "masa_libre_grasa", label: "Masa Magra (MLG)", unit: "kg", color: "#10B981", inverseGood: false },
   { key: "musculo_pct", label: "% Músculo", unit: "%", color: "#10B981", inverseGood: false },
   { key: "calc_masa_muscular", label: "Masa Muscular", unit: "kg", color: "#10B981", inverseGood: false },
   { key: "inbody_smm", label: "Masa Muscular (SMM)", unit: "kg", color: "#10B981", inverseGood: false },

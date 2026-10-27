@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -29,6 +29,7 @@ import { CachedImage } from "../../lib/mediaCache";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
+import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -98,6 +99,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
   const [activeAltSlot, setActiveAltSlot] = useState(null);
   const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
+  const [showMacroCalc, setShowMacroCalc] = useState(false);
+  const [latestMetrica, setLatestMetrica] = useState(() => {
+    const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
+    return Array.isArray(ms) && ms.length > 0 ? ms[0] : null;
+  });
 
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
@@ -284,10 +290,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
 
       const fetchFn = forceFresh ? dbGetFresh : dbGet;
 
-      const [ns, rs] = await Promise.all([
+      const [ns, rs, ms] = await Promise.all([
         fetchFn(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []),
         fetchFn(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
+        fetchFn(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc&limit=1`).catch(() => []),
       ]);
+
+      if (Array.isArray(ms) && ms.length > 0) {
+        setLatestMetrica(ms[0]);
+      } else {
+        setLatestMetrica(null);
+      }
 
       if (rs) {
         setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
@@ -308,6 +321,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     }
     if (!silent) setLoading(false);
   }, [selected, cicloSel]);
+
+  const handleApplyPrescribedMacros = async ({ calorias, proteinas, carbohidratos, grasas }) => {
+    if (!selected) return;
+    if (interceptNoPlan()) return;
+    const nextMacros = {
+      calorias: Number(calorias) || 0,
+      proteina: Number(proteinas) || 0,
+      carbohidratos: Number(carbohidratos) || 0,
+      grasas: Number(grasas) || 0,
+    };
+    setMacros(nextMacros);
+    try {
+      if (nutri?.id) {
+        setNutri(prev => ({ ...prev, ...nextMacros }));
+        await dbPatch(`nutricion?id=eq.${nutri.id}`, nextMacros);
+      } else {
+        const payload = {
+          cliente_id: selected.id,
+          ...nextMacros,
+          ...(cicloSel ? { ciclo_id: cicloSel.id } : {}),
+        };
+        const res = await dbPost("nutricion", payload);
+        if (res && res[0]) setNutri(res[0]);
+      }
+      notifyPlanUpdate("nutricion");
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Prescripción energética aplicada al plan</div>);
+    } catch (e) {
+      if (!isOfflineError(e)) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
+      }
+    }
+  };
 
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
@@ -1655,10 +1700,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         {/* ── NUTRICIÓN ── */}
         {subtab ==="nutri" && (
           <div>
-            
-            <div className="flex justify-between items-center mb-2.5">
+            {Number(macros.calorias) > 0 && (
+              <div
+                onClick={() => !isReadOnly && setShowMacroCalc(true)}
+                className={`mb-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xs ${!isReadOnly ? "cursor-pointer hover:border-[var(--brand-primary)]/40 transition-colors" : ""}`}
+              >
+                <div className="flex items-center gap-2 text-xs font-bold text-[#0B1929]">
+                  <Calculator className="w-4 h-4 text-[var(--brand-primary)]" />
+                  <span>Meta diaria prescrita</span>
+                </div>
+                <div className="flex items-center flex-wrap gap-3 text-xs">
+                  <span className="font-extrabold text-[var(--brand-primary)]">{macros.calorias} kcal</span>
+                  {Number(macros.proteina) > 0 && <span className="text-[#0B1929] font-semibold">{macros.proteina}g P</span>}
+                  {Number(macros.carbohidratos) > 0 && <span className="text-[#0B1929] font-semibold">{macros.carbohidratos}g C</span>}
+                  {Number(macros.grasas) > 0 && <span className="text-[#0B1929] font-semibold">{macros.grasas}g G</span>}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
               <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-wrap gap-2">
+                {!isReadOnly && (
+                  <button
+                    onClick={() => setShowMacroCalc(true)}
+                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] font-semibold shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Calculator className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                    <span>Calcular Macros</span>
+                  </button>
+                )}
                 {dias.length > 0 && (
                   <button
                     onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
@@ -2208,6 +2279,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
           />
         </Suspense>
       )}
+
+      {/* ── Calculadora Metabólica y de Macronutrientes ── */}
+      <MacroCalculatorModal
+        isOpen={showMacroCalc}
+        onClose={() => setShowMacroCalc(false)}
+        cliente={selected}
+        latestMetrica={latestMetrica}
+        onApplyMacros={handleApplyPrescribedMacros}
+      />
 
       {/* ── Modal de Confirmación Estilizado ── */}
       <ConfirmModal

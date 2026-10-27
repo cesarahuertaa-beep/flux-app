@@ -224,12 +224,15 @@ export default function Nutrition({
     );
   }
 
-  const caloriasMeta = nutri?.calorias || nutri?.calorias_meta || 0; // fallback to legacy
+  const caloriasMeta = Number(nutri?.calorias || nutri?.calorias_meta) || 0;
   const sumKcal = comidas.reduce((s, m) => s + (Number(m.calorias) || 0), 0);
+  const sumProt = comidas.reduce((s, m) => s + (Number(m.proteina) || 0), 0);
+  const sumCarbs = comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
+  const sumGrasas = comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
   const totalKcal = sumKcal > 0 ? sumKcal : caloriasMeta;
-  const totalProt = comidas.reduce((s, m) => s + (Number(m.proteina) || 0), 0);
-  const totalCarbs = comidas.reduce((s, m) => s + (Number(m.carbohidratos) || 0), 0);
-  const totalGrasas = comidas.reduce((s, m) => s + (Number(m.grasas) || 0), 0);
+  const totalProt = sumProt > 0 ? sumProt : (Number(nutri?.proteina) || 0);
+  const totalCarbs = sumCarbs > 0 ? sumCarbs : (Number(nutri?.carbohidratos) || 0);
+  const totalGrasas = sumGrasas > 0 ? sumGrasas : (Number(nutri?.grasas) || 0);
   const clienteNombre = cliente?.nombre;
 
   const handleDownloadPDF = () => {

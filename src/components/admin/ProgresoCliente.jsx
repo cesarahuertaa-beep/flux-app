@@ -1,129 +1,211 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from"react";
-import { calculateBodyComposition } from"../../lib/bodyComposition";
-import { createPortal } from"react-dom";
-import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from"../../lib/supabase";
-import { useBrand } from"../BrandContext";
-import { useBackButton } from"../../lib/backButtonHandler";
-import { generateProgresoPDF } from"../../utils/pdf";
-import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from"../../utils/helpers";
-import { 
-  Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell, 
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import {
+  calculateBodyComposition,
+  enrichMetrica,
+  prepareMetricaPayload,
+  normalizeSexo,
+  calcEdadFromBirthdate,
+  getMetodoLabel,
+} from "../../lib/bodyComposition";
+import { createPortal } from "react-dom";
+import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
+import { useBrand } from "../BrandContext";
+import { useBackButton } from "../../lib/backButtonHandler";
+import { generateProgresoPDF } from "../../utils/pdf";
+import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../utils/helpers";
+import {
+  Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, Apple, ChevronDown
-} from"lucide-react";
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList
+} from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
+import { peekClinicalRecord, fetchClinicalRecord } from "../../lib/clinicalRecord";
 
-const METRIC_GROUPS_MANUAL = [
-  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
-    { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
-    { key:"estatura",  label:"Estatura (cm)", type:"number" },
-  ]},
-  { label:"Pliegues cutáneos (mm)", icon:<Target className="w-4 h-4" />, fields:[
-    { key:"pliegue_triceps",      label:"Tríceps",      type:"number", step:"0.1" },
-    { key:"pliegue_subescapular", label:"Subescapular", type:"number", step:"0.1" },
-    { key:"pliegue_suprailiaco",  label:"Suprailíaco",  type:"number", step:"0.1" },
-    { key:"pliegue_abdominal",    label:"Abdominal",    type:"number", step:"0.1" },
-    { key:"pliegue_muslo",        label:"Muslo",        type:"number", step:"0.1" },
-    { key:"pliegue_pantorrilla",  label:"Pantorrilla",  type:"number", step:"0.1" },
-    { key:"pliegue_pectoral",     label:"Pectoral",     type:"number", step:"0.1" },
-    { key:"pliegue_biceps",       label:"Bíceps",       type:"number", step:"0.1" },
-  ]},
-  { label:"Circunferencias (cm)", icon:<Ruler className="w-4 h-4" />, fields:[
-    { key:"cuello",          label:"Cuello",           type:"number", step:"0.1" },
-    { key:"cintura",         label:"Cintura",          type:"number", step:"0.1" },
-    { key:"cadera",          label:"Cadera",           type:"number", step:"0.1" },
-    { key:"brazo_relajado",  label:"Brazo relajado",   type:"number", step:"0.1" },
-    { key:"brazo_contraido", label:"Brazo contraído",  type:"number", step:"0.1" },
-    { key:"muslo",           label:"Muslo",            type:"number", step:"0.1" },
-    { key:"pantorrilla",     label:"Pantorrilla",      type:"number", step:"0.1" },
-  ]},
-  { label:"Diámetros óseos (cm) - Rocha", icon:<Activity className="w-4 h-4" />, fields:[
-    { key:"diametro_muneca",  label:"Muñeca (Biestiloideo)",     type:"number", step:"0.1" },
-    { key:"diametro_codo",    label:"Codo (Biepicondíleo)",      type:"number", step:"0.1" },
-    { key:"diametro_rodilla", label:"Rodilla (Bicondíleo)",      type:"number", step:"0.1" },
-  ]},
-  { label:"Outputs Calculados", icon:<BarChart2 className="w-4 h-4" />, fields:[
-    { key:"calc_masa_grasa",    label:"Masa Grasa (kg)",      type:"number", readOnly:true },
-    { key:"calc_masa_muscular", label:"Masa Muscular (kg)",   type:"number", readOnly:true },
-    { key:"calc_masa_osea",     label:"Masa Ósea (kg)",       type:"number", readOnly:true },
-    { key:"calc_masa_residual", label:"Masa Residual (kg)",   type:"number", readOnly:true },
-    { key:"grasa_pct",          label:"% Grasa (Siri)",       type:"number", readOnly:true },
-    { key:"somatotipo_x",       label:"Somatotipo X",         type:"number", readOnly:true },
-    { key:"somatotipo_y",       label:"Somatotipo Y",         type:"number", readOnly:true },
-  ]},
-  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
-    { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
-    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
-  ]}
+const FIELDS_BASICAS = [
+  { key: "peso", label: "Peso (kg)", type: "number", step: "0.1" },
+  { key: "estatura", label: "Estatura (cm)", type: "number", step: "0.5" },
 ];
 
-const METRIC_GROUPS_INBODY = [
-  { label:"Básicas", icon:<Scale className="w-4 h-4" />, fields:[
-    { key:"peso",      label:"Peso (kg)",     type:"number", step:"0.1" },
-    { key:"estatura",  label:"Estatura (cm)", type:"number" },
-  ]},
-  { label:"Composición corporal (InBody)", icon:<Microscope className="w-4 h-4" />, fields:[
-    { key:"inbody_smm",          label:"Masa Muscular Esq. (SMM kg)", type:"number", step:"0.1" },
-    { key:"calc_masa_grasa",     label:"Masa Grasa Corporal (kg)",    type:"number", step:"0.1" },
-    { key:"grasa_pct",           label:"% Grasa Corporal",            type:"number", step:"0.1" },
-    { key:"inbody_tbw",          label:"Agua Corporal Total (TBW L)", type:"number", step:"0.1" },
-    { key:"inbody_mineral_oseo", label:"Masa Mineral Ósea (kg)",      type:"number", step:"0.1" },
-    { key:"inbody_proteina",     label:"Proteína (kg)",               type:"number", step:"0.1" },
-  ]},
-  { label:"Índices y metabolismo", icon:<Activity className="w-4 h-4" />, fields:[
-    { key:"imc",                   label:"IMC",                         type:"number", step:"0.1" },
-    { key:"inbody_grasa_visceral", label:"Grasa Visceral (Nivel)",      type:"number", step:"1" },
-    { key:"inbody_bmr",            label:"Tasa Metabólica Basal (kcal)",type:"number", step:"1" },
-    { key:"inbody_score",          label:"Puntaje InBody",              type:"number", step:"1" },
-    { key:"icc",                   label:"Relación Cintura-Cadera",     type:"number", step:"0.01" },
-  ]},
-  { label:"Análisis Segmentado Magra (kg)", icon:<Dumbbell className="w-4 h-4" />, fields:[
-    { key:"inbody_magra_brazo_der",  label:"Brazo Derecho",  type:"number", step:"0.1" },
-    { key:"inbody_magra_brazo_izq",  label:"Brazo Izquierdo",type:"number", step:"0.1" },
-    { key:"inbody_magra_pierna_der", label:"Pierna Derecha", type:"number", step:"0.1" },
-    { key:"inbody_magra_pierna_izq", label:"Pierna Izquierda",type:"number", step:"0.1" },
-    { key:"inbody_magra_tronco",     label:"Tronco",         type:"number", step:"0.1" },
-  ]},
-  { label:"Clínicos (Opcional)", icon:<Stethoscope className="w-4 h-4" />, fields:[
-    { key:"glucosa",          label:"Glucosa (mg/dL)",  type:"number" },
-    { key:"presion_arterial", label:"Presión arterial", type:"text", placeholder:"120/80" },
-  ]}
+const FIELDS_CIRCUNFERENCIAS_BASE = [
+  { key: "cintura", label: "Cintura (cm)", type: "number", step: "0.1" },
+  { key: "cadera", label: "Cadera (cm)", type: "number", step: "0.1" },
+  { key: "cuello", label: "Cuello (cm)", type: "number", step: "0.1" },
 ];
+
+const FIELDS_CIRCUNFERENCIAS_COMPLETAS = [
+  ...FIELDS_CIRCUNFERENCIAS_BASE,
+  { key: "pecho", label: "Pecho (cm)", type: "number", step: "0.1" },
+  { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
+  { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
+  { key: "muslo", label: "Muslo (cm)", type: "number", step: "0.1" },
+  { key: "pantorrilla", label: "Pantorrilla (cm)", type: "number", step: "0.1" },
+];
+
+const FIELDS_DIAMETROS = [
+  { key: "diametro_muneca", label: "Muñeca · Biestiloideo (cm)", type: "number", step: "0.1" },
+  { key: "diametro_codo", label: "Codo · Biepicondíleo (cm)", type: "number", step: "0.1" },
+  { key: "diametro_rodilla", label: "Rodilla · Bicondíleo (cm)", type: "number", step: "0.1" },
+];
+
+const FIELDS_CLINICOS = [
+  { key: "glucosa", label: "Glucosa (mg/dL)", type: "number" },
+  { key: "presion_arterial", label: "Presión arterial", type: "text", placeholder: "120/80" },
+];
+
+export function getGroupsForMethod(metodo, sexo = "M") {
+  const s = normalizeSexo(sexo);
+
+  if (metodo === "inbody") {
+    return [
+      { label: "Antropometría Base", icon: <Scale className="w-4 h-4" />, fields: [
+        ...FIELDS_BASICAS,
+        { key: "cintura", label: "Cintura (cm)", type: "number", step: "0.1" },
+        { key: "cadera", label: "Cadera (cm)", type: "number", step: "0.1" },
+      ]},
+      { label: "Composición por Bioimpedancia", icon: <Microscope className="w-4 h-4" />, fields: [
+        { key: "grasa_pct", label: "% Grasa Corporal", type: "number", step: "0.1" },
+        { key: "calc_masa_grasa", label: "Masa Grasa (kg)", type: "number", step: "0.1" },
+        { key: "inbody_smm", label: "Masa Muscular Esq. SMM (kg)", type: "number", step: "0.1" },
+        { key: "inbody_tbw", label: "Agua Corporal Total (L)", type: "number", step: "0.1" },
+        { key: "inbody_proteina", label: "Proteína (kg)", type: "number", step: "0.1" },
+        { key: "inbody_mineral_oseo", label: "Mineral Óseo (kg)", type: "number", step: "0.1" },
+      ]},
+      { label: "Indicadores Metabólicos", icon: <Activity className="w-4 h-4" />, fields: [
+        { key: "inbody_grasa_visceral", label: "Grasa Visceral (Nivel)", type: "number", step: "1" },
+        { key: "inbody_bmr", label: "TMB Basal (kcal)", type: "number", step: "1" },
+        { key: "inbody_score", label: "Puntaje BIA / InBody", type: "number", step: "1" },
+      ]},
+      { label: "Masa Magra Segmentada (Opcional)", icon: <Dumbbell className="w-4 h-4" />, fields: [
+        { key: "inbody_magra_brazo_der", label: "Brazo Derecho (kg)", type: "number", step: "0.1" },
+        { key: "inbody_magra_brazo_izq", label: "Brazo Izquierdo (kg)", type: "number", step: "0.1" },
+        { key: "inbody_magra_tronco", label: "Tronco (kg)", type: "number", step: "0.1" },
+        { key: "inbody_magra_pierna_der", label: "Pierna Derecha (kg)", type: "number", step: "0.1" },
+        { key: "inbody_magra_pierna_izq", label: "Pierna Izquierda (kg)", type: "number", step: "0.1" },
+      ]},
+      { label: "Clínicos (Opcional)", icon: <Stethoscope className="w-4 h-4" />, fields: FIELDS_CLINICOS },
+    ];
+  }
+
+  if (metodo === "basico") {
+    return [
+      { label: "Mediciones Básicas", icon: <Scale className="w-4 h-4" />, fields: [
+        ...FIELDS_BASICAS,
+        ...FIELDS_CIRCUNFERENCIAS_BASE,
+        { key: "grasa_pct", label: "% Grasa (Opcional / Báscula)", type: "number", step: "0.1", placeholder: "Auto US Navy si vacío" },
+      ]},
+      { label: "Perímetros Corporales (Opcional)", icon: <Ruler className="w-4 h-4" />, fields: [
+        { key: "pecho", label: "Pecho (cm)", type: "number", step: "0.1" },
+        { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
+        { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
+        { key: "muslo", label: "Muslo (cm)", type: "number", step: "0.1" },
+        { key: "pantorrilla", label: "Pantorrilla (cm)", type: "number", step: "0.1" },
+      ]},
+      { label: "Clínicos (Opcional)", icon: <Stethoscope className="w-4 h-4" />, fields: FIELDS_CLINICOS },
+    ];
+  }
+
+  if (metodo === "plicometria_jp3") {
+    const jp3Fields = s === "M"
+      ? [
+          { key: "pliegue_pectoral", label: "Pectoral (mm)", type: "number", step: "0.1" },
+          { key: "pliegue_abdominal", label: "Abdominal (mm)", type: "number", step: "0.1" },
+          { key: "pliegue_muslo", label: "Muslo anterior (mm)", type: "number", step: "0.1" },
+        ]
+      : [
+          { key: "pliegue_triceps", label: "Tricipital (mm)", type: "number", step: "0.1" },
+          { key: "pliegue_suprailiaco", label: "Suprailíaco (mm)", type: "number", step: "0.1" },
+          { key: "pliegue_muslo", label: "Muslo anterior (mm)", type: "number", step: "0.1" },
+        ];
+    return [
+      { label: "Antropometría Base", icon: <Scale className="w-4 h-4" />, fields: [
+        ...FIELDS_BASICAS,
+        ...FIELDS_CIRCUNFERENCIAS_BASE,
+      ]},
+      { label: `3 Pliegues Jackson-Pollock (${s === "M" ? "Hombre" : "Mujer"})`, icon: <Target className="w-4 h-4" />, fields: jp3Fields },
+      { label: "Perímetros Adicionales (Opcional)", icon: <Ruler className="w-4 h-4" />, fields: [
+        { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
+        { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
+        { key: "muslo", label: "Muslo (cm)", type: "number", step: "0.1" },
+        { key: "pantorrilla", label: "Pantorrilla (cm)", type: "number", step: "0.1" },
+      ]},
+    ];
+  }
+
+  if (metodo === "plicometria_dw4") {
+    return [
+      { label: "Antropometría Base", icon: <Scale className="w-4 h-4" />, fields: [
+        ...FIELDS_BASICAS,
+        ...FIELDS_CIRCUNFERENCIAS_BASE,
+      ]},
+      { label: "4 Pliegues Durnin-Womersley (mm)", icon: <Target className="w-4 h-4" />, fields: [
+        { key: "pliegue_biceps", label: "Bicipital (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_triceps", label: "Tricipital (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_subescapular", label: "Subescapular (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_suprailiaco", label: "Suprailíaco (mm)", type: "number", step: "0.1" },
+      ]},
+      { label: "Perímetros Adicionales (Opcional)", icon: <Ruler className="w-4 h-4" />, fields: [
+        { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
+        { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
+        { key: "muslo", label: "Muslo (cm)", type: "number", step: "0.1" },
+        { key: "pantorrilla", label: "Pantorrilla (cm)", type: "number", step: "0.1" },
+      ]},
+    ];
+  }
+
+  // Default: 'manual' (ISAK Completo — 4 componentes + Somatotipo Heath-Carter)
+  return [
+    { label: "Básicas", icon: <Scale className="w-4 h-4" />, fields: FIELDS_BASICAS },
+    { label: "6 Pliegues ISAK (mm)", icon: <Target className="w-4 h-4" />, fields: [
+      { key: "pliegue_triceps", label: "Tríceps", type: "number", step: "0.1" },
+      { key: "pliegue_subescapular", label: "Subescapular", type: "number", step: "0.1" },
+      { key: "pliegue_suprailiaco", label: "Suprailíaco", type: "number", step: "0.1" },
+      { key: "pliegue_abdominal", label: "Abdominal", type: "number", step: "0.1" },
+      { key: "pliegue_muslo", label: "Muslo", type: "number", step: "0.1" },
+      { key: "pliegue_pantorrilla", label: "Pantorrilla", type: "number", step: "0.1" },
+      { key: "pliegue_biceps", label: "Bíceps (Opcional)", type: "number", step: "0.1" },
+      { key: "pliegue_pectoral", label: "Pectoral (Opcional)", type: "number", step: "0.1" },
+    ]},
+    { label: "Circunferencias (cm)", icon: <Ruler className="w-4 h-4" />, fields: FIELDS_CIRCUNFERENCIAS_COMPLETAS },
+    { label: "Diámetros Óseos · Rocha / Heath-Carter", icon: <Activity className="w-4 h-4" />, fields: FIELDS_DIAMETROS },
+    { label: "Clínicos (Opcional)", icon: <Stethoscope className="w-4 h-4" />, fields: FIELDS_CLINICOS },
+  ];
+}
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split("T")[0],
-  metodo_evaluacion:"manual",
-  peso:"", estatura:"", imc:"",
-  
+  metodo_evaluacion: "manual",
+  peso: "", estatura: "", imc: "",
+
   // Pliegues (mm)
-  pliegue_triceps:"", pliegue_subescapular:"", pliegue_suprailiaco:"", pliegue_abdominal:"", 
-  pliegue_muslo:"", pliegue_pantorrilla:"", pliegue_pectoral:"", pliegue_biceps:"",
+  pliegue_triceps: "", pliegue_subescapular: "", pliegue_suprailiaco: "", pliegue_abdominal: "",
+  pliegue_muslo: "", pliegue_pantorrilla: "", pliegue_pectoral: "", pliegue_biceps: "",
 
   // Circunferencias (cm)
-  cuello:"", cintura:"", cadera:"", pecho:"", brazo_relajado:"", brazo_contraido:"", 
-  muslo:"", pantorrilla:"",
+  cuello: "", cintura: "", cadera: "", pecho: "", brazo_relajado: "", brazo_contraido: "",
+  muslo: "", pantorrilla: "",
 
   // Diámetros óseos (cm)
-  diametro_muneca:"", diametro_codo:"", diametro_rodilla:"",
+  diametro_muneca: "", diametro_codo: "", diametro_rodilla: "",
 
   // InBody
-  inbody_smm:"", inbody_tbw:"", inbody_proteina:"", inbody_mineral_oseo:"",
-  inbody_grasa_visceral:"", inbody_bmr:"", inbody_score:"",
-  inbody_magra_brazo_der:"", inbody_magra_brazo_izq:"", inbody_magra_pierna_der:"",
-  inbody_magra_pierna_izq:"", inbody_magra_tronco:"",
+  inbody_smm: "", inbody_tbw: "", inbody_proteina: "", inbody_mineral_oseo: "",
+  inbody_grasa_visceral: "", inbody_bmr: "", inbody_score: "",
+  inbody_magra_brazo_der: "", inbody_magra_brazo_izq: "", inbody_magra_pierna_der: "",
+  inbody_magra_pierna_izq: "", inbody_magra_tronco: "",
 
   // Outputs calculados / InBody
-  calc_masa_grasa:"", calc_masa_muscular:"", calc_masa_osea:"", calc_masa_residual:"",
-  somatotipo_x:"", somatotipo_y:"",
+  calc_masa_grasa: "", calc_masa_muscular: "", calc_masa_osea: "", calc_masa_residual: "",
+  somatotipo_x: "", somatotipo_y: "",
 
   // Legacy/Calculated
-  grasa_pct:"", musculo_pct:"", icc:"", glucosa:"", presion_arterial:"", notas:"",
+  grasa_pct: "", musculo_pct: "", icc: "", glucosa: "", presion_arterial: "", notas: "",
 });
 
-const fmtDate = (d) => new Date(d +"T12:00:00").toLocaleDateString("es-MX", { year:"numeric", month:"short", day:"numeric" });
+const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
@@ -134,7 +216,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const _peekRs = selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
 
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [metricas,     setMetricas]     = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas : []);
+  const [metricas,     setMetricas]     = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
   const [rutinas,      setRutinas]      = useState(() =>
     Array.isArray(_peekRs)
       ? _peekRs.map(r => ({ ...r, ejercicios: Array.isArray(r.ejercicios) ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0)) : [] }))
@@ -150,6 +232,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [loading,      setLoading]      = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [showModal,    setShowModal]    = useState(false);
+  const [showExpediente, setShowExpediente] = useState(false);
+  const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
+  const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo));
+  const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
   const [sub,          setSub]          = useState("evaluaciones");
   const [pendingFotos, setPendingFotos] = useState([]);   // File objects
@@ -161,6 +247,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
   useBackButton(showModal, () => setShowModal(false), 20);
+  useBackButton(showExpediente, () => setShowExpediente(false), 25);
 
   const loadCicloData = useCallback(async (ciclo) => {
     if (!selected) return;
@@ -257,7 +344,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     }
     try {
       const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`).catch(() => []);
-      setMetricas(ms || []);
+      setMetricas((ms || []).map(enrichMetrica));
+
+      fetchClinicalRecord(selected.id).then(rec => setClinicalRec(rec)).catch(() => {});
 
       // Load cycles and select the active one by default
       const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
@@ -269,6 +358,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
   }, [selected, loadCicloData, setMsg]);
+
+  useEffect(() => {
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+    setClinicalRec(peekClinicalRecord(selected?.id));
+  }, [selected]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -305,18 +400,40 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const updForm = (key, val) => {
     setForm(p => {
       const next = { ...p, [key]: val };
-      // Auto-calcular IMC
-      if ((key==="peso" || key==="estatura") && next.peso && next.estatura) {
+      if ((key === "peso" || key === "estatura") && next.peso && next.estatura) {
         const h = parseFloat(next.estatura) / 100;
-        next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(2) :"";
+        next.imc = h > 0 ? (parseFloat(next.peso) / (h * h)).toFixed(1) : "";
       }
-      // Auto-calcular ICC (cintura ÷ cadera)
-      if ((key==="cintura" || key==="cadera") && next.cintura && next.cadera) {
+      if ((key === "cintura" || key === "cadera") && next.cintura && next.cadera) {
         const icc = parseFloat(next.cintura) / parseFloat(next.cadera);
-        next.icc = icc > 0 ? icc.toFixed(2) :"";
+        next.icc = icc > 0 ? icc.toFixed(2) : "";
       }
       return next;
     });
+  };
+
+  const openNewEvaluation = () => {
+    const base = emptyForm();
+    const prev = metricas[0];
+    if (prev) {
+      if (prev.estatura) base.estatura = String(prev.estatura);
+      if (prev.diametro_muneca) base.diametro_muneca = String(prev.diametro_muneca);
+      if (prev.diametro_codo) base.diametro_codo = String(prev.diametro_codo);
+      if (prev.diametro_rodilla) base.diametro_rodilla = String(prev.diametro_rodilla);
+      if (prev.metodo_evaluacion) base.metodo_evaluacion = prev.metodo_evaluacion;
+    } else if (isCivil) {
+      base.metodo_evaluacion = "basico";
+    } else {
+      base.metodo_evaluacion = "plicometria_jp3";
+    }
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+    setForm(base);
+    setEditingId(null);
+    setExistingFotos([]);
+    setPendingFotos([]);
+    setPreviewUrls([]);
+    setShowModal(true);
   };
 
   const handleFotos = (e) => {
@@ -334,24 +451,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const saveMetrica = async () => {
     setSaving(true);
     try {
-      const data = {};
-      if (!editingId) data.cliente_id = selected.id;
-      const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos"]);
-      const STRING_KEYS = new Set(["fecha","presion_arterial","notas","metodo_evaluacion"]);
+      const rawData = {};
+      if (!editingId) rawData.cliente_id = selected.id;
+      const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
+      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion"]);
       Object.entries(form).forEach(([k, v]) => {
         if (IGNORED_KEYS.has(k)) return;
-        if (v !=="" && v !== null && v !== undefined) {
-          if (STRING_KEYS.has(k)) { data[k] = v; }
-          else { const n = parseFloat(v); data[k] = isNaN(n) ? v : n; }
+        if (v !== "" && v !== null && v !== undefined) {
+          if (STRING_KEYS.has(k)) { rawData[k] = v; }
+          else { const n = parseFloat(v); rawData[k] = isNaN(n) ? v : n; }
         }
       });
 
-      // Aplicar cálculos si es manual
-      if (data.metodo_evaluacion === 'manual') {
-         const edad = selected.edad || (selected.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
-         const calc = calculateBodyComposition(data, selected.sexo, edad);
-         Object.assign(data, calc);
-      }
+      const calc = calculateBodyComposition(form, evalSexo, evalEdad);
+      const data = prepareMetricaPayload(rawData, calc);
 
       // Subir fotos en paralelo para máxima velocidad
       let uploadedUrls = [];
@@ -370,21 +483,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       const allFotos = [...existingFotos, ...uploadedUrls];
       data.fotos = allFotos;
 
+      // Sincronizar peso y género en el perfil del paciente si cambiaron
+      if (selected?.id) {
+        const targetGenero = evalSexo === "F" ? "Femenino" : "Masculino";
+        const clientPatch = {};
+        if (selected.genero !== targetGenero) clientPatch.genero = targetGenero;
+        if (data.peso && Number(data.peso) > 0 && Number(selected.peso) !== Number(data.peso)) {
+          clientPatch.peso = Number(data.peso);
+        }
+        if (Object.keys(clientPatch).length > 0) {
+          dbPatch(`clientes?id=eq.${selected.id}`, clientPatch).catch(() => {});
+        }
+      }
+
       if (editingId) {
         await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
         setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
       } else {
         await dbPost("metricas_progreso", data);
         setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
-        
-        // Send notification if patient is uploading their own progress (non-blocking)
+
         if (['cliente', 'client'].includes(localStorage.getItem('flux_role')) && selected.nutriologo_id) {
           dbPost("notificaciones", {
             profile_id: selected.nutriologo_id,
-            titulo:"Nuevo progreso registrado",
+            titulo: "Nuevo progreso registrado",
             mensaje: `${selected.nombre || 'Un paciente'} ha registrado nuevas métricas de progreso.`,
-            tipo:"progreso",
-            link_url:"clientes", // Redirect to directory
+            tipo: "progreso",
+            link_url: "clientes",
             entidad_id: selected.id
           }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
         }
@@ -401,17 +526,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     setEditingId(null); setExistingFotos([]);
   };
 
-  const startEdit = (m) => {
+  const startEdit = (mRaw) => {
+    const m = enrichMetrica(mRaw);
     const filled = emptyForm();
-    const IGNORED = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos"]);
+    const IGNORED = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
     Object.keys(filled).forEach(k => {
-      if (m[k] !== null && m[k] !== undefined && m[k] !=="") filled[k] = String(m[k]);
+      if (m[k] !== null && m[k] !== undefined && m[k] !== "") filled[k] = String(m[k]);
     });
     Object.keys(m).forEach(k => {
       if (!IGNORED.has(k) && m[k] !== null && m[k] !== undefined && m[k] !== "") {
         filled[k] = String(m[k]);
       }
     });
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setForm(filled);
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
@@ -421,10 +549,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
 
   const deleteFoto = async (metrica, fotoUrl) => {
     const newFotos = parseFotos(metrica.fotos).filter(u => u !== fotoUrl);
-    // Actualización optimista en 0ms
     setMetricas(prev => prev.map(m => m.id === metrica.id ? { ...m, fotos: newFotos } : m));
     setExistingFotos(prev => prev.filter(u => u !== fotoUrl));
-    
+
     try {
       await dbPatch(`metricas_progreso?id=eq.${metrica.id}`, { fotos: newFotos });
       if (fotoUrl && fotoUrl.includes("storage/v1/object/public/progress-photos/")) {
@@ -452,7 +579,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       icon: "trash",
       onConfirm: async () => {
         const prevMetricas = metricas;
-        // Eliminación optimista en 0ms
         setConfirmDelete(null);
         setMetricas(prev => prev.filter(m => m.id !== id));
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
@@ -466,8 +592,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     });
   };
 
-  const edadCalc = selected?.edad || (selected?.fecha_nacimiento ? (new Date().getFullYear() - new Date(selected.fecha_nacimiento).getFullYear()) : 25);
-  const liveCalculations = form.metodo_evaluacion === 'manual' ? calculateBodyComposition(form, selected?.sexo, edadCalc) : {};
+  const liveCalculations = useMemo(
+    () => calculateBodyComposition(form, evalSexo, evalEdad),
+    [form, evalSexo, evalEdad]
+  );
 
   const delta = (curr, prev, key) => {
     if (curr[key]==null || prev[key]==null || curr[key]==="" || prev[key]==="") return null;
@@ -479,6 +607,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     { key:"peso",               label:"Peso",      unit:"kg",    icon:<Scale className="w-3.5 h-3.5" /> },
     { key:"imc",                label:"IMC",       unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"grasa_pct",          label:"Grasa",     unit:"%",     icon:<Activity className="w-3.5 h-3.5" /> },
+    { key:"masa_libre_grasa",   label:"MLG",       unit:"kg",    icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
     { key:"musculo_pct",        label:"Músculo",   unit:"%",     icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
     { key:"calc_masa_grasa",    label:"M. Grasa",  unit:"kg",    icon:<Activity className="w-3.5 h-3.5" /> },
     { key:"calc_masa_muscular", label:"M. Muscular",unit:"kg",   icon:<BicepsFlexed className="w-3.5 h-3.5" /> },
@@ -490,6 +619,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     { key:"cintura",            label:"Cintura",   unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"cadera",             label:"Cadera",    unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"icc",                label:"ICC",       unit:"",      icon:<Scale className="w-3.5 h-3.5" /> },
+    { key:"ice",                label:"ICE",       unit:"",      icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"pecho",              label:"Pecho",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"brazo_relajado",     label:"Brazo",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
     { key:"muslo",              label:"Muslo",     unit:"cm",    icon:<Ruler className="w-3.5 h-3.5" /> },
@@ -539,15 +669,27 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       {/* ── EVALUACIONES ── */}
       {sub==="evaluaciones"&&(
         <div>
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {!isCivil && !isMiPlan && (
+                <button
+                  onClick={() => setShowExpediente(true)}
+                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ClipboardList className="w-4 h-4 text-[var(--brand-primary)]" />
+                  Expediente
+                  {clinicalRec?.solicitud_activa && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  )}
+                </button>
+              )}
               {metricas.length > 0 && (
-                <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer">
                   <FileText className="w-4 h-4" /> PDF
                 </button>
               )}
-              <button onClick={()=>{setForm(emptyForm());setShowModal(true);}} className="bg-[var(--brand-primary)] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5">
+              <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer">
                 <Plus className="w-4 h-4" /> Nueva evaluación
               </button>
             </div>
@@ -593,8 +735,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5 whitespace-nowrap"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
                     {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap">Más reciente</span>}
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
-                      {m.metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : m.metodo_evaluacion === 'basico' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                      {getMetodoLabel(m.metodo_evaluacion)}
                     </span>
                   </div>
                   <div className="flex gap-1.5 self-start sm:self-auto">
@@ -1209,122 +1351,266 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       )}
 
       {/* ── MODAL NUEVA EVALUACIÓN ── */}
-      {showModal&&(
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-[#0B1929]">{editingId ?"Editar evaluación" :"Nueva evaluación corporal"}</h2>
-              <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929]"><X className="w-6 h-6" /></button>
-            </div>
-            
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              {!isCivil && (
-                  <div className="flex bg-[#F0F4FA] rounded-xl p-1 inline-flex w-full md:w-auto">
-                    <button 
-                      onClick={() => updForm("metodo_evaluacion","manual")}
-                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion ==="manual" ?"bg-white shadow-sm text-[#0B1929]" :"text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                    >
-                      MANUAL
-                    </button>
-                    <button 
-                      onClick={() => updForm("metodo_evaluacion","inbody")}
-                      className={`flex-1 md:flex-none px-6 py-2 rounded-[10px] text-[13px] transition-colors font-bold ${form.metodo_evaluacion ==="inbody" ?"bg-white shadow-sm text-[#0B1929]" :"text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                    >
-                      INBODY
-                    </button>
-                  </div>
-                )}
+      {showModal && (() => {
+        const isPlicometria = ["plicometria_jp3", "plicometria_dw4", "manual", "plicometria_isak"].includes(form.metodo_evaluacion);
+        const activeGroups = isCivil
+          ? getGroupsForMethod("basico", evalSexo)
+          : getGroupsForMethod(form.metodo_evaluacion, evalSexo);
 
-                <div className="flex flex-col gap-1.5 w-full md:w-auto">
-                  <label className="text-sm font-bold text-[#0B1929] hidden md:block">Fecha</label>
-                  <input type="date" value={form.fecha} onChange={e=>updForm("fecha",e.target.value)} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20" />
-                </div>
+        return (
+          <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluación" : "Nueva evaluación corporal"}</h2>
+                <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929] cursor-pointer"><X className="w-6 h-6" /></button>
               </div>
 
-              {!isCivil && metricas.length > 0 && metricas[0].metodo_evaluacion !== form.metodo_evaluacion && !editingId && (
-                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-bold text-yellow-800">Cambio de método detectado</h4>
-                    <p className="text-[13px] text-yellow-700 mt-0.5">
-                      El historial reciente de este paciente está en modo <strong>{metricas[0].metodo_evaluacion === 'inbody' ? 'INBODY' : 'MANUAL'}</strong>. Se recomienda mantener consistencia para que las gráficas de progreso y comparativas sean exactas.
-                    </p>
-                  </div>
-                </div>
-              )}
-  
-              {(form.metodo_evaluacion === 'inbody' ? METRIC_GROUPS_INBODY : (isCivil ? [METRIC_GROUPS_MANUAL[0]] : METRIC_GROUPS_MANUAL)).map(group=>(
-              <div key={group.label} className="mb-6">
-                <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
-                  {group.icon} {group.label}
-                </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
-                  {group.fields.map(f=>(
-                    <div key={f.key} className="flex flex-col gap-1.5">
-                      <label className="text-sm font-bold text-[#0B1929]">{f.label}</label>
+              {/* Barra superior: Selector de protocolo en 3 capas + Sexo/Edad enlazados + Fecha */}
+              <div className="flex flex-col gap-3 mb-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  {!isCivil && (
+                    <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full lg:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => updForm("metodo_evaluacion", "basico")}
+                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                      >
+                        Básico
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isPlicometria) updForm("metodo_evaluacion", "plicometria_jp3");
+                        }}
+                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${isPlicometria ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                      >
+                        Plicometría
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updForm("metodo_evaluacion", "inbody")}
+                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                      >
+                        Bioimpedancia
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Sexo, Edad y Fecha */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex bg-[#F0F4FA] rounded-xl p-1">
+                      <button
+                        type="button"
+                        onClick={() => setEvalSexo("M")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                      >
+                        Hombre
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEvalSexo("F")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                      >
+                        Mujer
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-gray-50 border border-[#E2E8F0] rounded-xl px-3 py-1.5">
+                      <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
                       <input
-                        type={f.type} step={f.step||"any"}
-                        value={f.readOnly && form.metodo_evaluacion === 'manual' ? (liveCalculations[f.key] || form[f.key] || '') : (form[f.key] ?? '')}
-                        readOnly={!!f.readOnly}
-                        placeholder={f.readOnly?"Auto":(f.placeholder||"")}
-                        className={`bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 ${f.readOnly ?"opacity-60 cursor-not-allowed" :""}`}
-                        onChange={e=>!f.readOnly&&updForm(f.key,e.target.value)}
+                        type="number"
+                        value={evalEdad}
+                        onChange={e => setEvalEdad(Number(e.target.value) || 25)}
+                        className="w-12 bg-transparent text-xs font-bold text-[#0B1929] text-center focus:outline-none"
                       />
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            
-            <div className="flex flex-col gap-1.5 mb-6">
-              <label className="text-sm font-bold text-[#0B1929]">Notas</label>
-              <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[100px]" />
-            </div>
 
-            {/* Fotos existentes cuando se edita */}
-            {editingId && existingFotos.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> Fotos actuales</div>
-                <div className="flex gap-2 flex-wrap">
-                  {existingFotos.map((url,i) => (
-                    <div key={i} className="relative w-20 h-20">
-                      <img src={url} onClick={()=>setLightbox(url)} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#E2E8F0] cursor-zoom-in" alt=""/>
-                      <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
-                    </div>
-                  ))}
+                    <input
+                      type="date"
+                      value={form.fecha}
+                      onChange={e => updForm("fecha", e.target.value)}
+                      className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Foto upload */}
-            <div className="mb-6">
-              <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ?"Agregar más fotos" :"Fotos de progreso"}</div>
-              <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
-                <Plus className="w-4 h-4" /> Agregar fotos
-                <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
-              </label>
-              {previewUrls.length>0&&(
-                <div className="flex gap-2 flex-wrap mt-3">
-                  {previewUrls.map((url,i)=>(
-                    <div key={i} className="relative w-20 h-20">
-                      <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[var(--brand-primary)]" alt=""/>
-                      <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
-                    </div>
-                  ))}
+                {/* Sub-selector de Plicometría */}
+                {!isCivil && isPlicometria && (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { id: "plicometria_jp3", label: "3 Pliegues (Jackson-Pollock)" },
+                      { id: "plicometria_dw4", label: "4 Pliegues (Durnin-Womersley)" },
+                      { id: "manual", label: "ISAK Completo (4 Componentes + Somatotipo)" },
+                    ].map(subP => {
+                      const active = form.metodo_evaluacion === subP.id || (subP.id === "manual" && form.metodo_evaluacion === "plicometria_isak");
+                      return (
+                        <button
+                          key={subP.id}
+                          type="button"
+                          onClick={() => updForm("metodo_evaluacion", subP.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                            active
+                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                              : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
+                          }`}
+                        >
+                          {subP.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Grupos de campos */}
+              {activeGroups.map(group => (
+                <div key={group.label} className="mb-6">
+                  <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
+                    {group.icon} {group.label}
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(175px,1fr))] gap-3.5">
+                    {group.fields.map(f => (
+                      <div key={f.key} className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-[#0B1929]">{f.label}</label>
+                        <input
+                          type={f.type}
+                          step={f.step || "any"}
+                          value={form[f.key] ?? ""}
+                          placeholder={f.placeholder || ""}
+                          className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                          onChange={e => updForm(f.key, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Resumen Clínico en Vivo */}
+              {(liveCalculations.imc || liveCalculations.grasa_pct || liveCalculations.icc || liveCalculations.masa_libre_grasa) && (
+                <div className="mb-6 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4">
+                  <div className="text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-2.5">
+                    Indicadores Calculados
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                    {liveCalculations.imc && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">IMC</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.imc}</div>
+                        {liveCalculations.imc_info && (
+                          <div className="text-[10px] font-bold text-[var(--brand-primary)]">{liveCalculations.imc_info.label}</div>
+                        )}
+                      </div>
+                    )}
+                    {(liveCalculations.grasa_pct || form.grasa_pct) && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">% Grasa</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.grasa_pct || form.grasa_pct}%</div>
+                        {liveCalculations.sum_pliegues && (
+                          <div className="text-[10px] text-[#6B7A8D]">Σ {liveCalculations.sum_pliegues} mm</div>
+                        )}
+                      </div>
+                    )}
+                    {liveCalculations.calc_masa_grasa && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Grasa</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_grasa} kg</div>
+                      </div>
+                    )}
+                    {liveCalculations.masa_libre_grasa && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-emerald-700 uppercase">MLG (Magra)</div>
+                        <div className="text-base font-black text-emerald-700 font-['Rajdhani']">{liveCalculations.masa_libre_grasa} kg</div>
+                      </div>
+                    )}
+                    {liveCalculations.calc_masa_muscular && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Muscular</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_muscular} kg</div>
+                      </div>
+                    )}
+                    {liveCalculations.icc && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">ICC / ICE</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
+                          {liveCalculations.icc}{liveCalculations.ice ? ` · ${liveCalculations.ice}` : ""}
+                        </div>
+                        {liveCalculations.icc_info && (
+                          <div className="text-[10px] font-bold text-[#6B7A8D]">{liveCalculations.icc_info.label}</div>
+                        )}
+                      </div>
+                    )}
+                    {liveCalculations.somatotipo_endo && liveCalculations.somatotipo_meso && liveCalculations.somatotipo_ecto && (
+                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0] col-span-2">
+                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Somatotipo (Endo · Meso · Ecto)</div>
+                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
+                          {liveCalculations.somatotipo_endo} - {liveCalculations.somatotipo_meso} - {liveCalculations.somatotipo_ecto}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
 
-            <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
-              <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">Cancelar</button>
-              <button onClick={saveMetrica} disabled={saving} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
-              </button>
+              <div className="flex flex-col gap-1.5 mb-6">
+                <label className="text-sm font-bold text-[#0B1929]">Notas</label>
+                <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[90px]" />
+              </div>
+
+              {/* Fotos existentes cuando se edita */}
+              {editingId && existingFotos.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> Fotos actuales</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {existingFotos.map((url,i) => (
+                      <div key={i} className="relative w-20 h-20">
+                        <img src={url} onClick={()=>setLightbox(url)} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#E2E8F0] cursor-zoom-in" alt=""/>
+                        <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Foto upload */}
+              <div className="mb-6">
+                <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ?"Agregar más fotos" :"Fotos de progreso"}</div>
+                <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
+                  <Plus className="w-4 h-4" /> Agregar fotos
+                  <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
+                </label>
+                {previewUrls.length>0&&(
+                  <div className="flex gap-2 flex-wrap mt-3">
+                    {previewUrls.map((url,i)=>(
+                      <div key={i} className="relative w-20 h-20">
+                        <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[var(--brand-primary)]" alt=""/>
+                        <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
+                <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors cursor-pointer">Cancelar</button>
+                <button onClick={saveMetrica} disabled={saving} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+                  {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
+        );
+      })()}
+
+      {/* Expediente Clínico y Seguimiento */}
+      <ExpedienteClinicoModal
+        isOpen={showExpediente}
+        onClose={() => setShowExpediente(false)}
+        cliente={selected}
+        mode="nutriologo"
+        onSaved={(saved) => setClinicalRec(saved)}
+      />
+
       {/* Lightbox */}
       {lightbox&&createPortal(
         <div onClick={()=>setLightbox(null)} className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out">

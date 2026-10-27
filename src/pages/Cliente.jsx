@@ -6,7 +6,7 @@ import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { getCurrentCycleWeekInfo } from "../utils/helpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
 import { CitasCliente } from "../components/CitasCliente";
@@ -15,6 +15,8 @@ import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
+import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
+import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
 
 // dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión con retorno mínimo para máxima velocidad
 const offlineAwareUpsert = async (records) => {
@@ -130,6 +132,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   
   
   const [biblioteca, setBiblioteca] = useState(() => dbPeek("biblioteca_ejercicios?order=nombre.asc") || []);
+  const [clinicalRec, setClinicalRec] = useState(() =>
+    cliente?.id && cliente?.nutriologo_id ? peekClinicalRecord(cliente.id) : null
+  );
+  const [showClinicalModal, setShowClinicalModal] = useState(false);
 
   const loadData = async ({ silent = false, forceFresh = false } = {}) => {
     if (!silent && dias.length === 0 && rutinas.length === 0 && _peekCiclos === null) {
@@ -138,6 +144,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       if (!isEmbedded && cliente?.nutriologo_id) {
+        fetchClinicalRecord(cliente.id).then((rec) => {
+          if (rec) setClinicalRec(rec);
+        }).catch(() => {});
+
         const nutriProfile = await fetcher(`profiles?id=eq.${cliente.nutriologo_id}&select=bloqueado`);
         if (nutriProfile && nutriProfile[0]?.bloqueado) {
           setNutriologoBloqueado(true);
@@ -364,6 +374,41 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return <BloqueadoPaciente onLogout={onLogout} />;
   }
 
+  // Resumen automático de adherencia nutricional para el check-in
+  const adherenciaSummary = (() => {
+    const entries = Object.values(nutriProgreso || {}).filter(
+      (r) => Number(r.semana) === Number(currentCycleWeek)
+    );
+    if (entries.length === 0) return null;
+    const totalComidasDone = entries.reduce(
+      (s, r) => s + (Array.isArray(r.comidas_completadas) ? r.comidas_completadas.length : 0),
+      0
+    );
+    const avgComidasPerDay =
+      dias.length > 0
+        ? dias.reduce((s, d) => s + ((d.comidas || []).length || 0), 0) / dias.length
+        : 4;
+    const expectedTotal = Math.max(1, Math.round(avgComidasPerDay * entries.length));
+    const comidasPct = Math.min(100, Math.round((totalComidasDone / expectedTotal) * 100));
+    const aguaEntries = entries.filter((r) => Number(r.agua_ml) > 0);
+    const aguaPromedioL =
+      aguaEntries.length > 0
+        ? (
+            aguaEntries.reduce((s, r) => s + Number(r.agua_ml || 0), 0) /
+            aguaEntries.length /
+            1000
+          ).toFixed(1)
+        : null;
+    return { comidasPct, aguaPromedioL };
+  })();
+
+  const hasActiveClinicalRequest =
+    !isEmbedded &&
+    !isAtletaMode &&
+    Boolean(cliente?.nutriologo_id) &&
+    (clinicalRec?.solicitud_activa === "historia_inicial" ||
+      clinicalRec?.solicitud_activa === "checkin_seguimiento");
+
   const innerContent = (
     <>
       {isAtletaMode && (
@@ -379,6 +424,36 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           <button onClick={onBackToAdmin} className="bg-[#10B981] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#059669] transition-colors shadow-sm whitespace-nowrap">
             {cliente?.nutriologo_id === null ?"Volver al Editor" :"Volver al Panel"}
           </button>
+        </div>
+      )}
+      {hasActiveClinicalRequest && (
+        <div className="px-4 md:px-8 pt-4 max-w-5xl w-full mx-auto">
+          <div className="bg-white border border-[var(--brand-primary)]/25 rounded-2xl p-3.5 sm:px-5 flex items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                <ClipboardList size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold text-[#0B1929] truncate">
+                  {clinicalRec?.solicitud_activa === "checkin_seguimiento"
+                    ? "Check-in de seguimiento pendiente"
+                    : "Historia clínica inicial solicitada"}
+                </p>
+                <p className="text-[11px] text-[#6B7A8D] truncate">
+                  {clinicalRec?.solicitud_activa === "checkin_seguimiento"
+                    ? "Comparte cómo te sentiste esta semana antes de tu consulta."
+                    : "Completa tus antecedentes y hábitos para tu especialista."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowClinicalModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity shrink-0 shadow-sm cursor-pointer"
+            >
+              Completar
+            </button>
+          </div>
         </div>
       )}
       {loading ? (
@@ -459,7 +534,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           )}
         </Suspense>
       )}
-        </>
+      {showClinicalModal && (
+        <ExpedienteClinicoModal
+          isOpen={showClinicalModal}
+          onClose={() => setShowClinicalModal(false)}
+          cliente={cliente}
+          mode="paciente"
+          adherenciaSummary={adherenciaSummary}
+          onSaved={(updatedRec) => setClinicalRec(updatedRec)}
+        />
+      )}
+    </>
   );
 
   if (isEmbedded) return innerContent;
