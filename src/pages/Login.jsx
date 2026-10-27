@@ -299,7 +299,7 @@ export default function Login({ onLogin }) {
     }
     setLoading(true); setErr(""); setInfo("");
     try {
-      await dbPost("solicitudes_profesionales", {
+      await dbPostMinimal("solicitudes_profesionales", {
         nombre: nombre.trim(),
         email: email.trim(),
         tipo: signupType,
@@ -308,6 +308,14 @@ export default function Login({ onLogin }) {
         mapa_url: mapaUrl.trim() || null,
         estado: "pendiente"
       });
+      sessionStorage.removeItem('flux_login_nombre');
+      sessionStorage.removeItem('flux_login_email');
+      sessionStorage.removeItem('flux_login_cedula');
+      setNombre("");
+      setEmail("");
+      setCedula("");
+      setNombreMarca("");
+      setMapaUrl("");
       setInfo("¡Solicitud enviada con éxito! Revisaremos tus credenciales y te enviaremos un correo de activación pronto.");
       setMode("login");
     } catch (e) {
