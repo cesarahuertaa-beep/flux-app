@@ -396,6 +396,42 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     return () => window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
   }, [selected?.id]);
 
+  const openNewEvaluation = useCallback(() => {
+    const base = emptyForm();
+    const prev = metricas[0];
+    if (prev) {
+      if (prev.estatura) base.estatura = String(prev.estatura);
+      if (prev.diametro_muneca) base.diametro_muneca = String(prev.diametro_muneca);
+      if (prev.diametro_codo) base.diametro_codo = String(prev.diametro_codo);
+      if (prev.diametro_rodilla) base.diametro_rodilla = String(prev.diametro_rodilla);
+      if (prev.metodo_evaluacion) base.metodo_evaluacion = prev.metodo_evaluacion;
+    } else if (isCivil) {
+      base.metodo_evaluacion = "basico";
+    } else {
+      base.metodo_evaluacion = "plicometria_jp3";
+    }
+
+    // Precargar respuesta reciente del paciente o del expediente si existe
+    const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
+    if (latestCheckin) {
+      if (latestCheckin.energia) base.checkin_energia = String(latestCheckin.energia);
+      if (latestCheckin.saciedad) base.checkin_saciedad = String(latestCheckin.saciedad);
+      if (latestCheckin.digestion) base.checkin_digestion = String(latestCheckin.digestion);
+      if (latestCheckin.descanso) base.checkin_descanso = String(latestCheckin.descanso);
+      if (latestCheckin.observaciones) base.checkin_observaciones = String(latestCheckin.observaciones);
+      if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
+    }
+
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+    setForm(base);
+    setEditingId(null);
+    setExistingFotos([]);
+    setPendingFotos([]);
+    setPreviewUrls([]);
+    setShowModal(true);
+  }, [metricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento]);
+
   useEffect(() => {
     const handleOpen = () => {
       openNewEvaluation();
@@ -454,42 +490,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       return next;
     });
   };
-
-  const openNewEvaluation = useCallback(() => {
-    const base = emptyForm();
-    const prev = metricas[0];
-    if (prev) {
-      if (prev.estatura) base.estatura = String(prev.estatura);
-      if (prev.diametro_muneca) base.diametro_muneca = String(prev.diametro_muneca);
-      if (prev.diametro_codo) base.diametro_codo = String(prev.diametro_codo);
-      if (prev.diametro_rodilla) base.diametro_rodilla = String(prev.diametro_rodilla);
-      if (prev.metodo_evaluacion) base.metodo_evaluacion = prev.metodo_evaluacion;
-    } else if (isCivil) {
-      base.metodo_evaluacion = "basico";
-    } else {
-      base.metodo_evaluacion = "plicometria_jp3";
-    }
-
-    // Precargar respuesta reciente del paciente o del expediente si existe
-    const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
-    if (latestCheckin) {
-      if (latestCheckin.energia) base.checkin_energia = String(latestCheckin.energia);
-      if (latestCheckin.saciedad) base.checkin_saciedad = String(latestCheckin.saciedad);
-      if (latestCheckin.digestion) base.checkin_digestion = String(latestCheckin.digestion);
-      if (latestCheckin.descanso) base.checkin_descanso = String(latestCheckin.descanso);
-      if (latestCheckin.observaciones) base.checkin_observaciones = String(latestCheckin.observaciones);
-      if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
-    }
-
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
-    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
-    setForm(base);
-    setEditingId(null);
-    setExistingFotos([]);
-    setPendingFotos([]);
-    setPreviewUrls([]);
-    setShowModal(true);
-  }, [metricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento]);
 
   const handleFotos = (e) => {
     const files = Array.from(e.target.files);
