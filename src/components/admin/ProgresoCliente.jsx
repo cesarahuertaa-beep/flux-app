@@ -244,7 +244,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [showModal,    setShowModal]    = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
-  const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo));
+  const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo || peekClinicalRecord(selected?.id)?.anamnesis?.genero));
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
@@ -426,10 +426,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [selected?.id, loadCicloData, setMsg, cicloActivo?.id, filterDeleted]);
 
   useEffect(() => {
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setClinicalRec(peekClinicalRecord(selected?.id));
-  }, [selected]);
+  }, [selected, clinicalRec?.anamnesis?.genero]);
 
   useEffect(() => {
     const onExpedienteUpdated = (e) => {
@@ -473,7 +473,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
     }
 
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setForm(base);
     setEditingId(null);
@@ -481,7 +481,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
-  }, [activeMetricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, cicloActivo?.id, cicloSel?.id]);
+  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis?.genero, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, cicloActivo?.id, cicloSel?.id]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -785,7 +785,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
 
     // 4. Configurar sexo, edad, fotos y estado de edición
-    const detectedSexo = normalizeSexo(m.sexo || selected?.genero || selected?.sexo);
+    const detectedSexo = normalizeSexo(m.sexo || selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero);
     const detectedEdad = Number(m.edad) || calcEdadFromBirthdate(selected?.fecha_nacimiento, 25);
     setEvalSexo(detectedSexo);
     setEvalEdad(detectedEdad);
@@ -1928,27 +1928,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       )}
 
-                      {/* Sexo, Edad y Fecha */}
+                      {/* Edad y Fecha */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex bg-[#F0F4FA] rounded-xl p-1">
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && setEvalSexo("M")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
-                          >
-                            Hombre
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && setEvalSexo("F")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
-                          >
-                            Mujer
-                          </button>
-                        </div>
-
                         <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5">
                           <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
                           <input
