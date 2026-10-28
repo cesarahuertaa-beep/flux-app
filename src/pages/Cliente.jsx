@@ -351,14 +351,26 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     // Ocultar pestaña de citas si es usuario civil (no tiene nutriólogo)
   const isActuallyCivil = cliente?.nutriologo_id === null;
 
+  const hasNutriService = isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.nutricion !== false);
+  const hasEntrenamientoService = isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.entrenamiento !== false);
+
   const SIDEBAR_ITEMS = [
-    { id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-    { id:"deporte",  label:"Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    ...(hasNutriService ? [{ id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
+    ...(hasEntrenamientoService ? [{ id:"deporte",  label:"Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> }] : []),
     { id:"progreso", label:"Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
     ...((!isActuallyCivil && cliente?.objetivo !=="Mi entrenamiento personal") ? [
       { id:"citas",    label:"Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
     ] : [])
   ];
+
+  // Si el servicio activo desactiva la pestaña actual, redirigir a una pestaña activa
+  useEffect(() => {
+    if (tab === "nutricion" && !hasNutriService) {
+      setTab(hasEntrenamientoService ? "deporte" : "progreso");
+    } else if (tab === "deporte" && !hasEntrenamientoService) {
+      setTab(hasNutriService ? "nutricion" : "progreso");
+    }
+  }, [tab, hasNutriService, hasEntrenamientoService]);
 
   // Cálculo de semana actual en zona horaria local del dispositivo (sin desfase UTC)
   const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : (nutri?.updated_at || null));

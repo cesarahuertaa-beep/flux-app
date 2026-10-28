@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -26,10 +26,13 @@ import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpl
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
+import { calcEdadFromBirthdate, normalizeSexo } from "../../lib/bodyComposition";
+import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
+import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -100,10 +103,72 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
   const [activeAltSlot, setActiveAltSlot] = useState(null);
   const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
   const [showMacroCalc, setShowMacroCalc] = useState(false);
+  const [showExpediente, setShowExpediente] = useState(false);
   const [latestMetrica, setLatestMetrica] = useState(() => {
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) && ms.length > 0 ? ms[0] : null;
   });
+  const [clinicalRec, setClinicalRec] = useState(() => {
+    return selected?.id ? peekClinicalRecord(selected.id) : null;
+  });
+
+  useEffect(() => {
+    let active = true;
+    if (selected?.id) {
+      fetchClinicalRecord(selected.id).then(rec => {
+        if (active && rec) setClinicalRec(rec);
+      });
+    } else {
+      setClinicalRec(null);
+    }
+    return () => { active = false; };
+  }, [selected?.id]);
+
+  const togglePilarServicio = async (pilar) => {
+    if (!selected?.id) return;
+    const currentActivos = clinicalRec?.servicios_activos || { nutricion: true, entrenamiento: true };
+    const nextVal = !currentActivos[pilar];
+    
+    // Evitar apagar ambos pilares
+    if (!nextVal) {
+      const other = pilar === "nutricion" ? "entrenamiento" : "nutricion";
+      if (!currentActivos[other]) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-500" /> El paciente debe tener al menos un servicio activo</div>);
+        return;
+      }
+    }
+
+    const updated = {
+      ...(clinicalRec || {}),
+      servicios_activos: {
+        ...currentActivos,
+        [pilar]: nextVal
+      }
+    };
+    setClinicalRec(updated);
+    try {
+      await saveClinicalRecord(selected.id, updated);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("flux:expediente-updated", { detail: { clienteId: selected.id } }));
+      }
+      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Servicios actualizados</div>);
+    } catch(e) {
+      if (!isOfflineError(e)) {
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error al actualizar servicios</div>);
+      }
+    }
+  };
+
+  const serviciosActivos = clinicalRec?.servicios_activos || { nutricion: true, entrenamiento: true };
+
+  // Reorientar subtab si el servicio seleccionado fue desactivado
+  useEffect(() => {
+    if (!serviciosActivos.nutricion && subtab === "nutri") {
+      setSubtab(serviciosActivos.entrenamiento ? "deporte" : "progreso");
+    } else if (!serviciosActivos.entrenamiento && subtab === "deporte") {
+      setSubtab(serviciosActivos.nutricion ? "nutri" : "progreso");
+    }
+  }, [serviciosActivos.nutricion, serviciosActivos.entrenamiento, subtab]);
 
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
@@ -128,6 +193,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     }
     setCropModal(null);
   }, 50);
+  useBackButton(showExpediente, () => setShowExpediente(false), 25);
   useBackButton(!!templateModal, () => setTemplateModal(null), 40);
   useBackButton(!!showDiaModal, () => setShowDiaModal(false), 20);
   useBackButton(!!showRutinaModal, () => setShowRutinaModal(false), 20);
@@ -1536,6 +1602,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
     );
   }
 
+  const birthdate = clinicalRec?.antecedentes?.fecha_nacimiento || selected?.fecha_nacimiento || null;
+  const rawSexo = clinicalRec?.antecedentes?.sexo || selected?.genero || selected?.sexo || null;
+  const edadNum = birthdate ? calcEdadFromBirthdate(birthdate) : null;
+  const edadStr = edadNum !== null ? `${edadNum} años` : null;
+  const sexoStr = rawSexo ? (normalizeSexo(rawSexo) === "M" ? "Masculino" : "Femenino") : null;
+  const pesoStr = latestMetrica?.peso ? `${latestMetrica.peso} kg` : null;
+
   return (
     <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente ── */}
@@ -1553,20 +1626,100 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         )}
         
         {!isMiPlan && (
-        <div className="flex items-stretch mb-5 w-max group">
-          <div className="bg-[#0B1929]/5 border border-[#0B1929]/20 rounded-l-xl px-4 py-2 flex flex-col justify-center">
-            <span className="font-bold text-[var(--brand-primary)] leading-tight">{selected.nombre}</span>
-            <span className="text-xs text-[#6B7A8D] leading-tight mt-0.5">{selected.email}</span>
+          <div className="mb-5 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              
+              {/* Left: Patient info + Back button */}
+              <div className="flex items-center gap-3.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="w-10 h-10 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] flex items-center justify-center transition-colors shrink-0"
+                  title="Cambiar paciente / Volver al listado"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">{selected.nombre}</h2>
+                    {edadStr && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D]">
+                        {edadStr}
+                      </span>
+                    )}
+                    {sexoStr && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D]">
+                        {sexoStr}
+                      </span>
+                    )}
+                    {pesoStr && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {pesoStr}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[#6B7A8D] truncate mt-0.5 flex items-center gap-2">
+                    <span>{selected.email}</span>
+                    {selected.telefono && <span>• {selected.telefono}</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Expediente + Service Pillars Toggles (Pilares de Servicio) */}
+              <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowExpediente(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs mr-1"
+                  title="Abrir Expediente Clínico Integral"
+                >
+                  <ClipboardList className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                  <span>Expediente</span>
+                  {clinicalRec?.solicitud_activa && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
+                  )}
+                </button>
+
+                <div className="h-4 w-px bg-[#E2E8F0] hidden sm:block mx-1" />
+
+                <span className="text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mr-1">Servicios:</span>
+                
+                {/* Nutrición Toggle */}
+                <button
+                  type="button"
+                  onClick={() => togglePilarServicio("nutricion")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                    serviciosActivos.nutricion
+                      ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
+                      : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
+                  }`}
+                  title={serviciosActivos.nutricion ? "Nutrición activa para este paciente" : "Nutrición desactivada"}
+                >
+                  <Utensils className="w-3.5 h-3.5" />
+                  <span>Nutrición</span>
+                  {serviciosActivos.nutricion ? <Check className="w-3 h-3 ml-0.5 text-[var(--brand-primary)]" /> : null}
+                </button>
+
+                {/* Entrenamiento Toggle */}
+                <button
+                  type="button"
+                  onClick={() => togglePilarServicio("entrenamiento")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                    serviciosActivos.entrenamiento
+                      ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
+                      : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
+                  }`}
+                  title={serviciosActivos.entrenamiento ? "Entrenamiento activo para este paciente" : "Entrenamiento desactivado"}
+                >
+                  <Dumbbell className="w-3.5 h-3.5" />
+                  <span>Entrenamiento</span>
+                  {serviciosActivos.entrenamiento ? <Check className="w-3 h-3 ml-0.5 text-[var(--brand-primary)]" /> : null}
+                </button>
+              </div>
+
+            </div>
           </div>
-          <button 
-            title="Cambiar paciente"
-            className="px-3 bg-[#0B1929]/5 border border-l-0 border-[#0B1929]/20 rounded-r-xl text-[#6B7A8D] hover:bg-[#0B1929]/10 hover:text-[var(--brand-primary)] transition-colors flex items-center justify-center" 
-            onClick={() => setSelected(null)}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        )}
 
       {/* ── Selector de Ciclos ── */}
       <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
@@ -1677,8 +1830,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
       {/* ── 🔴 Sub-tabs 🔴 ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
-          { k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" },
-          { k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Rutinas" },
+          ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
+          ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Rutinas" }] : []),
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Progreso" }
         ].map(({ k, ic, lb }) => (
           <button 
@@ -1907,50 +2060,116 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         </div>
       )}
 
-      {/* ── Modal Nuevo/Editar Día ── */}
+      {/* ── Editor de Día a Pantalla Completa (Master-Detail) ── */}
       {showDiaModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0] gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
-                <h3 className="text-lg font-bold text-[#0B1929]">{editDia ? `Editar día` :"Nuevo día"}</h3>
-                <div className="bg-[#F0F4FA] text-[#0B1929] px-3 py-1.5 rounded-lg text-xs font-semibold flex gap-3">
-                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.calorias) || 0), 0)} Kcal</span>
-                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0)}g P</span>
-                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0)}g C</span>
-                  <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0)}g G</span>
+        <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
+          {/* Top Sticky Bar */}
+          <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3.5 flex items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <button 
+                type="button"
+                onClick={() => setShowDiaModal(false)}
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-colors py-1.5 px-3 rounded-xl hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </button>
+              <span className="text-[#CBD5E1] hidden sm:inline">|</span>
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
+                  {editDia ? `Editar Día: ${diaForm.dia?.split('|')?.[0] || 'Día'}` : "Nuevo Día de Nutrición"}
+                </h2>
+                <div className="text-[11px] text-[#6B7A8D] hidden sm:block">
+                  {selected?.nombre} • {cicloSel?.nombre?.split('|')?.[0] || 'Plan'}
                 </div>
               </div>
-              <button onClick={() => setShowDiaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] shrink-0">
-                <X className="w-5 h-5" />
+            </div>
+
+            {/* Live Macros Comparison / Badge in Sticky Bar */}
+            <div className="hidden lg:flex items-center gap-3 bg-[#F0F4FA] border border-[#E2E8F0] px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[#0B1929]">
+              <span className="text-[#6B7A8D] font-normal">Total del día:</span>
+              <span className="font-extrabold text-[var(--brand-primary)]">
+                {diaForm.comidas.reduce((s, c) => s + (Number(c.calorias) || 0), 0)} Kcal
+              </span>
+              <span>•</span>
+              <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0)}g P</span>
+              <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0)}g C</span>
+              <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0)}g G</span>
+              {Number(macros.calorias) > 0 && (
+                <span className="text-[11px] text-[#6B7A8D] pl-1 font-normal">
+                  (Meta: {macros.calorias} kcal)
+                </span>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                type="button"
+                onClick={() => setShowDiaModal(false)}
+                className="px-3 sm:px-4 py-2 rounded-xl border border-[#E2E8F0] text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={saveDia} 
+                disabled={saving}
+                className="px-4 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Save className="w-4 h-4" />
+                <span>{saving ? "Guardando…" : "Guardar día"}</span>
               </button>
             </div>
-            <div className="p-5 overflow-y-auto">
+          </div>
+
+          {/* Main Content Area */}
+          <div className="max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
+            
+            {/* Mobile Macro Summary Banner */}
+            <div className="lg:hidden bg-white border border-[#E2E8F0] p-3.5 rounded-2xl flex items-center justify-between shadow-2xs">
+              <div className="text-xs font-semibold text-[#6B7A8D]">Total del día:</div>
+              <div className="flex items-center gap-2 text-xs font-bold text-[#0B1929]">
+                <span className="text-[var(--brand-primary)]">{diaForm.comidas.reduce((s, c) => s + (Number(c.calorias) || 0), 0)} Kcal</span>
+                <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0)}g P</span>
+                <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0)}g C</span>
+                <span>{diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0)}g G</span>
+              </div>
+            </div>
+
+            {/* Card 1: Configuración del Día */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[var(--brand-primary)]" />
+                Programación del Día
+              </h3>
+
               {!editDia && historialDias.length > 0 && !isEstandar && (
-                <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
-                  <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
-                    <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                    <CustomSelect
-                      value=""
-                      onChange={onSelectHistorialDia}
-                      placeholder="-- Seleccionar día preexistente --"
-                      options={[
-                        { value: "", label: "-- Seleccionar día preexistente --" },
-                        ...historialDias.map(hd => ({
-                          value: hd.id,
-                          label: `${(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de ${getClientName(hd.cliente_id)})`
-                        }))
-                      ]}
-                    />
-                  </div>
+                <div className="mb-5 pb-5 border-b border-[#F0F4FA]">
+                  <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">Importar desde Historial</div>
+                  <CustomSelect
+                    value=""
+                    onChange={onSelectHistorialDia}
+                    placeholder="-- Seleccionar día preexistente --"
+                    options={[
+                      { value: "", label: "-- Seleccionar día preexistente --" },
+                      ...historialDias.map(hd => ({
+                        value: hd.id,
+                        label: `${(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de ${getClientName(hd.cliente_id)})`
+                      }))
+                    ]}
+                  />
                 </div>
               )}
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
-                  <div className="flex flex-wrap gap-2 mb-3">
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día(s) de la semana asignado(s)</label>
+                  <div className="flex flex-wrap gap-2">
                     {["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].map(d => (
                       <button
                         key={d}
+                        type="button"
                         onClick={() => {
                           setDiaForm(p => ({
                             ...p,
@@ -1959,117 +2178,282 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               : [...(p.diasSeleccionados || []), d])
                           }));
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${diaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          diaForm.diasSeleccionados?.includes(d) 
+                            ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' 
+                            : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'
+                        }`}
                       >
                         {d}
                       </button>
                     ))}
                   </div>
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2 mt-4">Título Libre (Subtítulo)</label>
-                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]" value={diaForm.tituloPersonalizado ||""} onChange={e=>setDiaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Fase de Volumen, Día de Pierna..." />
                 </div>
-              <div className="flex justify-between items-center mb-2.5">
-                <span className="font-semibold text-[14px]">Comidas</span>
-                <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors font-medium" onClick={addComida}><Plus className="w-3.5 h-3.5" /> Comida</button>
-              </div>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
-                <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
-                  {diaForm.comidas.map((c, i) => (
-                    <SortableItem key={c._dndId} id={c._dndId}>
-                      {({ dragHandle, isDragging }) => (
-                        <div className="bg-gray-50 rounded-xl border border-[#E2E8F0] p-3 mb-2.5">
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center gap-2">
-                              {dragHandle}
-                              <span className="text-xs text-[#6B7A8D] font-medium">Comida {i + 1}</span>
-                            </div>
-                            <button onClick={() => remComida(i)} className="text-red-400 hover:text-red-600 transition-colors border-none bg-transparent">
-                              <Trash2 className="w-[18px] h-[18px]" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Hora</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.hora} onChange={e=>updComida(i,"hora",e.target.value)} placeholder="7:00 am" /></div>
-                            <div><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre</label><input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={c.nombre} onChange={e=>updComida(i,"nombre",e.target.value)} placeholder="Desayuno" /></div>
-                          </div>
-                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 1</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion1} onChange={e=>updComida(i,"opcion1",e.target.value)} placeholder="Descripción..." /></div>
-                          <div className="mb-2"><label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción 2</label><textarea className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px] min-h-[60px]" value={c.opcion2} onChange={e=>updComida(i,"opcion2",e.target.value)} placeholder="Descripción..." /></div>
-                          
-                          {/* Image Upload for Meal */}
-                          <div className="mb-2">
-                            <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Foto de referencia (opcional)</label>
-                            <div className="flex items-center gap-3">
-                              {c.foto_url && (
-                                <CachedImage src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
-                              )}
-                              <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors w-full sm:w-auto">
-                                <ImageIcon className="w-4 h-4" />
-                                <span>{c.foto_url ?"Cambiar foto" :"Subir foto"}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                              </label>
-                              {c.foto_url && (
-                                <button onClick={() => updComida(i,"foto_url","")} className="text-red-400 hover:text-red-600 p-2">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-1.5 mt-2">
-                            {[["calorias","Kcal"], ["proteina","Prot g"], ["carbohidratos","Carbs g"], ["grasas","Grasas g"]].map(([f, lb]) => (
-                              <div key={f}><label className="block text-[11px] sm:text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1 sm:mb-1.5 truncate">{lb}</label><input type="number" className="w-full px-2 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-[#E2E8F0] bg-white text-[13px] sm:text-[14px] text-center sm:text-left" value={c[f]} onChange={e=>updComida(i,f,e.target.value)} placeholder="0" /></div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </SortableItem>
-                  ))}
-                </SortableContext>
-              </DndContext>
-              <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
-                <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowDiaModal(false)}>Cancelar</button>
-                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveDia} disabled={saving}>{saving ?"Guardando…" :"Guardar día"}</button>
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título o Nota del Día (Opcional)</label>
+                  <input 
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] transition-colors" 
+                    value={diaForm.tituloPersonalizado || ""} 
+                    onChange={e => setDiaForm(p => ({ ...p, tituloPersonalizado: e.target.value }))} 
+                    placeholder="Ej. Fase de Definición, Día Alto en Carbos..." 
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Card 2: Lista de Comidas */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
+                    Comidas y Distribución ({diaForm.comidas.length})
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reorganizar el orden de las tomas</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={addComida}
+                  className="text-xs flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--brand-primary)]/40 bg-blue-50/50 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white transition-all font-bold"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar Comida</span>
+                </button>
+              </div>
+
+              {diaForm.comidas.length === 0 ? (
+                <div className="text-center py-10 border-2 border-dashed border-[#E2E8F0] rounded-2xl bg-gray-50/50">
+                  <Utensils className="w-8 h-8 text-[#94A3B8] mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-[#0B1929]">No hay comidas en este día</p>
+                  <p className="text-xs text-[#6B7A8D] mb-4">Agrega la primera comida para comenzar a diseñar el menú</p>
+                  <button 
+                    type="button"
+                    onClick={addComida}
+                    className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity"
+                  >
+                    + Agregar Comida
+                  </button>
+                </div>
+              ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
+                  <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-4">
+                      {diaForm.comidas.map((c, i) => (
+                        <SortableItem key={c._dndId} id={c._dndId}>
+                          {({ dragHandle, isDragging }) => (
+                            <div className={`bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 transition-all ${isDragging ? 'shadow-lg ring-2 ring-[var(--brand-primary)]/20 bg-white' : ''}`}>
+                              <div className="flex justify-between items-center mb-3">
+                                <div className="flex items-center gap-2.5">
+                                  {dragHandle}
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929]">
+                                    Comida {i + 1}
+                                  </span>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => remComida(i)} 
+                                  className="text-red-400 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50"
+                                  title="Eliminar comida"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Hora sugerida</label>
+                                  <input 
+                                    className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
+                                    value={c.hora} 
+                                    onChange={e => updComida(i, "hora", e.target.value)} 
+                                    placeholder="Ej. 8:00 AM" 
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la toma</label>
+                                  <input 
+                                    className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
+                                    value={c.nombre} 
+                                    onChange={e => updComida(i, "nombre", e.target.value)} 
+                                    placeholder="Ej. Desayuno, Pre-entreno, Cena..." 
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-3 mb-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción Principal</label>
+                                  <textarea 
+                                    className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[64px]" 
+                                    value={c.opcion1} 
+                                    onChange={e => updComida(i, "opcion1", e.target.value)} 
+                                    placeholder="Ingredientes, porciones, instrucciones de preparación..." 
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción Alternativa (Opcional)</label>
+                                  <textarea 
+                                    className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[64px]" 
+                                    value={c.opcion2} 
+                                    onChange={e => updComida(i, "opcion2", e.target.value)} 
+                                    placeholder="Alternativa de alimentos en caso de no tener la opción 1..." 
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Photo upload */}
+                              <div className="mb-3.5 p-3 bg-white rounded-xl border border-[#E2E8F0]">
+                                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Foto de referencia visual</label>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  {c.foto_url && (
+                                    <CachedImage src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
+                                  )}
+                                  <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                  </label>
+                                  {c.foto_url && (
+                                    <button type="button" onClick={() => updComida(i, "foto_url", "")} className="text-red-400 hover:text-red-600 p-2 text-xs font-semibold flex items-center gap-1">
+                                      <Trash2 className="w-3.5 h-3.5" /> Quitar
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Macros per meal */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                {[["calorias","Calorías (Kcal)"], ["proteina","Proteína (g)"], ["carbohidratos","Carbohidratos (g)"], ["grasas","Grasas (g)"]].map(([f, lb]) => (
+                                  <div key={f} className="bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
+                                    <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1 truncate">{lb}</label>
+                                    <input 
+                                      type="number" 
+                                      className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#0B1929] text-center focus:outline-none focus:border-[var(--brand-primary)]" 
+                                      value={c[f]} 
+                                      onChange={e => updComida(i, f, e.target.value)} 
+                                      placeholder="0" 
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                            </div>
+                          )}
+                        </SortableItem>
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {diaForm.comidas.length > 0 && (
+                <div className="mt-5 flex justify-end">
+                  <button 
+                    type="button"
+                    onClick={addComida}
+                    className="text-xs flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 transition-colors font-bold shadow-2xs"
+                  >
+                    <Plus className="w-4 h-4 text-[var(--brand-primary)]" />
+                    <span>Agregar otra comida</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}
 
-      {/* ── Modal Nueva/Editar Rutina ── */}
+      {/* ── Editor de Rutina a Pantalla Completa (Master-Detail) ── */}
       {showRutinaModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
-              <h3 className="text-lg font-bold text-[#0B1929]">{editRutina ? `Editar: ${editRutina.nombre}` :"Nueva rutina"}</h3>
-              <button onClick={() => setShowRutinaModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
+          {/* Top Sticky Bar */}
+          <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3.5 flex items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <button 
+                type="button"
+                onClick={() => setShowRutinaModal(false)}
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-colors py-1.5 px-3 rounded-xl hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </button>
+              <span className="text-[#CBD5E1] hidden sm:inline">|</span>
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
+                  {editRutina ? `Editar: ${editRutina.nombre?.split('|')?.slice(1)?.join('|') || editRutina.nombre}` : "Nueva Rutina de Entrenamiento"}
+                </h2>
+                <div className="text-[11px] text-[#6B7A8D] hidden sm:block">
+                  {selected?.nombre} • {cicloSel?.nombre?.split('|')?.[0] || 'Plan'}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick stats in Sticky Bar */}
+            <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-[#6B7A8D]">
+              <span className="px-3 py-1 bg-[#F0F4FA] rounded-xl text-[#0B1929] font-bold">
+                {rutinaForm.ejercicios.length} ejercicios programados
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                type="button"
+                onClick={() => setShowRutinaModal(false)}
+                className="px-3 sm:px-4 py-2 rounded-xl border border-[#E2E8F0] text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={saveRutina} 
+                disabled={saving}
+                className="px-4 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Save className="w-4 h-4" />
+                <span>{saving ? "Guardando…" : "Guardar rutina"}</span>
               </button>
             </div>
-            <div className="p-5 overflow-y-auto">
+          </div>
+
+          {/* Main Content Area */}
+          <div className="max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
+
+            {/* Card 1: Configuración de la Rutina */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[var(--brand-primary)]" />
+                Programación de la Rutina
+              </h3>
+
               {!editRutina && historialRutinas.length > 0 && !isEstandar && (
-                <div className="mb-4 bg-white rounded-xl p-3 border border-[#E2E8F0]">
-                  <div className="mb-3 pb-3 border-b border-[#E2E8F0]">
-                    <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">IMPORTAR DESDE HISTORIAL</div>
-                    <CustomSelect
-                      value=""
-                      onChange={onSelectHistorialRutina}
-                      placeholder="-- Seleccionar rutina preexistente --"
-                      options={[
-                        { value: "", label: "-- Seleccionar rutina preexistente --" },
-                        ...historialRutinas.map(hr => ({
-                          value: hr.id,
-                          label: `${(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de ${getClientName(hr.cliente_id)})`
-                        }))
-                      ]}
-                    />
-                  </div>
+                <div className="mb-5 pb-5 border-b border-[#F0F4FA]">
+                  <div className="text-xs font-semibold text-[#6B7A8D] mb-1.5 uppercase tracking-wider">Importar desde Historial</div>
+                  <CustomSelect
+                    value=""
+                    onChange={onSelectHistorialRutina}
+                    placeholder="-- Seleccionar rutina preexistente --"
+                    options={[
+                      { value: "", label: "-- Seleccionar rutina preexistente --" },
+                      ...historialRutinas.map(hr => ({
+                        value: hr.id,
+                        label: `${(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de ${getClientName(hr.cliente_id)})`
+                      }))
+                    ]}
+                  />
                 </div>
               )}
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día de la semana</label>
-                  <div className="flex flex-wrap gap-2 mb-3">
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Día(s) de la semana asignado(s)</label>
+                  <div className="flex flex-wrap gap-2">
                     {["LUN","MAR","MIE","JUE","VIE","SAB","DOM"].map(d => (
                       <button
                         key={d}
+                        type="button"
                         onClick={() => {
                           setRutinaForm(p => ({
                             ...p,
@@ -2078,27 +2462,66 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                               : [...(p.diasSeleccionados || []), d])
                           }));
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${rutinaForm.diasSeleccionados?.includes(d) ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'}`}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          rutinaForm.diasSeleccionados?.includes(d) 
+                            ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm' 
+                            : 'bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50'
+                        }`}
                       >
                         {d}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="mb-4">
+
+                <div>
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Título de la Rutina</label>
-                  <input className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={rutinaForm.tituloPersonalizado ||""} onChange={e=>setRutinaForm(p=>({...p,tituloPersonalizado:e.target.value}))} placeholder="Ej. Upper 1, Pierna, etc." />
+                  <input 
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] transition-colors" 
+                    value={rutinaForm.tituloPersonalizado || ""} 
+                    onChange={e => setRutinaForm(p => ({ ...p, tituloPersonalizado: e.target.value }))} 
+                    placeholder="Ej. Torso Pesado, Pierna / Glúteo, Empuje..." 
+                  />
                 </div>
+              </div>
+            </div>
+
+            {/* Card 2: Selector del Catálogo */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-1 flex items-center gap-2">
+                <Dumbbell className="w-4 h-4 text-[var(--brand-primary)]" />
+                Catálogo de Ejercicios
+              </h3>
+              <p className="text-xs text-[#6B7A8D] mb-4">Busca y añade ejercicios a la rutina o como alternativa</p>
               <EjercicioSelector biblioteca={biblioteca} onSelect={addEj} selected={rutinaForm.ejercicios}/>
-              {rutinaForm.ejercicios.length > 0 && (
+            </div>
+
+            {/* Card 3: Ejercicios Programados & Alternativas */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
+                    Ejercicios Asignados ({rutinaForm.ejercicios.length})
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra para reorganizar el orden de ejecución</p>
+                </div>
+              </div>
+
+              {rutinaForm.ejercicios.length === 0 ? (
+                <div className="text-center py-10 border-2 border-dashed border-[#E2E8F0] rounded-2xl bg-gray-50/50">
+                  <Dumbbell className="w-8 h-8 text-[#94A3B8] mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-[#0B1929]">No hay ejercicios seleccionados</p>
+                  <p className="text-xs text-[#6B7A8D]">Utiliza el catálogo de arriba para agregar ejercicios a esta rutina</p>
+                </div>
+              ) : (
                 <div className="mt-3">
-                    <div className="hidden sm:grid grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-1.5 mb-1.5 items-center">
-                      <span/><span/><span className="text-[11px] text-[#6B7A8D] font-semibold">EJERCICIO</span>
-                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">SERIES</span>
-                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">REPS</span>
-                      <span className="text-[11px] text-[#6B7A8D] font-semibold text-center">PESO</span>
-                      <span/>
-                    </div>
+                  <div className="hidden sm:grid grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-1.5 mb-2 items-center px-1">
+                    <span/><span/><span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider">EJERCICIO</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">SERIES</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">REPS</span>
+                    <span className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-wider text-center">PESO</span>
+                    <span/>
+                  </div>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndEjercicios}>
                       <SortableContext items={rutinaForm.ejercicios.map(e => String(e._dndId))} strategy={verticalListSortingStrategy}>
                         {rutinaForm.ejercicios.map((e, i) => (
@@ -2191,11 +2614,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
                     </DndContext>
                 </div>
               )}
-              <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-[#E2E8F0]">
-                <button className="text-sm px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors" onClick={() => setShowRutinaModal(false)}>Cancelar</button>
-                <button className="text-sm px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50" onClick={saveRutina} disabled={saving}>{saving ?"Guardando…" :"Guardar rutina"}</button>
-              </div>
+
             </div>
+
           </div>
         </div>
       )}
@@ -2288,6 +2709,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, setMsg, bibl
         latestMetrica={latestMetrica}
         onApplyMacros={handleApplyPrescribedMacros}
       />
+
+      {/* ── Expediente Clínico Integral ── */}
+      {showExpediente && selected && (
+        <ExpedienteClinicoModal
+          cliente={selected}
+          isOpen={showExpediente}
+          onClose={() => setShowExpediente(false)}
+          onSaveSuccess={(savedRec) => {
+            setClinicalRec(savedRec);
+            setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Expediente clínico guardado</div>);
+          }}
+        />
+      )}
 
       {/* ── Modal de Confirmación Estilizado ── */}
       <ConfirmModal

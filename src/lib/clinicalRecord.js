@@ -39,6 +39,7 @@ export function getDefaultClinicalRecord() {
     solicitud_activa: null, // null | 'historia_inicial' | 'checkin_seguimiento'
     solicitud_fecha: null,
     ultima_respuesta_paciente: null,
+    servicios_activos: { nutricion: true, entrenamiento: true },
   };
 }
 
@@ -57,6 +58,11 @@ export function peekClinicalRecord(clienteId) {
         ...parsed,
         anamnesis: { ...EMPTY_ANAMNESIS, ...(parsed?.anamnesis || {}) },
         checkins: Array.isArray(parsed?.checkins) ? parsed.checkins : [],
+        servicios_activos: {
+          nutricion: true,
+          entrenamiento: true,
+          ...(parsed?.servicios_activos || {}),
+        },
       };
     }
   } catch {
@@ -78,6 +84,11 @@ export async function fetchClinicalRecord(clienteId) {
         ...parsed,
         anamnesis: { ...EMPTY_ANAMNESIS, ...(parsed?.anamnesis || {}) },
         checkins: Array.isArray(parsed?.checkins) ? parsed.checkins : [],
+        servicios_activos: {
+          nutricion: true,
+          entrenamiento: true,
+          ...(parsed?.servicios_activos || {}),
+        },
       };
       try {
         localStorage.setItem(getCacheKey(clienteId), JSON.stringify(merged));
