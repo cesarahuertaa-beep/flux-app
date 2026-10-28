@@ -85,9 +85,9 @@ export default function ExpedienteClinicoModal({
     setPerfil({
       nombre: cliente?.nombre || "",
       email: cliente?.email || "",
-      telefono: local?.anamnesis?.telefono || cliente?.telefono || "",
-      fecha_nacimiento: local?.anamnesis?.fecha_nacimiento || cliente?.fecha_nacimiento || "",
-      sexo: local?.anamnesis?.sexo || cliente?.genero || cliente?.sexo || "M",
+      telefono: cliente?.telefono || local?.anamnesis?.telefono || "",
+      fecha_nacimiento: cliente?.fecha_nacimiento || local?.anamnesis?.fecha_nacimiento || "",
+      sexo: cliente?.genero || cliente?.sexo || local?.anamnesis?.sexo || "M",
       objetivo: cliente?.objetivo || local?.anamnesis?.objetivo_principal || local?.anamnesis?.objetivo_expectativas || "",
     });
 
@@ -101,10 +101,11 @@ export default function ExpedienteClinicoModal({
       });
       setPerfil((prev) => ({
         ...prev,
-        telefono: fresh?.anamnesis?.telefono || prev.telefono,
-        fecha_nacimiento: fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
-        sexo: fresh?.anamnesis?.sexo || prev.sexo,
-        objetivo: fresh?.anamnesis?.objetivo_principal || fresh?.anamnesis?.objetivo_expectativas || cliente?.objetivo || prev.objetivo,
+        nombre: cliente?.nombre || prev.nombre,
+        telefono: cliente?.telefono || fresh?.anamnesis?.telefono || prev.telefono,
+        fecha_nacimiento: cliente?.fecha_nacimiento || fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
+        sexo: cliente?.genero || cliente?.sexo || fresh?.anamnesis?.sexo || prev.sexo,
+        objetivo: cliente?.objetivo || fresh?.anamnesis?.objetivo_principal || fresh?.anamnesis?.objetivo_expectativas || prev.objetivo,
       }));
     });
   }, [isOpen, clienteId, cliente]);

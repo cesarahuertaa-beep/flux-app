@@ -10,6 +10,7 @@ import { useBackButton } from "../lib/backButtonHandler";
 import { CachedImage } from "../lib/mediaCache";
 import { showFluxAlert } from "./ui/ConfirmModal";
 import { refreshUserRoles } from "../lib/authRoles";
+import { peekClinicalRecord, saveClinicalRecord } from "../lib/clinicalRecord";
 
 export default function UserProfile({ session, onLogout, onChangeRole, onRolesUpdated, multiRoles }) {
   const navigate = useNavigate();
@@ -107,6 +108,26 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         });
         localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
       }
+
+      // Sincronizar también con el expediente clínico si es paciente
+      if (isCliente && user?.id) {
+        try {
+          const rec = peekClinicalRecord(user.id);
+          const nextRec = {
+            ...rec,
+            anamnesis: {
+              ...rec.anamnesis,
+              telefono: formData.telefono !== undefined ? formData.telefono : rec.anamnesis?.telefono,
+              fecha_nacimiento: formData.fecha_nacimiento !== undefined ? (formData.fecha_nacimiento || null) : rec.anamnesis?.fecha_nacimiento,
+              sexo: formData.genero ? (formData.genero.toLowerCase().startsWith("f") ? "F" : "M") : rec.anamnesis?.sexo,
+              updated_at: new Date().toISOString()
+            }
+          };
+          await saveClinicalRecord(user.id, nextRec);
+        } catch (clinicalErr) {
+          console.warn("Aviso sincronizando perfil con expediente:", clinicalErr);
+        }
+      }
     } catch (e) {
       console.error("Error saving profile", e);
       showFluxAlert("Error guardando datos", e.message);
@@ -119,6 +140,23 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
     try {
       await dbPatch(`clientes?id=eq.${user.id}`, { objetivo });
       if (user) user.objetivo = objetivo;
+
+      // Sincronizar objetivo con el expediente clínico
+      try {
+        const rec = peekClinicalRecord(user.id);
+        const nextRec = {
+          ...rec,
+          anamnesis: {
+            ...rec.anamnesis,
+            objetivo_principal: objetivo,
+            objetivo_expectativas: objetivo,
+            updated_at: new Date().toISOString()
+          }
+        };
+        await saveClinicalRecord(user.id, nextRec);
+      } catch (clinicalErr) {
+        console.warn("Aviso sincronizando objetivo con expediente:", clinicalErr);
+      }
     } catch (e) {
       console.error(e);
     }

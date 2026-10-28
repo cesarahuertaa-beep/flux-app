@@ -135,6 +135,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }).catch(() => {
         if (active) setClinicalLoaded(true);
       });
+
+      // Refrescar datos frescos del paciente desde la base de datos (nombre, teléfono, fecha_nacimiento, genero, objetivo)
+      dbGetFresh(`clientes?id=eq.${selected.id}`).then(freshRows => {
+        if (active && Array.isArray(freshRows) && freshRows.length > 0) {
+          setSelected(prev => ({ ...prev, ...freshRows[0] }));
+        }
+      }).catch(() => {});
     } else {
       setClinicalRec(null);
       setClinicalLoaded(true);
@@ -1719,8 +1726,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     );
   }
 
-  const birthdate = clinicalRec?.anamnesis?.fecha_nacimiento || clinicalRec?.antecedentes?.fecha_nacimiento || selected?.fecha_nacimiento || null;
-  const rawSexo = clinicalRec?.anamnesis?.sexo || clinicalRec?.antecedentes?.sexo || selected?.genero || selected?.sexo || null;
+  const birthdate = selected?.fecha_nacimiento || clinicalRec?.anamnesis?.fecha_nacimiento || clinicalRec?.antecedentes?.fecha_nacimiento || null;
+  const rawSexo = selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.sexo || clinicalRec?.antecedentes?.sexo || null;
   const edadNum = birthdate ? calcEdadFromBirthdate(birthdate) : null;
   const edadStr = edadNum !== null ? `${edadNum} años` : null;
   const sexoStr = rawSexo ? (normalizeSexo(rawSexo) === "M" ? "Masculino" : "Femenino") : null;
