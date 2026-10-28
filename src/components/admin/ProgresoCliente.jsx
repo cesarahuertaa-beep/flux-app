@@ -8,7 +8,7 @@ import {
   getMetodoLabel,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
-import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, updateQueryCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
@@ -356,14 +356,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     }
   }, [cicloActivo, cicloSel?.id, loadCicloData]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (!selected) return;
     if (metricas.length === 0 && rutinas.length === 0 && _peekMetricas === null && _peekCiclos === null) {
       setLoading(true);
     }
     try {
-      const ms = await dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`).catch(() => []);
-      setMetricas((ms || []).map(enrichMetrica));
+      const qPath = `metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`;
+      const ms = force
+        ? await dbGetFresh(qPath).catch(() => [])
+        : await dbGet(qPath, (bg) => {
+            if (Array.isArray(bg)) setMetricas(bg.map(enrichMetrica));
+          }).catch(() => []);
+      if (Array.isArray(ms)) {
+        setMetricas(ms.map(enrichMetrica));
+      }
 
       fetchClinicalRecord(selected.id).then(rec => setClinicalRec(rec)).catch(() => {});
 
@@ -376,7 +383,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       await loadCicloData(activeCiclo);
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setLoading(false);
-  }, [selected, loadCicloData, setMsg]);
+  }, [selected, loadCicloData, setMsg, metricas.length, rutinas.length, _peekMetricas, _peekCiclos, cicloActivo]);
 
   useEffect(() => {
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
@@ -454,17 +461,40 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       if (table && !["metricas_progreso", "progreso", "nutricion_progreso", "rutinas", "nutricion_dias", "ciclos"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
+        if (table === "metricas_progreso" || table === "*") {
+          const fresh = dbPeek(`metricas_progreso?cliente_id=eq.${selected?.id}&order=fecha.desc`);
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            setMetricas(fresh.map(enrichMetrica));
+          } else {
+            load(false);
+          }
+        }
         if (cicloSel !== undefined) loadCicloData(cicloSel);
       }, 400);
     };
+
+    const onMetricasUpdated = (ev) => {
+      const targetId = ev?.detail?.clienteId;
+      if (!targetId || targetId === selected?.id) {
+        const fresh = dbPeek(`metricas_progreso?cliente_id=eq.${selected?.id}&order=fecha.desc`);
+        if (Array.isArray(fresh) && fresh.length > 0) {
+          setMetricas(fresh.map(enrichMetrica));
+        } else {
+          load(true);
+        }
+      }
+    };
+
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
+    window.addEventListener("flux:metricas-updated", onMetricasUpdated);
     return () => {
       if (timer) clearTimeout(timer);
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
+      window.removeEventListener("flux:metricas-updated", onMetricasUpdated);
     };
-  }, [saving, showModal, cicloSel, loadCicloData]);
+  }, [saving, showModal, cicloSel, loadCicloData, selected?.id, load]);
 
   // Load routines & nutrition for any selected cycle (used when the user clicks a cycle pill)
   const loadRutinas = useCallback(async (ciclo) => {
@@ -554,11 +584,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         }
       }
 
+      let savedRow = null;
       if (editingId) {
-        await dbPatch(`metricas_progreso?id=eq.${editingId}`, data);
+        const patchRes = await dbPatch(`metricas_progreso?id=eq.${editingId}`, data, { headers: { Prefer: "return=representation" } });
+        savedRow = Array.isArray(patchRes) && patchRes[0] ? patchRes[0] : { ...data, id: editingId };
         setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación actualizada</div>);
       } else {
-        await dbPost("metricas_progreso", data);
+        const postRes = await dbPost("metricas_progreso", data, { headers: { Prefer: "return=representation" } });
+        savedRow = Array.isArray(postRes) && postRes[0] ? postRes[0] : { ...data, id: `temp_${Date.now()}` };
         setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Evaluación guardada</div>);
 
         if (['cliente', 'client'].includes(localStorage.getItem('flux_role')) && selected.nutriologo_id) {
@@ -576,7 +609,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       // Sincronizar check-in al expediente clínico
       if (selected?.id && (form.checkin_observaciones || form.checkin_ajustes || form.checkin_energia)) {
         const checkinEntry = {
-          id: `eval_${editingId || Date.now()}`,
+          id: `eval_${editingId || savedRow.id || Date.now()}`,
           fecha: form.fecha || new Date().toISOString().split("T")[0],
           energia: Number(form.checkin_energia) || 4,
           saciedad: Number(form.checkin_saciedad) || 4,
@@ -596,8 +629,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         saveClinicalRecord(selected.id, nextRec).then(rec => setClinicalRec(rec)).catch(() => {});
       }
 
+      // 1. Actualización optimista instantánea (0ms) en el estado de React:
+      const enrichedItem = enrichMetrica(savedRow);
+      setMetricas(prev => {
+        const filtered = prev.filter(m => m.id !== enrichedItem.id && m.id !== editingId);
+        const next = [enrichedItem, ...filtered];
+        return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
+      });
+
+      // 2. Actualizar caché de consulta (queryCache) de inmediato para evitar lecturas obsoletas:
+      updateQueryCache("metricas_progreso", (cachedList) => {
+        if (!Array.isArray(cachedList)) return [savedRow];
+        const filtered = cachedList.filter(m => m.id !== savedRow.id && m.id !== editingId);
+        const next = [savedRow, ...filtered];
+        return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
+      });
+
       closeModal();
-      await load();
+      setSaving(false);
+      await load(true);
       if (typeof window !== "undefined" && selected?.id) {
         window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id } }));
       }
@@ -725,6 +775,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         const prevMetricas = metricas;
         setConfirmDelete(null);
         setMetricas(prev => prev.filter(m => m.id !== id));
+        updateQueryCache("metricas_progreso", (cachedList) => {
+          if (!Array.isArray(cachedList)) return cachedList;
+          return cachedList.filter(m => m.id !== id);
+        });
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
         try {
           await dbDel(`metricas_progreso?id=eq.${id}`);
