@@ -23,6 +23,7 @@ import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
+import SeguimientoClinicoModal from "../clinical/SeguimientoClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord } from "../../lib/clinicalRecord";
 
 const FIELDS_BASICAS = [
@@ -233,6 +234,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   const [saving,       setSaving]       = useState(false);
   const [showModal,    setShowModal]    = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
+  const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
   const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo));
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
@@ -252,6 +254,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
   useBackButton(showModal, () => setShowModal(false), 20);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
+  useBackButton(showCheckinModal, () => setShowCheckinModal(false), 22);
 
   const loadCicloData = useCallback(async (ciclo) => {
     if (!selected) return;
@@ -387,6 +390,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     return () => window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
   }, [selected?.id]);
+
+  useEffect(() => {
+    const handleOpenCheckin = () => {
+      setShowCheckinModal(true);
+    };
+    window.addEventListener("flux:open-checkin", handleOpenCheckin);
+    return () => window.removeEventListener("flux:open-checkin", handleOpenCheckin);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -713,7 +724,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         <div>
           <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isMiPlan && (
+                <button
+                  type="button"
+                  onClick={() => setShowCheckinModal(true)}
+                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Ver o registrar check-in de seguimiento clínico"
+                >
+                  <Activity className="w-4 h-4 text-[var(--brand-primary)]" />
+                  <span>Check-in</span>
+                  {Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[var(--brand-primary)] rounded-full font-bold">
+                      {clinicalRec.checkins.length}
+                    </span>
+                  )}
+                  {clinicalRec?.solicitud_activa === "checkin_seguimiento" && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa al paciente" />
+                  )}
+                </button>
+              )}
               {metricas.length > 0 && (
                 <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
@@ -1730,6 +1760,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         cliente={selected}
         mode="nutriologo"
         onSaved={(saved) => setClinicalRec(saved)}
+      />
+
+      {/* Modal de Check-in de Seguimiento Clínico */}
+      <SeguimientoClinicoModal
+        isOpen={showCheckinModal}
+        onClose={() => setShowCheckinModal(false)}
+        cliente={selected}
+        clinicalRec={clinicalRec}
+        onUpdated={(saved) => setClinicalRec(saved)}
+        setMsg={setMsg}
       />
 
       {/* Lightbox */}

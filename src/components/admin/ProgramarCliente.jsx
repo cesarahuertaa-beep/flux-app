@@ -34,7 +34,6 @@ import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
-import SeguimientoClinicoCard from "../clinical/SeguimientoClinicoCard";
 import ClinicalAiSummaryCard from "../clinical/ClinicalAiSummaryCard";
 
 const sanitizeWhatsAppPhone = (phone) => {
@@ -995,10 +994,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
 
         setShowPlanModal(false);
-        setAutoOpenCheckinTrigger(Date.now());
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("flux:open-checkin"));
-        }
+        setSubtab("progreso");
+        setTimeout(() => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("flux:open-checkin"));
+          }
+        }, 150);
         setMsg(
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente
@@ -2374,17 +2375,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               </span>
             </div>
           )}
-
-      {/* ── Seguimiento Clínico y Check-ins (Debajo del Cuadro de Planes) ── */}
-      {!isMiPlan && (
-        <SeguimientoClinicoCard
-          cliente={selected}
-          clinicalRec={clinicalRec}
-          onUpdated={(rec) => setClinicalRec(rec)}
-          setMsg={setMsg}
-          autoOpenTrigger={autoOpenCheckinTrigger}
-        />
-      )}
 
       {/* ── 🔴 Sub-tabs 🔴 ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
