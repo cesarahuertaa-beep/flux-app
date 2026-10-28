@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -49,6 +49,56 @@ const isOfflineError = (e) => {
   if (!e) return false;
   const m = (e.message || String(e)).toLowerCase();
   return m.includes("offline") || m.includes("failed to fetch") || m.includes("network") || m.includes("aborted");
+};
+
+// ── Helpers de Tiempos y Ciclos ──
+const toDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const addDaysToDate = (dateStr, days) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + Number(days));
+  return toDateStr(d);
+};
+
+const diffDaysBetween = (startStr, endStr) => {
+  if (!startStr || !endStr) return 0;
+  const d1 = new Date(startStr + "T12:00:00");
+  const d2 = new Date(endStr + "T12:00:00");
+  const diff = d2.getTime() - d1.getTime();
+  return Math.round(diff / (1000 * 60 * 60 * 24)) + 1;
+};
+
+const parseCycleData = (cycle, fallbackServicios = { nutricion: true, entrenamiento: true }) => {
+  if (!cycle) {
+    return {
+      nombreBase: "Plan",
+      semanas: 4,
+      dias: 28,
+      servicios: fallbackServicios,
+      enfoque: ""
+    };
+  }
+  const parts = (cycle.nombre || "").split("|");
+  const nombreBase = parts[0] || "Plan";
+  const semanas = parseInt(parts[1], 10) || 4;
+  let servicios = { ...fallbackServicios };
+  if (parts[2]) {
+    const sList = parts[2].split(",");
+    servicios = {
+      nutricion: sList.includes("nutri"),
+      entrenamiento: sList.includes("entreno")
+    };
+  }
+  const dias = parseInt(parts[3], 10) || (semanas * 7);
+  const enfoque = (parts[4] || "").trim();
+
+  return { nombreBase, semanas, dias, servicios, enfoque };
 };
 
 export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
@@ -104,7 +154,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     grasas: _peekNutri?.grasas || ""
   }));
   const [showPlanModal, setShowPlanModal] = useState(false);
-  const [planForm, setPlanForm] = useState({ fecha_inicio: new Date().toISOString().split("T")[0], semanas: 4 });
+  const [planModalMode, setPlanModalMode] = useState("create"); // "create" | "edit"
+  const [editingCycle, setEditingCycle] = useState(null);
+  const [hasPatientData, setHasPatientData] = useState(false);
+  const [checkingPatientData, setCheckingPatientData] = useState(false);
+  const [planForm, setPlanForm] = useState(() => {
+    const start = toDateStr(new Date());
+    const dias = 28;
+    const semanas = 4;
+    const fin = addDaysToDate(start, dias - 1);
+    return {
+      fecha_inicio: start,
+      semanas,
+      dias,
+      fecha_fin: fin,
+      servicios: { nutricion: true, entrenamiento: true },
+      enfoque: "",
+      clonarAnterior: true,
+    };
+  });
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[] });
@@ -176,30 +244,58 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   }, [selected?.id]);
 
+  const parsedActiveCycle = useMemo(() => {
+    return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
+  }, [cicloSel, clinicalRec?.servicios_activos]);
+
+  const serviciosActivos = parsedActiveCycle.servicios;
+
   const togglePilarServicio = async (pilar) => {
     if (!selected?.id) return;
-    const currentActivos = clinicalRec?.servicios_activos || { nutricion: true, entrenamiento: true };
+    const currentActivos = parsedActiveCycle.servicios;
     const nextVal = !currentActivos[pilar];
     
     // Evitar apagar ambos pilares
     if (!nextVal) {
       const other = pilar === "nutricion" ? "entrenamiento" : "nutricion";
       if (!currentActivos[other]) {
-        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-500" /> El paciente debe tener al menos un servicio activo</div>);
+        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-500" /> El plan debe tener al menos un servicio activo</div>);
         return;
       }
     }
 
-    const updated = {
-      ...(clinicalRec || {}),
-      servicios_activos: {
-        ...currentActivos,
-        [pilar]: nextVal
-      }
+    const nextServices = {
+      ...currentActivos,
+      [pilar]: nextVal
     };
-    setClinicalRec(updated);
+
+    if (cicloSel) {
+      const sList = [];
+      if (nextServices.nutricion) sList.push("nutri");
+      if (nextServices.entrenamiento) sList.push("entreno");
+      const serviciosStr = sList.join(",");
+
+      const existingParts = (cicloSel.nombre || "").split("|");
+      const prefix = existingParts[0] || "Plan";
+      const weeks = existingParts[1] || "4";
+      const days = existingParts[3] || String(parseInt(weeks) * 7);
+      const enf = existingParts[4] || "";
+      const updatedName = `${prefix}|${weeks}|${serviciosStr}|${days}|${enf}`;
+
+      const updatedCycle = { ...cicloSel, nombre: updatedName };
+      setCicloSel(updatedCycle);
+      setCiclos(prev => prev.map(c => c.id === cicloSel.id ? updatedCycle : c));
+      dbPatch(`ciclos?id=eq.${cicloSel.id}`, { nombre: updatedName }).catch(() => {});
+    }
+
+    const updatedRec = {
+      ...(clinicalRec || {}),
+      servicios_activos: nextServices
+    };
+    setClinicalRec(updatedRec);
+
     try {
-      await saveClinicalRecord(selected.id, updated);
+      await saveClinicalRecord(selected.id, updatedRec);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("flux:expediente-updated", { detail: { clienteId: selected.id } }));
       }
@@ -210,8 +306,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     }
   };
-
-  const serviciosActivos = clinicalRec?.servicios_activos || { nutricion: true, entrenamiento: true };
 
   // Reorientar subtab si el servicio seleccionado fue desactivado
   useEffect(() => {
@@ -610,43 +704,336 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   // ── Operaciones de Planes (Ciclos) ──
-  const getCycleWeeks = (c) => c?.nombre.includes("|") ? parseInt(c.nombre.split("|")[1]) : 4;
+  const getCycleWeeks = (c) => c?.nombre?.includes("|") ? parseInt(c.nombre.split("|")[1], 10) || 4 : 4;
+
+  const handlePlanStartChange = (newStart) => {
+    if (!newStart) return;
+    const currentDays = Number(planForm.dias) || 28;
+    const newEnd = addDaysToDate(newStart, currentDays - 1);
+    setPlanForm(p => ({
+      ...p,
+      fecha_inicio: newStart,
+      fecha_fin: newEnd
+    }));
+  };
+
+  const handlePlanWeeksChange = (newWeeks) => {
+    const w = Math.max(1, parseInt(newWeeks, 10) || 1);
+    const d = w * 7;
+    const newEnd = addDaysToDate(planForm.fecha_inicio, d - 1);
+    setPlanForm(p => ({
+      ...p,
+      semanas: w,
+      dias: d,
+      fecha_fin: newEnd
+    }));
+  };
+
+  const handlePlanDaysChange = (newDays) => {
+    const d = Math.max(1, parseInt(newDays, 10) || 1);
+    const w = Math.max(1, Math.round(d / 7));
+    const newEnd = addDaysToDate(planForm.fecha_inicio, d - 1);
+    setPlanForm(p => ({
+      ...p,
+      dias: d,
+      semanas: w,
+      fecha_fin: newEnd
+    }));
+  };
+
+  const handlePlanEndChange = (newEnd) => {
+    if (!newEnd) return;
+    if (newEnd < planForm.fecha_inicio) return;
+    const d = Math.max(1, diffDaysBetween(planForm.fecha_inicio, newEnd));
+    const w = Math.max(1, Math.round(d / 7));
+    setPlanForm(p => ({
+      ...p,
+      fecha_fin: newEnd,
+      dias: d,
+      semanas: w
+    }));
+  };
+
+  const openCreatePlan = () => {
+    setPlanModalMode("create");
+    setEditingCycle(null);
+    setHasPatientData(false);
+    setCheckingPatientData(false);
+
+    let suggestedStart = toDateStr(new Date());
+    const activeCycle = ciclos.find(c => c.activo) || ciclos[0];
+    if (activeCycle) {
+      const parsedOld = parseCycleData(activeCycle);
+      const oldEnd = addDaysToDate(activeCycle.fecha_inicio, (parsedOld.dias || (parsedOld.semanas * 7)) - 1);
+      const dayAfterOld = addDaysToDate(oldEnd, 1);
+      if (dayAfterOld > suggestedStart) suggestedStart = dayAfterOld;
+    }
+
+    const defaultDays = 28;
+    const defaultWeeks = 4;
+    const defaultEnd = addDaysToDate(suggestedStart, defaultDays - 1);
+    const prevServices = activeCycle
+      ? parseCycleData(activeCycle, clinicalRec?.servicios_activos).servicios
+      : (clinicalRec?.servicios_activos || { nutricion: true, entrenamiento: true });
+
+    setPlanForm({
+      fecha_inicio: suggestedStart,
+      semanas: defaultWeeks,
+      dias: defaultDays,
+      fecha_fin: defaultEnd,
+      servicios: { ...prevServices },
+      enfoque: "",
+      clonarAnterior: ciclos.length > 0,
+    });
+
+    setShowPlanModal(true);
+  };
+
+  const openEditPlan = async (ciclo) => {
+    setPlanModalMode("edit");
+    setEditingCycle(ciclo);
+    const parsed = parseCycleData(ciclo, clinicalRec?.servicios_activos);
+    const start = ciclo.fecha_inicio || toDateStr(new Date());
+    const dias = parsed.dias || (parsed.semanas * 7);
+    const fin = addDaysToDate(start, dias - 1);
+
+    setPlanForm({
+      fecha_inicio: start,
+      semanas: parsed.semanas,
+      dias: dias,
+      fecha_fin: fin,
+      servicios: { ...parsed.servicios },
+      enfoque: parsed.enfoque,
+      clonarAnterior: false,
+    });
+
+    setShowPlanModal(true);
+    setHasPatientData(false);
+    setCheckingPatientData(true);
+
+    try {
+      const hoy = toDateStr(new Date());
+      const yaInicio = start <= hoy;
+      let tieneDatos = false;
+
+      if (yaInicio && selected?.id) {
+        // 1. Verificar registros en nutrición_progreso para días de este ciclo
+        const nutris = await dbGet(`nutricion?ciclo_id=eq.${ciclo.id}&select=id,nutricion_dias(id)`).catch(() => []);
+        const diaIds = [];
+        if (Array.isArray(nutris)) {
+          nutris.forEach(n => {
+            (n.nutricion_dias || []).forEach(d => { if (d.id) diaIds.push(d.id); });
+          });
+        }
+        if (diaIds.length > 0) {
+          const npRows = await dbGet(`nutricion_progreso?cliente_id=eq.${selected.id}&dia_id=in.(${diaIds.join(",")})&limit=1`).catch(() => []);
+          if (Array.isArray(npRows) && npRows.length > 0) {
+            tieneDatos = true;
+          }
+        }
+
+        // 2. Si aún no, verificar en rutinas de este ciclo
+        if (!tieneDatos) {
+          const ruts = await dbGet(`rutinas?ciclo_id=eq.${ciclo.id}&select=id,ejercicios(id)`).catch(() => []);
+          const ejIds = [];
+          if (Array.isArray(ruts)) {
+            ruts.forEach(r => {
+              (r.ejercicios || []).forEach(ej => { if (ej.id) ejIds.push(ej.id); });
+            });
+          }
+          if (ejIds.length > 0) {
+            const pRows = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${ejIds.join(",")})&limit=1`).catch(() => []);
+            if (Array.isArray(pRows) && pRows.length > 0) {
+              tieneDatos = true;
+            }
+          }
+        }
+      }
+
+      setHasPatientData(tieneDatos);
+    } catch (err) {
+      console.warn("Error al verificar datos del ciclo:", err);
+    } finally {
+      setCheckingPatientData(false);
+    }
+  };
 
   const savePlan = async () => {
     setSaving(true);
     try {
-      const start = new Date(planForm.fecha_inicio +"T12:00:00");
-      const end = new Date(start);
-      end.setDate(end.getDate() + (parseInt(planForm.semanas) * 7) - 1);
-      const options = { day: 'numeric', month: 'short' };
-      const rangeStr = `${start.toLocaleDateString('es-ES', options)} - ${end.toLocaleDateString('es-ES', options)}`;
-      
-      const idx = ciclos.length;
-      const ordinal = ORDINALES[idx] || `${idx + 1}º`;
-      const finalName = `${ordinal} Plan (${rangeStr})|${planForm.semanas}`;
+      const start = new Date(planForm.fecha_inicio + "T12:00:00");
+      const end = new Date(planForm.fecha_fin + "T12:00:00");
+      const options = { day: "numeric", month: "short" };
+      const rangeStr = `${start.toLocaleDateString("es-ES", options)} - ${end.toLocaleDateString("es-ES", options)}`;
 
-      if (ciclos.some(c => c.activo)) {
-        await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
-      }
-      const cRes = await dbPost("ciclos", { cliente_id: selected.id, nombre: finalName, fecha_inicio: planForm.fecha_inicio, activo: true });
-      setShowPlanModal(false);
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente</div>);
-      await loadCiclos(cRes[0].id);
-      setCicloSel(cRes[0]);
-      if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, cRes[0].id);
-      await loadData(cRes[0], { silent: true, forceFresh: true });
-      notifyPlanUpdate("ciclos");
-      
-      // Notify the patient (non-blocking)
-      if (!isMiPlan && selected.auth_id) {
-        dbPost("notificaciones", {
-          profile_id: selected.auth_id,
-          titulo: "Nuevo plan disponible",
-          mensaje: "Tu nutriólogo ha creado un nuevo ciclo para ti.",
-          tipo: "plan",
-          link_url: "mi_plan",
-          entidad_id: cRes[0].id
-        }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+      const sList = [];
+      if (planForm.servicios.nutricion) sList.push("nutri");
+      if (planForm.servicios.entrenamiento) sList.push("entreno");
+      const serviciosStr = sList.join(",");
+
+      if (planModalMode === "edit" && editingCycle) {
+        // ── EDICIÓN DE PLAN EXISTENTE ──
+        const existingParts = (editingCycle.nombre || "").split("|");
+        const ordinalMatch = existingParts[0].match(/^([^\(]+)/);
+        const prefix = ordinalMatch ? ordinalMatch[1].trim() : `${editingCycle.nombre.split(" ")[0] || "1º"} Plan`;
+        const finalName = `${prefix} (${rangeStr})|${planForm.semanas}|${serviciosStr}|${planForm.dias}|${(planForm.enfoque || "").trim()}`;
+
+        await dbPatch(`ciclos?id=eq.${editingCycle.id}`, {
+          nombre: finalName,
+          fecha_inicio: planForm.fecha_inicio,
+        });
+
+        if (cicloSel?.id === editingCycle.id) {
+          const nextRec = {
+            ...(clinicalRec || {}),
+            servicios_activos: { ...planForm.servicios }
+          };
+          setClinicalRec(nextRec);
+          saveClinicalRecord(selected.id, nextRec).catch(() => {});
+        }
+
+        setShowPlanModal(false);
+        setMsg(
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan actualizado exitosamente
+          </div>
+        );
+        await loadCiclos(editingCycle.id);
+        await loadData(editingCycle, { silent: true, forceFresh: true });
+        notifyPlanUpdate("ciclos");
+      } else {
+        // ── CREACIÓN DE NUEVO PLAN ──
+        const idx = ciclos.length;
+        const ordinal = ORDINALES[idx] || `${idx + 1}º`;
+        const finalName = `${ordinal} Plan (${rangeStr})|${planForm.semanas}|${serviciosStr}|${planForm.dias}|${(planForm.enfoque || "").trim()}`;
+
+        if (ciclos.some((c) => c.activo)) {
+          await dbPatch(`ciclos?cliente_id=eq.${selected.id}&activo=eq.true`, { activo: false });
+        }
+        const cRes = await dbPost("ciclos", {
+          cliente_id: selected.id,
+          nombre: finalName,
+          fecha_inicio: planForm.fecha_inicio,
+          activo: true,
+        });
+
+        const newCiclo = cRes[0];
+
+        // Sincronizar servicios en expediente clínico
+        const nextRec = {
+          ...(clinicalRec || {}),
+          servicios_activos: { ...planForm.servicios }
+        };
+        setClinicalRec(nextRec);
+        saveClinicalRecord(selected.id, nextRec).catch(() => {});
+
+        // Clonar plan anterior si fue solicitado
+        const cicloAnterior = ciclos.find((c) => c.activo) || ciclos[0];
+        if (planForm.clonarAnterior && cicloAnterior) {
+          try {
+            // 1. Clonar Nutrición
+            const oldNutris = await dbGet(`nutricion?ciclo_id=eq.${cicloAnterior.id}`).catch(() => []);
+            if (oldNutris && oldNutris.length > 0) {
+              const oldN = oldNutris[0];
+              const nRes = await dbPost("nutricion", {
+                cliente_id: selected.id,
+                ciclo_id: newCiclo.id,
+                calorias: oldN.calorias || 0,
+                proteina: oldN.proteina || 0,
+                carbohidratos: oldN.carbohidratos || 0,
+                grasas: oldN.grasas || 0,
+              });
+              const newN = nRes && nRes[0];
+              if (newN) {
+                const oldDias = await dbGet(`nutricion_dias?nutricion_id=eq.${oldN.id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+                if (Array.isArray(oldDias)) {
+                  for (const od of oldDias) {
+                    const dRes = await dbPost("nutricion_dias", {
+                      nutricion_id: newN.id,
+                      dia: od.dia,
+                      orden: od.orden || 0,
+                    });
+                    const newD = dRes && dRes[0];
+                    if (newD && od.comidas && od.comidas.length > 0) {
+                      const comsData = od.comidas.map((c, cIdx) => ({
+                        dia_id: newD.id,
+                        hora: c.hora || "",
+                        nombre: c.nombre || `Comida ${cIdx + 1}`,
+                        opcion1: c.opcion1 || "",
+                        opcion2: c.opcion2 || "",
+                        calorias: +c.calorias || 0,
+                        proteina: +c.proteina || 0,
+                        carbohidratos: +c.carbohidratos || 0,
+                        grasas: +c.grasas || 0,
+                        foto_url: c.foto_url || "",
+                        orden: c.orden != null ? c.orden : cIdx,
+                      }));
+                      await dbPost("comidas", comsData);
+                    }
+                  }
+                }
+              }
+            }
+
+            // 2. Clonar Rutinas
+            const oldRuts = await dbGet(`rutinas?ciclo_id=eq.${cicloAnterior.id}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
+            if (Array.isArray(oldRuts) && oldRuts.length > 0) {
+              for (const r of oldRuts) {
+                const rRes = await dbPost("rutinas", {
+                  cliente_id: selected.id,
+                  ciclo_id: newCiclo.id,
+                  nombre: r.nombre,
+                  semanas: r.semanas || planForm.semanas,
+                  orden: r.orden || 0,
+                });
+                const newR = rRes && rRes[0];
+                if (newR && r.ejercicios && r.ejercicios.length > 0) {
+                  const ejsData = r.ejercicios.map((ej, ejIdx) => ({
+                    rutina_id: newR.id,
+                    ejercicio: ej.ejercicio || "",
+                    series: ej.series || "",
+                    repeticiones: ej.repeticiones || "",
+                    descanso: ej.descanso || "",
+                    rir_rpe: ej.rir_rpe || "",
+                    notas: ej.notas || "",
+                    superset_id: ej.superset_id || null,
+                    grupo_muscular: ej.grupo_muscular || "",
+                    tipo_ejercicio: ej.tipo_ejercicio || "",
+                    gif_url: ej.gif_url || "",
+                    foto_url: ej.foto_url || "",
+                    orden: ej.orden != null ? ej.orden : ejIdx,
+                  }));
+                  await dbPost("ejercicios", ejsData);
+                }
+              }
+            }
+          } catch (cloneErr) {
+            console.warn("Aviso al clonar plan anterior:", cloneErr);
+          }
+        }
+
+        setShowPlanModal(false);
+        setMsg(
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente
+          </div>
+        );
+        await loadCiclos(newCiclo.id);
+        setCicloSel(newCiclo);
+        if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, newCiclo.id);
+        await loadData(newCiclo, { silent: true, forceFresh: true });
+        notifyPlanUpdate("ciclos");
+
+        if (!isMiPlan && selected.auth_id) {
+          dbPost("notificaciones", {
+            profile_id: selected.auth_id,
+            titulo: "Nuevo plan disponible",
+            mensaje: "Tu especialista ha creado un nuevo ciclo para ti.",
+            tipo: "plan",
+            link_url: "mi_plan",
+            entidad_id: newCiclo.id,
+          }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+        }
       }
     } catch(e) { 
       setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
@@ -1852,15 +2239,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ?"rotate-180" :""}`} />
               </button>
             )}
-            <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium" onClick={() => setShowPlanModal(true)}>
+            <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium cursor-pointer" onClick={openCreatePlan}>
               <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{ciclos.length === 0 ?"Crear Primer Plan" :"Siguiente Plan"}</span>
             </button>
           </div>
         </div>
 
         {ciclos.length === 0 ? (
-          <div className="text-center py-6 text-[#6B7A8D] text-[13px] border-2 border-dashed border-[#E2E8F0] rounded-xl bg-gray-50/50 mb-3">
-            Aún no hay planes configurados. <button onClick={() => setShowPlanModal(true)} className="text-[var(--brand-primary)] font-semibold hover:underline">Haz clic aquí para crear tu primer plan.</button>
+          <div className="text-center py-8 px-4 text-[#6B7A8D] text-xs sm:text-[13px] border-2 border-dashed border-[#E2E8F0] rounded-2xl bg-gray-50/50 mb-1 flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-[#0B1929] text-sm">Aún no hay planes configurados para este paciente</p>
+              <p className="text-[#6B7A8D] mt-0.5">Crea el primer plan para comenzar a estructurar la alimentación y el entrenamiento.</p>
+            </div>
+            <button
+              onClick={openCreatePlan}
+              className="mt-1 px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 shadow-sm transition-opacity flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Crear Primer Plan</span>
+            </button>
           </div>
         ) : (
           <>
@@ -1879,11 +2279,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   {c.nombre.split("|")[0]}
                   <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>
                 </button>
+                {cicloSel?.id === c.id && !isReadOnly && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditPlan(c); }}
+                    title="Editar este plan"
+                    className="flex items-center justify-center px-2.5 bg-[var(--brand-primary)] text-white/90 hover:text-white border-y border-r border-white/20 transition-colors cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 {cicloSel?.id === c.id && (
                   <button
                     onClick={(e) => eliminarCiclo(c, e)}
                     title="Eliminar este plan"
-                    className="flex items-center justify-center px-3 bg-[var(--brand-primary)] text-white/80 hover:text-white border-y border-r border-[var(--brand-primary)] rounded-r-xl transition-colors"
+                    className="flex items-center justify-center px-2.5 bg-[var(--brand-primary)] text-white/80 hover:text-white border-y border-r border-[var(--brand-primary)] rounded-r-xl transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1921,13 +2330,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         {c.nombre.split("|")[0]}
                       </button>
                       {cicloSel?.id === c.id && (
-                        <button
-                          onClick={(e) => eliminarCiclo(c, e)}
-                          title="Eliminar este plan"
-                          className="flex items-center justify-center px-3 bg-[#6B7A8D] text-white/80 hover:text-white border-y border-r border-[#6B7A8D] rounded-r-xl transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openEditPlan(c); }}
+                            title="Editar este plan"
+                            className="flex items-center justify-center px-2.5 bg-[#6B7A8D] text-white/90 hover:text-white border-y border-r border-white/20 transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => eliminarCiclo(c, e)}
+                            title="Eliminar este plan"
+                            className="flex items-center justify-center px-2.5 bg-[#6B7A8D] text-white/80 hover:text-white border-y border-r border-[#6B7A8D] rounded-r-xl transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                     </div>
                   ))
@@ -1943,6 +2361,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </>
         )}
       </div>
+
+      {/* ── Solo mostrar herramientas inferiores si existe al menos un plan creado ── */}
+      {ciclos.length > 0 && (
+        <>
+          {/* Subtítulo / Enfoque del plan activo (si existe) */}
+          {parsedActiveCycle.enfoque && (
+            <div className="mb-4 bg-white rounded-2xl border border-blue-100 p-3.5 sm:px-5 sm:py-3 shadow-2xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-full bg-[var(--brand-primary)] shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                    Enfoque del {parsedActiveCycle.nombreBase}
+                  </span>
+                  <h4 className="text-sm font-bold text-[#0B1929] truncate">
+                    {parsedActiveCycle.enfoque}
+                  </h4>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                {parsedActiveCycle.dias} días • {parsedActiveCycle.semanas} sem
+              </span>
+            </div>
+          )}
 
       {/* ── Servicios Asignados (Debajo del Cuadro de Planes) ── */}
       {!isMiPlan && (
@@ -2199,36 +2640,278 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </Suspense>
         )}
       </>}
+        </>
+      )}
 
-      {/* ── Modal Nuevo Plan ── */}
+      {/* ── Modal Inteligente de Plan (Crear y Editar) ── */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col">
-            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0]">
-              <h3 className="text-lg font-bold text-[#0B1929]">Configuración del Plan</h3>
-              <button onClick={() => setShowPlanModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl border border-[#E2E8F0] flex flex-col overflow-hidden max-h-[90vh]">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[#E2E8F0] bg-white">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
+                  {planModalMode === "edit"
+                    ? `Editar Plan · ${editingCycle?.nombre?.split("|")[0] || ""}`
+                    : (ciclos.length === 0 ? "Crear Primer Plan" : "Configuración del Siguiente Plan")}
+                </h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                  {planModalMode === "edit"
+                    ? "Ajusta la duración, servicios o enfoque de este ciclo."
+                    : "Establece el rango de tiempo y servicios para este nuevo ciclo de trabajo."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPlanModal(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 transition-colors shrink-0"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5">
-              <p className="text-sm text-[#6B7A8D] mb-5">
-                Al iniciar un nuevo plan, se establecerá el rango de tiempo durante el cual la dieta y las rutinas estarán activas.
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Fecha de inicio</label>
-                  <input type="date" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={planForm.fecha_inicio} onChange={e=>setPlanForm(p=>({...p,fecha_inicio:e.target.value}))} />
+
+            {/* Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+              
+              {/* Aviso de protección de datos si el paciente ya tiene registros en este ciclo */}
+              {planModalMode === "edit" && hasPatientData && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in duration-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5 leading-relaxed">
+                    <span className="font-bold block text-amber-950">
+                      Fecha de inicio bloqueada por seguridad
+                    </span>
+                    <p className="text-amber-800">
+                      Este plan ya inició y tu paciente cuenta con registros de cumplimiento o series registradas. Puedes extender la duración del plan o ajustar servicios, pero la fecha de inicio no se modifica para preservar su historial clínico.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Duración (Semanas)</label>
-                  <input type="number" min="1" max="52" className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-[14px]" value={planForm.semanas} onChange={e=>setPlanForm(p=>({...p,semanas:e.target.value}))} />
+              )}
+
+              {/* ── Grid de Fechas y Duración Sincronizada ── */}
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3.5 sm:p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calendar className="w-4 h-4 text-[var(--brand-primary)]" />
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Temporalidad del Plan
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Fecha de Inicio */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                      Fecha de inicio
+                    </label>
+                    <input
+                      type="date"
+                      disabled={planModalMode === "edit" && hasPatientData}
+                      value={planForm.fecha_inicio}
+                      onChange={e => handlePlanStartChange(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs sm:text-[13px] bg-white transition-all outline-none ${
+                        planModalMode === "edit" && hasPatientData
+                          ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
+                          : "border-[#E2E8F0] text-[#0B1929] focus:border-[var(--brand-primary)]"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Fecha de Fin */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                      Fecha de fin
+                    </label>
+                    <input
+                      type="date"
+                      min={planForm.fecha_inicio}
+                      value={planForm.fecha_fin}
+                      onChange={e => handlePlanEndChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-[13px] text-[#0B1929] focus:border-[var(--brand-primary)] outline-none"
+                    />
+                  </div>
+
+                  {/* Semanas */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                      Duración (Semanas)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="52"
+                      value={planForm.semanas}
+                      onChange={e => handlePlanWeeksChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-[13px] text-[#0B1929] focus:border-[var(--brand-primary)] outline-none font-semibold"
+                    />
+                  </div>
+
+                  {/* Días */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                      Duración (Días totales)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={planForm.dias}
+                      onChange={e => handlePlanDaysChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-[13px] text-[#0B1929] focus:border-[var(--brand-primary)] outline-none font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Resumen de días y semanas */}
+                <div className="pt-2 border-t border-gray-200/70 text-xs text-[#6B7A8D] flex items-center justify-between flex-wrap gap-1">
+                  <span>
+                    Total: <strong className="text-[#0B1929]">{planForm.dias} días</strong> ({planForm.semanas} {planForm.semanas === 1 ? "semana" : "semanas"})
+                  </span>
+                  <span className="text-[var(--brand-primary)] font-semibold text-[11px]">
+                    Rango sincronizado
+                  </span>
                 </div>
               </div>
+
+              {/* ── Servicios Asignados al Plan ── */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-2">
+                  Servicios Activos en este Plan
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Nutrición */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (planForm.servicios.nutricion && !planForm.servicios.entrenamiento) return;
+                      setPlanForm(p => ({
+                        ...p,
+                        servicios: { ...p.servicios, nutricion: !p.servicios.nutricion }
+                      }));
+                    }}
+                    className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                      planForm.servicios.nutricion
+                        ? "border-[var(--brand-primary)] bg-blue-50/50 text-[var(--brand-primary)] font-bold shadow-2xs"
+                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Utensils className="w-4 h-4 shrink-0" />
+                      <span className="text-xs">Nutrición</span>
+                    </div>
+                    <div className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 ${
+                      planForm.servicios.nutricion
+                        ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white"
+                        : "border-gray-300 bg-white"
+                    }`}>
+                      {planForm.servicios.nutricion && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </button>
+
+                  {/* Entrenamiento */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (planForm.servicios.entrenamiento && !planForm.servicios.nutricion) return;
+                      setPlanForm(p => ({
+                        ...p,
+                        servicios: { ...p.servicios, entrenamiento: !p.servicios.entrenamiento }
+                      }));
+                    }}
+                    className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                      planForm.servicios.entrenamiento
+                        ? "border-[var(--brand-primary)] bg-blue-50/50 text-[var(--brand-primary)] font-bold shadow-2xs"
+                        : "border-[#E2E8F0] bg-white text-[#6B7A8D] hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Dumbbell className="w-4 h-4 shrink-0" />
+                      <span className="text-xs">Entrenamiento</span>
+                    </div>
+                    <div className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 ${
+                      planForm.servicios.entrenamiento
+                        ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white"
+                        : "border-gray-300 bg-white"
+                    }`}>
+                      {planForm.servicios.entrenamiento && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </button>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] mt-1.5">
+                  Define si este ciclo incluirá pauta de comidas, plan de ejercicios o ambos.
+                </p>
+              </div>
+
+              {/* ── Subtítulo / Enfoque del Plan (Opcional) ── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Enfoque o Subtítulo del Plan
+                  </label>
+                  <span className="text-[10px] text-[#6B7A8D] font-medium lowercase">
+                    (opcional)
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  maxLength={60}
+                  placeholder="Ej. Fase 1: Déficit y Adaptación, Recomposición..."
+                  value={planForm.enfoque}
+                  onChange={e => setPlanForm(p => ({ ...p, enfoque: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-[13px] text-[#0B1929] focus:border-[var(--brand-primary)] outline-none placeholder:text-gray-400"
+                />
+                <p className="text-[11px] text-[#6B7A8D] mt-1">
+                  Se mostrará como título destacado de este ciclo arriba de las herramientas.
+                </p>
+              </div>
+
+              {/* ── Opción de Clonar Plan Anterior (Solo en modo creación si ya existen planes) ── */}
+              {planModalMode === "create" && ciclos.length > 0 && (
+                <div
+                  onClick={() => setPlanForm(p => ({ ...p, clonarAnterior: !p.clonarAnterior }))}
+                  className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    planForm.clonarAnterior
+                      ? "bg-indigo-50/50 border-indigo-200 text-indigo-950 shadow-2xs"
+                      : "bg-gray-50/60 border-[#E2E8F0] text-[#6B7A8D]"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center border shrink-0 ${
+                    planForm.clonarAnterior
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "border-gray-300 bg-white"
+                  }`}>
+                    {planForm.clonarAnterior && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold block text-[#0B1929]">
+                      Clonar comidas y rutinas del plan anterior
+                    </span>
+                    <span className="text-[11px] text-[#6B7A8D] leading-tight block mt-0.5">
+                      Copia la estructura del ciclo previo como base de trabajo para que no tengas que empezar desde cero. Si lo desmarcas, arranca en blanco.
+                    </span>
+                  </div>
+                </div>
+              )}
+
             </div>
-            <div className="p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5">
-              <button onClick={() => setShowPlanModal(false)} className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors text-[14px]">Cancelar</button>
-              <button onClick={savePlan} disabled={saving} className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white font-medium hover:opacity-90 transition-opacity text-[14px] shadow-sm disabled:opacity-50">
-                {saving ?"Creando..." :"Iniciar Plan"}
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5 bg-white">
+              <button
+                type="button"
+                onClick={() => setShowPlanModal(false)}
+                className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50 font-medium transition-colors text-xs sm:text-[13px] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={savePlan}
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white font-bold hover:opacity-90 transition-opacity text-xs sm:text-[13px] shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                {saving
+                  ? (planModalMode === "edit" ? "Guardando..." : "Creando...")
+                  : (planModalMode === "edit" ? "Guardar Cambios" : (ciclos.length === 0 ? "Crear Primer Plan" : "Iniciar Siguiente Plan"))}
               </button>
             </div>
           </div>
