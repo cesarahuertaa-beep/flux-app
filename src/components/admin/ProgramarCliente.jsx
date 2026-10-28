@@ -2387,8 +2387,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       {/* ── 🔴 Sub-tabs 🔴 ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
+          ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <ClipboardList className="w-4 h-4 shrink-0"/>, lb:"Evaluación" }] : []),
           ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
-          ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Rutinas" }] : []),
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Progreso" }
         ].map(({ k, ic, lb }) => (
           <button 
