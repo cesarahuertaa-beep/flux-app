@@ -27,12 +27,13 @@ import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo } from "../../lib/bodyComposition";
-import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
+import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData } from "../../lib/clinicalRecord";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
+import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -1661,6 +1662,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
         )}
       </div>
+    );
+  }
+
+  // ── Verificación de Expediente Inicial para Pacientes Nuevos ──
+  const isExpedienteCompletado = Boolean(
+    clinicalRec?.anamnesis_completada ||
+    clinicalRec?.anamnesis?.completado_por ||
+    (hasAnamnesisData(clinicalRec?.anamnesis) && !clinicalRec?.draft_step) ||
+    rutinas.length > 0 ||
+    dias.length > 0 ||
+    isMiPlan
+  );
+
+  if (!isMiPlan && !isExpedienteCompletado) {
+    return (
+      <NuevoExpedienteForms
+        cliente={selected}
+        onFinished={(savedRec) => {
+          setClinicalRec(savedRec);
+        }}
+        onBackToList={() => {
+          if (onBackToList) onBackToList();
+          else setSelected(null);
+        }}
+        setMsg={setMsg}
+      />
     );
   }
 

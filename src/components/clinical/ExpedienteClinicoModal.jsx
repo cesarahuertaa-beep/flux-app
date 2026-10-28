@@ -18,6 +18,7 @@ import {
   fetchClinicalRecord,
   saveClinicalRecord,
 } from "../../lib/clinicalRecord";
+import { dbPost } from "../../lib/supabase";
 
 const SCALE_ITEMS = [
   { key: "energia", label: "Energía diaria" },
@@ -94,8 +95,12 @@ export default function ExpedienteClinicoModal({
   const handleSaveAnamnesis = async () => {
     setSaving(true);
     try {
+      const isPatientCompleting = mode === "paciente" && record.solicitud_activa === "historia_inicial";
       const next = {
         ...record,
+        draft_step: null,
+        draft_anamnesis: null,
+        anamnesis_completada: true,
         anamnesis: {
           ...anamnesis,
           updated_at: new Date().toISOString(),
@@ -112,6 +117,19 @@ export default function ExpedienteClinicoModal({
       };
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);
+
+      // Si el paciente completó la historia inicial, notificar a su especialista
+      if (mode === "paciente" && cliente?.nutriologo_id) {
+        dbPost("notificaciones", {
+          profile_id: cliente.nutriologo_id,
+          titulo: "Expediente completado",
+          mensaje: `${cliente.nombre || "Tu paciente"} ha completado su expediente clínico inicial.`,
+          tipo: "expediente",
+          link_url: "clientes",
+          entidad_id: cliente.id,
+        }).catch(() => {});
+      }
+
       if (onSaved) onSaved(saved);
       if (mode === "paciente") onClose();
     } finally {
