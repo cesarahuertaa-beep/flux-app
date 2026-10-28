@@ -236,6 +236,8 @@ export function enrichMetrica(m) {
     checkin_descanso: meta.checkin_descanso ?? m.checkin_descanso ?? "",
     checkin_observaciones: meta.checkin_observaciones ?? m.checkin_observaciones ?? "",
     checkin_ajustes: meta.checkin_ajustes ?? m.checkin_ajustes ?? "",
+    eval_objetivo: meta.eval_objetivo ?? m.eval_objetivo ?? "",
+    eval_faf: meta.eval_faf ?? m.eval_faf ?? "",
   };
 }
 
@@ -309,6 +311,8 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.checkin_saciedad !== undefined && rawData.checkin_saciedad !== "") extraMeta.checkin_saciedad = rawData.checkin_saciedad;
   if (rawData.checkin_digestion !== undefined && rawData.checkin_digestion !== "") extraMeta.checkin_digestion = rawData.checkin_digestion;
   if (rawData.checkin_descanso !== undefined && rawData.checkin_descanso !== "") extraMeta.checkin_descanso = rawData.checkin_descanso;
+  if (rawData.eval_objetivo !== undefined && rawData.eval_objetivo !== "") extraMeta.eval_objetivo = rawData.eval_objetivo;
+  if (rawData.eval_faf !== undefined && rawData.eval_faf !== "") extraMeta.eval_faf = rawData.eval_faf;
 
   Object.entries(calcResult || {}).forEach(([k, v]) => {
     if (k === "imc_info" || k === "icc_info") return;
@@ -654,13 +658,63 @@ export const ACTIVITY_FACTORS = [
 ];
 
 export const GOAL_PRESETS = [
-  { id: "cut_20", label: "Déficit -20%", pct: -20 },
-  { id: "cut_15", label: "Déficit -15%", pct: -15 },
-  { id: "cut_10", label: "Déficit -10%", pct: -10 },
-  { id: "maint", label: "Mantenimiento", pct: 0 },
-  { id: "bulk_10", label: "Superávit +10%", pct: 10 },
-  { id: "bulk_15", label: "Superávit +15%", pct: 15 },
+  { id: "cut_20", label: "Déficit -20%", title: "Definición Intensa", pct: -20, desc: "Pérdida acelerada de grasa corporal" },
+  { id: "cut_15", label: "Déficit -15%", title: "Pérdida de Grasa", pct: -15, desc: "Déficit sostenible preservando masa muscular" },
+  { id: "cut_10", label: "Déficit -10%", title: "Recomposición Corporal", pct: -10, desc: "Oxidación gradual de grasa y mejora muscular" },
+  { id: "maint", label: "Mantenimiento", title: "Mantenimiento / Rendimiento", pct: 0, desc: "Equilibrio energético y consolidación" },
+  { id: "bulk_10", label: "Superávit +10%", title: "Ganancia Muscular Limpia", pct: 10, desc: "Aumento de masa muscular minimizando grasa" },
+  { id: "bulk_15", label: "Superávit +15%", title: "Volumen / Fuerza", pct: 15, desc: "Superávit para ganancia de peso y fuerza" },
 ];
+
+export function getGoalPresetInfo(val) {
+  if (val === null || val === undefined || val === "") return null;
+  const byId = GOAL_PRESETS.find((g) => g.id === String(val));
+  if (byId) return byId;
+  const num = Number(val);
+  if (!isNaN(num)) {
+    return GOAL_PRESETS.find((g) => g.pct === num) || null;
+  }
+  return null;
+}
+
+export function getActivityFactorInfo(val) {
+  const num = parseFloat(val);
+  if (!num || isNaN(num)) return null;
+  return (
+    ACTIVITY_FACTORS.find((af) => Math.abs(af.value - num) < 0.02) ||
+    ACTIVITY_FACTORS[2]
+  );
+}
+
+/**
+ * Infiere el código de objetivo ('cut_15', 'cut_10', 'bulk_10', 'maint', etc.) a partir de texto libre
+ * del expediente inicial o del enfoque del plan.
+ */
+export function inferGoalFromText(rawText = "") {
+  const s = String(rawText || "").toLowerCase();
+  if (!s) return "cut_15";
+  if (/(recomposi|tonific|definir y ganar|mantener musculo)/i.test(s)) return "cut_10";
+  if (/(agresiv|rapido|urgente|competencia|corte)/i.test(s) && /(bajar|grasa|perder|defin)/i.test(s)) return "cut_20";
+  if (/(bajar|perder|grasa|definici|adelgaz|oxidar|reducci|peso)/i.test(s)) return "cut_15";
+  if (/(volumen intenso|subir rapido|ectomorfo|ganar mucho)/i.test(s)) return "bulk_15";
+  if (/(muscul|hipertrof|volumen|aument|subir|ganar|fuerza|masa)/i.test(s)) return "bulk_10";
+  if (/(manten|salud|rendimiento|energia|habito|bienestar)/i.test(s)) return "maint";
+  return "cut_15";
+}
+
+/**
+ * Infiere el Factor de Actividad Física (FAF) a partir de los hábitos declarados en el expediente.
+ */
+export function inferFafFromAnamnesis(anamnesis = {}) {
+  const ana = anamnesis || {};
+  const combined = `${ana.dias_entrenamiento || ""} ${ana.frecuencia_ejercicio || ""} ${ana.tipo_entrenamiento || ""} ${ana.ocupacion_actividad || ""}`.toLowerCase();
+  if (/(doble sesi|atleta|alto rendimiento|2 veces al dia|construcci|campo)/i.test(combined)) return 1.9;
+  if (/(6|7)\s*(dias|días|veces)|diario|todos los dias/i.test(combined)) return 1.725;
+  if (/(3|4|5)\s*(dias|días|veces)|moderad/i.test(combined)) return 1.55;
+  if (/(1|2)\s*(dias|días|veces)|liger|caminar/i.test(combined)) return 1.375;
+  if (/(sedentari|ningun|no entren|0 dias|oficina)/i.test(combined)) return 1.2;
+  return 1.55;
+}
 
 /**
  * Calcula la Tasa Metabólica Basal (TMB / BMR) en kcal/día.
@@ -791,3 +845,194 @@ export function calculateEnergyPrescription({
     fatPct: Math.round(((grasasG * 9) / totalCalcKcal) * 100),
   };
 }
+
+/**
+ * Motor Inteligente de Prescripción Energética y Macros potenciado por IA Clínica.
+ * Combina datos permanentes del Expediente Clínico (género, edad, patologías)
+ * con datos dinámicos de la Evaluación del Plan (peso, MLG, % grasa, objetivo de etapa, FAF, check-in).
+ */
+export function generateSmartMacroPrescription({
+  cliente = {},
+  metrica = null,
+  prevMetrica = null,
+  clinicalRec = null,
+  ciclo = null,
+}) {
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const enriched = metrica ? enrichMetrica(metrica) : null;
+  const enrichedPrev = prevMetrica ? enrichMetrica(prevMetrica) : null;
+
+  const sexo = normalizeSexo(
+    cliente?.genero || cliente?.sexo || anamnesis?.genero || enriched?.sexo || "M"
+  );
+  const edad = calcEdadFromBirthdate(
+    cliente?.fecha_nacimiento || anamnesis?.fecha_nacimiento,
+    Number(enriched?.edad) || 25
+  );
+
+  const peso =
+    parseFloat(enriched?.peso) ||
+    parseFloat(cliente?.peso) ||
+    parseFloat(enrichedPrev?.peso) ||
+    0;
+
+  const rawEstatura =
+    parseFloat(enriched?.estatura) ||
+    parseFloat(enrichedPrev?.estatura) ||
+    parseFloat(cliente?.estatura) ||
+    parseFloat(anamnesis?.estatura) ||
+    0;
+  const estaturaEstimada = rawEstatura <= 0;
+  const estatura = rawEstatura > 0 ? rawEstatura : sexo === "F" ? 162 : 172;
+
+  const mlg = parseFloat(enriched?.masa_libre_grasa) || 0;
+  const grasaPct = parseFloat(enriched?.grasa_pct) || 0;
+  const biaBmr = parseFloat(enriched?.inbody_bmr) || 0;
+
+  // 1. Selección inteligente de fórmula TMB
+  let formula = "mifflin";
+  let formulaLabel = "Mifflin-St Jeor";
+  if (biaBmr > 0) {
+    formula = "bia";
+    formulaLabel = "BMR Bioimpedancia";
+  } else if (mlg > 0) {
+    formula = "katch";
+    formulaLabel = `Katch-McArdle (${mlg} kg MLG)`;
+  }
+
+  // 2. Nivel de Actividad Física (FAF) del ciclo actual
+  const fafVal =
+    parseFloat(enriched?.eval_faf) ||
+    parseFloat(enrichedPrev?.eval_faf) ||
+    inferFafFromAnamnesis(anamnesis);
+  const fafInfo = getActivityFactorInfo(fafVal) || ACTIVITY_FACTORS[2];
+
+  // 3. Objetivo Energético de la etapa actual
+  const cycleParts = String(ciclo?.nombre || "").split("|");
+  const cycleEnfoque = cycleParts[4] || ciclo?.enfoque || "";
+  const rawGoalId =
+    enriched?.eval_objetivo ||
+    (cycleEnfoque ? inferGoalFromText(cycleEnfoque) : "") ||
+    enrichedPrev?.eval_objetivo ||
+    inferGoalFromText(anamnesis?.objetivo_principal || anamnesis?.objetivo_expectativas || cliente?.objetivo || "");
+
+  const goalInfo = getGoalPresetInfo(rawGoalId) || GOAL_PRESETS[1]; // Default: Déficit -15%
+  let goalPct = goalInfo.pct;
+
+  // 4. Ajuste clínico inteligente de Proteína y Grasas (g/kg)
+  const patologiasStr = `${anamnesis?.patologias || ""} ${anamnesis?.medicacion_suplementos || ""}`.toLowerCase();
+  const tieneCondicionMetabolica = /(insulina|diabetes|sop|ovario poliqu|hipotiroid|tiroid|metabolic)/i.test(patologiasStr);
+  const tieneCondicionRenal = /(renal|riñon|rinon|nefro)/i.test(patologiasStr);
+
+  // Detectar si hay porcentaje de grasa elevado para escalar proteína de forma realista
+  const highBodyFat =
+    (sexo === "M" && grasaPct >= 26) ||
+    (sexo === "F" && grasaPct >= 34) ||
+    (peso > 0 && estatura > 0 && peso / ((estatura / 100) ** 2) >= 29);
+
+  let protGKg = 2.0;
+  let fatGKg = 0.9;
+
+  if (tieneCondicionRenal) {
+    protGKg = 1.4;
+  } else if (goalPct < 0) {
+    // En déficit calórico se eleva proteína para proteger masa magra
+    protGKg = highBodyFat ? 1.8 : fafInfo.value >= 1.55 ? 2.2 : 2.0;
+  } else if (goalPct > 0) {
+    // En superávit calórico los carbohidratos ejercen ahorro proteico
+    protGKg = 1.9;
+  } else {
+    protGKg = 1.9;
+  }
+
+  if (tieneCondicionMetabolica) {
+    // En resistencia a la insulina / SOP / hipotiroidismo se prioriza saciedad y control glucémico
+    fatGKg = 1.0;
+  } else if (goalPct <= -15) {
+    fatGKg = 0.85;
+  } else if (goalPct > 0) {
+    fatGKg = 0.95;
+  } else {
+    fatGKg = 0.9;
+  }
+
+  // Ajuste sutil si en el check-in de la evaluación reportó hambre severa o baja energía (<=2/5)
+  const lowEnergyOrSatiety =
+    (enriched?.checkin_energia && Number(enriched.checkin_energia) <= 2) ||
+    (enriched?.checkin_saciedad && Number(enriched.checkin_saciedad) <= 2);
+
+  if (lowEnergyOrSatiety && goalPct <= -20) {
+    goalPct = -15; // Modera déficit agresivo para sostener adherencia
+  }
+
+  const calc = calculateEnergyPrescription({
+    formula,
+    peso,
+    estatura,
+    edad,
+    sexo,
+    mlg,
+    biaBmr,
+    faf: fafInfo.value,
+    goalPct,
+    mode: "g_kg",
+    protGKg,
+    fatGKg,
+  });
+
+  // 5. Construir explicación clínica clara y etiquetas de respaldo
+  const clinicalNotes = [];
+  if (enriched) {
+    clinicalNotes.push(`Evaluación ${enriched.fecha || "actual"}`);
+  } else {
+    clinicalNotes.push("Basado en Perfil y Expediente");
+  }
+  clinicalNotes.push(formulaLabel);
+  clinicalNotes.push(`FAF ${fafInfo.short} (${fafInfo.label})`);
+  clinicalNotes.push(`${goalInfo.title} (${goalPct > 0 ? `+${goalPct}` : goalPct}%)`);
+
+  if (tieneCondicionMetabolica) {
+    clinicalNotes.push("Ajuste glucémico/endocrino (Expediente)");
+  }
+  if (lowEnergyOrSatiety) {
+    clinicalNotes.push("Protección de saciedad/energía (Check-in)");
+  }
+  if (estaturaEstimada && formula !== "katch" && formula !== "bia") {
+    clinicalNotes.push(`Estatura ref. ${estatura} cm`);
+  }
+
+  const sourceLabel = enriched
+    ? "Evaluación del Plan"
+    : "Perfil y Expediente Clínico";
+
+  const rationale =
+    peso > 0
+      ? `Prescripción calculada desde la ${sourceLabel} mediante ${formulaLabel} (TMB ${calc.tmb} kcal × FAF ${fafInfo.short} = ${calc.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalPct > 0 ? `+${goalPct}` : goalPct}%), se establecen ${calc.targetKcal} kcal con ${calc.protGKg} g/kg de proteína (${calc.proteinasG}g) para preservar masa muscular, ${calc.fatGKg} g/kg de grasas (${calc.grasasG}g) y ${calc.carbohidratosG}g de carbohidratos.`
+      : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
+
+  return {
+    hasEnoughData: peso > 0 && calc.targetKcal > 0,
+    hasEvaluation: Boolean(enriched),
+    hasExplicitEvalParams: Boolean(enriched?.eval_objetivo && enriched?.eval_faf),
+    peso,
+    estatura: rawEstatura > 0 ? rawEstatura : estatura,
+    edad,
+    sexo,
+    mlg,
+    grasaPct,
+    biaBmr,
+    formula,
+    formulaLabel,
+    faf: fafInfo.value,
+    fafInfo,
+    goalId: goalInfo.id,
+    goalInfo,
+    goalPct,
+    protGKg,
+    fatGKg,
+    ...calc,
+    rationale,
+    clinicalNotes,
+  };
+}
+

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Calculator, Check, Flame } from "lucide-react";
+import { X, Calculator, Check, Flame, Sparkles, RotateCcw, Target } from "lucide-react";
 import {
   TMB_FORMULAS,
   ACTIVITY_FACTORS,
@@ -8,19 +8,35 @@ import {
   calcEdadFromBirthdate,
   normalizeSexo,
   enrichMetrica,
+  prepareMetricaPayload,
+  calculateBodyComposition,
+  generateSmartMacroPrescription,
 } from "../../lib/bodyComposition";
-import { dbPatch } from "../../lib/supabase";
+import { dbPatch, updateQueryCache } from "../../lib/supabase";
 
 export default function MacroCalculatorModal({
   isOpen,
   onClose,
   cliente,
   latestMetrica = null,
+  clinicalRec = null,
+  cicloNombre = "",
   onApplyMacros, // ({ calorias, proteinas, carbohidratos, grasas }) => void
 }) {
   const enriched = useMemo(
     () => (latestMetrica ? enrichMetrica(latestMetrica) : null),
     [latestMetrica]
+  );
+
+  const smartDefault = useMemo(
+    () =>
+      generateSmartMacroPrescription({
+        cliente,
+        metrica: enriched,
+        clinicalRec,
+        cicloNombre,
+      }),
+    [cliente, enriched, clinicalRec, cicloNombre]
   );
 
   const [sexo, setSexo] = useState("M");
@@ -42,13 +58,12 @@ export default function MacroCalculatorModal({
   const [carbPct, setCarbPct] = useState(45);
   const [fatPct, setFatPct] = useState(25);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const s = normalizeSexo(cliente?.genero || cliente?.sexo || "M");
-    const e = calcEdadFromBirthdate(cliente?.fecha_nacimiento, 25);
+  const applySmartDefaults = () => {
+    const s = smartDefault.sexo || normalizeSexo(cliente?.genero || cliente?.sexo || "M");
+    const e = smartDefault.edad || calcEdadFromBirthdate(cliente?.fecha_nacimiento, 25);
     const p = enriched?.peso || cliente?.peso || "";
-    const h = enriched?.estatura || "";
-    const ffm = enriched?.masa_libre_grasa || "";
+    const h = enriched?.estatura || cliente?.estatura || "";
+    const ffm = enriched?.masa_libre_grasa || (smartDefault.mlg > 0 ? smartDefault.mlg : "");
     const bmr = enriched?.inbody_bmr || "";
 
     setSexo(s);
@@ -58,12 +73,19 @@ export default function MacroCalculatorModal({
     setMlg(ffm ? String(ffm) : "");
     setBiaBmr(bmr ? String(bmr) : "");
 
-    if (ffm && Number(ffm) > 0) {
-      setFormula("katch");
-    } else {
-      setFormula("mifflin");
-    }
-  }, [isOpen, cliente, enriched]);
+    setFormula(smartDefault.formula || (ffm && Number(ffm) > 0 ? "katch" : "mifflin"));
+    setFaf(smartDefault.faf || 1.55);
+    setGoalPct(smartDefault.goalPct ?? 0);
+    setCustomKcal("");
+    setMode("g_kg");
+    setProtGKg(smartDefault.protGKg || 2.0);
+    setFatGKg(smartDefault.fatGKg || 0.9);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    applySmartDefaults();
+  }, [isOpen, cliente?.id, enriched?.id]);
 
   const prescription = useMemo(
     () =>
@@ -108,17 +130,51 @@ export default function MacroCalculatorModal({
   if (!isOpen) return null;
 
   const handleApply = async () => {
-    // Sincronizar género y peso en el perfil del paciente si cambiaron
+    // 1. Sincronizar peso en el perfil del paciente si cambió
     if (cliente?.id) {
-      const targetGenero = sexo === "F" ? "Femenino" : "Masculino";
       const patch = {};
-      if (cliente.genero !== targetGenero) patch.genero = targetGenero;
       if (peso && Number(peso) > 0 && Number(cliente.peso) !== Number(peso)) {
         patch.peso = Number(peso);
       }
       if (Object.keys(patch).length > 0) {
         dbPatch(`clientes?id=eq.${cliente.id}`, patch).catch(() => {});
       }
+    }
+
+    // 2. Sincronizar objetivo de la etapa (eval_objetivo) y FAF (eval_faf) de vuelta a la evaluación activa si cambió
+    if (enriched?.id && !String(enriched.id).startsWith("temp_")) {
+      const matchedGoal = GOAL_PRESETS.find((g) => g.pct === Number(goalPct));
+      const nextGoalId = matchedGoal ? matchedGoal.id : (enriched.eval_objetivo || "maint");
+      const nextFafStr = String(faf);
+      const nextPeso = peso && Number(peso) > 0 ? Number(peso) : enriched.peso;
+      const nextEstatura = estatura && Number(estatura) > 0 ? Number(estatura) : enriched.estatura;
+
+      const updatedRaw = {
+        ...enriched,
+        peso: nextPeso,
+        estatura: nextEstatura,
+        eval_objetivo: nextGoalId,
+        eval_faf: nextFafStr,
+        evalSexo: sexo,
+        evalEdad: edad,
+      };
+      const calc = calculateBodyComposition(updatedRaw, sexo, edad);
+      const payload = prepareMetricaPayload(updatedRaw, calc);
+      dbPatch(`metricas_progreso?id=eq.${enriched.id}`, payload)
+        .then(() => {
+          updateQueryCache("metricas_progreso", (list) => {
+            if (!Array.isArray(list)) return list;
+            return list.map((m) => (String(m.id) === String(enriched.id) ? { ...m, ...payload } : m));
+          });
+          if (typeof window !== "undefined" && cliente?.id) {
+            window.dispatchEvent(
+              new CustomEvent("flux:metricas-updated", {
+                detail: { clienteId: cliente.id, source: "MacroCalculatorModal" },
+              })
+            );
+          }
+        })
+        .catch(() => {});
     }
 
     if (onApplyMacros && prescription.targetKcal > 0) {
@@ -140,23 +196,30 @@ export default function MacroCalculatorModal({
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl border border-[#E2E8F0] overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center">
-              <Calculator className="w-5 h-5" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-[#0B1929]">
-                Prescripción Energética y Macros
-              </h2>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-bold text-[#0B1929]">
+                  Simulador & Prescripción Energética IA
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D]">
+                  {sexo === "F" ? "Mujer" : "Hombre"} · {edad} años
+                </span>
+              </div>
               {cliente?.nombre && (
-                <p className="text-xs text-[#6B7A8D]">{cliente.nombre}</p>
+                <p className="text-xs text-[#6B7A8D] truncate">
+                  {cliente.nombre} {enriched?.fecha ? `· Alimentado por evaluación (${enriched.fecha.split("T")[0]})` : "· Alimentado por perfil clínico"}
+                </p>
               )}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -164,36 +227,35 @@ export default function MacroCalculatorModal({
 
         {/* Body */}
         <div className="p-5 overflow-y-auto flex-1 space-y-5">
-          {/* 1. Datos antropométricos base enlazados */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">
-                Sexo
-              </label>
-              <div className="flex bg-[#F0F4FA] rounded-xl p-1">
-                {[
-                  { id: "M", label: "H" },
-                  { id: "F", label: "M" },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setSexo(opt.id)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                      sexo === opt.id
-                        ? "bg-white text-[#0B1929] shadow-sm"
-                        : "text-[#6B7A8D]"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+          {/* Banner de Diagnóstico y Sugerencia IA */}
+          {smartDefault.hasEnoughData && (
+            <div className="bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-emerald-50/50 border border-indigo-100 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Criterio Automático IA ({smartDefault.goalInfo?.title} · FAF {smartDefault.faf})</span>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] leading-relaxed">
+                  {smartDefault.rationale}
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={applySmartDefaults}
+                className="px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-bold flex items-center gap-1.5 shrink-0 self-start sm:self-center cursor-pointer shadow-2xs transition-colors"
+                title="Restaurar los parámetros calculados automáticamente por la IA"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Sugerencia IA</span>
+              </button>
             </div>
+          )}
 
+          {/* 1. Datos antropométricos base enlazados a la evaluación */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">
-                Edad
+                Edad (años)
               </label>
               <input
                 type="number"
@@ -205,7 +267,7 @@ export default function MacroCalculatorModal({
 
             <div>
               <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">
-                Peso (kg)
+                Peso Eval. (kg)
               </label>
               <input
                 type="number"
@@ -231,17 +293,17 @@ export default function MacroCalculatorModal({
               />
             </div>
 
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">
-                MLG (kg)
+            <div>
+              <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">
+                MLG Magra (kg)
               </label>
               <input
                 type="number"
                 step="0.1"
                 value={mlg}
                 onChange={(e) => setMlg(e.target.value)}
-                placeholder="Opcional"
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm font-bold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                placeholder="Auto eval."
+                className="w-full bg-emerald-50/50 border border-emerald-200 rounded-xl px-3 py-2 text-sm font-bold text-emerald-800 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>

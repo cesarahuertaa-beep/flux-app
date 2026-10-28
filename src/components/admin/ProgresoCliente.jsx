@@ -7,6 +7,13 @@ import {
   calcEdadFromBirthdate,
   getMetodoLabel,
   linkMetricasToCiclos,
+  GOAL_PRESETS,
+  ACTIVITY_FACTORS,
+  getGoalPresetInfo,
+  getActivityFactorInfo,
+  inferGoalFromText,
+  inferFafFromAnamnesis,
+  generateSmartMacroPrescription,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
 import { dbPeek, dbGet, dbGetFresh, updateQueryCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
@@ -17,7 +24,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -205,13 +212,15 @@ const emptyForm = () => ({
   // Legacy/Calculated
   grasa_pct: "", musculo_pct: "", icc: "", glucosa: "", presion_arterial: "", notas: "",
 
-  // Check-in clínico integrado
+  // Check-in clínico integrado y Enfoque de la Etapa (Alimenta Cálculo de Macros IA)
   checkin_energia: "4",
   checkin_saciedad: "4",
   checkin_digestion: "4",
   checkin_descanso: "4",
   checkin_observaciones: "",
   checkin_ajustes: "",
+  eval_objetivo: "",
+  eval_faf: "",
   ciclo_id: "",
 });
 
@@ -247,6 +256,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo || peekClinicalRecord(selected?.id)?.anamnesis?.genero));
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
+  const [autoSyncMacros, setAutoSyncMacros] = useState(true);
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
@@ -391,7 +401,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     if (cicloActivo?.id && cicloSel?.id !== cicloActivo.id) {
       setCicloSel(cicloActivo);
       loadCicloData(cicloActivo);
-      setEvalFilter("plan");
     }
   }, [cicloActivo, cicloSel?.id, loadCicloData]);
 
@@ -462,6 +471,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       base.metodo_evaluacion = "plicometria_jp3";
     }
 
+    // Precargar objetivo de la etapa y factor de actividad física del ciclo (o inferir desde expediente)
+    const fallbackGoal = inferGoalFromText(
+      clinicalRec?.anamnesis?.objetivo_principal || selected?.objetivo || targetCiclo?.nombre || ""
+    );
+    const fallbackFaf = inferFafFromAnamnesis(clinicalRec?.anamnesis);
+    base.eval_objetivo = prev?.eval_objetivo || fallbackGoal;
+    base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(fallbackFaf);
+
     // Precargar respuesta reciente del paciente o del expediente si existe
     const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
     if (latestCheckin) {
@@ -476,12 +493,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setForm(base);
+    setAutoSyncMacros(true);
     setEditingId(null);
     setExistingFotos([]);
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
-  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis?.genero, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, cicloActivo?.id, cicloSel?.id]);
+  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, selected?.objetivo, cicloActivo, cicloSel]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -578,6 +596,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setPreviewUrls(prev => prev.filter((_,i) => i !== idx));
   };
 
+  const liveCalculations = useMemo(
+    () => calculateBodyComposition(form, evalSexo, evalEdad),
+    [form, evalSexo, evalEdad]
+  );
+
+  const liveSmartMacros = useMemo(() => {
+    const enrichedDraft = {
+      ...form,
+      ...liveCalculations,
+      peso: form.peso || activeMetricas[0]?.peso || selected?.peso || "",
+      estatura: form.estatura || activeMetricas[0]?.estatura || selected?.estatura || "",
+      grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
+      masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
+      sexo: evalSexo,
+      edad: evalEdad,
+    };
+    return generateSmartMacroPrescription({
+      cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
+      metrica: enrichedDraft,
+      clinicalRec,
+      cicloNombre: currentCiclo?.nombre || "",
+    });
+  }, [form, liveCalculations, activeMetricas, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
+
   const saveMetrica = async () => {
     setSaving(true);
     try {
@@ -588,7 +630,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         rawData.ciclo_id = targetCicloId;
       }
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
-      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion", "checkin_observaciones", "checkin_ajustes"]);
+      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion", "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf"]);
       Object.entries(form).forEach(([k, v]) => {
         if (IGNORED_KEYS.has(k)) return;
         if (v !== "" && v !== null && v !== undefined) {
@@ -699,11 +741,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
 
+      const macrosToSync = (autoSyncMacros && !isReadOnly && liveSmartMacros?.hasEnoughData) ? liveSmartMacros : null;
+
       closeModal();
       setSaving(false);
       await load(true);
       if (typeof window !== "undefined" && selected?.id) {
-        window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id, source: "ProgresoCliente" } }));
+        window.dispatchEvent(new CustomEvent("flux:metricas-updated", {
+          detail: {
+            clienteId: selected.id,
+            source: "ProgresoCliente",
+            prescribedMacros: macrosToSync,
+          }
+        }));
       }
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);
@@ -755,6 +805,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       filled.fecha = String(m.fecha).split("T")[0];
     }
 
+    // Fallback inteligente para eval_objetivo y eval_faf si es una evaluación previa sin esos metadatos
+    if (!filled.eval_objetivo) {
+      filled.eval_objetivo = inferGoalFromText(
+        clinicalRec?.anamnesis?.objetivo_principal || selected?.objetivo || targetCiclo?.nombre || ""
+      );
+    }
+    if (!filled.eval_faf) {
+      filled.eval_faf = String(inferFafFromAnamnesis(clinicalRec?.anamnesis));
+    }
+
     // 3. Cruzar check-in del expediente clínico si faltaban observaciones o escalas
     const checkinList = Array.isArray(clinicalRec?.checkins) ? clinicalRec.checkins : [];
     const evalFecha = filled.fecha;
@@ -790,6 +850,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEvalSexo(detectedSexo);
     setEvalEdad(detectedEdad);
     setForm(filled);
+    setAutoSyncMacros(true);
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
     setPendingFotos([]);
@@ -873,11 +934,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       }
     });
   };
-
-  const liveCalculations = useMemo(
-    () => calculateBodyComposition(form, evalSexo, evalEdad),
-    [form, evalSexo, evalEdad]
-  );
 
   const showRutinasSub = isCivil || isMiPlan || (clinicalRec?.servicios_activos?.entrenamiento !== false) || rutinas.length > 0;
   const showNutriSub = isCivil || isMiPlan || (clinicalRec?.servicios_activos?.nutricion !== false) || nutriDias.length > 0;
@@ -1035,6 +1091,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {cycleName}
                       </span>
                     )}
+                    {m.eval_objetivo && (() => {
+                      const g = getGoalPresetInfo(m.eval_objetivo);
+                      return g ? (
+                        <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap">
+                          <Target className="w-3 h-3" /> {g.title} ({g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`})
+                        </span>
+                      ) : null;
+                    })()}
+                    {m.eval_faf && (() => {
+                      const f = getActivityFactorInfo(m.eval_faf);
+                      return f ? (
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap">
+                          <Flame className="w-3 h-3" /> FAF {f.value} ({f.label})
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="flex gap-1.5 self-start sm:self-auto">
                     <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1 cursor-pointer">
@@ -1891,6 +1963,106 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       />
                     </div>
                   </div>
+
+                  {/* Enfoque Energético de la Etapa (Alimenta Cálculo Automático de Macros IA) */}
+                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
+                        <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                          Enfoque Energético de esta Etapa (Alimenta Cálculo de Macros IA)
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-[#6B7A8D]">
+                        Parámetros dinámicos exclusivos de este ciclo
+                      </span>
+                    </div>
+
+                    {/* Objetivo de la Etapa */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
+                        Objetivo Nutricional de este Ciclo
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {GOAL_PRESETS.map((g) => {
+                          const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && updForm("eval_objetivo", g.id)}
+                              className={`text-left p-2.5 rounded-xl border transition-all ${
+                                isReadOnly ? "cursor-default" : "cursor-pointer"
+                              } ${
+                                isSelected
+                                  ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
+                                  : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                                  {g.title}
+                                </span>
+                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                  isSelected
+                                    ? "bg-[var(--brand-primary)] text-white"
+                                    : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                                }`}>
+                                  {g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                                {g.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Nivel de Actividad Física del Ciclo (FAF) */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
+                        Factor de Actividad Física (FAF) en este Ciclo
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {ACTIVITY_FACTORS.map((f) => {
+                          const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
+                          const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
+                          return (
+                            <button
+                              key={f.value}
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && updForm("eval_faf", String(f.value))}
+                              className={`text-left p-2.5 rounded-xl border transition-all ${
+                                isReadOnly ? "cursor-default" : "cursor-pointer"
+                              } ${
+                                isSelected
+                                  ? "bg-amber-50/90 border-amber-400 text-[#0B1929] shadow-2xs"
+                                  : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-xs font-bold ${isSelected ? "text-amber-700" : "text-[#0B1929]"}`}>
+                                  {f.label}
+                                </span>
+                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                                  isSelected ? "bg-amber-500 text-white" : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                                }`}>
+                                  {f.value}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                                {f.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Card 1: Protocolo, Sexo, Edad y Fecha */}
@@ -2058,7 +2230,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
               </div>
 
-              {/* Right Column: Sticky Live Clinical Summary */}
+              {/* Right Column: Sticky Live Clinical Summary & AI Macro Prescription */}
               <div className="lg:col-span-4 lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
                 <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-[#F0F4FA]">
@@ -2134,6 +2306,87 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             {liveCalculations.somatotipo_endo} - {liveCalculations.somatotipo_meso} - {liveCalculations.somatotipo_ecto}
                           </div>
                         </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Prescripción Energética & Macros IA en Vivo */}
+                <div className="bg-white rounded-2xl border border-indigo-100 p-5 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
+                  <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-[#F0F4FA]">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                        Prescripción de Macros IA
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      {liveSmartMacros.formulaShort}
+                    </span>
+                  </div>
+
+                  {!liveSmartMacros.hasEnoughData ? (
+                    <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                      Ingresa el peso corporal para generar automáticamente la prescripción calórica y de macronutrientes de esta etapa.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-[#F8FAFC] rounded-xl p-2.5 border border-[#E2E8F0] text-center">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">TMB Basal</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.tmb}</div>
+                          <div className="text-[9px] text-[#6B7A8D]">kcal</div>
+                        </div>
+                        <div className="bg-[#F8FAFC] rounded-xl p-2.5 border border-[#E2E8F0] text-center">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">GET (×{liveSmartMacros.faf})</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.get}</div>
+                          <div className="text-[9px] text-[#6B7A8D]">kcal</div>
+                        </div>
+                        <div className="bg-[var(--brand-primary)]/10 rounded-xl p-2.5 border border-[var(--brand-primary)]/30 text-center">
+                          <div className="text-[10px] font-bold text-[var(--brand-primary)] uppercase">Meta Etapa</div>
+                          <div className="text-base font-black text-[var(--brand-primary)] font-['Rajdhani']">{liveSmartMacros.targetKcal}</div>
+                          <div className="text-[9px] font-bold text-[var(--brand-primary)]">
+                            {liveSmartMacros.goalPct > 0 ? `+${liveSmartMacros.goalPct}%` : `${liveSmartMacros.goalPct}%`} kcal
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] font-bold text-blue-700 uppercase">Proteína</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.proteinG}g</div>
+                          <div className="text-[10px] text-blue-700 font-semibold">{liveSmartMacros.protGKg} g/kg · {liveSmartMacros.proteinPct}%</div>
+                        </div>
+                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] font-bold text-emerald-700 uppercase">Carbos</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.carbsG}g</div>
+                          <div className="text-[10px] text-emerald-700 font-semibold">{liveSmartMacros.carbsGKg} g/kg · {liveSmartMacros.carbsPct}%</div>
+                        </div>
+                        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] font-bold text-amber-700 uppercase">Grasas</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.fatsG}g</div>
+                          <div className="text-[10px] text-amber-700 font-semibold">{liveSmartMacros.fatGKg} g/kg · {liveSmartMacros.fatsPct}%</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-[11px] text-[#6B7A8D] leading-relaxed">
+                        <span className="font-bold text-[#0B1929]">Criterio Clínico IA: </span>
+                        {liveSmartMacros.rationale}
+                      </div>
+
+                      {!isReadOnly && (
+                        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={autoSyncMacros}
+                            onChange={(e) => setAutoSyncMacros(e.target.checked)}
+                            className="mt-0.5 rounded border-indigo-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
+                          />
+                          <span className="text-[11px] font-semibold text-[#0B1929] leading-snug">
+                            Sincronizar automáticamente estas metas de kcal y macros al Plan Nutricional activo al guardar la evaluación
+                          </span>
+                        </label>
                       )}
                     </div>
                   )}

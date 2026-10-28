@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -26,7 +26,7 @@ import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpl
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
-import { calcEdadFromBirthdate, normalizeSexo } from "../../lib/bodyComposition";
+import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 
 import { ProgresoCliente } from "./ProgresoCliente";
@@ -186,14 +186,37 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
   const [showMacroCalc, setShowMacroCalc] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
+  const [allMetricas, setAllMetricas] = useState(() => {
+    const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
+    return Array.isArray(ms) ? ms.map(enrichMetrica) : [];
+  });
   const [latestMetrica, setLatestMetrica] = useState(() => {
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
-    return Array.isArray(ms) && ms.length > 0 ? ms[0] : null;
+    return Array.isArray(ms) && ms.length > 0 ? enrichMetrica(ms[0]) : null;
   });
   const [clinicalLoaded, setClinicalLoaded] = useState(false);
   const [clinicalRec, setClinicalRec] = useState(() => {
     return selected?.id ? peekClinicalRecord(selected.id) : null;
   });
+
+  const cycleMetrica = useMemo(() => {
+    if (!Array.isArray(allMetricas) || allMetricas.length === 0) return latestMetrica;
+    const linked = linkMetricasToCiclos(allMetricas, ciclos);
+    if (cicloSel?.id) {
+      const forCycle = linked.find((m) => String(m.ciclo_id) === String(cicloSel.id));
+      if (forCycle) return forCycle;
+    }
+    return linked[0] || latestMetrica;
+  }, [allMetricas, ciclos, cicloSel?.id, latestMetrica]);
+
+  const smartPrescription = useMemo(() => {
+    return generateSmartMacroPrescription({
+      cliente: selected,
+      metrica: cycleMetrica || latestMetrica,
+      clinicalRec,
+      cicloNombre: cicloSel?.nombre || "",
+    });
+  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel?.nombre]);
 
   useEffect(() => {
     let active = true;
@@ -221,6 +244,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return () => { active = false; };
   }, [selected?.id]);
 
+  const applyPrescribedMacrosRef = useRef(null);
+
   useEffect(() => {
     const onExpedienteUpdated = (e) => {
       const targetId = e?.detail?.clienteId;
@@ -233,9 +258,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const targetId = e?.detail?.clienteId;
       if (!targetId || targetId === selected?.id) {
         if (selected?.id) {
-          dbGetFresh(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc&limit=1`)
-            .then(ms => setLatestMetrica(Array.isArray(ms) && ms.length > 0 ? ms[0] : null))
+          dbGetFresh(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc&limit=30`)
+            .then(ms => {
+              const enrichedList = Array.isArray(ms) ? ms.map(enrichMetrica) : [];
+              setAllMetricas(enrichedList);
+              setLatestMetrica(enrichedList.length > 0 ? enrichedList[0] : null);
+            })
             .catch(() => {});
+        }
+        const pm = e?.detail?.prescribedMacros;
+        if (pm && pm.targetKcal > 0 && applyPrescribedMacrosRef.current) {
+          applyPrescribedMacrosRef.current({
+            calorias: pm.targetKcal,
+            proteinas: pm.proteinG,
+            carbohidratos: pm.carbsG,
+            grasas: pm.fatsG,
+          });
         }
       }
     };
@@ -492,12 +530,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const [ns, rs, ms] = await Promise.all([
         fetchFn(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`).catch(() => []),
         fetchFn(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
-        fetchFn(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc&limit=1`).catch(() => []),
+        fetchFn(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc&limit=30`).catch(() => []),
       ]);
 
       if (Array.isArray(ms) && ms.length > 0) {
-        setLatestMetrica(ms[0]);
+        const enrichedList = ms.map(enrichMetrica);
+        setAllMetricas(enrichedList);
+        setLatestMetrica(enrichedList[0]);
       } else {
+        setAllMetricas([]);
         setLatestMetrica(null);
       }
 
@@ -552,6 +593,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     }
   };
+  applyPrescribedMacrosRef.current = handleApplyPrescribedMacros;
 
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
@@ -2448,23 +2490,158 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
             {nutriView === "programar" ? (
               <>
-                {Number(macros.calorias) > 0 && (
-              <div
-                onClick={() => !isReadOnly && setShowMacroCalc(true)}
-                className={`mb-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xs ${!isReadOnly ? "cursor-pointer hover:border-[var(--brand-primary)]/40 transition-colors" : ""}`}
-              >
-                <div className="flex items-center gap-2 text-xs font-bold text-[#0B1929]">
-                  <Calculator className="w-4 h-4 text-[var(--brand-primary)]" />
-                  <span>Meta diaria prescrita</span>
-                </div>
-                <div className="flex items-center flex-wrap gap-3 text-xs">
-                  <span className="font-extrabold text-[var(--brand-primary)]">{macros.calorias} kcal</span>
-                  {Number(macros.proteina) > 0 && <span className="text-[#0B1929] font-semibold">{macros.proteina}g P</span>}
-                  {Number(macros.carbohidratos) > 0 && <span className="text-[#0B1929] font-semibold">{macros.carbohidratos}g C</span>}
-                  {Number(macros.grasas) > 0 && <span className="text-[#0B1929] font-semibold">{macros.grasas}g G</span>}
-                </div>
-              </div>
-            )}
+                {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
+                {(() => {
+                  const activeKcal = Number(macros.calorias) || 0;
+                  const hasPlanMacros = activeKcal > 0;
+                  const targetKcal = hasPlanMacros ? activeKcal : smartPrescription.targetKcal;
+                  const activeP = hasPlanMacros ? (Number(macros.proteina) || 0) : smartPrescription.proteinG;
+                  const activeC = hasPlanMacros ? (Number(macros.carbohidratos) || 0) : smartPrescription.carbsG;
+                  const activeF = hasPlanMacros ? (Number(macros.grasas) || 0) : smartPrescription.fatsG;
+                  const isSyncedWithAi = hasPlanMacros && Math.abs(activeKcal - smartPrescription.targetKcal) <= 5 && activeP === smartPrescription.proteinG;
+                  const pPct = targetKcal > 0 ? Math.round((activeP * 4 / targetKcal) * 100) : 0;
+                  const cPct = targetKcal > 0 ? Math.round((activeC * 4 / targetKcal) * 100) : 0;
+                  const fPct = targetKcal > 0 ? Math.round((activeF * 9 / targetKcal) * 100) : 0;
+                  const refWeight = smartPrescription.weight || Number(selected?.peso) || 0;
+
+                  return (
+                    <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors">
+                      {/* Cabecera de la tarjeta */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#F0F4FA]">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-200/60">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-[#0B1929]">
+                                {hasPlanMacros ? "Meta Diaria Prescrita" : "Prescripción Inteligente Sugerida (IA)"}
+                              </h4>
+                              {smartPrescription.goalInfo?.title && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
+                                  <Target className="w-3 h-3 shrink-0" />
+                                  <span>{smartPrescription.goalInfo.title}</span>
+                                </span>
+                              )}
+                              {smartPrescription.fafInfo?.label && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
+                                  <Flame className="w-3 h-3 shrink-0" />
+                                  <span>FAF {smartPrescription.faf}</span>
+                                </span>
+                              )}
+                              <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#6B7A8D]">
+                                {smartPrescription.formula}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#6B7A8D] truncate">
+                              {hasPlanMacros
+                                ? `Plan activo del ciclo • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`
+                                : `Calculado automáticamente de la última evaluación clínica (${smartPrescription.weight} kg)`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Botones de acción rápida */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {!hasPlanMacros && !isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => handleApplyPrescribedMacros({
+                                calorias: smartPrescription.targetKcal,
+                                proteinas: smartPrescription.proteinG,
+                                carbohidratos: smartPrescription.carbsG,
+                                grasas: smartPrescription.fatsG,
+                              })}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Aplicar Prescripción IA</span>
+                            </button>
+                          )}
+                          {hasPlanMacros && !isSyncedWithAi && !isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => handleApplyPrescribedMacros({
+                                calorias: smartPrescription.targetKcal,
+                                proteinas: smartPrescription.proteinG,
+                                carbohidratos: smartPrescription.carbsG,
+                                grasas: smartPrescription.fatsG,
+                              })}
+                              title="Alinear calorías y macronutrientes con la prescripción de la evaluación actual"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 text-[var(--brand-primary)] hover:bg-blue-100 border border-blue-200/80 text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span className="hidden sm:inline">Sincronizar IA</span> ({smartPrescription.targetKcal} kcal)
+                            </button>
+                          )}
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => setShowMacroCalc(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                            >
+                              <Calculator className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                              <span>Simulador</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Cuadrícula de Macronutrientes */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3">
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-[#6B7A8D] block">Energía Diaria</span>
+                          <span className="text-base sm:text-lg font-extrabold text-[var(--brand-primary)]">
+                            {targetKcal} <span className="text-xs font-medium text-[#6B7A8D]">kcal</span>
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            TMB {smartPrescription.tmb} • GET {smartPrescription.get}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-emerald-700 block">Proteínas</span>
+                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                            {activeP} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {pPct}% • {refWeight > 0 ? (activeP / refWeight).toFixed(1) : "-"} g/kg
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-amber-700 block">Carbohidratos</span>
+                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                            {activeC} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {cPct}% • {refWeight > 0 ? (activeC / refWeight).toFixed(1) : "-"} g/kg
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-rose-700 block">Grasas</span>
+                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                            {activeF} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {fPct}% • {refWeight > 0 ? (activeF / refWeight).toFixed(1) : "-"} g/kg
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Explicación clínica IA */}
+                      {smartPrescription.rationale && (
+                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2 text-xs text-[#6B7A8D]">
+                          <Sparkles className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                          <p className="leading-relaxed">
+                            {smartPrescription.rationale}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
               <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
@@ -3691,7 +3868,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         isOpen={showMacroCalc}
         onClose={() => setShowMacroCalc(false)}
         cliente={selected}
-        latestMetrica={latestMetrica}
+        latestMetrica={cycleMetrica || latestMetrica}
+        clinicalRec={clinicalRec}
+        cicloNombre={cicloSel?.nombre || ""}
         onApplyMacros={handleApplyPrescribedMacros}
       />
 

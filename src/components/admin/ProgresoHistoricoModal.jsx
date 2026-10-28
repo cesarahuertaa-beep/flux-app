@@ -21,7 +21,9 @@ import {
   Zap,
   Utensils,
   Moon,
-  Stethoscope
+  Stethoscope,
+  Target,
+  Flame
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -30,6 +32,8 @@ import {
   enrichMetrica,
   linkMetricasToCiclos,
   getMetodoLabel,
+  getGoalPresetInfo,
+  getActivityFactorInfo,
 } from "../../lib/bodyComposition";
 import { dbPeek, dbGet } from "../../lib/supabase";
 import { parseFotos } from "../../utils/helpers";
@@ -484,16 +488,26 @@ export default function ProgresoHistoricoModal({
                             key={ev.id}
                             className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col justify-between gap-2.5 hover:shadow-xs transition-shadow"
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
                                 {fmtDate(ev.fecha)}
                               </span>
-                              {ev.metodo_evaluacion && (
-                                <span className="text-[10px] font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-2 py-0.5 rounded-md">
-                                  {getMetodoLabel(ev.metodo_evaluacion)}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {ev.eval_objetivo && (() => {
+                                  const g = getGoalPresetInfo(ev.eval_objetivo);
+                                  return g ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                                      <Target className="w-2.5 h-2.5" /> {g.title}
+                                    </span>
+                                  ) : null;
+                                })()}
+                                {ev.metodo_evaluacion && (
+                                  <span className="text-[10px] font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-2 py-0.5 rounded-md">
+                                    {getMetodoLabel(ev.metodo_evaluacion)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]/60">
@@ -590,9 +604,25 @@ export default function ProgresoHistoricoModal({
                   <h3 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
                     Evaluación del {fmtDate(selectedEval.fecha)}
                   </h3>
-                  <p className="text-xs text-[#6B7A8D]">
-                    {getMetodoLabel(selectedEval.metodo_evaluacion)} • Modo solo lectura
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs text-[#6B7A8D] mt-0.5">
+                    <span>{getMetodoLabel(selectedEval.metodo_evaluacion)} • Modo solo lectura</span>
+                    {selectedEval.eval_objetivo && (() => {
+                      const g = getGoalPresetInfo(selectedEval.eval_objetivo);
+                      return g ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                          <Target className="w-2.5 h-2.5" /> {g.title} ({g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`})
+                        </span>
+                      ) : null;
+                    })()}
+                    {selectedEval.eval_faf && (() => {
+                      const f = getActivityFactorInfo(selectedEval.eval_faf);
+                      return f ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                          <Flame className="w-2.5 h-2.5" /> FAF {f.value}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
               </div>
               <button
