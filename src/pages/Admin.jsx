@@ -980,23 +980,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         ]
       : [
           { id:"clientes",   label: isSuperadmin ?"Directorio" :"Clientes",   icon: <Users size={18} strokeWidth={1.5} /> },
-          { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
-          { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-          { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
-          { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
-          ...(isSuperadmin ? [
-            { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
-            { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> }
-          ] : []),
           { id:"agenda",     label:"Agenda",     icon: <CalendarDays size={18} strokeWidth={1.5} /> },
           { id:"equipo",     label:"Mi Equipo",  icon: <UsersRound size={18} strokeWidth={1.5} /> },
           ...(!isSuperadmin ? [
             { id:"membresia",  label:"Membresía",  icon: <CreditCard size={18} strokeWidth={1.5} /> }
           ] : []),
           ...(isSuperadmin ? [
+            { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
+            { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
             { id:"tienda", label:"Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
             { id:"pagos", label:"Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
-          ] : [])
+          ] : []),
+          { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
+          { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+          { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+          { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> }
         ];
 
   const handlePaymentUploaded = async () => {
