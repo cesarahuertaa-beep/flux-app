@@ -207,7 +207,7 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
-export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
+export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
   const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
@@ -227,7 +227,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
   const [showPastWeeks, setShowPastWeeks] = useState(false);
   const [ciclos,       setCiclos]       = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
-  const [cicloSel,     setCicloSel]     = useState(() => _peekActiveCiclo); // ciclo activo por defecto
+  const [cicloSel,     setCicloSel]     = useState(() => cicloActivo || _peekActiveCiclo);
   const [progreso,     setProgreso]     = useState({});
   const [loading,      setLoading]      = useState(false);
   const [saving,       setSaving]       = useState(false);
@@ -237,7 +237,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo));
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
-  const [sub,          setSub]          = useState("evaluaciones");
+  const [sub,          setSub]          = useState(() => mode || "evaluaciones");
+
+  useEffect(() => {
+    if (mode) setSub(mode);
+  }, [mode]);
   const [pendingFotos, setPendingFotos] = useState([]);   // File objects
   const [previewUrls,  setPreviewUrls]  = useState([]);   // object URLs
   const [lightbox,     setLightbox]     = useState(null); // URL shown fullscreen
@@ -337,6 +341,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     setNutriProgreso(npMap);
   }, [selected]);
 
+  useEffect(() => {
+    if (cicloActivo?.id && cicloSel?.id !== cicloActivo.id) {
+      setCicloSel(cicloActivo);
+      loadCicloData(cicloActivo);
+    }
+  }, [cicloActivo, cicloSel?.id, loadCicloData]);
+
   const load = useCallback(async () => {
     if (!selected) return;
     if (metricas.length === 0 && rutinas.length === 0 && _peekMetricas === null && _peekCiclos === null) {
@@ -351,7 +362,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       // Load cycles and select the active one by default
       const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
       setCiclos(cs || []);
-      const activeCiclo = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
+      const activeCiclo = cicloActivo || (cs || []).find(c => c.activo) || (cs || [])[0] || null;
       setCicloSel(prev => prev ?? activeCiclo); // Only set on first load
 
       await loadCicloData(activeCiclo);
@@ -619,9 +630,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
   const showNutriSub = isCivil || isMiPlan || (clinicalRec?.servicios_activos?.nutricion !== false) || nutriDias.length > 0;
 
   useEffect(() => {
+    if (mode) return;
     if (sub === "rutinas" && !showRutinasSub) setSub("evaluaciones");
     else if (sub === "nutricion" && !showNutriSub) setSub("evaluaciones");
-  }, [sub, showRutinasSub, showNutriSub]);
+  }, [sub, showRutinasSub, showNutriSub, mode]);
 
   const delta = (curr, prev, key) => {
     if (curr[key]==null || prev[key]==null || curr[key]==="" || prev[key]==="") return null;
@@ -669,31 +681,35 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       }))
   );
 
+  const activeSection = mode || sub;
+
   return (
     <div className="pb-2">
-      {/* Sub-nav */}
-      <div className="flex gap-1 mb-5 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
-        {[
-          { k: "evaluaciones", ic: <BarChart2 className="w-4 h-4 shrink-0" />, lb: "Evaluaciones" },
-          ...(showRutinasSub ? [{ k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Adherencia Rutinas" }] : []),
-          ...(showNutriSub ? [{ k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Adherencia Nutrición" }] : [])
-        ].map(({ k, ic, lb }) => (
-          <button
-            key={k}
-            onClick={() => setSub(k)}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none shrink-0 ${
-              sub === k
-                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
-                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
-            }`}
-          >
-            {ic} {lb}
-          </button>
-        ))}
-      </div>
+      {/* Sub-nav (solo si no se definió un modo fijo) */}
+      {!mode && (
+        <div className="flex gap-1 mb-5 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
+          {[
+            { k: "evaluaciones", ic: <BarChart2 className="w-4 h-4 shrink-0" />, lb: "Evaluaciones" },
+            ...(showRutinasSub ? [{ k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Adherencia Rutinas" }] : []),
+            ...(showNutriSub ? [{ k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Adherencia Nutrición" }] : [])
+          ].map(({ k, ic, lb }) => (
+            <button
+              key={k}
+              onClick={() => setSub(k)}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none shrink-0 ${
+                sub === k
+                  ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                  : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+              }`}
+            >
+              {ic} {lb}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── EVALUACIONES ── */}
-      {sub==="evaluaciones"&&(
+      {activeSection === "evaluaciones" && (
         <div>
           <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
@@ -812,10 +828,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       )}
 
       {/* ── RUTINAS DEL CLIENTE ── */}
-      {sub==="rutinas"&&(
+      {activeSection === "rutinas" && (
         <div>
           {/* Cycle selector */}
-          {ciclos.length > 0 && (
+          {!cicloActivo && ciclos.length > 0 && (
             <div className="mb-4">
               <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
               <div className="flex gap-1.5 flex-wrap">
@@ -945,10 +961,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       )}
 
       {/* ── NUTRICIÓN Y AGUA DEL CLIENTE ── */}
-      {sub==="nutricion"&&(
+      {activeSection === "nutricion" && (
         <div>
           {/* Cycle selector */}
-          {ciclos.length > 0 && (
+          {!cicloActivo && ciclos.length > 0 && (
             <div className="mb-4">
               <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
               <div className="flex gap-1.5 flex-wrap">

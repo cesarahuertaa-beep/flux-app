@@ -106,7 +106,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const catalogRef = useRef(null);
   const [subtab, setSubtab] = useState(() => {
     const s = sessionStorage.getItem("flux_programar_subtab");
-    return s ? s : "nutri";
+    return s ? s : "progreso";
   });
 
   useEffect(() => {
@@ -174,6 +174,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   });
   const [autoOpenCheckinTrigger, setAutoOpenCheckinTrigger] = useState(0);
+  const [nutriView, setNutriView] = useState("programar"); // "programar" | "tracking"
+  const [entrenoView, setEntrenoView] = useState("programar"); // "programar" | "tracking"
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[] });
@@ -2410,7 +2412,37 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         {/* ── NUTRICIÓN ── */}
         {subtab ==="nutri" && (
           <div>
-            {Number(macros.calorias) > 0 && (
+            {/* Sub-pestañas: Programar vs Tracking */}
+            <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max">
+              <button
+                type="button"
+                onClick={() => setNutriView("programar")}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none cursor-pointer ${
+                  nutriView === "programar"
+                    ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                    : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+                }`}
+              >
+                <Utensils className="w-3.5 h-3.5" />
+                <span>Programar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNutriView("tracking")}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none cursor-pointer ${
+                  nutriView === "tracking"
+                    ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                    : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Tracking</span>
+              </button>
+            </div>
+
+            {nutriView === "programar" ? (
+              <>
+                {Number(macros.calorias) > 0 && (
               <div
                 onClick={() => !isReadOnly && setShowMacroCalc(true)}
                 className={`mb-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xs ${!isReadOnly ? "cursor-pointer hover:border-[var(--brand-primary)]/40 transition-colors" : ""}`}
@@ -2508,12 +2540,54 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   )})}
               </SortableContext>
             </DndContext>
-          </div>
+          </>
+        ) : (
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <ProgresoCliente
+              selected={selected}
+              setMsg={setMsg}
+              isMiPlan={isMiPlan}
+              mode="nutricion"
+              cicloActivo={cicloSel}
+            />
+          </Suspense>
         )}
+      </div>
+    )}
 
-        {/* ── RUTINAS ── */}
-        {subtab ==="deporte" && (
-          <div>
+    {/* ── ENTRENAMIENTO ── */}
+    {subtab === "deporte" && (
+      <div>
+        {/* Sub-pestañas: Programar vs Tracking */}
+        <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max">
+          <button
+            type="button"
+            onClick={() => setEntrenoView("programar")}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none cursor-pointer ${
+              entrenoView === "programar"
+                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+            }`}
+          >
+            <Dumbbell className="w-3.5 h-3.5" />
+            <span>Programar</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntrenoView("tracking")}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-[13px] whitespace-nowrap transition-all flex-1 sm:flex-none cursor-pointer ${
+              entrenoView === "tracking"
+                ? "bg-white shadow-sm text-[var(--brand-primary)] font-bold border border-transparent"
+                : "text-[#6B7A8D] hover:text-[#0B1929] border border-transparent"
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Tracking</span>
+          </button>
+        </div>
+
+        {entrenoView === "programar" ? (
+          <>
             <div className="flex justify-between items-center mb-3">
               <span className="font-semibold">Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span></span>
               <div className="flex items-center gap-2">
@@ -2533,7 +2607,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
               <SortableContext items={rutinas.map(r => String(r.id))} strategy={verticalListSortingStrategy}>
                 {rutinas.map(r => {
-                  const parts = (r.nombre ||"").split('|');
+                  const parts = (r.nombre || "").split('|');
                   const tab = parts.length > 1 ? parts[0] : 'S/D';
                   const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
                   return (
@@ -2547,7 +2621,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 {tab !== 'S/D' && (
                                   <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
                                 )}
-                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title ||"Sin título"}</span>
+                                <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                               </div>
                               <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
                             </div>
@@ -2572,14 +2646,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             {rutinas.length === 0 && !isReadOnly && (
               <div className="text-center py-8 text-[#6B7A8D] text-[13px]">Sin rutinas en este ciclo. ¡Agrega la primera!</div>
             )}
-          </div>
-        )}
-
-        {subtab ==="progreso" && (
+          </>
+        ) : (
           <Suspense fallback={<ListSkeleton rows={4} />}>
-            <ProgresoCliente selected={selected} setMsg={setMsg} isMiPlan={isMiPlan} />
+            <ProgresoCliente
+              selected={selected}
+              setMsg={setMsg}
+              isMiPlan={isMiPlan}
+              mode="rutinas"
+              cicloActivo={cicloSel}
+            />
           </Suspense>
         )}
+      </div>
+    )}
+
+    {subtab === "progreso" && (
+      <Suspense fallback={<ListSkeleton rows={4} />}>
+        <ProgresoCliente
+          selected={selected}
+          setMsg={setMsg}
+          isMiPlan={isMiPlan}
+          mode="evaluaciones"
+          cicloActivo={cicloSel}
+        />
+      </Suspense>
+    )}
       </>}
         </>
       )}
