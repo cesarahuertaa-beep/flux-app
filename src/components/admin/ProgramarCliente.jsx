@@ -1704,8 +1704,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return (
       <NuevoExpedienteForms
         cliente={selected}
-        onFinished={(savedRec) => {
+        onFinished={(savedRec, updatedClient) => {
           setClinicalRec(savedRec);
+          if (updatedClient) {
+            setSelected((prev) => ({ ...prev, ...updatedClient }));
+          }
         }}
         onBackToList={() => {
           if (onBackToList) onBackToList();
@@ -2956,8 +2959,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           cliente={selected}
           isOpen={showExpediente}
           onClose={() => setShowExpediente(false)}
-          onSaved={(savedRec) => {
+          onSaved={(savedRec, updatedClient) => {
             setClinicalRec(savedRec);
+            if (updatedClient) {
+              setSelected((prev) => ({ ...prev, ...updatedClient }));
+            }
             setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Expediente clínico guardado</div>);
           }}
         />

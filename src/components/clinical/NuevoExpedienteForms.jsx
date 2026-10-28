@@ -75,14 +75,19 @@ export function NuevoExpedienteForms({
     sexo: cliente?.genero || cliente?.sexo || "M",
     fecha_nacimiento: cliente?.fecha_nacimiento || "",
     foto_url: cliente?.foto_url || "",
+    objetivo: cliente?.objetivo || "",
   });
 
   // Estado de la anamnesis
-  const [anamnesis, setAnamnesis] = useState(() => ({
-    ...EMPTY_ANAMNESIS,
-    ...(peekClinicalRecord(clienteId)?.anamnesis || {}),
-    ...(peekClinicalRecord(clienteId)?.draft_anamnesis || {})
-  }));
+  const [anamnesis, setAnamnesis] = useState(() => {
+    const peek = peekClinicalRecord(clienteId);
+    return {
+      ...EMPTY_ANAMNESIS,
+      ...(peek?.anamnesis || {}),
+      ...(peek?.draft_anamnesis || {}),
+      objetivo_principal: peek?.anamnesis?.objetivo_principal || peek?.draft_anamnesis?.objetivo_principal || cliente?.objetivo || "",
+    };
+  });
 
   // Sincronizar con almacenamiento remoto
   useEffect(() => {
@@ -98,11 +103,12 @@ export function NuevoExpedienteForms({
         setAnamnesis((prev) => ({
           ...prev,
           ...fresh.anamnesis,
-          ...(fresh.draft_anamnesis || {})
+          ...(fresh.draft_anamnesis || {}),
+          objetivo_principal: fresh.anamnesis.objetivo_principal || fresh.draft_anamnesis?.objetivo_principal || cliente?.objetivo || prev.objetivo_principal || "",
         }));
       }
     });
-  }, [clienteId]);
+  }, [clienteId, cliente?.objetivo]);
 
   const edadCalc = useMemo(() => calcAge(perfil.fecha_nacimiento), [perfil.fecha_nacimiento]);
 
@@ -176,6 +182,8 @@ export function NuevoExpedienteForms({
       if (perfil.telefono !== cliente.telefono) clientPatch.telefono = perfil.telefono;
       if (perfil.fecha_nacimiento !== cliente.fecha_nacimiento) clientPatch.fecha_nacimiento = perfil.fecha_nacimiento || null;
       if (perfil.sexo) clientPatch.genero = perfil.sexo;
+      const targetObj = perfil.objetivo || anamnesis.objetivo_principal || "";
+      if (targetObj && targetObj !== cliente.objetivo) clientPatch.objetivo = targetObj;
       if (Object.keys(clientPatch).length > 0) {
         await dbPatch(`clientes?id=eq.${clienteId}`, clientPatch).catch(() => {});
       }
@@ -212,12 +220,14 @@ export function NuevoExpedienteForms({
   const handleFinalizar = async () => {
     setSaving(true);
     try {
+      const targetObj = perfil.objetivo || anamnesis.objetivo_principal || cliente.objetivo || null;
       // 1. Guardar cambios en el perfil del cliente en base de datos
       const clientPatch = {
         nombre: perfil.nombre || cliente.nombre,
         telefono: perfil.telefono || null,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
         genero: perfil.sexo || "M",
+        objetivo: targetObj,
       };
       if (perfil.foto_url) clientPatch.foto_url = perfil.foto_url;
       await dbPatch(`clientes?id=eq.${clienteId}`, clientPatch).catch(() => {});
@@ -228,6 +238,7 @@ export function NuevoExpedienteForms({
         fecha_nacimiento: perfil.fecha_nacimiento || null,
         sexo: perfil.sexo,
         telefono: perfil.telefono,
+        objetivo_principal: targetObj,
         updated_at: new Date().toISOString(),
         completado_por: "nutriologo",
       };
@@ -251,7 +262,7 @@ export function NuevoExpedienteForms({
         );
       }
 
-      onFinished(saved);
+      onFinished(saved, clientPatch);
     } catch (e) {
       if (setMsg) setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
     } finally {
@@ -839,8 +850,11 @@ export function NuevoExpedienteForms({
                   </label>
                   <input
                     type="text"
-                    value={anamnesis.objetivo_principal || ""}
-                    onChange={(e) => updAnam("objetivo_principal", e.target.value)}
+                    value={anamnesis.objetivo_principal || perfil.objetivo || ""}
+                    onChange={(e) => {
+                      updAnam("objetivo_principal", e.target.value);
+                      updPerfil("objetivo", e.target.value);
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                     placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular"
                   />

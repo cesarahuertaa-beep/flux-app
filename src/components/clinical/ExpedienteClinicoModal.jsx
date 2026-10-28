@@ -10,7 +10,11 @@ import {
   Send,
   Calendar,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  User,
+  Phone,
+  Mail,
+  Target
 } from "lucide-react";
 import {
   EMPTY_ANAMNESIS,
@@ -45,17 +49,25 @@ export default function ExpedienteClinicoModal({
   const [record, setRecord] = useState(() => peekClinicalRecord(clienteId));
   const [historiaStep, setHistoriaStep] = useState("clinico"); // 'clinico' | 'habitos' | 'r24h'
   
-  // Perfil básico editable
+  // Perfil del paciente editable
   const [perfil, setPerfil] = useState({
-    fecha_nacimiento: cliente?.fecha_nacimiento || "",
-    sexo: cliente?.genero || cliente?.sexo || "M",
+    nombre: cliente?.nombre || "",
+    email: cliente?.email || "",
     telefono: cliente?.telefono || "",
+    sexo: cliente?.genero || cliente?.sexo || "M",
+    fecha_nacimiento: cliente?.fecha_nacimiento || "",
+    objetivo: cliente?.objetivo || "",
   });
 
-  const [anamnesis, setAnamnesis] = useState(() => ({
-    ...EMPTY_ANAMNESIS,
-    ...(peekClinicalRecord(clienteId)?.anamnesis || {}),
-  }));
+  const [anamnesis, setAnamnesis] = useState(() => {
+    const local = peekClinicalRecord(clienteId);
+    return {
+      ...EMPTY_ANAMNESIS,
+      ...(local?.anamnesis || {}),
+      objetivo_principal: local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+      objetivo_expectativas: local?.anamnesis?.objetivo_expectativas || local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+    };
+  });
 
   const [saving, setSaving] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
@@ -64,23 +76,36 @@ export default function ExpedienteClinicoModal({
     if (!isOpen || !clienteId) return;
     const local = peekClinicalRecord(clienteId);
     setRecord(local);
-    setAnamnesis({ ...EMPTY_ANAMNESIS, ...(local.anamnesis || {}) });
+    setAnamnesis({
+      ...EMPTY_ANAMNESIS,
+      ...(local?.anamnesis || {}),
+      objetivo_principal: local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+      objetivo_expectativas: local?.anamnesis?.objetivo_expectativas || local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+    });
     setPerfil({
+      nombre: cliente?.nombre || "",
+      email: cliente?.email || "",
+      telefono: local?.anamnesis?.telefono || cliente?.telefono || "",
       fecha_nacimiento: local?.anamnesis?.fecha_nacimiento || cliente?.fecha_nacimiento || "",
       sexo: local?.anamnesis?.sexo || cliente?.genero || cliente?.sexo || "M",
-      telefono: cliente?.telefono || "",
+      objetivo: cliente?.objetivo || local?.anamnesis?.objetivo_principal || local?.anamnesis?.objetivo_expectativas || "",
     });
 
     fetchClinicalRecord(clienteId).then((fresh) => {
       setRecord(fresh);
-      setAnamnesis({ ...EMPTY_ANAMNESIS, ...(fresh?.anamnesis || {}) });
-      if (fresh?.anamnesis?.fecha_nacimiento || fresh?.anamnesis?.sexo) {
-        setPerfil((prev) => ({
-          ...prev,
-          fecha_nacimiento: fresh.anamnesis.fecha_nacimiento || prev.fecha_nacimiento,
-          sexo: fresh.anamnesis.sexo || prev.sexo,
-        }));
-      }
+      setAnamnesis({
+        ...EMPTY_ANAMNESIS,
+        ...(fresh?.anamnesis || {}),
+        objetivo_principal: fresh?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+        objetivo_expectativas: fresh?.anamnesis?.objetivo_expectativas || fresh?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
+      });
+      setPerfil((prev) => ({
+        ...prev,
+        telefono: fresh?.anamnesis?.telefono || prev.telefono,
+        fecha_nacimiento: fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
+        sexo: fresh?.anamnesis?.sexo || prev.sexo,
+        objetivo: fresh?.anamnesis?.objetivo_principal || fresh?.anamnesis?.objetivo_expectativas || cliente?.objetivo || prev.objetivo,
+      }));
     });
   }, [isOpen, clienteId, cliente]);
 
@@ -96,19 +121,24 @@ export default function ExpedienteClinicoModal({
     setSaving(true);
     try {
       // 1. Guardar cambios en la tabla clientes si cambiaron datos
-      const patchData = {};
-      if (perfil.fecha_nacimiento !== cliente.fecha_nacimiento) patchData.fecha_nacimiento = perfil.fecha_nacimiento || null;
-      if (perfil.sexo && perfil.sexo !== cliente.genero) patchData.genero = perfil.sexo;
-      if (perfil.telefono && perfil.telefono !== cliente.telefono) patchData.telefono = perfil.telefono;
-      if (Object.keys(patchData).length > 0) {
-        await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
-      }
+      const patchData = {
+        nombre: perfil.nombre || cliente.nombre,
+        telefono: perfil.telefono || null,
+        fecha_nacimiento: perfil.fecha_nacimiento || null,
+        genero: perfil.sexo || "M",
+        objetivo: perfil.objetivo || null,
+      };
+      await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
 
       // 2. Guardar en expediente clínico
       const updatedAnamnesis = {
         ...anamnesis,
+        nombre: perfil.nombre,
+        telefono: perfil.telefono,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
         sexo: perfil.sexo,
+        objetivo_principal: perfil.objetivo || null,
+        objetivo_expectativas: perfil.objetivo || anamnesis.objetivo_expectativas || null,
         updated_at: new Date().toISOString(),
         completado_por: anamnesis.completado_por || mode,
       };
@@ -136,7 +166,7 @@ export default function ExpedienteClinicoModal({
         }).catch(() => {});
       }
 
-      if (onSaved) onSaved(saved);
+      if (onSaved) onSaved(saved, patchData);
       onClose();
     } finally {
       setSaving(false);
@@ -196,7 +226,7 @@ export default function ExpedienteClinicoModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
-                {mode === "paciente" ? "Historia Clínica y Hábitos" : `Expediente · ${cliente.nombre}`}
+                {mode === "paciente" ? "Historia Clínica y Hábitos" : `Expediente · ${perfil.nombre || cliente.nombre}`}
               </h2>
               {anamnesis.updated_at && (
                 <p className="text-[11px] text-[#6B7A8D]">
@@ -247,9 +277,9 @@ export default function ExpedienteClinicoModal({
         <div className="px-5 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-1.5 w-full sm:w-auto">
             {[
-              { id: "clinico", label: "1. Clínico", icon: HeartPulse },
+              { id: "clinico", label: "1. Perfil y Salud", icon: HeartPulse },
               { id: "habitos", label: "2. Hábitos", icon: Clock },
-              { id: "r24h", label: "3. R24H", icon: Utensils },
+              { id: "r24h", label: "3. R24H y Meta", icon: Utensils },
             ].map((st) => {
               const Icon = st.icon;
               const active = historiaStep === st.id;
@@ -280,15 +310,77 @@ export default function ExpedienteClinicoModal({
 
         {/* Body del Expediente */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {/* SECCIÓN 1: CLÍNICO */}
+          {/* SECCIÓN 1: PERFIL Y CLÍNICO */}
           {historiaStep === "clinico" && (
             <div className="space-y-4">
-              {/* Datos biológicos */}
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4">
-                <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-3">
-                  Datos Biológicos del Paciente
+              {/* Ficha de Identificación del Paciente */}
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 space-y-3.5">
+                <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                  Ficha de Identificación del Paciente
                 </span>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Nombre */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                      Nombre Completo
+                    </label>
+                    <input
+                      type="text"
+                      value={perfil.nombre}
+                      onChange={(e) => updPerfil("nombre", e.target.value)}
+                      placeholder="Nombre del paciente"
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+
+                  {/* Correo Electrónico */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={perfil.email}
+                      disabled
+                      className="w-full bg-slate-100 border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#6B7A8D] cursor-not-allowed"
+                      title="El correo es el identificador único de cuenta"
+                    />
+                  </div>
+
+                  {/* Teléfono / WhatsApp */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                      Teléfono / WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      value={perfil.telefono}
+                      onChange={(e) => updPerfil("telefono", e.target.value)}
+                      placeholder="Ej. +52 55 1234 5678"
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+
+                  {/* Objetivo Principal */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                      Objetivo Principal
+                    </label>
+                    <input
+                      type="text"
+                      value={perfil.objetivo}
+                      onChange={(e) => {
+                        updPerfil("objetivo", e.target.value);
+                        updAnamnesis("objetivo_principal", e.target.value);
+                        updAnamnesis("objetivo_expectativas", e.target.value);
+                      }}
+                      placeholder="Ej. Pérdida de grasa corporal, masa muscular..."
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] font-medium"
+                    />
+                  </div>
+
+                  {/* Fecha de Nacimiento */}
                   <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
                       Fecha de Nacimiento {edadNum !== null && <span className="text-[var(--brand-primary)] font-normal">({edadNum} años)</span>}
@@ -300,6 +392,8 @@ export default function ExpedienteClinicoModal({
                       className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                     />
                   </div>
+
+                  {/* Sexo Biológico */}
                   <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
                       Sexo Biológico
@@ -511,7 +605,7 @@ export default function ExpedienteClinicoModal({
             </div>
           )}
 
-          {/* SECCIÓN 3: R24H Y EXPECTATIVAS */}
+          {/* SECCIÓN 3: R24H Y OBJETIVO */}
           {historiaStep === "r24h" && (
             <div className="space-y-3.5">
               <div>
@@ -550,12 +644,16 @@ export default function ExpedienteClinicoModal({
 
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Objetivo principal y expectativas del paciente
+                  Objetivo Principal y Expectativas del Paciente
                 </label>
                 <textarea
                   rows={2}
-                  value={anamnesis.objetivo_expectativas || ""}
-                  onChange={(e) => updAnamnesis("objetivo_expectativas", e.target.value)}
+                  value={perfil.objetivo || anamnesis.objetivo_expectativas || anamnesis.objetivo_principal || ""}
+                  onChange={(e) => {
+                    updPerfil("objetivo", e.target.value);
+                    updAnamnesis("objetivo_principal", e.target.value);
+                    updAnamnesis("objetivo_expectativas", e.target.value);
+                  }}
                   placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular, mejorar relación con la comida..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
                 />
