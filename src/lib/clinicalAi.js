@@ -85,51 +85,56 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
     r24h.desayuno || r24h.comida || r24h.cena || r24h.colacion_m || r24h.colacion_v || r24h.picoteos
   );
 
-  // 10. Generación de Síntesis Clínica Estructurada (Inteligencia Inmediata)
+  // 10. Generación de Diagnóstico Clínico Estructurado (Motor Analítico Local)
   const nombre = (cliente?.nombre || "").trim().split(" ")[0] || "El paciente";
   const sexoStr = cliente?.genero === "F" || cliente?.sexo === "F" ? "Paciente femenina" : "Paciente masculino";
   
   let sintesisParts = [];
 
-  // Oración 1: Perfil y Objetivo
-  let p1 = `${sexoStr}`;
-  if (objetivo) {
-    p1 += ` con meta de ${objetivo.toLowerCase()}`;
-  }
-  sintesisParts.push(p1 + ".");
+  // Párrafo 1: Evaluación metabólica y diagnósticos
+  if (tienePatologias) {
+    const isDiabetes = /diabet/i.test(patologiasRaw);
+    const isTiroides = /hipotiroid|tiroid/i.test(patologiasRaw);
+    const isHipertension = /hipertens|presi[oó]n/i.test(patologiasRaw);
+    const isInsulina = /insulina|resistencia/i.test(patologiasRaw);
 
-  // Oración 2: Alertas Médicas
-  let alertasArray = [];
-  if (tienePatologias) alertasArray.push(`diagnóstico de ${patologiasRaw}`);
-  if (tieneAlergias) alertasArray.push(`alergia/intolerancia a ${alergiasRaw}`);
-  if (tieneLesiones) alertasArray.push(`lesión o antecedente de ${lesionesRaw}`);
-  if (tieneSintomasGI) alertasArray.push(`molestias GI (${digestivoRaw})`);
+    let patoImpacto = `diagnóstico de ${patologiasRaw}`;
+    if (isDiabetes) patoImpacto += ", requiriendo un control riguroso de carbohidratos, índice glucémico y distribución estable de las comidas";
+    else if (isInsulina) patoImpacto += ", demandando una pauta baja en azúcares refinados y alta en fibra soluble";
+    else if (isTiroides) patoImpacto += ", sugiriendo atención al metabolismo basal y micronutrientes tiroideos";
+    else if (isHipertension) patoImpacto += ", aconsejando moderación de sodio y equilibrio electrolítico";
 
-  if (alertasArray.length > 0) {
-    sintesisParts.push(`Alertas clínicas: ${alertasArray.join(", ")}.`);
+    sintesisParts.push(`${sexoStr} con perfil clínico marcado por ${patoImpacto}.`);
   } else {
-    sintesisParts.push("Sin patologías ni alergias severas reportadas.");
+    sintesisParts.push(`${sexoStr} sin patologías crónicas reportadas, con objetivo central de ${objetivo ? objetivo.toLowerCase() : "optimización de la composición corporal"}.`);
   }
 
-  // Oración 3: Alimentos (Qué evitar y qué incluir)
-  if (tieneAversiones && tienePreferencias) {
-    sintesisParts.push(`Alimentación: rechaza expresamente ${aversionesRaw}; priorizar como base sus favoritos (${preferenciasRaw}).`);
-  } else if (tieneAversiones) {
-    sintesisParts.push(`Alimentación: no tolera ni consume ${aversionesRaw} (evitar en el menú).`);
-  } else if (tienePreferencias) {
-    sintesisParts.push(`Alimentación: tiene preferencia por ${preferenciasRaw}.`);
+  // Párrafo 2: Exclusiones obligatorias (Alergias y Aversiones)
+  let exclusiones = [];
+  if (tieneAlergias) exclusiones.push(`alergia confirmada a ${alergiasRaw}`);
+  if (tieneAversiones) exclusiones.push(`aversión a ${aversionesRaw}`);
+  if (tieneSintomasGI) exclusiones.push(`sintomatología GI (${digestivoRaw})`);
+
+  if (exclusiones.length > 0) {
+    sintesisParts.push(`Desde la perspectiva de prescripción, es indispensable excluir de forma absoluta ${exclusiones.join(" y ")} para evitar hipersensibilidad y deserción.`);
   }
 
-  // Oración 4: Estilo de vida y R24H
-  let habitosArray = [];
-  if (sueno) habitosArray.push(`${sueno} de sueño`);
-  if (estresNivel >= 4) habitosArray.push("nivel de estrés alto");
-  if (agua) habitosArray.push(`consumo de agua de ${agua}`);
-  if (picoteos && !/^(no|ningun|nada)/i.test(picoteos)) {
-    habitosArray.push(`picoteo/bebidas: ${picoteos}`);
+  // Párrafo 3: Alimentos favoritos y estilo de vida
+  let planEstrategia = [];
+  if (tienePreferencias) {
+    planEstrategia.push(`aprovechar ${preferenciasRaw} como fuente principal en los tiempos de comida`);
   }
-  if (habitosArray.length > 0) {
-    sintesisParts.push(`Estilo de vida: ${habitosArray.join(", ")}.`);
+  if (sueno || estresNivel >= 4 || agua) {
+    let habs = [];
+    if (sueno) habs.push(`${sueno} de descanso`);
+    if (estresNivel >= 4) habs.push("alto nivel de estrés");
+    else if (estresNivel <= 2) habs.push("bajo nivel de estrés");
+    if (agua) habs.push(`hidratación de ${agua}`);
+    planEstrategia.push(`acompañado de una base con ${habs.join(" y ")}`);
+  }
+
+  if (planEstrategia.length > 0) {
+    sintesisParts.push(`Se aconseja ${planEstrategia.join(", ")}, consolidando un plan sostenible.`);
   }
 
   const sintesisTexto = sintesisParts.join(" ");
@@ -191,91 +196,85 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
 }
 
 /**
- * Generates an intelligent clinical synopsis using Google Gemini or falls back to structured synthesis.
+ * Generates an intelligent clinical diagnosis using Google Gemini or falls back to analytical synthesis.
  */
 export async function generateClinicalAiSynopsis(anamnesis, cliente) {
   const highlights = extractClinicalHighlights(anamnesis, cliente);
 
-  // Prompt clínico estructurado para el nutriólogo
-  const prompt = `Eres un asistente de nutrición clínica avanzada de la plataforma FLUX.
-Analiza la historia inicial del siguiente paciente y redacta una síntesis clínica ejecutiva de máximo 3 a 4 oraciones directamente útil para el nutriólogo que diseñará su menú.
+  const prompt = `Eres una IA clínica especializada en nutrición deportiva y clínica de FLUX.
+Genera un DIAGNÓSTICO Y ANÁLISIS CLÍNICO-NUTRICIONAL EJECUTIVO (exactamente 1 párrafo de 3 a 4 oraciones) para el especialista basado en el expediente.
+
+NO te limites a concatenar o repetir datos en lista. Proporciona un criterio clínico inteligente de especialista:
+1. Evalúa el impacto metabólico/clínico de sus diagnósticos o alertas (ej. Diabetes tipo 1 exige conteo de carbohidratos, índice glucémico y sincronización insulínica; hipotiroidismo, resistencia a la insulina o hipertensión su manejo respectivo).
+2. Trata alergias y aversiones (alimentos que rechaza) como exclusiones obligatorias de seguridad y apego.
+3. Explica cómo capitalizar sus alimentos favoritos estratégicamente en sus tomas para asegurar adherencia.
+4. Evalúa su descanso (${highlights.habitos.sueno || "normal"}), estrés (${highlights.habitos.estresNivel}/5), agua (${highlights.habitos.agua || "normal"}) y picoteos, concluyendo con una recomendación táctica clara para la pauta.
 
 DATOS DEL PACIENTE:
-- Nombre: ${cliente?.nombre || "Paciente"}
 - Sexo: ${cliente?.genero === "F" || cliente?.sexo === "F" ? "Femenino" : "Masculino"}
-- Objetivo principal: ${highlights.objetivo || "Mejora de composición corporal"}
-- Patologías o diagnósticos: ${highlights.patologias.raw || "Ninguna"}
-- Medicación y suplementos: ${highlights.medicacion.raw || "Ninguna"}
-- Alergias o intolerancias: ${highlights.alergias.raw || "Ninguna"}
-- Síntomas gastrointestinales: ${highlights.digestivo.raw || "Normal"}
-- Cirugías o lesiones: ${highlights.lesiones.raw || "Ninguna"}
-- Alimentos que rechaza o no le gustan (AVERSIONES): ${highlights.aversiones.raw || "Ninguno"}
+- Objetivo: ${highlights.objetivo || "Mejorar salud y composición corporal"}
+- Patologías/Diagnósticos: ${highlights.patologias.raw || "Sin patologías reportadas"}
+- Alergias/Intolerancias: ${highlights.alergias.raw || "Ninguna"}
+- Molestias GI: ${highlights.digestivo.raw || "Normal"}
+- Lesiones o cirugías: ${highlights.lesiones.raw || "Ninguna"}
+- Medicación/Suplementos: ${highlights.medicacion.raw || "Ninguna"}
+- Alimentos que evita o rechaza (AVERSIONES): ${highlights.aversiones.raw || "Ninguno"}
 - Alimentos predilectos (FAVORITOS): ${highlights.preferencias.raw || "Ninguno"}
-- Ocupación / actividad: ${highlights.habitos.ocupacion || "No especificada"}
 - Horas de sueño: ${highlights.habitos.sueno || "No especificadas"}
-- Estrés (1-5): ${highlights.habitos.estresNivel}/5
+- Nivel de estrés (1-5): ${highlights.habitos.estresNivel}/5
 - Consumo de agua: ${highlights.habitos.agua || "No especificado"}
-- Recordatorio 24h:
-  * Desayuno: ${highlights.r24h.desayuno || "No especificado"}
-  * Colación matutina: ${highlights.r24h.colacion_m || "No"}
-  * Comida: ${highlights.r24h.comida || "No especificado"}
-  * Colación vespertina: ${highlights.r24h.colacion_v || "No"}
-  * Cena: ${highlights.r24h.cena || "No especificado"}
-  * Picoteos/bebidas: ${highlights.r24h.picoteos || "No reportado"}
+- Picoteos/Bebidas entre horas: ${highlights.r24h.picoteos || "No reportado"}
 
-REGLAS DE RESPUESTA:
-1. Resalta enfáticamente lo que NUNCA debe incluirse en la dieta (aversiones y alergias).
-2. Menciona qué alimentos favoritos incorporar para asegurar adherencia.
-3. Menciona cualquier alerta médica (patología, lesión física o síntoma GI).
-4. Resume brevemente su R24H/estilo de vida y una sugerencia táctica de ajuste.
-5. Sé directo, profesional, médico y conciso (un solo párrafo continuo). No uses viñetas ni asteriscos innecesarios.`;
+Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado con lenguaje médico profesional y directo. Sin listas ni viñetas.`;
 
-  // Intentar llamada a Gemini si está configurada la clave en el entorno
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
   
   if (apiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout max
+    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash"];
+    for (const model of candidateModels) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.2,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          }),
-        }
-      );
-      clearTimeout(timeoutId);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                thinkingConfig: { thinkingBudget: 0 },
+              },
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        const data = await res.json();
-        const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (geminiText) {
-          return {
-            texto: geminiText,
-            origen: "gemini",
-            generadoEn: new Date().toISOString(),
-            highlights,
-          };
+        if (res.ok) {
+          const data = await res.json();
+          const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (geminiText) {
+            return {
+              texto: geminiText,
+              origen: "gemini",
+              generadoEn: new Date().toISOString(),
+              highlights,
+            };
+          }
         }
+      } catch {
+        // Continuar al siguiente modelo o fallback
       }
-    } catch {
-      // Fallback transparente al motor estructurado
     }
   }
 
-  // Fallback garantizado: Síntesis Estructurada de Alto Rendimiento
+  // Fallback garantizado: Motor Analítico Clínico
   return {
     texto: highlights.sintesisTexto,
-    origen: "estructurado",
+    origen: "analitico",
     generadoEn: new Date().toISOString(),
     highlights,
   };

@@ -25,6 +25,7 @@ import {
 import { dbPatch, dbPost } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
+import { generateClinicalAiSynopsis } from "../../lib/clinicalAi";
 
 const fmtDate = (d) => {
   if (!d) return "";
@@ -131,7 +132,7 @@ export default function ExpedienteClinicoModal({
       };
       await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
 
-      // 2. Guardar en expediente clínico
+      // 2. Guardar en expediente clínico y actualizar diagnóstico con IA
       const updatedAnamnesis = {
         ...anamnesis,
         nombre: perfil.nombre,
@@ -143,6 +144,20 @@ export default function ExpedienteClinicoModal({
         updated_at: new Date().toISOString(),
         completado_por: anamnesis.completado_por || mode,
       };
+
+      // Generación automática del análisis de IA cada vez que se guarda
+      try {
+        const aiDiag = await generateClinicalAiSynopsis(updatedAnamnesis, { ...cliente, ...patchData });
+        if (aiDiag?.texto) {
+          updatedAnamnesis.resumen_ia = {
+            texto: aiDiag.texto,
+            origen: aiDiag.origen,
+            generado_en: aiDiag.generadoEn,
+          };
+        }
+      } catch (e) {
+        console.warn("Diagnóstico IA automático:", e);
+      }
 
       const next = {
         ...record,

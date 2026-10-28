@@ -1834,7 +1834,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         <ClinicalAiSummaryCard
           cliente={selected}
           clinicalRec={clinicalRec}
-          onOpenExpediente={() => setShowExpediente(true)}
           onRecordUpdated={(rec) => setClinicalRec(rec)}
         />
       )}

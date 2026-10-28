@@ -1,20 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Sparkles,
-  ClipboardList,
-  AlertTriangle,
   Heart,
   Ban,
   Clock,
   ChevronDown,
-  Copy,
-  Check,
-  RotateCcw,
-  Utensils,
   ShieldAlert,
-  Activity,
-  HeartPulse,
-  Send
+  Check
 } from "lucide-react";
 import {
   extractClinicalHighlights,
@@ -25,13 +17,12 @@ import { saveClinicalRecord } from "../../lib/clinicalRecord";
 export default function ClinicalAiSummaryCard({
   cliente,
   clinicalRec,
-  onOpenExpediente,
   onRecordUpdated,
 }) {
   const anamnesis = clinicalRec?.anamnesis || {};
-  const [collapsed, setCollapsed] = useState(false);
+  // Por defecto colapsado según requerimiento del usuario
+  const [collapsed, setCollapsed] = useState(true);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [aiSynopsis, setAiSynopsis] = useState(() => {
     return anamnesis?.resumen_ia?.texto || null;
   });
@@ -40,52 +31,42 @@ export default function ClinicalAiSummaryCard({
     return extractClinicalHighlights(anamnesis, cliente);
   }, [anamnesis, cliente]);
 
-  // Si no hay resumen IA guardado, inicializar con la síntesis estructurada
+  // Si no hay diagnóstico guardado o era la versión simple antigua, enriquecer automáticamente en segundo plano
   useEffect(() => {
-    if (anamnesis?.resumen_ia?.texto) {
-      setAiSynopsis(anamnesis.resumen_ia.texto);
-    } else if (highlights.sintesisTexto) {
+    const existing = anamnesis?.resumen_ia?.texto;
+    if (existing) {
+      setAiSynopsis(existing);
+    } else {
       setAiSynopsis(highlights.sintesisTexto);
+      // Disparar generación con IA en segundo plano
+      if (cliente?.id && !loadingAi) {
+        setLoadingAi(true);
+        generateClinicalAiSynopsis(anamnesis, cliente)
+          .then((res) => {
+            if (res?.texto) {
+              setAiSynopsis(res.texto);
+              const updatedAnamnesis = {
+                ...anamnesis,
+                resumen_ia: {
+                  texto: res.texto,
+                  origen: res.origen,
+                  generado_en: res.generadoEn,
+                },
+              };
+              const nextRec = {
+                ...clinicalRec,
+                anamnesis: updatedAnamnesis,
+              };
+              saveClinicalRecord(cliente.id, nextRec).then((saved) => {
+                if (onRecordUpdated) onRecordUpdated(saved);
+              });
+            }
+          })
+          .catch(() => {})
+          .finally(() => setLoadingAi(false));
+      }
     }
-  }, [anamnesis?.resumen_ia?.texto, highlights.sintesisTexto]);
-
-  const handleCopiar = () => {
-    const textoACopiar = aiSynopsis || highlights.sintesisTexto;
-    if (!textoACopiar) return;
-    navigator.clipboard?.writeText(textoACopiar).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const handleRegenerar = async () => {
-    if (!cliente?.id || loadingAi) return;
-    setLoadingAi(true);
-    try {
-      const res = await generateClinicalAiSynopsis(anamnesis, cliente);
-      setAiSynopsis(res.texto);
-
-      // Guardar el resumen en el registro clínico
-      const updatedAnamnesis = {
-        ...anamnesis,
-        resumen_ia: {
-          texto: res.texto,
-          origen: res.origen,
-          generado_en: res.generadoEn,
-        },
-      };
-
-      const nextRec = {
-        ...clinicalRec,
-        anamnesis: updatedAnamnesis,
-      };
-
-      const saved = await saveClinicalRecord(cliente.id, nextRec);
-      if (onRecordUpdated) onRecordUpdated(saved);
-    } finally {
-      setLoadingAi(false);
-    }
-  };
+  }, [cliente?.id, anamnesis?.resumen_ia?.texto]);
 
   const hayAlertasMedicas =
     highlights.patologias.presente ||
@@ -96,97 +77,48 @@ export default function ClinicalAiSummaryCard({
   return (
     <div className="mb-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white rounded-2xl border border-blue-200/80 shadow-sm overflow-hidden transition-all duration-200">
       
-      {/* ── Barra Superior (Encabezado del Resumen) ── */}
-      <div className="p-4 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3 border-b border-blue-100/60 flex-wrap sm:flex-nowrap">
-        
+      {/* ── Barra Superior (Encabezado Limpio y Colapsable) ── */}
+      <div
+        onClick={() => setCollapsed((p) => !p)}
+        className="p-3.5 sm:px-5 sm:py-3 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-blue-50/50 transition-colors"
+      >
         {/* Left: Icono y Título */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-[var(--brand-primary)] text-white flex items-center justify-center shrink-0 shadow-xs">
             <Sparkles className="w-4 h-4" />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-bold text-[#0B1929] tracking-tight">
-                Resumen Clínico Inteligente
-              </h3>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100/80 text-[var(--brand-primary)] border border-blue-200">
-                IA FLUX
-              </span>
-              {clinicalRec?.anamnesis?.completado_por && (
-                <span className="hidden md:inline-flex text-[11px] font-semibold text-[#6B7A8D] bg-white/80 px-2 py-0.5 rounded-md border border-[#E2E8F0]">
-                  Llenado por: {clinicalRec.anamnesis.completado_por === "paciente" ? "Paciente" : "Nutriólogo"}
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-[#6B7A8D] truncate">
-              Puntos clave para el diseño del plan sin revisar todo el expediente
-            </p>
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <h3 className="text-sm font-bold text-[#0B1929] tracking-tight">
+              Resumen Clínico Inteligente
+            </h3>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100/80 text-[var(--brand-primary)] border border-blue-200">
+              IA FLUX
+            </span>
           </div>
         </div>
 
-        {/* Right: Acciones Rápidas */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Botón: Copiar Síntesis */}
+        {/* Right: Flecha para extender / colapsar */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-semibold text-[#6B7A8D] hidden sm:inline">
+            {collapsed ? "Ver diagnóstico y alertas" : "Ocultar"}
+          </span>
           <button
             type="button"
-            onClick={handleCopiar}
-            className="px-2.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50 text-[11px] font-bold text-[#0B1929] transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
-            title="Copiar resumen al portapapeles"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] bg-white shadow-2xs border border-[#E2E8F0] transition-transform"
+            title={collapsed ? "Extender análisis clínico" : "Colapsar"}
           >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700">Copiado</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-[#6B7A8D]" />
-                <span className="hidden sm:inline">Copiar</span>
-              </>
-            )}
-          </button>
-
-          {/* Botón: Regenerar con IA */}
-          <button
-            type="button"
-            onClick={handleRegenerar}
-            disabled={loadingAi}
-            className="px-2.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-[11px] font-bold text-indigo-700 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-            title="Actualizar y enriquecer análisis con IA"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 ${loadingAi ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{loadingAi ? "Analizando..." : "Actualizar"}</span>
-          </button>
-
-          {/* Botón: Ver Expediente Completo */}
-          {onOpenExpediente && (
-            <button
-              type="button"
-              onClick={onOpenExpediente}
-              className="px-2.5 py-1.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[11px] font-bold text-[#0B1929] transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
-              title="Abrir expediente clínico completo"
-            >
-              <ClipboardList className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-              <span>Expediente</span>
-            </button>
-          )}
-
-          {/* Botón: Colapsar / Expandir */}
-          <button
-            type="button"
-            onClick={() => setCollapsed((p) => !p)}
-            className="p-1.5 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-white/80 transition-colors cursor-pointer"
-            title={collapsed ? "Expandir resumen" : "Minimizar resumen"}
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
+            <ChevronDown
+              className={`w-4 h-4 text-[#0B1929] transition-transform duration-200 ${
+                collapsed ? "" : "rotate-180"
+              }`}
+            />
           </button>
         </div>
-
       </div>
 
       {/* ── Contenido Expandido ── */}
       {!collapsed && (
-        <div className="p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-150">
+        <div className="p-4 sm:p-5 pt-1 space-y-3.5 border-t border-blue-100/60 animate-in fade-in duration-150">
           
           {/* Fila 1: Las 4 Tarjetas de Puntos Clave */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -279,7 +211,7 @@ export default function ClinicalAiSummaryCard({
               )}
             </div>
 
-            {/* 🚫 Card 2: Alimentos que Rechaza (Aversiones) — ¡NUNCA INCLUIR! */}
+            {/* 🚫 Card 2: Alimentos que Rechaza (Aversiones) */}
             <div className="p-3.5 rounded-xl border bg-rose-50/40 border-rose-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-rose-900">
@@ -405,19 +337,19 @@ export default function ClinicalAiSummaryCard({
 
           </div>
 
-          {/* Fila 2: Síntesis Narrativa Ejecutiva de la IA */}
+          {/* Fila 2: Diagnóstico Basado en el Expediente (Potenciado por IA) */}
           <div className="bg-white rounded-xl border border-blue-200/70 p-3.5 sm:p-4 shadow-2xs">
             <div className="flex items-start gap-2.5">
               <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5 border border-indigo-200">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                    Síntesis Clínica Ejecutiva
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
+                    Diagnóstico Basado en el Expediente
                   </span>
-                  <span className="text-[10px] text-[#6B7A8D]">
-                    {loadingAi ? "Consultando a la IA..." : "Resumen consolidado"}
+                  <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                    {loadingAi ? "Analizando con IA..." : "Análisis IA"}
                   </span>
                 </div>
                 <p className="text-xs text-[#0B1929] leading-relaxed font-normal">
