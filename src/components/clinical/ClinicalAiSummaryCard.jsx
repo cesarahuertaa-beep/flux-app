@@ -31,14 +31,24 @@ export default function ClinicalAiSummaryCard({
     return extractClinicalHighlights(anamnesis, cliente);
   }, [anamnesis, cliente]);
 
-  // Si no hay diagnóstico guardado o era la versión simple antigua, enriquecer automáticamente en segundo plano
+  // Si no hay diagnóstico guardado o era la versión con fallas antiguas, enriquecer automáticamente con IA
   useEffect(() => {
     const existing = anamnesis?.resumen_ia?.texto;
-    if (existing) {
+    const esTextoAntiguoConFallas =
+      existing &&
+      (existing.includes("(Norml)") ||
+        existing.includes("Desde la perspectiva de prescripción") ||
+        existing.includes("Dabetes") ||
+        existing.includes("sintomatología GI") ||
+        existing.includes("y hidratación") ||
+        existing.includes("8 de descanso") ||
+        existing.includes("alergia confirmada"));
+
+    if (existing && !esTextoAntiguoConFallas) {
       setAiSynopsis(existing);
     } else {
+      // Mostrar primero la síntesis limpia local y luego actualizar con Gemini
       setAiSynopsis(highlights.sintesisTexto);
-      // Disparar generación con IA en segundo plano
       if (cliente?.id && !loadingAi) {
         setLoadingAi(true);
         generateClinicalAiSynopsis(anamnesis, cliente)
