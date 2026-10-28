@@ -16,7 +16,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Send
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -490,40 +490,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     setPreviewUrls([]);
     setShowModal(true);
   }, [metricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento]);
-
-  const toggleSolicitarPaciente = async () => {
-    if (!selected?.id) return;
-    const isRequested = clinicalRec?.solicitud_activa === "checkin_seguimiento";
-    try {
-      const next = {
-        ...clinicalRec,
-        solicitud_activa: isRequested ? null : "checkin_seguimiento",
-        solicitud_fecha: isRequested ? null : new Date().toISOString(),
-      };
-      const saved = await saveClinicalRecord(selected.id, next);
-      setClinicalRec(saved);
-
-      if (!isRequested && selected?.auth_id) {
-        await dbPost("notificaciones", {
-          profile_id: selected.auth_id,
-          titulo: "Check-in de Seguimiento Solicitado",
-          mensaje: "Tu especialista te ha solicitado registrar tu seguimiento y sensaciones de la semana.",
-          tipo: "alerta",
-          link_url: "perfil",
-          entidad_id: selected.id,
-        }).catch(() => {});
-      }
-
-      setMsg(
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4 text-green-500" />
-          {isRequested ? "Solicitud cancelada" : `Seguimiento solicitado a ${selected.nombre}`}
-        </div>
-      );
-    } catch (e) {
-      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
-    }
-  };
 
   const handleFotos = (e) => {
     const files = Array.from(e.target.files);
@@ -1606,36 +1572,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                           </span>
                         </div>
                         <p className="text-xs text-[#6B7A8D] mt-0.5">
-                          Registra o consulta las sensaciones del paciente sobre energía, saciedad, digestión y descanso.
+                          Registra las sensaciones y adherencia del paciente durante la consulta (energía, saciedad, digestión y descanso).
                         </p>
                       </div>
                     </div>
-
-                    {!isCivil && !isMiPlan && (
-                      <button
-                        type="button"
-                        onClick={toggleSolicitarPaciente}
-                        disabled={saving}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border shrink-0 ${
-                          clinicalRec?.solicitud_activa === "checkin_seguimiento"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                            : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
-                        }`}
-                        title="Solicitar al paciente que responda el check-in desde su app"
-                      >
-                        {clinicalRec?.solicitud_activa === "checkin_seguimiento" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Solicitado al paciente</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                            <span>Solicitar al paciente</span>
-                          </>
-                        )}
-                      </button>
-                    )}
                   </div>
 
                   {/* 4 Escalas 1 a 5 */}

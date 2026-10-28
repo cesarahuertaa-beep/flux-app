@@ -174,7 +174,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     try {
       if (bossId) {
         await dbPatch(`profiles?id=eq.${bossId}`, formData);
-              }
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("flux:brand-updated"));
+        }
+      }
     } catch (e) {
       setErr("Error guardando datos empresariales.");
     }

@@ -6,10 +6,10 @@ const BrandContext = createContext(null);
 
 export const useBrand = () => useContext(BrandContext);
 
-// Default FLUX brand - used for superadmin or unauthenticated state
+// Default FLUX brand - used as absolute fallback if database is offline/unreachable
 const FLUX_DEFAULT = { 
   nombre_marca: "FLUX Sport Supplements", 
-  color_primario: "#56CCF2", 
+  color_primario: "#1A6FD4", 
   logo_url: "/flux_logo.jpeg" 
 };
 
@@ -19,7 +19,7 @@ export function BrandProvider({ children, session }) {
       const cachedColor = localStorage.getItem("flux_cached_brand_color");
       const cachedName = localStorage.getItem("flux_cached_brand_name");
       const cachedLogo = localStorage.getItem("flux_cached_brand_logo");
-      if (cachedColor && cachedColor !== "#1A6FD4") {
+      if (cachedColor) {
         return {
           nombre_marca: cachedName || FLUX_DEFAULT.nombre_marca,
           color_primario: cachedColor,
@@ -53,55 +53,73 @@ export function BrandProvider({ children, session }) {
 
     const fetchBrand = async () => {
       try {
+        // 1. Obtener la marca oficial configurada por el Superadmin en la BD (FLUX), base y fallback de todo el sistema
+        let superadminBrand = { ...FLUX_DEFAULT };
+        try {
+          const superadminRows = await dbGet("profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
+          if (superadminRows && superadminRows.length > 0) {
+            const sa = superadminRows[0];
+            if (sa.nombre_marca?.trim()) superadminBrand.nombre_marca = sa.nombre_marca.trim();
+            if (sa.color_primario?.trim()) superadminBrand.color_primario = sa.color_primario.trim();
+            if (sa.logo_url?.trim()) superadminBrand.logo_url = sa.logo_url.trim();
+          }
+        } catch (saErr) {
+          console.warn("No se pudo cargar marca superadmin:", saErr);
+        }
+
+        // 2. Determinar si hay un perfil específico según la sesión
         let profileIdToFetch = null;
 
         if (session?.role === "cliente" && session.data?.nutriologo_id) {
           // Cliente ve la marca de su nutriólogo
           profileIdToFetch = session.data.nutriologo_id;
-        } else if (session?.role === "nutriologo" || session?.role === "nutriologo_estudiante" || session?.role === "superadmin" || session?.role === "admin") {
-          // Nutriólogo o Superadmin ve su propia marca configurada en su perfil
+        } else if (
+          session?.role === "nutriologo" ||
+          session?.role === "nutriologo_estudiante" ||
+          session?.role === "superadmin" ||
+          session?.role === "admin"
+        ) {
+          // Nutriólogo (titulado o estudiante) o Superadmin
           profileIdToFetch = session.profileId || getProfileId() || session.data?.id;
         }
 
+        // 3. Si hay perfil asignado a consultar
         if (profileIdToFetch) {
           const res = await dbGet(`profiles?id=eq.${profileIdToFetch}&select=nombre_marca,color_primario,logo_url`);
           if (active && res && res.length > 0) {
             const p = res[0];
-            setBrand({
-              nombre_marca: p.nombre_marca || FLUX_DEFAULT.nombre_marca,
-              color_primario: p.color_primario || FLUX_DEFAULT.color_primario,
-              logo_url: p.logo_url || FLUX_DEFAULT.logo_url
-            });
+            // Si el nutriólogo tiene definido su propio logo o color, se respeta.
+            // Si NO tiene logo o color definido, se utiliza exactamente el color y logo fijados por el Superadmin para FLUX.
+            const resolved = {
+              nombre_marca: p.nombre_marca?.trim() || superadminBrand.nombre_marca,
+              color_primario: p.color_primario?.trim() || superadminBrand.color_primario,
+              logo_url: p.logo_url?.trim() || superadminBrand.logo_url,
+            };
+            setBrand(resolved);
             return;
           }
         }
 
-        // Si es atleta independiente o sin marca asignada con sesión activa, consultar superadmin
-        if (session) {
-          const superadminRows = await dbGet("profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
-          if (active && superadminRows && superadminRows.length > 0 && superadminRows[0].color_primario) {
-            const sa = superadminRows[0];
-            setBrand({
-              nombre_marca: sa.nombre_marca || FLUX_DEFAULT.nombre_marca,
-              color_primario: sa.color_primario || FLUX_DEFAULT.color_primario,
-              logo_url: sa.logo_url || FLUX_DEFAULT.logo_url
-            });
-            return;
-          }
-        }
-
+        // 4. Si es atleta independiente (civil), staff, o paciente directo de FLUX:
         if (active) {
-          setBrand(prev => (prev?.color_primario && prev.color_primario !== "#1A6FD4" ? prev : FLUX_DEFAULT));
+          setBrand(superadminBrand);
         }
       } catch (e) {
         if (active) {
-          setBrand(prev => (prev?.color_primario && prev.color_primario !== "#1A6FD4" ? prev : FLUX_DEFAULT));
+          setBrand((prev) => prev || FLUX_DEFAULT);
         }
       }
     };
 
     fetchBrand();
-    return () => { active = false; };
+
+    const onBrandUpdated = () => { fetchBrand(); };
+    window.addEventListener("flux:brand-updated", onBrandUpdated);
+
+    return () => {
+      active = false;
+      window.removeEventListener("flux:brand-updated", onBrandUpdated);
+    };
   }, [session]);
 
   // Generamos variables CSS dinámicas basadas en el color primario de la marca.

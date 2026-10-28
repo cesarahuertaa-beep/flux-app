@@ -23,7 +23,12 @@ const tint = (hex, amt = 230) => {
 /** Escapa una URL para uso seguro en atributos src */
 const safeUrl = (url) => {
   if (!url) return "";
-  if (!/^https?:\/\//i.test(url)) return "";
+  if (url.startsWith("/")) {
+    return typeof window !== "undefined" && window.location?.origin
+      ? `${window.location.origin}${url}`
+      : url;
+  }
+  if (!/^https?:\/\//i.test(url) && !url.startsWith("data:")) return "";
   return escapeHtml(url);
 };
 
@@ -592,11 +597,11 @@ const openPdfPreviewModal = ({ html, title, fileName, accent = "#1A6FD4" }) => {
 
 export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   if (!cliente) return;
-  const accent = brand.color_primario || "#2D9CDB";
+  const accent = brand.color_primario || "#1A6FD4";
   const dark = darken(accent, 60);
   const light = tint(accent, 210);
   const nombre = escapeHtml(brand.nombre_marca || "FLUX Sport Supplements");
-  const logoUrl = brand.logo_url && brand.logo_url !== "/flux_logo.jpeg" ? safeUrl(brand.logo_url) : null;
+  const logoUrl = brand.logo_url ? safeUrl(brand.logo_url) : null;
 
   const clienteNombre = escapeHtml(cliente.nombre || "Paciente");
   const clienteObjetivo = escapeHtml(cliente.objetivo || "\u2014");
@@ -796,9 +801,9 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
   if (!cliente) return;
 
   const metricas = (rawMetricas || []).map((m) => enrichMetrica(m, cliente));
-  const logoUrl = brand?.logo_url && brand.logo_url !== "/flux_logo.jpeg" ? safeUrl(brand.logo_url) : null;
-  const nombre = escapeHtml(brand?.nombre_marca || "FLUX");
-  const accent = brand?.color_primario || "#38bdf8";
+  const logoUrl = brand?.logo_url ? safeUrl(brand.logo_url) : null;
+  const nombre = escapeHtml(brand?.nombre_marca || "FLUX Sport Supplements");
+  const accent = brand?.color_primario || "#1A6FD4";
   const dark = darken(accent, 60);
   const light = tint(accent, 210);
 

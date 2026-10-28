@@ -15,7 +15,6 @@ import Training from "../components/cliente/Training";
 import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../components/clinical/NuevoExpedienteForms";
 import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
 
@@ -136,7 +135,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [clinicalRec, setClinicalRec] = useState(() =>
     cliente?.id && cliente?.nutriologo_id ? peekClinicalRecord(cliente.id) : null
   );
-  const [showClinicalModal, setShowClinicalModal] = useState(false);
   const [showIntakeForms, setShowIntakeForms] = useState(false);
 
   const loadData = async ({ silent = false, forceFresh = false } = {}) => {
@@ -430,8 +428,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     !isEmbedded &&
     !isAtletaMode &&
     Boolean(cliente?.nutriologo_id) &&
-    (clinicalRec?.solicitud_activa === "historia_inicial" ||
-      clinicalRec?.solicitud_activa === "checkin_seguimiento");
+    clinicalRec?.solicitud_activa === "historia_inicial";
 
   const innerContent = (
     <>
@@ -459,26 +456,16 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               </div>
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm font-bold text-[#0B1929] truncate">
-                  {clinicalRec?.solicitud_activa === "checkin_seguimiento"
-                    ? "Check-in de seguimiento pendiente"
-                    : "Historia clínica inicial solicitada"}
+                  Historia clínica inicial solicitada
                 </p>
                 <p className="text-[11px] text-[#6B7A8D] truncate">
-                  {clinicalRec?.solicitud_activa === "checkin_seguimiento"
-                    ? "Comparte cómo te sentiste esta semana antes de tu consulta."
-                    : "Completa tus antecedentes y hábitos para tu especialista."}
+                  Completa tus antecedentes y hábitos para tu especialista.
                 </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => {
-                if (clinicalRec?.solicitud_activa === "historia_inicial") {
-                  setShowIntakeForms(true);
-                } else {
-                  setShowClinicalModal(true);
-                }
-              }}
+              onClick={() => setShowIntakeForms(true)}
               className="px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity shrink-0 shadow-sm cursor-pointer"
             >
               Completar
@@ -563,16 +550,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </div>
           )}
         </Suspense>
-      )}
-      {showClinicalModal && (
-        <ExpedienteClinicoModal
-          isOpen={showClinicalModal}
-          onClose={() => setShowClinicalModal(false)}
-          cliente={cliente}
-          mode="paciente"
-          adherenciaSummary={adherenciaSummary}
-          onSaved={(updatedRec) => setClinicalRec(updatedRec)}
-        />
       )}
       {showIntakeForms && (
         <div className="fixed inset-0 z-[120] bg-[#F7F9FC] overflow-y-auto flex flex-col p-3 sm:p-6 animate-in fade-in duration-200">
