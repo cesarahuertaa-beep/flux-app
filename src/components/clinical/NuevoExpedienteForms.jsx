@@ -28,6 +28,23 @@ import {
 } from "../../lib/clinicalRecord";
 import { dbPatch, dbPost, storageUpload } from "../../lib/supabase";
 import { extractClinicalHighlights, generateClinicalAiSynopsis } from "../../lib/clinicalAi";
+import { CustomSelect } from "../ui/CustomSelect";
+
+const GENERO_OPTIONS = [
+  { value: "", label: "Selecciona..." },
+  { value: "Femenino", label: "Femenino" },
+  { value: "Masculino", label: "Masculino" },
+  { value: "Otro", label: "Otro" }
+];
+
+const normalizeGeneroVal = (val) => {
+  if (!val) return "";
+  const s = String(val).trim();
+  if (s === "M" || s.toLowerCase() === "masculino" || s.toLowerCase() === "hombre") return "Masculino";
+  if (s === "F" || s.toLowerCase() === "femenino" || s.toLowerCase() === "mujer") return "Femenino";
+  if (s.toLowerCase() === "otro") return "Otro";
+  return s;
+};
 
 function calcAge(birthdate) {
   if (!birthdate) return null;
@@ -99,7 +116,7 @@ export function NuevoExpedienteForms({
     nombre: cliente?.nombre || "",
     email: cliente?.email || "",
     telefono: cliente?.telefono || "",
-    sexo: cliente?.genero || cliente?.sexo || "M",
+    sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || "Masculino"),
     fecha_nacimiento: cliente?.fecha_nacimiento || "",
     foto_url: cliente?.foto_url || "",
     objetivo: cliente?.objetivo || "",
@@ -147,6 +164,14 @@ export function NuevoExpedienteForms({
             "",
         }));
       }
+      setPerfil((prev) => ({
+        ...prev,
+        nombre: cliente?.nombre || prev.nombre,
+        telefono: cliente?.telefono || fresh?.anamnesis?.telefono || prev.telefono,
+        fecha_nacimiento: cliente?.fecha_nacimiento || fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
+        sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || fresh?.anamnesis?.sexo || prev.sexo),
+        objetivo: cliente?.objetivo || fresh?.anamnesis?.objetivo_principal || prev.objetivo,
+      }));
     });
   }, [clienteId, cliente?.objetivo, isPatientMode]);
 
@@ -241,7 +266,7 @@ export function NuevoExpedienteForms({
         nombre: perfil.nombre || cliente.nombre,
         telefono: perfil.telefono || null,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
-        genero: perfil.sexo || "M",
+        genero: perfil.sexo || "Masculino",
         objetivo: targetObj,
       };
       if (perfil.foto_url) clientPatch.foto_url = perfil.foto_url;
@@ -714,24 +739,14 @@ export function NuevoExpedienteForms({
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  Sexo Biológico
+                  Género
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[["M", "Masculino"], ["F", "Femenino"]].map(([val, label]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => updPerfil("sexo", val)}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                        perfil.sexo === val
-                          ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                          : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-100"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <CustomSelect
+                  value={perfil.sexo}
+                  onChange={(val) => updPerfil("sexo", val)}
+                  placeholder="Selecciona..."
+                  options={GENERO_OPTIONS}
+                />
               </div>
 
               <div className="sm:col-span-2">

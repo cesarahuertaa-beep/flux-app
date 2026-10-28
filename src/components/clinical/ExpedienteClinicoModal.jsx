@@ -24,8 +24,25 @@ import {
 } from "../../lib/clinicalRecord";
 import { dbPatch, dbPost } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { CustomSelect } from "../ui/CustomSelect";
 import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
 import { generateClinicalAiSynopsis } from "../../lib/clinicalAi";
+
+const GENERO_OPTIONS = [
+  { value: "", label: "Selecciona..." },
+  { value: "Femenino", label: "Femenino" },
+  { value: "Masculino", label: "Masculino" },
+  { value: "Otro", label: "Otro" }
+];
+
+const normalizeGeneroVal = (val) => {
+  if (!val) return "";
+  const s = String(val).trim();
+  if (s === "M" || s.toLowerCase() === "masculino" || s.toLowerCase() === "hombre") return "Masculino";
+  if (s === "F" || s.toLowerCase() === "femenino" || s.toLowerCase() === "mujer") return "Femenino";
+  if (s.toLowerCase() === "otro") return "Otro";
+  return s;
+};
 
 const fmtDate = (d) => {
   if (!d) return "";
@@ -55,7 +72,7 @@ export default function ExpedienteClinicoModal({
     nombre: cliente?.nombre || "",
     email: cliente?.email || "",
     telefono: cliente?.telefono || "",
-    sexo: cliente?.genero || cliente?.sexo || "M",
+    sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || "Masculino"),
     fecha_nacimiento: cliente?.fecha_nacimiento || "",
     objetivo: cliente?.objetivo || "",
   });
@@ -88,7 +105,7 @@ export default function ExpedienteClinicoModal({
       email: cliente?.email || "",
       telefono: cliente?.telefono || local?.anamnesis?.telefono || "",
       fecha_nacimiento: cliente?.fecha_nacimiento || local?.anamnesis?.fecha_nacimiento || "",
-      sexo: cliente?.genero || cliente?.sexo || local?.anamnesis?.sexo || "M",
+      sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || local?.anamnesis?.sexo || "Masculino"),
       objetivo: cliente?.objetivo || local?.anamnesis?.objetivo_principal || local?.anamnesis?.objetivo_expectativas || "",
     });
 
@@ -105,7 +122,7 @@ export default function ExpedienteClinicoModal({
         nombre: cliente?.nombre || prev.nombre,
         telefono: cliente?.telefono || fresh?.anamnesis?.telefono || prev.telefono,
         fecha_nacimiento: cliente?.fecha_nacimiento || fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
-        sexo: cliente?.genero || cliente?.sexo || fresh?.anamnesis?.sexo || prev.sexo,
+        sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || fresh?.anamnesis?.sexo || prev.sexo),
         objetivo: cliente?.objetivo || fresh?.anamnesis?.objetivo_principal || fresh?.anamnesis?.objetivo_expectativas || prev.objetivo,
       }));
     });
@@ -127,7 +144,7 @@ export default function ExpedienteClinicoModal({
         nombre: perfil.nombre || cliente.nombre,
         telefono: perfil.telefono || null,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
-        genero: perfil.sexo || "M",
+        genero: perfil.sexo || "Masculino",
         objetivo: perfil.objetivo || null,
       };
       await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
@@ -409,30 +426,17 @@ export default function ExpedienteClinicoModal({
                     />
                   </div>
 
-                  {/* Sexo Biológico */}
+                  {/* Género */}
                   <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Sexo Biológico
+                      Género
                     </label>
-                    <div className="flex gap-2">
-                      {[
-                        { k: "M", lb: "Masculino" },
-                        { k: "F", lb: "Femenino" },
-                      ].map((sx) => (
-                        <button
-                          key={sx.k}
-                          type="button"
-                          onClick={() => updPerfil("sexo", sx.k)}
-                          className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                            perfil.sexo === sx.k
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                              : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
-                          }`}
-                        >
-                          {sx.lb}
-                        </button>
-                      ))}
-                    </div>
+                    <CustomSelect
+                      value={perfil.sexo}
+                      onChange={(val) => updPerfil("sexo", val)}
+                      placeholder="Selecciona..."
+                      options={GENERO_OPTIONS}
+                    />
                   </div>
                 </div>
               </div>
