@@ -517,6 +517,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
           else { const n = parseFloat(v); rawData[k] = isNaN(n) ? v : n; }
         }
       });
+      rawData.metodo_evaluacion = form.metodo_evaluacion;
+      rawData.evalSexo = evalSexo;
+      rawData.evalEdad = evalEdad;
 
       const calc = calculateBodyComposition(form, evalSexo, evalEdad);
       const data = prepareMetricaPayload(rawData, calc);
@@ -611,21 +614,80 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   const startEdit = (mRaw) => {
     const m = enrichMetrica(mRaw);
     const filled = emptyForm();
+
+    // 1. Detección inteligente del método de evaluación si no está definido o es ambiguo
+    let metodo = m.metodo_evaluacion || "";
+    if (!metodo) {
+      if (m.inbody_smm || m.inbody_score || m.inbody_tbw || m.inbody_proteina || m.inbody_mineral_oseo || m.inbody_grasa_visceral) {
+        metodo = "inbody";
+      } else if (m.diametro_muneca || m.diametro_codo || m.diametro_rodilla || (m.pliegue_pantorrilla && m.pliegue_subescapular)) {
+        metodo = "manual";
+      } else if (m.pliegue_biceps && m.pliegue_triceps && !m.pliegue_abdominal) {
+        metodo = "plicometria_dw4";
+      } else if (m.pliegue_pectoral || m.pliegue_abdominal || m.pliegue_muslo || m.pliegue_suprailiaco || m.pliegue_triceps) {
+        metodo = "plicometria_jp3";
+      } else {
+        metodo = isCivil ? "basico" : "basico";
+      }
+    }
+    filled.metodo_evaluacion = metodo;
+
+    // 2. Mapear todos los campos existentes de m a filled
     const IGNORED = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
     Object.keys(filled).forEach(k => {
-      if (m[k] !== null && m[k] !== undefined && m[k] !== "") filled[k] = String(m[k]);
+      if (m[k] !== null && m[k] !== undefined && m[k] !== "") {
+        filled[k] = String(m[k]);
+      }
     });
     Object.keys(m).forEach(k => {
       if (!IGNORED.has(k) && m[k] !== null && m[k] !== undefined && m[k] !== "") {
         filled[k] = String(m[k]);
       }
     });
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
-    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+
+    if (m.fecha) {
+      filled.fecha = String(m.fecha).split("T")[0];
+    }
+
+    // 3. Cruzar check-in del expediente clínico si faltaban observaciones o escalas
+    const checkinList = Array.isArray(clinicalRec?.checkins) ? clinicalRec.checkins : [];
+    const evalFecha = filled.fecha;
+    const matchingCheckin = checkinList.find(c =>
+      c.id === `eval_${m.id}` ||
+      (c.fecha && evalFecha && c.fecha.split("T")[0] === evalFecha)
+    ) || (checkinList.length > 0 && Math.abs(new Date(checkinList[0].fecha || "").getTime() - new Date(evalFecha || "").getTime()) < 86400000 * 2 ? checkinList[0] : null);
+
+    if (matchingCheckin) {
+      if (!filled.checkin_energia || filled.checkin_energia === "4") {
+        if (matchingCheckin.energia) filled.checkin_energia = String(matchingCheckin.energia);
+      }
+      if (!filled.checkin_saciedad || filled.checkin_saciedad === "4") {
+        if (matchingCheckin.saciedad) filled.checkin_saciedad = String(matchingCheckin.saciedad);
+      }
+      if (!filled.checkin_digestion || filled.checkin_digestion === "4") {
+        if (matchingCheckin.digestion) filled.checkin_digestion = String(matchingCheckin.digestion);
+      }
+      if (!filled.checkin_descanso || filled.checkin_descanso === "4") {
+        if (matchingCheckin.descanso) filled.checkin_descanso = String(matchingCheckin.descanso);
+      }
+      if (!filled.checkin_observaciones && matchingCheckin.observaciones) {
+        filled.checkin_observaciones = String(matchingCheckin.observaciones);
+      }
+      if (!filled.checkin_ajustes && matchingCheckin.ajustes_solicitados) {
+        filled.checkin_ajustes = String(matchingCheckin.ajustes_solicitados);
+      }
+    }
+
+    // 4. Configurar sexo, edad, fotos y estado de edición
+    const detectedSexo = normalizeSexo(m.sexo || selected?.genero || selected?.sexo);
+    const detectedEdad = Number(m.edad) || calcEdadFromBirthdate(selected?.fecha_nacimiento, 25);
+    setEvalSexo(detectedSexo);
+    setEvalEdad(detectedEdad);
     setForm(filled);
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
-    setPendingFotos([]); setPreviewUrls([]);
+    setPendingFotos([]);
+    setPreviewUrls([]);
     setShowModal(true);
   };
 
@@ -1771,7 +1833,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">Notas y Observaciones Clínicas</label>
                     <textarea
-                      value={form.notas}
+                      value={form.notas || ""}
                       onChange={e => updForm("notas", e.target.value)}
                       placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"}
                       className="bg-[#F8FAFC] focus:bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[90px]"

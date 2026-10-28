@@ -197,7 +197,8 @@ export const DB_METRICA_COLUMNS = new Set([
  */
 export function enrichMetrica(m) {
   if (!m || typeof m !== "object") return m;
-  const { cleanNotas, meta } = unpackMetricaMeta(m.notas);
+  const rawNotasStr = typeof m._rawNotas === "string" ? m._rawNotas : m.notas;
+  const { cleanNotas, meta } = unpackMetricaMeta(rawNotasStr);
   const peso = parseFloat(m.peso) || 0;
   const estatura = parseFloat(m.estatura) || 0;
   const cintura = parseFloat(m.cintura) || 0;
@@ -215,10 +216,11 @@ export function enrichMetrica(m) {
     (cintura > 0 && estatura > 0 ? Number((cintura / estatura).toFixed(2)) : null);
 
   return {
-    ...meta,
     ...m,
+    ...meta,
     notas: cleanNotas,
-    _rawNotas: m.notas,
+    _rawNotas: rawNotasStr,
+    metodo_evaluacion: m.metodo_evaluacion || meta.metodo_evaluacion || null,
     cuello: m.cuello ?? meta.cuello ?? "",
     pliegue_pectoral: m.pliegue_pectoral ?? meta.pliegue_pectoral ?? "",
     ice: ice ?? "",
@@ -254,6 +256,19 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
       extraMeta[k] = v;
     }
   });
+
+  // Metadatos críticos que SIEMPRE deben preservarse en notas (incluso si son columna de BD)
+  if (rawData.metodo_evaluacion) extraMeta.metodo_evaluacion = rawData.metodo_evaluacion;
+  if (rawData.evalSexo) extraMeta.sexo = rawData.evalSexo;
+  if (rawData.evalEdad) extraMeta.edad = rawData.evalEdad;
+  if (rawData.cuello !== undefined && rawData.cuello !== "") extraMeta.cuello = rawData.cuello;
+  if (rawData.pliegue_pectoral !== undefined && rawData.pliegue_pectoral !== "") extraMeta.pliegue_pectoral = rawData.pliegue_pectoral;
+  if (rawData.checkin_observaciones !== undefined && rawData.checkin_observaciones !== "") extraMeta.checkin_observaciones = rawData.checkin_observaciones;
+  if (rawData.checkin_ajustes !== undefined && rawData.checkin_ajustes !== "") extraMeta.checkin_ajustes = rawData.checkin_ajustes;
+  if (rawData.checkin_energia !== undefined && rawData.checkin_energia !== "") extraMeta.checkin_energia = rawData.checkin_energia;
+  if (rawData.checkin_saciedad !== undefined && rawData.checkin_saciedad !== "") extraMeta.checkin_saciedad = rawData.checkin_saciedad;
+  if (rawData.checkin_digestion !== undefined && rawData.checkin_digestion !== "") extraMeta.checkin_digestion = rawData.checkin_digestion;
+  if (rawData.checkin_descanso !== undefined && rawData.checkin_descanso !== "") extraMeta.checkin_descanso = rawData.checkin_descanso;
 
   Object.entries(calcResult || {}).forEach(([k, v]) => {
     if (k === "imc_info" || k === "icc_info") return;
