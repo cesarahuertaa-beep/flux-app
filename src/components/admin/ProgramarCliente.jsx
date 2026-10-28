@@ -474,18 +474,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   // ── Cargar ciclos del cliente ──
-  const loadCiclos = useCallback(async (preferCycleId = null) => {
+  const loadCiclos = useCallback(async (preferCycleId = null, opts = {}) => {
     if (!selected) return null;
+    const { forceFresh = false } = opts;
     try {
-      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
-      setCiclos(cs || []);
+      const fetchFn = forceFresh ? dbGetFresh : dbGet;
+      const cs = await fetchFn(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
+      const finalCycles = Array.isArray(cs) ? cs : [];
+      setCiclos(finalCycles);
       
-      const activeCycle = (cs || []).find(c => c.activo);
+      const activeCycle = finalCycles.find(c => c.activo);
       let chosen = null;
 
       // 1. Si se pasa un ciclo preferido explícitamente (ej: recién creado o recién aplicado)
       if (preferCycleId) {
-        chosen = (cs || []).find(c => c.id === preferCycleId);
+        chosen = finalCycles.find(c => c.id === preferCycleId);
       }
 
       // 2. Si no, en "Mi Plan", SIEMPRE priorizar el ciclo activo
@@ -497,7 +500,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (!chosen) {
         const savedCycleId = sessionStorage.getItem(`flux_programar_ciclo_${selected.id}`);
         if (savedCycleId) {
-          const found = (cs || []).find(c => c.id === savedCycleId);
+          const found = finalCycles.find(c => c.id === savedCycleId);
           // Si el cliente tiene ciclo activo pero el guardado es inactivo, preferir el activo
           if (found && (found.activo || !activeCycle)) {
             chosen = found;
@@ -507,7 +510,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
       // 4. Fallback al ciclo activo o al más reciente
       if (!chosen) {
-        chosen = activeCycle || (cs && cs[0]) || null;
+        chosen = activeCycle || finalCycles[0] || null;
       }
 
       setCicloSel(chosen);
@@ -666,7 +669,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           }
           delPromises.push(dbDel(`ciclos?id=eq.${ciclo.id}`));
           await Promise.all(delPromises);
-          loadCiclos();
+          invalidateCache("ciclos");
+          loadCiclos(null, { forceFresh: true });
           loadData(undefined, { silent: true, forceFresh: true });
           notifyPlanUpdate("ciclos");
         } catch(err) {
@@ -883,6 +887,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           fecha_inicio: planForm.fecha_inicio,
         });
 
+        const updatedCycle = {
+          ...editingCycle,
+          nombre: finalName,
+          fecha_inicio: planForm.fecha_inicio,
+        };
+
+        // Actualización optimista inmediata en 0ms
+        setCiclos(prev => prev.map(c => c.id === updatedCycle.id ? updatedCycle : c));
+        if (cicloSel?.id === updatedCycle.id) {
+          setCicloSel(updatedCycle);
+        }
+
+        invalidateCache("ciclos");
+        updateQueryCache(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`, (old) => {
+          if (!Array.isArray(old)) return [updatedCycle];
+          return old.map(c => (c.id === updatedCycle.id ? updatedCycle : c));
+        });
+
         if (cicloSel?.id === editingCycle.id) {
           const nextRec = {
             ...(clinicalRec || {}),
@@ -898,8 +920,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan actualizado exitosamente
           </div>
         );
-        await loadCiclos(editingCycle.id);
-        await loadData(editingCycle, { silent: true, forceFresh: true });
+        await loadCiclos(editingCycle.id, { forceFresh: true });
+        await loadData(updatedCycle, { silent: true, forceFresh: true });
         notifyPlanUpdate("ciclos");
       } else {
         // ── CREACIÓN DE NUEVO PLAN ──
@@ -918,6 +940,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         });
 
         const newCiclo = cRes[0];
+
+        // Actualización optimista inmediata en 0ms para desbloquear herramientas de abajo
+        setCiclos(prev => [
+          newCiclo,
+          ...prev.filter(c => c.id !== newCiclo.id).map(c => ({ ...c, activo: false }))
+        ]);
+        setCicloSel(newCiclo);
+        if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, newCiclo.id);
+
+        invalidateCache("ciclos");
+        updateQueryCache(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`, (old) => {
+          const prev = Array.isArray(old) ? old : [];
+          return [newCiclo, ...prev.filter(c => c.id !== newCiclo.id).map(c => ({ ...c, activo: false }))];
+        });
 
         // Sincronizar servicios en expediente clínico
         const nextRec = {
@@ -1018,9 +1054,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente
           </div>
         );
-        await loadCiclos(newCiclo.id);
-        setCicloSel(newCiclo);
-        if (selected?.id) sessionStorage.setItem(`flux_programar_ciclo_${selected.id}`, newCiclo.id);
+        await loadCiclos(newCiclo.id, { forceFresh: true });
         await loadData(newCiclo, { silent: true, forceFresh: true });
         notifyPlanUpdate("ciclos");
 
@@ -1068,7 +1102,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           activo: true
         });
         activeCiclo = cRes[0];
-        await loadCiclos(activeCiclo.id);
+        setCiclos(prev => [activeCiclo, ...prev.filter(c => c.id !== activeCiclo.id).map(c => ({ ...c, activo: false }))]);
+        setCicloSel(activeCiclo);
+        invalidateCache("ciclos");
+        await loadCiclos(activeCiclo.id, { forceFresh: true });
       }
 
       setCicloSel(activeCiclo);
@@ -1162,7 +1199,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           activo: true
         });
         activeCiclo = cRes[0];
-        await loadCiclos(activeCiclo.id);
+        setCiclos(prev => [activeCiclo, ...prev.filter(c => c.id !== activeCiclo.id).map(c => ({ ...c, activo: false }))]);
+        setCicloSel(activeCiclo);
+        invalidateCache("ciclos");
+        await loadCiclos(activeCiclo.id, { forceFresh: true });
       }
 
       // Limpiar rutinas fantasma vacías (0 ejercicios) en este ciclo si existían
