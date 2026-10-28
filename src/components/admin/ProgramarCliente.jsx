@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -2187,8 +2187,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 </div>
               </div>
 
-              {/* Right: Expediente */}
+              {/* Right: Histórico & Expediente */}
               <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setSubtab("historico")}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all shadow-2xs cursor-pointer shrink-0 ${
+                    subtab === "historico"
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                      : "border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929]"
+                  }`}
+                  title="Ver gráficas de progreso histórico plan a plan"
+                >
+                  <TrendingUp className={`w-3.5 h-3.5 ${subtab === "historico" ? "text-white" : "text-[var(--brand-primary)]"}`} />
+                  <span>Histórico</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowExpediente(true)}
@@ -2382,6 +2396,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Evaluación" },
           ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
           ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Entrenamiento" }] : []),
+          { k:"historico", ic: <TrendingUp className="w-4 h-4 shrink-0"/>, lb:"Histórico" },
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
@@ -2662,6 +2677,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           mode="evaluaciones"
           cicloActivo={cicloSel}
           isReadOnly={isReadOnly}
+        />
+      </Suspense>
+    )}
+
+    {subtab === "historico" && (
+      <Suspense fallback={<ListSkeleton rows={4} />}>
+        <ProgresoCliente
+          selected={selected}
+          setMsg={setMsg}
+          isMiPlan={isMiPlan}
+          mode="historico"
+          cicloActivo={cicloSel}
+          isReadOnly={false}
         />
       </Suspense>
     )}
