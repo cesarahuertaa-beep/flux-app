@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -34,6 +34,14 @@ import TemplatesManagerModal from "../ui/TemplatesManagerModal";
 import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
+import SeguimientoClinicoCard from "../clinical/SeguimientoClinicoCard";
+
+const sanitizeWhatsAppPhone = (phone) => {
+  if (!phone) return "";
+  let clean = String(phone).replace(/\D/g, "");
+  if (clean.length === 10) clean = "52" + clean;
+  return clean;
+};
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -1771,12 +1779,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </div>
                   <div className="text-xs text-[#6B7A8D] truncate mt-0.5 flex items-center gap-2 flex-wrap">
                     <span className="truncate">{selected.email}</span>
-                    {selected.telefono && <span className="shrink-0">• {selected.telefono}</span>}
+                    {selected.telefono && (
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span>•</span>
+                        <a
+                          href={`https://wa.me/${sanitizeWhatsAppPhone(selected.telefono)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:underline font-semibold transition-colors"
+                          title="Abrir chat de WhatsApp con el paciente"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                          <span>{selected.telefono}</span>
+                        </a>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Right: Expediente + Service Pillars Toggles (Pilares de Servicio) */}
+              {/* Right: Expediente + Reiniciar Cuestionario */}
               <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
@@ -1793,20 +1815,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (window.confirm("¿Deseas reiniciar o volver a realizar el cuestionario inicial de este paciente? Se limpiará el registro inicial para poder responderlo o solicitarlo nuevamente.")) {
-                      const next = {
-                        ...clinicalRec,
-                        anamnesis_completada: false,
-                        draft_step: null,
-                        draft_anamnesis: null,
-                        solicitud_activa: null,
-                        solicitud_fecha: null,
-                        anamnesis: { ...EMPTY_ANAMNESIS },
-                      };
-                      const saved = await saveClinicalRecord(selected.id, next);
-                      setClinicalRec(saved);
-                    }
+                  onClick={() => {
+                    setConfirmDelete({
+                      title: "¿Reiniciar Cuestionario Inicial?",
+                      description: "Se limpiará el expediente inicial de este paciente para que puedas volver a responder el cuestionario de 3 páginas o solicitárselo nuevamente.",
+                      confirmText: "Sí, reiniciar",
+                      cancelText: "Cancelar",
+                      danger: false,
+                      icon: "alert",
+                      onConfirm: async () => {
+                        const next = {
+                          ...clinicalRec,
+                          anamnesis_completada: false,
+                          draft_step: null,
+                          draft_anamnesis: null,
+                          solicitud_activa: null,
+                          solicitud_fecha: null,
+                          anamnesis: { ...EMPTY_ANAMNESIS },
+                        };
+                        const saved = await saveClinicalRecord(selected.id, next);
+                        setClinicalRec(saved);
+                        setConfirmDelete(null);
+                        if (setMsg) {
+                          setMsg(
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-green-500" /> Cuestionario reiniciado
+                            </div>
+                          );
+                        }
+                      },
+                    });
                   }}
                   className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-[#E2E8F0] bg-white hover:bg-rose-50 text-[#6B7A8D] hover:text-rose-600 transition-all cursor-pointer shrink-0"
                   title="Reiniciar cuestionario inicial para volver a evaluarlo desde cero"
@@ -1814,44 +1852,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Reiniciar Cuestionario</span>
                 </button>
-
-                <div className="h-4 w-px bg-[#E2E8F0] hidden sm:block mx-0.5" />
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider hidden md:inline mr-0.5">Servicios:</span>
-                  
-                  {/* Nutrición Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => togglePilarServicio("nutricion")}
-                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      serviciosActivos.nutricion
-                        ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
-                        : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
-                    }`}
-                    title={serviciosActivos.nutricion ? "Nutrición activa para este paciente" : "Nutrición desactivada"}
-                  >
-                    <Utensils className="w-3.5 h-3.5 shrink-0" />
-                    <span>Nutrición</span>
-                    {serviciosActivos.nutricion ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
-                  </button>
-
-                  {/* Entrenamiento Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => togglePilarServicio("entrenamiento")}
-                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      serviciosActivos.entrenamiento
-                        ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
-                        : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
-                    }`}
-                    title={serviciosActivos.entrenamiento ? "Entrenamiento activo para este paciente" : "Entrenamiento desactivada"}
-                  >
-                    <Dumbbell className="w-3.5 h-3.5 shrink-0" />
-                    <span>Entreno</span>
-                    {serviciosActivos.entrenamiento ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
-                  </button>
-                </div>
               </div>
 
             </div>
@@ -1963,6 +1963,64 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </>
         )}
       </div>
+
+      {/* ── Servicios Asignados (Debajo del Cuadro de Planes) ── */}
+      {!isMiPlan && (
+        <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+              Servicios Asignados:
+            </span>
+            <span className="text-xs text-[#6B7A8D]">
+              Activa o desactiva las áreas para este paciente
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Nutrición Toggle */}
+            <button
+              type="button"
+              onClick={() => togglePilarServicio("nutricion")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                serviciosActivos.nutricion
+                  ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
+                  : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
+              }`}
+              title={serviciosActivos.nutricion ? "Nutrición activa para este paciente" : "Nutrición desactivada"}
+            >
+              <Utensils className="w-3.5 h-3.5 shrink-0" />
+              <span>Nutrición</span>
+              {serviciosActivos.nutricion ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
+            </button>
+
+            {/* Entrenamiento Toggle */}
+            <button
+              type="button"
+              onClick={() => togglePilarServicio("entrenamiento")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                serviciosActivos.entrenamiento
+                  ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
+                  : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
+              }`}
+              title={serviciosActivos.entrenamiento ? "Entrenamiento activo para este paciente" : "Entrenamiento desactivado"}
+            >
+              <Dumbbell className="w-3.5 h-3.5 shrink-0" />
+              <span>Entreno</span>
+              {serviciosActivos.entrenamiento ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Seguimiento Clínico y Check-ins (Debajo del Cuadro de Planes) ── */}
+      {!isMiPlan && (
+        <SeguimientoClinicoCard
+          cliente={selected}
+          clinicalRec={clinicalRec}
+          onUpdated={(rec) => setClinicalRec(rec)}
+          setMsg={setMsg}
+        />
+      )}
 
       {/* ── 🔴 Sub-tabs 🔴 ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">

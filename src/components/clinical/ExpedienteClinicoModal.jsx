@@ -1,32 +1,26 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   ClipboardList,
-  Activity,
-  Send,
-  Check,
-  Calendar,
-  Trash2,
   HeartPulse,
   Utensils,
   Clock,
   RotateCcw,
+  Check,
+  Send,
+  Calendar,
+  AlertCircle,
+  CheckCircle2
 } from "lucide-react";
 import {
   EMPTY_ANAMNESIS,
-  EMPTY_CHECKIN,
   peekClinicalRecord,
   fetchClinicalRecord,
   saveClinicalRecord,
 } from "../../lib/clinicalRecord";
-import { dbPost } from "../../lib/supabase";
-
-const SCALE_ITEMS = [
-  { key: "energia", label: "Energía diaria" },
-  { key: "saciedad", label: "Control de saciedad" },
-  { key: "digestion", label: "Digestión" },
-  { key: "descanso", label: "Calidad de sueño" },
-];
+import { dbPatch, dbPost } from "../../lib/supabase";
+import { ConfirmModal } from "../ui/ConfirmModal";
+import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
 
 const fmtDate = (d) => {
   if (!d) return "";
@@ -40,82 +34,93 @@ const fmtDate = (d) => {
 };
 
 export default function ExpedienteClinicoModal({
+  cliente,
   isOpen,
   onClose,
-  cliente,
   mode = "nutriologo", // 'nutriologo' | 'paciente'
-  initialSection = null, // 'historia' | 'seguimiento'
-  adherenciaSummary = null, // { comidasPct, aguaPromedioL }
-  onSaved,
+  initialSection = null,
+  onSaved = null,
 }) {
   const clienteId = cliente?.id;
   const [record, setRecord] = useState(() => peekClinicalRecord(clienteId));
-  const [activeTab, setActiveTab] = useState("historia"); // 'historia' | 'seguimiento'
   const [historiaStep, setHistoriaStep] = useState("clinico"); // 'clinico' | 'habitos' | 'r24h'
+  
+  // Perfil básico editable
+  const [perfil, setPerfil] = useState({
+    fecha_nacimiento: cliente?.fecha_nacimiento || "",
+    sexo: cliente?.genero || cliente?.sexo || "M",
+    telefono: cliente?.telefono || "",
+  });
+
   const [anamnesis, setAnamnesis] = useState(() => ({
     ...EMPTY_ANAMNESIS,
-    ...peekClinicalRecord(clienteId).anamnesis,
+    ...(peekClinicalRecord(clienteId)?.anamnesis || {}),
   }));
-  const [checkinForm, setCheckinForm] = useState({ ...EMPTY_CHECKIN });
+
   const [saving, setSaving] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !clienteId) return;
     const local = peekClinicalRecord(clienteId);
     setRecord(local);
-    setAnamnesis({ ...EMPTY_ANAMNESIS, ...local.anamnesis });
-
-    if (initialSection) {
-      setActiveTab(initialSection);
-    } else if (mode === "paciente") {
-      setActiveTab(
-        local.solicitud_activa === "checkin_seguimiento"
-          ? "seguimiento"
-          : "historia"
-      );
-    }
+    setAnamnesis({ ...EMPTY_ANAMNESIS, ...(local.anamnesis || {}) });
+    setPerfil({
+      fecha_nacimiento: local?.anamnesis?.fecha_nacimiento || cliente?.fecha_nacimiento || "",
+      sexo: local?.anamnesis?.sexo || cliente?.genero || cliente?.sexo || "M",
+      telefono: cliente?.telefono || "",
+    });
 
     fetchClinicalRecord(clienteId).then((fresh) => {
       setRecord(fresh);
-      setAnamnesis({ ...EMPTY_ANAMNESIS, ...fresh.anamnesis });
-      if (!initialSection && mode === "paciente") {
-        setActiveTab(
-          fresh.solicitud_activa === "checkin_seguimiento"
-            ? "seguimiento"
-            : "historia"
-        );
+      setAnamnesis({ ...EMPTY_ANAMNESIS, ...(fresh?.anamnesis || {}) });
+      if (fresh?.anamnesis?.fecha_nacimiento || fresh?.anamnesis?.sexo) {
+        setPerfil((prev) => ({
+          ...prev,
+          fecha_nacimiento: fresh.anamnesis.fecha_nacimiento || prev.fecha_nacimiento,
+          sexo: fresh.anamnesis.sexo || prev.sexo,
+        }));
       }
     });
-  }, [isOpen, clienteId, initialSection, mode]);
+  }, [isOpen, clienteId, cliente]);
 
   if (!isOpen || !cliente) return null;
 
-  const updAnamnesis = (k, v) =>
-    setAnamnesis((prev) => ({ ...prev, [k]: v }));
+  const updAnamnesis = (k, v) => setAnamnesis((prev) => ({ ...prev, [k]: v }));
+  const updPerfil = (k, v) => setPerfil((prev) => ({ ...prev, [k]: v }));
 
-  const handleSaveAnamnesis = async () => {
+  const edadNum = perfil.fecha_nacimiento ? calcEdadFromBirthdate(perfil.fecha_nacimiento) : null;
+
+  // Guardar cambios en el expediente e información del cliente
+  const handleSaveExpediente = async () => {
     setSaving(true);
     try {
-      const isPatientCompleting = mode === "paciente" && record.solicitud_activa === "historia_inicial";
+      // 1. Guardar cambios en la tabla clientes si cambiaron datos
+      const patchData = {};
+      if (perfil.fecha_nacimiento !== cliente.fecha_nacimiento) patchData.fecha_nacimiento = perfil.fecha_nacimiento || null;
+      if (perfil.sexo && perfil.sexo !== cliente.genero) patchData.genero = perfil.sexo;
+      if (perfil.telefono && perfil.telefono !== cliente.telefono) patchData.telefono = perfil.telefono;
+      if (Object.keys(patchData).length > 0) {
+        await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
+      }
+
+      // 2. Guardar en expediente clínico
+      const updatedAnamnesis = {
+        ...anamnesis,
+        fecha_nacimiento: perfil.fecha_nacimiento || null,
+        sexo: perfil.sexo,
+        updated_at: new Date().toISOString(),
+        completado_por: anamnesis.completado_por || mode,
+      };
+
       const next = {
         ...record,
-        draft_step: null,
-        draft_anamnesis: null,
         anamnesis_completada: true,
-        anamnesis: {
-          ...anamnesis,
-          updated_at: new Date().toISOString(),
-          completado_por: mode,
-        },
-        solicitud_activa:
-          mode === "paciente" && record.solicitud_activa === "historia_inicial"
-            ? null
-            : record.solicitud_activa,
-        ultima_respuesta_paciente:
-          mode === "paciente"
-            ? new Date().toISOString()
-            : record.ultima_respuesta_paciente,
+        anamnesis: updatedAnamnesis,
+        solicitud_activa: mode === "paciente" && record.solicitud_activa === "historia_inicial" ? null : record.solicitud_activa,
+        ultima_respuesta_paciente: mode === "paciente" ? new Date().toISOString() : record.ultima_respuesta_paciente,
       };
+
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);
 
@@ -123,8 +128,8 @@ export default function ExpedienteClinicoModal({
       if (mode === "paciente" && cliente?.nutriologo_id) {
         dbPost("notificaciones", {
           profile_id: cliente.nutriologo_id,
-          titulo: "Expediente completado",
-          mensaje: `${cliente.nombre || "Tu paciente"} ha completado su expediente clínico inicial.`,
+          titulo: "Expediente actualizado",
+          mensaje: `${cliente.nombre || "Tu paciente"} ha completado o actualizado su expediente clínico.`,
           tipo: "expediente",
           link_url: "clientes",
           entidad_id: cliente.id,
@@ -132,20 +137,14 @@ export default function ExpedienteClinicoModal({
       }
 
       if (onSaved) onSaved(saved);
-      if (mode === "paciente") onClose();
+      onClose();
     } finally {
       setSaving(false);
     }
   };
 
-  const handleResetAnamnesis = async () => {
-    if (
-      !window.confirm(
-        "¿Deseas reiniciar el cuestionario inicial de este paciente? Se limpiarán las respuestas registradas y podrás volver a llenarlo o solicitarlo desde cero."
-      )
-    ) {
-      return;
-    }
+  // Reiniciar cuestionario (con ConfirmModal nativo)
+  const executeResetAnamnesis = async () => {
     setSaving(true);
     try {
       const next = {
@@ -160,6 +159,7 @@ export default function ExpedienteClinicoModal({
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);
       setAnamnesis({ ...EMPTY_ANAMNESIS });
+      setShowConfirmReset(false);
       if (onSaved) onSaved(saved);
       onClose();
     } finally {
@@ -167,65 +167,14 @@ export default function ExpedienteClinicoModal({
     }
   };
 
-  const handleSaveCheckin = async () => {
-    setSaving(true);
-    try {
-      const newEntry = {
-        id: `${Date.now()}`,
-        fecha: new Date().toISOString().split("T")[0],
-        energia: Number(checkinForm.energia) || 4,
-        saciedad: Number(checkinForm.saciedad) || 4,
-        digestion: Number(checkinForm.digestion) || 4,
-        descanso: Number(checkinForm.descanso) || 4,
-        observaciones: (checkinForm.observaciones || "").trim(),
-        ajustes_solicitados: (checkinForm.ajustes_solicitados || "").trim(),
-        adherencia_comidas_pct: adherenciaSummary?.comidasPct ?? null,
-        adherencia_agua_l: adherenciaSummary?.aguaPromedioL ?? null,
-        autor: mode,
-      };
-      const next = {
-        ...record,
-        checkins: [newEntry, ...(record.checkins || [])].slice(0, 30),
-        solicitud_activa:
-          mode === "paciente" &&
-          record.solicitud_activa === "checkin_seguimiento"
-            ? null
-            : record.solicitud_activa,
-        ultima_respuesta_paciente:
-          mode === "paciente"
-            ? new Date().toISOString()
-            : record.ultima_respuesta_paciente,
-      };
-      const saved = await saveClinicalRecord(clienteId, next);
-      setRecord(saved);
-      setCheckinForm({ ...EMPTY_CHECKIN });
-      if (onSaved) onSaved(saved);
-      if (mode === "paciente") onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteCheckin = async (id) => {
-    const next = {
-      ...record,
-      checkins: (record.checkins || []).filter((c) => c.id !== id),
-    };
-    const saved = await saveClinicalRecord(clienteId, next);
-    setRecord(saved);
-    if (onSaved) onSaved(saved);
-  };
-
-  const targetRequestType =
-    activeTab === "historia" ? "historia_inicial" : "checkin_seguimiento";
-  const isCurrentlyRequested = record.solicitud_activa === targetRequestType;
+  const isCurrentlyRequested = record.solicitud_activa === "historia_inicial";
 
   const togglePatientRequest = async () => {
     setSaving(true);
     try {
       const next = {
         ...record,
-        solicitud_activa: isCurrentlyRequested ? null : targetRequestType,
+        solicitud_activa: isCurrentlyRequested ? null : "historia_inicial",
         solicitud_fecha: isCurrentlyRequested ? null : new Date().toISOString(),
       };
       const saved = await saveClinicalRecord(clienteId, next);
@@ -237,7 +186,7 @@ export default function ExpedienteClinicoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl border border-[#E2E8F0] overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
@@ -247,15 +196,11 @@ export default function ExpedienteClinicoModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
-                {mode === "paciente"
-                  ? activeTab === "seguimiento"
-                    ? "Check-in de Seguimiento"
-                    : "Historia Clínica"
-                  : `Expediente · ${cliente.nombre}`}
+                {mode === "paciente" ? "Historia Clínica y Hábitos" : `Expediente · ${cliente.nombre}`}
               </h2>
-              {anamnesis.updated_at && activeTab === "historia" && (
+              {anamnesis.updated_at && (
                 <p className="text-[11px] text-[#6B7A8D]">
-                  Actualizado {fmtDate(anamnesis.updated_at)}
+                  Última actualización: {fmtDate(anamnesis.updated_at)}
                 </p>
               )}
             </div>
@@ -272,15 +217,18 @@ export default function ExpedienteClinicoModal({
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                     : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
                 }`}
+                title="Solicitar al paciente que responda o actualice desde su app"
               >
                 {isCurrentlyRequested ? (
                   <>
-                    <Check className="w-3.5 h-3.5" /> Solicitado al paciente
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Solicitado</span>
                   </>
                 ) : (
                   <>
-                    <Send className="w-3.5 h-3.5 text-[var(--brand-primary)]" />{" "}
-                    Solicitar al paciente
+                    <Send className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                    <span className="hidden sm:inline">Solicitar al paciente</span>
+                    <span className="sm:hidden">Solicitar</span>
                   </>
                 )}
               </button>
@@ -295,444 +243,339 @@ export default function ExpedienteClinicoModal({
           </div>
         </div>
 
-        {/* Selector principal (Solo visible para nutriólogo o cuando no está bloqueado a un modo) */}
-        {mode === "nutriologo" && (
-          <div className="px-5 pt-3.5 pb-2 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex bg-[#E2E8F0]/60 rounded-xl p-1 gap-1 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setActiveTab("historia")}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === "historia"
-                    ? "bg-white text-[#0B1929] shadow-sm"
-                    : "text-[#6B7A8D] hover:text-[#0B1929]"
-                }`}
-              >
-                Historia Inicial
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("seguimiento")}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeTab === "seguimiento"
-                    ? "bg-white text-[#0B1929] shadow-sm"
-                    : "text-[#6B7A8D] hover:text-[#0B1929]"
-                }`}
-              >
-                Seguimiento
-                {(record.checkins || []).length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]">
-                    {record.checkins.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {activeTab === "historia" && (
-              <div className="flex gap-1 w-full sm:w-auto">
-                {[
-                  { id: "clinico", label: "Clínico", icon: HeartPulse },
-                  { id: "habitos", label: "Hábitos", icon: Clock },
-                  { id: "r24h", label: "R24H", icon: Utensils },
-                ].map((st) => {
-                  const Icon = st.icon;
-                  const active = historiaStep === st.id;
-                  return (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => setHistoriaStep(st.id)}
-                      className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer border ${
-                        active
-                          ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                          : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      {st.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Sub-selector de pasos cuando el paciente llena su Historia Inicial */}
-        {mode === "paciente" && activeTab === "historia" && (
-          <div className="px-5 py-2.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex gap-1.5">
+        {/* Sub-tabs de navegación de las 3 áreas del Expediente */}
+        <div className="px-5 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex gap-1.5 w-full sm:w-auto">
             {[
-              { id: "clinico", label: "1. Salud" },
-              { id: "habitos", label: "2. Hábitos" },
-              { id: "r24h", label: "3. Día habitual" },
-            ].map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => setHistoriaStep(st.id)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
-                  historiaStep === st.id
-                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                    : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
-                }`}
-              >
-                {st.label}
-              </button>
-            ))}
+              { id: "clinico", label: "1. Clínico", icon: HeartPulse },
+              { id: "habitos", label: "2. Hábitos", icon: Clock },
+              { id: "r24h", label: "3. R24H", icon: Utensils },
+            ].map((st) => {
+              const Icon = st.icon;
+              const active = historiaStep === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setHistoriaStep(st.id)}
+                  className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                    active
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-xs"
+                      : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{st.label}</span>
+                </button>
+              );
+            })}
           </div>
-        )}
 
-        {/* Body */}
+          {anamnesis.completado_por && (
+            <span className="text-[11px] font-semibold text-[#6B7A8D] bg-slate-100 px-2.5 py-1 rounded-lg">
+              Llenado por: {anamnesis.completado_por === "paciente" ? "Paciente" : "Nutriólogo"}
+            </span>
+          )}
+        </div>
+
+        {/* Body del Expediente */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {activeTab === "historia" ? (
-            <>
-              {historiaStep === "clinico" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
+          {/* SECCIÓN 1: CLÍNICO */}
+          {historiaStep === "clinico" && (
+            <div className="space-y-4">
+              {/* Datos biológicos */}
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4">
+                <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-3">
+                  Datos Biológicos del Paciente
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Condiciones médicas o patologías
+                      Fecha de Nacimiento {edadNum !== null && <span className="text-[var(--brand-primary)] font-normal">({edadNum} años)</span>}
                     </label>
                     <input
-                      type="text"
-                      value={anamnesis.patologias}
-                      onChange={(e) =>
-                        updAnamnesis("patologias", e.target.value)
-                      }
-                      placeholder="Ej. Ninguna, resistencia a la insulina, hipotiroidismo..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Medicación y suplementación actual
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.medicacion_suplementos}
-                      onChange={(e) =>
-                        updAnamnesis("medicacion_suplementos", e.target.value)
-                      }
-                      placeholder="Ej. Creatina 5g, Omega 3, Metformina..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                      type="date"
+                      value={perfil.fecha_nacimiento}
+                      onChange={(e) => updPerfil("fecha_nacimiento", e.target.value)}
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Alergias o intolerancias
+                      Sexo Biológico
                     </label>
-                    <input
-                      type="text"
-                      value={anamnesis.alergias_intolerancias}
-                      onChange={(e) =>
-                        updAnamnesis("alergias_intolerancias", e.target.value)
-                      }
-                      placeholder="Ej. Lactosa, mariscos..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Digestión / Síntomas GI
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.sintomas_gi}
-                      onChange={(e) =>
-                        updAnamnesis("sintomas_gi", e.target.value)
-                      }
-                      placeholder="Ej. Normal, inflamación, reflujo..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Horas de sueño promedio
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={anamnesis.horas_sueno}
-                      onChange={(e) =>
-                        updAnamnesis("horas_sueno", e.target.value)
-                      }
-                      placeholder="Ej. 7.5"
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Nivel de estrés (1 bajo – 5 alto)
-                    </label>
-                    <div className="flex gap-1.5">
-                      {["1", "2", "3", "4", "5"].map((lvl) => (
+                    <div className="flex gap-2">
+                      {[
+                        { k: "M", lb: "Masculino" },
+                        { k: "F", lb: "Femenino" },
+                      ].map((sx) => (
                         <button
-                          key={lvl}
+                          key={sx.k}
                           type="button"
-                          onClick={() => updAnamnesis("nivel_estres", lvl)}
+                          onClick={() => updPerfil("sexo", sx.k)}
                           className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                            String(anamnesis.nivel_estres) === lvl
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                              : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0]"
-                          }`}
-                        >
-                          {lvl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {historiaStep === "habitos" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Ocupación y actividad diaria
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.ocupacion_actividad}
-                      onChange={(e) =>
-                        updAnamnesis("ocupacion_actividad", e.target.value)
-                      }
-                      placeholder="Ej. Oficina sentado 8h, entrena 6pm..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Horarios habituales de comida
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.horarios_comida}
-                      onChange={(e) =>
-                        updAnamnesis("horarios_comida", e.target.value)
-                      }
-                      placeholder="Ej. 8:00 am, 2:30 pm, 9:00 pm"
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Alimentos preferidos
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.preferencias_alimentos}
-                      onChange={(e) =>
-                        updAnamnesis("preferencias_alimentos", e.target.value)
-                      }
-                      placeholder="Ej. Pollo, huevo, avena, arroz, aguacate..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Alimentos que evita o no le gustan
-                    </label>
-                    <input
-                      type="text"
-                      value={anamnesis.aversiones_alimentos}
-                      onChange={(e) =>
-                        updAnamnesis("aversiones_alimentos", e.target.value)
-                      }
-                      placeholder="Ej. Atún, brócoli, hígado..."
-                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {historiaStep === "r24h" && (
-                <div className="space-y-3">
-                  {[
-                    { key: "r24h_desayuno", label: "Desayuno habitual" },
-                    { key: "r24h_colacion_m", label: "Colación matutina" },
-                    { key: "r24h_comida", label: "Comida" },
-                    { key: "r24h_colacion_v", label: "Colación vespertina" },
-                    { key: "r24h_cena", label: "Cena" },
-                  ].map((item) => (
-                    <div key={item.key}>
-                      <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                        {item.label}
-                      </label>
-                      <input
-                        type="text"
-                        value={anamnesis[item.key]}
-                        onChange={(e) => updAnamnesis(item.key, e.target.value)}
-                        placeholder="Alimentos y cantidades aproximadas..."
-                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-5">
-              {/* Adherencia automática FLUX si existe */}
-              {adherenciaSummary && (
-                <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-3 rounded-xl border border-[#E2E8F0]">
-                  <div>
-                    <div className="text-[11px] font-bold text-[#6B7A8D] uppercase">
-                      Adherencia Comidas
-                    </div>
-                    <div className="text-base font-extrabold text-[#0B1929]">
-                      {adherenciaSummary.comidasPct != null
-                        ? `${adherenciaSummary.comidasPct}%`
-                        : "Sin registros"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-[#6B7A8D] uppercase">
-                      Agua Promedio
-                    </div>
-                    <div className="text-base font-extrabold text-[#0B1929]">
-                      {adherenciaSummary.aguaPromedioL != null
-                        ? `${adherenciaSummary.aguaPromedioL} L/día`
-                        : "Sin registros"}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Escalas rápidas 1-5 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {SCALE_ITEMS.map((sc) => (
-                  <div
-                    key={sc.key}
-                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-[#0B1929]">
-                        {sc.label}
-                      </span>
-                      <span className="text-xs font-extrabold text-[var(--brand-primary)]">
-                        {checkinForm[sc.key]}/5
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() =>
-                            setCheckinForm((p) => ({ ...p, [sc.key]: n }))
-                          }
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
-                            Number(checkinForm[sc.key]) === n
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                            perfil.sexo === sx.k
+                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                               : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
                           }`}
                         >
-                          {n}
+                          {sx.lb}
                         </button>
                       ))}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
 
+              {/* Patologías */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Condiciones médicas o patologías
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.patologias}
+                  onChange={(e) => updAnamnesis("patologias", e.target.value)}
+                  placeholder="Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Medicación */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Medicación y suplementación actual
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.medicacion_suplementos}
+                  onChange={(e) => updAnamnesis("medicacion_suplementos", e.target.value)}
+                  placeholder="Ej. Creatina 5g, Omega 3, Metformina..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Alergias y Digestión */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Sensaciones de la semana
+                    Alergias o intolerancias alimentarias
                   </label>
                   <input
                     type="text"
-                    value={checkinForm.observaciones}
-                    onChange={(e) =>
-                      setCheckinForm((p) => ({
-                        ...p,
-                        observaciones: e.target.value,
-                      }))
-                    }
-                    placeholder="Rendimiento, ansiedad, eventos..."
+                    value={anamnesis.alergias_intolerancias}
+                    onChange={(e) => updAnamnesis("alergias_intolerancias", e.target.value)}
+                    placeholder="Ej. Lactosa, mariscos, cacahuate, gluten..."
                     className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Ajustes para el siguiente menú
+                    Digestión / Síntomas GI
                   </label>
                   <input
                     type="text"
-                    value={checkinForm.ajustes_solicitados}
-                    onChange={(e) =>
-                      setCheckinForm((p) => ({
-                        ...p,
-                        ajustes_solicitados: e.target.value,
-                      }))
-                    }
-                    placeholder="Cambiar desayuno, opciones rápidas..."
+                    value={anamnesis.sintomas_gi}
+                    onChange={(e) => updAnamnesis("sintomas_gi", e.target.value)}
+                    placeholder="Ej. Normal, reflujo, colitis, estreñimiento..."
                     className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
               </div>
 
-              {/* Historial de Check-ins (vista nutriólogo) */}
-              {mode === "nutriologo" && (record.checkins || []).length > 0 && (
-                <div className="pt-2 border-t border-[#E2E8F0]">
-                  <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-2.5">
-                    Bitácora de seguimientos
-                  </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {record.checkins.map((c) => (
-                      <div
-                        key={c.id}
-                        className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-xs flex items-start justify-between gap-3"
+              {/* Cirugías o lesiones */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Cirugías previas o lesiones activas
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.cirugias_lesiones || ""}
+                  onChange={(e) => updAnamnesis("cirugias_lesiones", e.target.value)}
+                  placeholder="Ej. Apendicectomía (2020), lesión menisco rodilla derecha..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 2: HÁBITOS Y ESTILO DE VIDA */}
+          {historiaStep === "habitos" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Ocupación y actividad diaria
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.ocupacion_actividad}
+                    onChange={(e) => updAnamnesis("ocupacion_actividad", e.target.value)}
+                    placeholder="Ej. Trabajo de oficina sentado 8h, entrena pesas 5pm..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Horas de sueño promedio
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={anamnesis.horas_sueno}
+                    onChange={(e) => updAnamnesis("horas_sueno", e.target.value)}
+                    placeholder="Ej. 7.5"
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              </div>
+
+              {/* Estrés y Agua */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Nivel de estrés autopercibido (1 a 5)
+                  </label>
+                  <div className="flex gap-1.5">
+                    {["1", "2", "3", "4", "5"].map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => updAnamnesis("nivel_estres", lvl)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                          String(anamnesis.nivel_estres) === lvl
+                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                            : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0]"
+                        }`}
                       >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-[#0B1929] flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                              {fmtDate(c.fecha)}
-                            </span>
-                            <span className="text-[#6B7A8D]">
-                              Energía <b>{c.energia}/5</b> · Saciedad{" "}
-                              <b>{c.saciedad}/5</b> · Digestión{" "}
-                              <b>{c.digestion}/5</b> · Sueño{" "}
-                              <b>{c.descanso}/5</b>
-                            </span>
-                          </div>
-                          {c.observaciones && (
-                            <p className="text-[#0B1929]">{c.observaciones}</p>
-                          )}
-                          {c.ajustes_solicitados && (
-                            <p className="text-[var(--brand-primary)] font-semibold">
-                              Ajustes: {c.ajustes_solicitados}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCheckin(c.id)}
-                          className="text-[#6B7A8D] hover:text-red-600 p-1 cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                        {lvl}
+                      </button>
                     ))}
                   </div>
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Consumo de agua estimado
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.consumo_agua_estimado || ""}
+                    onChange={(e) => updAnamnesis("consumo_agua_estimado", e.target.value)}
+                    placeholder="Ej. 2 a 2.5 litros al día..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              </div>
+
+              {/* Alcohol / Tabaco */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Consumo de alcohol o tabaco
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.consumo_alcohol_tabaco || ""}
+                  onChange={(e) => updAnamnesis("consumo_alcohol_tabaco", e.target.value)}
+                  placeholder="Ej. Social 1 vez por quincena, no fuma..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Preferencias y Aversiones */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Alimentos preferidos
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.preferencias_alimentos}
+                    onChange={(e) => updAnamnesis("preferencias_alimentos", e.target.value)}
+                    placeholder="Ej. Pollo, huevo, avena, arroz, aguacate..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Alimentos que evita o no le gustan
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.aversiones_alimentos}
+                    onChange={(e) => updAnamnesis("aversiones_alimentos", e.target.value)}
+                    placeholder="Ej. Atún, brócoli, champiñones, hígado..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 3: R24H Y EXPECTATIVAS */}
+          {historiaStep === "r24h" && (
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Horarios habituales de comida
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.horarios_comida}
+                  onChange={(e) => updAnamnesis("horarios_comida", e.target.value)}
+                  placeholder="Ej. Desayuno 8:00 am, Comida 2:30 pm, Cena 9:00 pm"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {[
+                { key: "r24h_desayuno", label: "Desayuno habitual" },
+                { key: "r24h_colacion_m", label: "Colación matutina" },
+                { key: "r24h_comida", label: "Comida habitual" },
+                { key: "r24h_colacion_v", label: "Colación vespertina" },
+                { key: "r24h_cena", label: "Cena habitual" },
+              ].map((item) => (
+                <div key={item.key}>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    {item.label}
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis[item.key] || ""}
+                    onChange={(e) => updAnamnesis(item.key, e.target.value)}
+                    placeholder="Alimentos y porciones aproximadas..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Objetivo principal y expectativas del paciente
+                </label>
+                <textarea
+                  rows={2}
+                  value={anamnesis.objetivo_expectativas || ""}
+                  onChange={(e) => updAnamnesis("objetivo_expectativas", e.target.value)}
+                  placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular, mejorar relación con la comida..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
+                />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer del Modal */}
         <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
-          {mode === "nutriologo" && activeTab === "historia" ? (
+          {mode === "nutriologo" ? (
             <button
               type="button"
               disabled={saving}
-              onClick={handleResetAnamnesis}
+              onClick={() => setShowConfirmReset(true)}
               className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Borra la historia inicial para volver a realizar el cuestionario inicial de 3 páginas"
+              title="Borra la historia inicial para volver a realizar el cuestionario de 3 páginas"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reiniciar Cuestionario Inicial</span>
+              <span>Reiniciar Cuestionario</span>
             </button>
           ) : (
             <div />
@@ -749,20 +592,27 @@ export default function ExpedienteClinicoModal({
             <button
               type="button"
               disabled={saving}
-              onClick={
-                activeTab === "historia" ? handleSaveAnamnesis : handleSaveCheckin
-              }
-              className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+              onClick={handleSaveExpediente}
+              className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50 shadow-sm"
             >
-              {saving
-                ? "Guardando..."
-                : activeTab === "historia"
-                ? "Guardar Historia"
-                : "Registrar Check-in"}
+              {saving ? "Guardando..." : "Guardar Cambios"}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal Nativo de Confirmación para Reiniciar */}
+      <ConfirmModal
+        isOpen={showConfirmReset}
+        onClose={() => setShowConfirmReset(false)}
+        onConfirm={executeResetAnamnesis}
+        title="¿Reiniciar Cuestionario Inicial?"
+        description="Se limpiará el registro inicial del paciente para que puedas volver a responder el cuestionario de 3 páginas o solicitárselo nuevamente."
+        confirmText="Sí, reiniciar"
+        cancelText="Cancelar"
+        danger={false}
+        icon="alert"
+      />
     </div>
   );
 }
