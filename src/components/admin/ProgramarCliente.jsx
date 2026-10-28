@@ -173,6 +173,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       clonarAnterior: true,
     };
   });
+  const [autoOpenCheckinTrigger, setAutoOpenCheckinTrigger] = useState(0);
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[] });
@@ -249,63 +250,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [cicloSel, clinicalRec?.servicios_activos]);
 
   const serviciosActivos = parsedActiveCycle.servicios;
-
-  const togglePilarServicio = async (pilar) => {
-    if (!selected?.id) return;
-    const currentActivos = parsedActiveCycle.servicios;
-    const nextVal = !currentActivos[pilar];
-    
-    // Evitar apagar ambos pilares
-    if (!nextVal) {
-      const other = pilar === "nutricion" ? "entrenamiento" : "nutricion";
-      if (!currentActivos[other]) {
-        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-500" /> El plan debe tener al menos un servicio activo</div>);
-        return;
-      }
-    }
-
-    const nextServices = {
-      ...currentActivos,
-      [pilar]: nextVal
-    };
-
-    if (cicloSel) {
-      const sList = [];
-      if (nextServices.nutricion) sList.push("nutri");
-      if (nextServices.entrenamiento) sList.push("entreno");
-      const serviciosStr = sList.join(",");
-
-      const existingParts = (cicloSel.nombre || "").split("|");
-      const prefix = existingParts[0] || "Plan";
-      const weeks = existingParts[1] || "4";
-      const days = existingParts[3] || String(parseInt(weeks) * 7);
-      const enf = existingParts[4] || "";
-      const updatedName = `${prefix}|${weeks}|${serviciosStr}|${days}|${enf}`;
-
-      const updatedCycle = { ...cicloSel, nombre: updatedName };
-      setCicloSel(updatedCycle);
-      setCiclos(prev => prev.map(c => c.id === cicloSel.id ? updatedCycle : c));
-      dbPatch(`ciclos?id=eq.${cicloSel.id}`, { nombre: updatedName }).catch(() => {});
-    }
-
-    const updatedRec = {
-      ...(clinicalRec || {}),
-      servicios_activos: nextServices
-    };
-    setClinicalRec(updatedRec);
-
-    try {
-      await saveClinicalRecord(selected.id, updatedRec);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("flux:expediente-updated", { detail: { clienteId: selected.id } }));
-      }
-      setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Servicios actualizados</div>);
-    } catch(e) {
-      if (!isOfflineError(e)) {
-        setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> Error al actualizar servicios</div>);
-      }
-    }
-  };
 
   // Reorientar subtab si el servicio seleccionado fue desactivado
   useEffect(() => {
@@ -1049,6 +993,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
 
         setShowPlanModal(false);
+        setAutoOpenCheckinTrigger(Date.now());
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("flux:open-checkin"));
+        }
         setMsg(
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-green-500" /> Plan creado exitosamente
@@ -2425,54 +2373,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
           )}
 
-      {/* ── Servicios Asignados (Debajo del Cuadro de Planes) ── */}
-      {!isMiPlan && (
-        <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-              Servicios Asignados:
-            </span>
-            <span className="text-xs text-[#6B7A8D]">
-              Activa o desactiva las áreas para este paciente
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Nutrición Toggle */}
-            <button
-              type="button"
-              onClick={() => togglePilarServicio("nutricion")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                serviciosActivos.nutricion
-                  ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
-                  : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
-              }`}
-              title={serviciosActivos.nutricion ? "Nutrición activa para este paciente" : "Nutrición desactivada"}
-            >
-              <Utensils className="w-3.5 h-3.5 shrink-0" />
-              <span>Nutrición</span>
-              {serviciosActivos.nutricion ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
-            </button>
-
-            {/* Entrenamiento Toggle */}
-            <button
-              type="button"
-              onClick={() => togglePilarServicio("entrenamiento")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                serviciosActivos.entrenamiento
-                  ? "bg-blue-50 text-[var(--brand-primary)] border-[var(--brand-primary)]/30 shadow-2xs"
-                  : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 hover:opacity-100"
-              }`}
-              title={serviciosActivos.entrenamiento ? "Entrenamiento activo para este paciente" : "Entrenamiento desactivado"}
-            >
-              <Dumbbell className="w-3.5 h-3.5 shrink-0" />
-              <span>Entreno</span>
-              {serviciosActivos.entrenamiento ? <Check className="w-3 h-3 text-[var(--brand-primary)] shrink-0" /> : null}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Seguimiento Clínico y Check-ins (Debajo del Cuadro de Planes) ── */}
       {!isMiPlan && (
         <SeguimientoClinicoCard
@@ -2480,6 +2380,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           clinicalRec={clinicalRec}
           onUpdated={(rec) => setClinicalRec(rec)}
           setMsg={setMsg}
+          autoOpenTrigger={autoOpenCheckinTrigger}
         />
       )}
 

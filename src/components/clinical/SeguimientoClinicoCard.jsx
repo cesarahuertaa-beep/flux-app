@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Activity,
   Calendar,
@@ -42,14 +42,38 @@ export default function SeguimientoClinicoCard({
   cliente,
   clinicalRec,
   onUpdated,
-  setMsg
+  setMsg,
+  autoOpenTrigger
 }) {
+  const cardRef = useRef(null);
   const clienteId = cliente?.id;
   const [isExpanded, setIsExpanded] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
   const [checkinForm, setCheckinForm] = useState({ ...EMPTY_CHECKIN });
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  useEffect(() => {
+    if (autoOpenTrigger) {
+      setIsExpanded(true);
+      setShowNewForm(true);
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [autoOpenTrigger]);
+
+  useEffect(() => {
+    const handleOpenCheckin = () => {
+      setIsExpanded(true);
+      setShowNewForm(true);
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    };
+    window.addEventListener("flux:open-checkin", handleOpenCheckin);
+    return () => window.removeEventListener("flux:open-checkin", handleOpenCheckin);
+  }, []);
 
   const checkins = Array.isArray(clinicalRec?.checkins) ? clinicalRec.checkins : [];
   const isRequested = clinicalRec?.solicitud_activa === "checkin_seguimiento";
@@ -164,7 +188,7 @@ export default function SeguimientoClinicoCard({
   };
 
   return (
-    <div className="mb-5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+    <div ref={cardRef} className="mb-5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden scroll-mt-20">
       {/* Header bar del Card */}
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
         <div className="flex items-center gap-3 min-w-0">
