@@ -1798,7 +1798,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 </div>
               </div>
 
-              {/* Right: Expediente + Reiniciar Cuestionario */}
+              {/* Right: Expediente */}
               <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
@@ -1811,46 +1811,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   {clinicalRec?.solicitud_activa && (
                     <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
                   )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmDelete({
-                      title: "¿Reiniciar Cuestionario Inicial?",
-                      description: "Se limpiará el expediente inicial de este paciente para que puedas volver a responder el cuestionario de 3 páginas o solicitárselo nuevamente.",
-                      confirmText: "Sí, reiniciar",
-                      cancelText: "Cancelar",
-                      danger: false,
-                      icon: "alert",
-                      onConfirm: async () => {
-                        const next = {
-                          ...clinicalRec,
-                          anamnesis_completada: false,
-                          draft_step: null,
-                          draft_anamnesis: null,
-                          solicitud_activa: null,
-                          solicitud_fecha: null,
-                          anamnesis: { ...EMPTY_ANAMNESIS },
-                        };
-                        const saved = await saveClinicalRecord(selected.id, next);
-                        setClinicalRec(saved);
-                        setConfirmDelete(null);
-                        if (setMsg) {
-                          setMsg(
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-green-500" /> Cuestionario reiniciado
-                            </div>
-                          );
-                        }
-                      },
-                    });
-                  }}
-                  className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-[#E2E8F0] bg-white hover:bg-rose-50 text-[#6B7A8D] hover:text-rose-600 transition-all cursor-pointer shrink-0"
-                  title="Reiniciar cuestionario inicial para volver a evaluarlo desde cero"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Reiniciar Cuestionario</span>
                 </button>
               </div>
 
