@@ -6,7 +6,7 @@ import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { getCurrentCycleWeekInfo } from "../utils/helpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
 import { CitasCliente } from "../components/CitasCliente";
@@ -16,6 +16,7 @@ import Progreso from "../components/cliente/Progreso";
 import UserProfile from "../components/UserProfile";
 import PerfilNutriologo from "../components/admin/PerfilNutriologo";
 import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
+import NuevoExpedienteForms from "../components/clinical/NuevoExpedienteForms";
 import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
 
 // dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión con retorno mínimo para máxima velocidad
@@ -136,6 +137,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     cliente?.id && cliente?.nutriologo_id ? peekClinicalRecord(cliente.id) : null
   );
   const [showClinicalModal, setShowClinicalModal] = useState(false);
+  const [showIntakeForms, setShowIntakeForms] = useState(false);
 
   const loadData = async ({ silent = false, forceFresh = false } = {}) => {
     if (!silent && dias.length === 0 && rutinas.length === 0 && _peekCiclos === null) {
@@ -470,7 +472,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
             </div>
             <button
               type="button"
-              onClick={() => setShowClinicalModal(true)}
+              onClick={() => {
+                if (clinicalRec?.solicitud_activa === "historia_inicial") {
+                  setShowIntakeForms(true);
+                } else {
+                  setShowClinicalModal(true);
+                }
+              }}
               className="px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity shrink-0 shadow-sm cursor-pointer"
             >
               Completar
@@ -565,6 +573,29 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           adherenciaSummary={adherenciaSummary}
           onSaved={(updatedRec) => setClinicalRec(updatedRec)}
         />
+      )}
+      {showIntakeForms && (
+        <div className="fixed inset-0 z-[120] bg-[#F7F9FC] overflow-y-auto flex flex-col p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl mx-auto flex justify-end mb-1">
+            <button
+              type="button"
+              onClick={() => setShowIntakeForms(false)}
+              className="p-2 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-white transition-colors flex items-center gap-1.5 text-xs font-bold"
+            >
+              <X size={16} />
+              <span>Cerrar</span>
+            </button>
+          </div>
+          <NuevoExpedienteForms
+            cliente={cliente}
+            mode="paciente"
+            onFinished={(savedRec) => {
+              if (savedRec) setClinicalRec(savedRec);
+              setShowIntakeForms(false);
+            }}
+            onBackToList={() => setShowIntakeForms(false)}
+          />
+        </div>
       )}
     </>
   );

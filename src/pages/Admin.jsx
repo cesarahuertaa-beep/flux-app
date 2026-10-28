@@ -27,6 +27,7 @@ import MiMembresia from "../components/admin/MiMembresia";
 import ControlPagos from "../components/admin/ControlPagos";
 import MisComisiones from "../components/admin/MisComisiones";
 import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
+import { peekClinicalRecord } from "../lib/clinicalRecord";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -913,6 +914,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     const primerNombre = (c.nombre || "campeón").trim().split(" ")[0];
     const remitente = myProfile?.nombre_marca || myProfile?.nombre || "tu especialista";
 
+    if (templateType === "cuestionario") {
+      const appUrl = typeof window !== "undefined" ? window.location.origin : "https://flux-sport.com";
+      return `¡Hola ${primerNombre}! 👋 Te saluda ${remitente}. Te recuerdo llenar tu cuestionario inicial en tu app FLUX antes de nuestra cita para tener listo tu plan personalizado: ${appUrl} 💪`;
+    }
+
     if (templateType === "inactividad") {
       const diasTxt = ret.daysInactive ? `llevas ${ret.daysInactive} días` : "llevas unos días";
       return `¡Hola ${primerNombre}! 👋 Te escribe ${remitente}. Noté que ${diasTxt} sin registrar tus comidas o entrenamientos en tu app FLUX. ¿Cómo te has sentido? ¿Se te ha complicado algún ejercicio o comida? Recuerda que estoy aquí para apoyarte y podemos hacer cualquier ajuste que necesites 💪`;
@@ -1218,6 +1224,19 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                                 Nuevo
                               </span>
                             )}
+
+                            {(() => {
+                              const clinRec = peekClinicalRecord(c.id);
+                              if (clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Clock size={11} />
+                                    Expediente solicitado
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
 
                           <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
@@ -1229,30 +1248,38 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                           {/* Botón WhatsApp Inteligente a 1 Clic */}
                           {c.telefono ? (
                             <div className="inline-flex items-stretch h-9 rounded-xl overflow-hidden shadow-sm" onClick={e => e.stopPropagation()}>
-                              <a 
-                                href={getWhatsAppUrl(
-                                  c.telefono,
-                                  buildWhatsAppMessage(
-                                    c, 
-                                    ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento"))
-                                  )
-                                )} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 transition-colors ${
-                                  ret.isVenciendo 
-                                    ? 'bg-amber-600 hover:bg-amber-700' 
-                                    : ret.isInactivo 
-                                    ? 'bg-rose-600 hover:bg-rose-700' 
-                                    : 'bg-[#25D366] hover:bg-[#20bd5a]'
-                                }`}
-                                title="Enviar mensaje por WhatsApp a 1 clic"
-                              >
-                                <MessageCircle size={14} className="fill-white shrink-0" />
-                                <span>
-                                  {ret.isVenciendo ? "Recordar Renovación" : ret.isInactivo ? "Check-in Adherencia" : "WhatsApp"}
-                                </span>
-                              </a>
+                              {(() => {
+                                const clinRec = peekClinicalRecord(c.id);
+                                const isIntakePending = clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada;
+                                return (
+                                  <a 
+                                    href={getWhatsAppUrl(
+                                      c.telefono,
+                                      buildWhatsAppMessage(
+                                        c, 
+                                        isIntakePending ? "cuestionario" : (ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento")))
+                                      )
+                                    )} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 transition-colors ${
+                                      isIntakePending
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : ret.isVenciendo 
+                                        ? 'bg-amber-600 hover:bg-amber-700' 
+                                        : ret.isInactivo 
+                                        ? 'bg-rose-600 hover:bg-rose-700' 
+                                        : 'bg-[#25D366] hover:bg-[#20bd5a]'
+                                    }`}
+                                    title="Enviar mensaje por WhatsApp a 1 clic"
+                                  >
+                                    <MessageCircle size={14} className="fill-white shrink-0" />
+                                    <span>
+                                      {isIntakePending ? "Recordar Cuestionario" : ret.isVenciendo ? "Recordar Renovación" : ret.isInactivo ? "Check-in Adherencia" : "WhatsApp"}
+                                    </span>
+                                  </a>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 onClick={() => setSelectedWaClient(c)}

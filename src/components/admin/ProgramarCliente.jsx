@@ -1821,6 +1821,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
         )}
 
+        {!isMiPlan && clinicalRec?.completado_por === "paciente" && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 sm:px-4 flex items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold text-emerald-950 truncate">
+                  {selected.nombre} completó su expediente inicial desde su app
+                </p>
+                <p className="text-[11px] text-emerald-700 truncate">
+                  Sus antecedentes, hábitos y R24H están disponibles en el botón "Expediente".
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowExpediente(true)}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shrink-0 transition-colors shadow-2xs cursor-pointer"
+            >
+              Ver Respuestas
+            </button>
+          </div>
+        )}
+
       {/* ── Selector de Ciclos ── */}
       <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2 mb-3">
