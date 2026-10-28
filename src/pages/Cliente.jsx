@@ -256,11 +256,20 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       }
     };
 
+    const onExpedienteUpdated = (e) => {
+      const targetId = e?.detail?.clienteId;
+      if (!targetId || targetId === cliente?.id) {
+        if (e?.detail?.record) setClinicalRec(e.detail.record);
+        else if (cliente?.id) fetchClinicalRecord(cliente.id).then(rec => rec && setClinicalRec(rec)).catch(() => {});
+      }
+    };
+
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onFocus);
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
     window.addEventListener("flux:plan-updated", onPlanUpdated);
+    window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     
     return () => {
       if (cacheTimer) clearTimeout(cacheTimer);
@@ -269,6 +278,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
       window.removeEventListener("flux:plan-updated", onPlanUpdated);
+      window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
     };
   }, [cliente?.id]);
 

@@ -38,7 +38,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
+      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div>
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
@@ -1343,8 +1343,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (
         <div className={tab === "programar" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <SubComponentWrapper title="Asignador de Dietas y Rutinas" subtitle="Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente">
-            <ProgramarCliente clientes={clientes} selected={selected} setSelected={setSelected} setMsg={setMsg} biblioteca={biblioteca} />
+          <SubComponentWrapper
+            title={selected ? null : "Asignador de Dietas y Rutinas"}
+            subtitle={selected ? null : "Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente"}
+          >
+            <ProgramarCliente
+              clientes={clientes}
+              selected={selected}
+              setSelected={setSelected}
+              onBackToList={() => { setSelected(null); setTab("clientes"); }}
+              setMsg={setMsg}
+              biblioteca={biblioteca}
+            />
           </SubComponentWrapper>
         </div>
       )}

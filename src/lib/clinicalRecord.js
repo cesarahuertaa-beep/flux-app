@@ -110,6 +110,11 @@ export async function saveClinicalRecord(clienteId, nextRecord) {
     ...nextRecord,
     anamnesis: { ...EMPTY_ANAMNESIS, ...(nextRecord?.anamnesis || {}) },
     checkins: Array.isArray(nextRecord?.checkins) ? nextRecord.checkins : [],
+    servicios_activos: {
+      nutricion: true,
+      entrenamiento: true,
+      ...(nextRecord?.servicios_activos || {}),
+    },
   };
   try {
     localStorage.setItem(getCacheKey(clienteId), JSON.stringify(normalized));

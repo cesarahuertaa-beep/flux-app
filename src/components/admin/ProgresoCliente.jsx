@@ -16,7 +16,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -365,6 +365,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     setClinicalRec(peekClinicalRecord(selected?.id));
   }, [selected]);
 
+  useEffect(() => {
+    const onExpedienteUpdated = (e) => {
+      const targetId = e?.detail?.clienteId;
+      if (!targetId || targetId === selected?.id) {
+        if (e?.detail?.record) setClinicalRec(e.detail.record);
+        else if (selected?.id) fetchClinicalRecord(selected.id).then(rec => setClinicalRec(rec)).catch(() => {});
+      }
+    };
+    window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
+    return () => window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
+  }, [selected?.id]);
+
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
@@ -516,6 +528,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       }
       closeModal();
       await load();
+      if (typeof window !== "undefined" && selected?.id) {
+        window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id } }));
+      }
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);
   };
@@ -584,6 +599,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
         try {
           await dbDel(`metricas_progreso?id=eq.${id}`);
+          if (typeof window !== "undefined" && selected?.id) {
+            window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id } }));
+          }
         } catch(err) {
           setMetricas(prevMetricas);
           setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { err.message }</div>);
@@ -596,6 +614,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
     () => calculateBodyComposition(form, evalSexo, evalEdad),
     [form, evalSexo, evalEdad]
   );
+
+  const showRutinasSub = isCivil || isMiPlan || (clinicalRec?.servicios_activos?.entrenamiento !== false) || rutinas.length > 0;
+  const showNutriSub = isCivil || isMiPlan || (clinicalRec?.servicios_activos?.nutricion !== false) || nutriDias.length > 0;
+
+  useEffect(() => {
+    if (sub === "rutinas" && !showRutinasSub) setSub("evaluaciones");
+    else if (sub === "nutricion" && !showNutriSub) setSub("evaluaciones");
+  }, [sub, showRutinasSub, showNutriSub]);
 
   const delta = (curr, prev, key) => {
     if (curr[key]==null || prev[key]==null || curr[key]==="" || prev[key]==="") return null;
@@ -649,8 +675,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
       <div className="flex gap-1 mb-5 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
           { k: "evaluaciones", ic: <BarChart2 className="w-4 h-4 shrink-0" />, lb: "Evaluaciones" },
-          { k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Rutinas" },
-          { k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Nutrición" }
+          ...(showRutinasSub ? [{ k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Adherencia Rutinas" }] : []),
+          ...(showNutriSub ? [{ k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Adherencia Nutrición" }] : [])
         ].map(({ k, ic, lb }) => (
           <button
             key={k}
@@ -672,24 +698,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
           <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
             <div className="flex flex-wrap gap-2">
-              {!isCivil && !isMiPlan && (
-                <button
-                  onClick={() => setShowExpediente(true)}
-                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <ClipboardList className="w-4 h-4 text-[var(--brand-primary)]" />
-                  Expediente
-                  {clinicalRec?.solicitud_activa && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  )}
-                </button>
-              )}
               {metricas.length > 0 && (
-                <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] text-[#0B1929] px-3 py-1.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer">
-                  <FileText className="w-4 h-4" /> PDF
+                <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                  <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
                 </button>
               )}
-              <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3 py-1.5 rounded-xl text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer">
+              <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm">
                 <Plus className="w-4 h-4" /> Nueva evaluación
               </button>
             </div>
@@ -1350,252 +1364,343 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan }) {
         </div>
       )}
 
-      {/* ── MODAL NUEVA EVALUACIÓN ── */}
+      {/* ── EDITOR DE EVALUACIÓN CORPORAL A PANTALLA COMPLETA (Master-Detail) ── */}
       {showModal && (() => {
         const isPlicometria = ["plicometria_jp3", "plicometria_dw4", "manual", "plicometria_isak"].includes(form.metodo_evaluacion);
         const activeGroups = isCivil
           ? getGroupsForMethod("basico", evalSexo)
           : getGroupsForMethod(form.metodo_evaluacion, evalSexo);
+        const hasLiveCalc = Boolean(
+          liveCalculations.imc ||
+          liveCalculations.grasa_pct ||
+          form.grasa_pct ||
+          liveCalculations.icc ||
+          liveCalculations.masa_libre_grasa ||
+          liveCalculations.calc_masa_muscular
+        );
 
         return (
-          <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
-              <div className="flex justify-between items-center mb-5">
-                <h2 className="text-xl font-bold text-[#0B1929]">{editingId ? "Editar evaluación" : "Nueva evaluación corporal"}</h2>
-                <button onClick={closeModal} className="text-[#6B7A8D] hover:text-[#0B1929] cursor-pointer"><X className="w-6 h-6" /></button>
+          <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
+            {/* Top Sticky Header */}
+            <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] shadow-2xs">
+              <div className="px-4 md:px-8 py-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-colors py-1.5 px-2.5 sm:px-3 rounded-xl hover:bg-gray-100 shrink-0 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Volver</span>
+                  </button>
+                  <span className="text-[#CBD5E1] hidden sm:inline">|</span>
+                  <div className="min-w-0">
+                    <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
+                      {editingId ? "Editar Evaluación Corporal" : "Nueva Evaluación Corporal"}
+                    </h2>
+                    <div className="text-[11px] text-[#6B7A8D] hidden sm:block truncate">
+                      {selected?.nombre} • {getMetodoLabel(form.metodo_evaluacion)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="hidden sm:inline-flex px-4 py-2 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveMetrica}
+                    disabled={saving}
+                    className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Barra superior: Selector de protocolo en 3 capas + Sexo/Edad enlazados + Fecha */}
-              <div className="flex flex-col gap-3 mb-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                  {!isCivil && (
-                    <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full lg:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => updForm("metodo_evaluacion", "basico")}
-                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                      >
-                        Básico
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!isPlicometria) updForm("metodo_evaluacion", "plicometria_jp3");
-                        }}
-                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${isPlicometria ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                      >
-                        Plicometría
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updForm("metodo_evaluacion", "inbody")}
-                        className={`flex-1 lg:flex-none px-4 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                      >
-                        Bioimpedancia
-                      </button>
+              {/* Mobile Live Indicators Strip (< lg) */}
+              {hasLiveCalc && (
+                <div className="lg:hidden bg-[#F0F4FA]/90 border-t border-[#E2E8F0] px-4 py-2 flex items-center gap-3 overflow-x-auto scroll-hide text-xs">
+                  <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider shrink-0">Cálculo en vivo:</span>
+                  {liveCalculations.imc && (
+                    <span className="font-bold text-[#0B1929] shrink-0">IMC <strong className="text-[var(--brand-primary)]">{liveCalculations.imc}</strong></span>
+                  )}
+                  {(liveCalculations.grasa_pct || form.grasa_pct) && (
+                    <span className="font-bold text-[#0B1929] shrink-0">Grasa <strong className="text-[var(--brand-primary)]">{liveCalculations.grasa_pct || form.grasa_pct}%</strong></span>
+                  )}
+                  {liveCalculations.masa_libre_grasa && (
+                    <span className="font-bold text-emerald-700 shrink-0">MLG {liveCalculations.masa_libre_grasa}kg</span>
+                  )}
+                  {liveCalculations.calc_masa_muscular && (
+                    <span className="font-bold text-[#0B1929] shrink-0">Músculo {liveCalculations.calc_masa_muscular}kg</span>
+                  )}
+                  {liveCalculations.icc && (
+                    <span className="font-bold text-[#0B1929] shrink-0">ICC {liveCalculations.icc}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Main Responsive Grid Container */}
+            <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Protocol & Anthropometric Fields */}
+              <div className="lg:col-span-8 flex flex-col gap-5">
+                {/* Card 1: Protocolo, Sexo, Edad y Fecha */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
+                  <div className="flex flex-col gap-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {!isCivil && (
+                        <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => updForm("metodo_evaluacion", "basico")}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                          >
+                            Básico
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!isPlicometria) updForm("metodo_evaluacion", "plicometria_jp3");
+                            }}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${isPlicometria ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                          >
+                            Plicometría
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updForm("metodo_evaluacion", "inbody")}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                          >
+                            Bioimpedancia
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Sexo, Edad y Fecha */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex bg-[#F0F4FA] rounded-xl p-1">
+                          <button
+                            type="button"
+                            onClick={() => setEvalSexo("M")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                          >
+                            Hombre
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEvalSexo("F")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                          >
+                            Mujer
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5">
+                          <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
+                          <input
+                            type="number"
+                            value={evalEdad}
+                            onChange={e => setEvalEdad(Number(e.target.value) || 25)}
+                            className="w-12 bg-transparent text-xs font-bold text-[#0B1929] text-center focus:outline-none"
+                          />
+                        </div>
+
+                        <input
+                          type="date"
+                          value={form.fecha}
+                          onChange={e => updForm("fecha", e.target.value)}
+                          className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sub-selector de Plicometría */}
+                    {!isCivil && isPlicometria && (
+                      <div className="flex gap-1.5 flex-wrap pt-2 border-t border-[#F0F4FA]">
+                        {[
+                          { id: "plicometria_jp3", label: "3 Pliegues (Jackson-Pollock)" },
+                          { id: "plicometria_dw4", label: "4 Pliegues (Durnin-Womersley)" },
+                          { id: "manual", label: "ISAK Completo (4 Componentes + Somatotipo)" },
+                        ].map(subP => {
+                          const active = form.metodo_evaluacion === subP.id || (subP.id === "manual" && form.metodo_evaluacion === "plicometria_isak");
+                          return (
+                            <button
+                              key={subP.id}
+                              type="button"
+                              onClick={() => updForm("metodo_evaluacion", subP.id)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                                active
+                                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                  : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
+                              }`}
+                            >
+                              {subP.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 2: Grupos de Campos Antropométricos */}
+                {activeGroups.map(group => (
+                  <div key={group.label} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
+                    <div className="text-xs text-[#0B1929] font-bold mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-[#F0F4FA] pb-2.5">
+                      <span className="text-[var(--brand-primary)]">{group.icon}</span>
+                      <span>{group.label}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                      {group.fields.map(f => (
+                        <div key={f.key} className="flex flex-col gap-1">
+                          <label className="text-xs font-bold text-[#6B7A8D]">{f.label}</label>
+                          <input
+                            type={f.type}
+                            step={f.step || "any"}
+                            value={form[f.key] ?? ""}
+                            placeholder={f.placeholder || ""}
+                            className="bg-[#F8FAFC] focus:bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+                            onChange={e => updForm(f.key, e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Card 3: Notas y Fotografías de Progreso */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm space-y-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">Notas y Observaciones Clínicas</label>
+                    <textarea
+                      value={form.notas}
+                      onChange={e => updForm("notas", e.target.value)}
+                      placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"}
+                      className="bg-[#F8FAFC] focus:bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[90px]"
+                    />
+                  </div>
+
+                  {editingId && existingFotos.length > 0 && (
+                    <div>
+                      <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-wider flex items-center gap-1.5"><Camera className="w-4 h-4 text-[var(--brand-primary)]"/> Fotos actuales</div>
+                      <div className="flex gap-2.5 flex-wrap">
+                        {existingFotos.map((url, i) => (
+                          <div key={i} className="relative w-20 h-20">
+                            <img src={url} onClick={() => setLightbox(url)} className="w-20 h-20 object-cover rounded-xl border border-[#E2E8F0] cursor-zoom-in" alt=""/>
+                            <button onClick={() => setExistingFotos(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Sexo, Edad y Fecha */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex bg-[#F0F4FA] rounded-xl p-1">
-                      <button
-                        type="button"
-                        onClick={() => setEvalSexo("M")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
-                      >
-                        Hombre
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEvalSexo("F")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
-                      >
-                        Mujer
-                      </button>
+                  <div>
+                    <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-wider flex items-center gap-1.5"><Camera className="w-4 h-4 text-[var(--brand-primary)]"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
+                    <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-xs sm:text-sm text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
+                      <Plus className="w-4 h-4" /> Agregar fotos
+                      <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
+                    </label>
+                    {previewUrls.length > 0 && (
+                      <div className="flex gap-2.5 flex-wrap mt-3">
+                        {previewUrls.map((url, i) => (
+                          <div key={i} className="relative w-20 h-20">
+                            <img src={url} className="w-20 h-20 object-cover rounded-xl border-2 border-[var(--brand-primary)]" alt=""/>
+                            <button onClick={() => removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Sticky Live Clinical Summary */}
+              <div className="lg:col-span-4 lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-[#F0F4FA]">
+                    <Activity className="w-4 h-4 text-[var(--brand-primary)]" />
+                    <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                      Composición Calculada en Vivo
+                    </h3>
+                  </div>
+
+                  {!hasLiveCalc ? (
+                    <div className="text-center py-8 text-xs text-[#6B7A8D]">
+                      Ingresa peso, estatura, perímetros o pliegues para calcular los indicadores automáticamente.
                     </div>
-
-                    <div className="flex items-center gap-1.5 bg-gray-50 border border-[#E2E8F0] rounded-xl px-3 py-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
-                      <input
-                        type="number"
-                        value={evalEdad}
-                        onChange={e => setEvalEdad(Number(e.target.value) || 25)}
-                        className="w-12 bg-transparent text-xs font-bold text-[#0B1929] text-center focus:outline-none"
-                      />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {liveCalculations.imc && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">IMC</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.imc}</div>
+                          {liveCalculations.imc_info && (
+                            <div className="text-[10px] font-bold text-[var(--brand-primary)]">{liveCalculations.imc_info.label}</div>
+                          )}
+                        </div>
+                      )}
+                      {(liveCalculations.grasa_pct || form.grasa_pct) && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">% Grasa</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.grasa_pct || form.grasa_pct}%</div>
+                          {liveCalculations.sum_pliegues && (
+                            <div className="text-[10px] text-[#6B7A8D]">Σ {liveCalculations.sum_pliegues} mm</div>
+                          )}
+                        </div>
+                      )}
+                      {liveCalculations.calc_masa_grasa && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Grasa</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_grasa} kg</div>
+                        </div>
+                      )}
+                      {liveCalculations.masa_libre_grasa && (
+                        <div className="bg-emerald-50/70 rounded-xl p-3 border border-emerald-200">
+                          <div className="text-[10px] font-bold text-emerald-700 uppercase">MLG (Magra)</div>
+                          <div className="text-lg font-black text-emerald-700 font-['Rajdhani']">{liveCalculations.masa_libre_grasa} kg</div>
+                        </div>
+                      )}
+                      {liveCalculations.calc_masa_muscular && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Muscular</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_muscular} kg</div>
+                        </div>
+                      )}
+                      {liveCalculations.calc_masa_osea && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Ósea</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_osea} kg</div>
+                        </div>
+                      )}
+                      {liveCalculations.icc && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">ICC / ICE</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">
+                            {liveCalculations.icc}{liveCalculations.ice ? ` · ${liveCalculations.ice}` : ""}
+                          </div>
+                          {liveCalculations.icc_info && (
+                            <div className="text-[10px] font-bold text-[#6B7A8D]">{liveCalculations.icc_info.label}</div>
+                          )}
+                        </div>
+                      )}
+                      {liveCalculations.somatotipo_endo && liveCalculations.somatotipo_meso && liveCalculations.somatotipo_ecto && (
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] col-span-2">
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Somatotipo (Endo · Meso · Ecto)</div>
+                          <div className="text-lg font-black text-[#0B1929] font-['Rajdhani']">
+                            {liveCalculations.somatotipo_endo} - {liveCalculations.somatotipo_meso} - {liveCalculations.somatotipo_ecto}
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    <input
-                      type="date"
-                      value={form.fecha}
-                      onChange={e => updForm("fecha", e.target.value)}
-                      className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
-                    />
-                  </div>
+                  )}
                 </div>
-
-                {/* Sub-selector de Plicometría */}
-                {!isCivil && isPlicometria && (
-                  <div className="flex gap-1.5 flex-wrap">
-                    {[
-                      { id: "plicometria_jp3", label: "3 Pliegues (Jackson-Pollock)" },
-                      { id: "plicometria_dw4", label: "4 Pliegues (Durnin-Womersley)" },
-                      { id: "manual", label: "ISAK Completo (4 Componentes + Somatotipo)" },
-                    ].map(subP => {
-                      const active = form.metodo_evaluacion === subP.id || (subP.id === "manual" && form.metodo_evaluacion === "plicometria_isak");
-                      return (
-                        <button
-                          key={subP.id}
-                          type="button"
-                          onClick={() => updForm("metodo_evaluacion", subP.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                            active
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                              : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
-                          }`}
-                        >
-                          {subP.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Grupos de campos */}
-              {activeGroups.map(group => (
-                <div key={group.label} className="mb-6">
-                  <div className="text-xs text-[#6B7A8D] font-bold mb-3 uppercase tracking-[0.5px] flex items-center gap-1.5 border-b border-[#E2E8F0] pb-2">
-                    {group.icon} {group.label}
-                  </div>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(175px,1fr))] gap-3.5">
-                    {group.fields.map(f => (
-                      <div key={f.key} className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-[#0B1929]">{f.label}</label>
-                        <input
-                          type={f.type}
-                          step={f.step || "any"}
-                          value={form[f.key] ?? ""}
-                          placeholder={f.placeholder || ""}
-                          className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
-                          onChange={e => updForm(f.key, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              {/* Resumen Clínico en Vivo */}
-              {(liveCalculations.imc || liveCalculations.grasa_pct || liveCalculations.icc || liveCalculations.masa_libre_grasa) && (
-                <div className="mb-6 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4">
-                  <div className="text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-2.5">
-                    Indicadores Calculados
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-                    {liveCalculations.imc && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">IMC</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.imc}</div>
-                        {liveCalculations.imc_info && (
-                          <div className="text-[10px] font-bold text-[var(--brand-primary)]">{liveCalculations.imc_info.label}</div>
-                        )}
-                      </div>
-                    )}
-                    {(liveCalculations.grasa_pct || form.grasa_pct) && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">% Grasa</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.grasa_pct || form.grasa_pct}%</div>
-                        {liveCalculations.sum_pliegues && (
-                          <div className="text-[10px] text-[#6B7A8D]">Σ {liveCalculations.sum_pliegues} mm</div>
-                        )}
-                      </div>
-                    )}
-                    {liveCalculations.calc_masa_grasa && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Grasa</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_grasa} kg</div>
-                      </div>
-                    )}
-                    {liveCalculations.masa_libre_grasa && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-emerald-700 uppercase">MLG (Magra)</div>
-                        <div className="text-base font-black text-emerald-700 font-['Rajdhani']">{liveCalculations.masa_libre_grasa} kg</div>
-                      </div>
-                    )}
-                    {liveCalculations.calc_masa_muscular && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Masa Muscular</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveCalculations.calc_masa_muscular} kg</div>
-                      </div>
-                    )}
-                    {liveCalculations.icc && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0]">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">ICC / ICE</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
-                          {liveCalculations.icc}{liveCalculations.ice ? ` · ${liveCalculations.ice}` : ""}
-                        </div>
-                        {liveCalculations.icc_info && (
-                          <div className="text-[10px] font-bold text-[#6B7A8D]">{liveCalculations.icc_info.label}</div>
-                        )}
-                      </div>
-                    )}
-                    {liveCalculations.somatotipo_endo && liveCalculations.somatotipo_meso && liveCalculations.somatotipo_ecto && (
-                      <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0] col-span-2">
-                        <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">Somatotipo (Endo · Meso · Ecto)</div>
-                        <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
-                          {liveCalculations.somatotipo_endo} - {liveCalculations.somatotipo_meso} - {liveCalculations.somatotipo_ecto}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1.5 mb-6">
-                <label className="text-sm font-bold text-[#0B1929]">Notas</label>
-                <textarea value={form.notas} onChange={e=>updForm("notas",e.target.value)} placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"} className="bg-gray-50 border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 min-h-[90px]" />
-              </div>
-
-              {/* Fotos existentes cuando se edita */}
-              {editingId && existingFotos.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> Fotos actuales</div>
-                  <div className="flex gap-2 flex-wrap">
-                    {existingFotos.map((url,i) => (
-                      <div key={i} className="relative w-20 h-20">
-                        <img src={url} onClick={()=>setLightbox(url)} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[#E2E8F0] cursor-zoom-in" alt=""/>
-                        <button onClick={()=>setExistingFotos(prev=>prev.filter((_,j)=>j!==i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Foto upload */}
-              <div className="mb-6">
-                <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-[0.5px] flex items-center gap-1.5"><Camera className="w-4 h-4"/> {editingId ?"Agregar más fotos" :"Fotos de progreso"}</div>
-                <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-[13px] text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
-                  <Plus className="w-4 h-4" /> Agregar fotos
-                  <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
-                </label>
-                {previewUrls.length>0&&(
-                  <div className="flex gap-2 flex-wrap mt-3">
-                    {previewUrls.map((url,i)=>(
-                      <div key={i} className="relative w-20 h-20">
-                        <img src={url} className="w-20 h-20 object-cover rounded-[10px] border-2 border-[var(--brand-primary)]" alt=""/>
-                        <button onClick={()=>removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-[18px] h-[18px] text-[11px] leading-[18px] text-center cursor-pointer border-none font-bold">×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2 justify-end mt-8 border-t border-[#E2E8F0] pt-4">
-                <button onClick={closeModal} className="border border-[#E2E8F0] text-[#6B7A8D] px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={saveMetrica} disabled={saving} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                  {saving?"Subiendo…":editingId?"Guardar cambios":"Guardar evaluación"}
-                </button>
               </div>
             </div>
           </div>
