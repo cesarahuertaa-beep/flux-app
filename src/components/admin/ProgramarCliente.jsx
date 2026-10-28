@@ -2539,6 +2539,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               isMiPlan={isMiPlan}
               mode="nutricion"
               cicloActivo={cicloSel}
+              isReadOnly={isReadOnly}
             />
           </Suspense>
         )}
@@ -2645,6 +2646,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               isMiPlan={isMiPlan}
               mode="rutinas"
               cicloActivo={cicloSel}
+              isReadOnly={isReadOnly}
             />
           </Suspense>
         )}
@@ -2659,6 +2661,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           isMiPlan={isMiPlan}
           mode="evaluaciones"
           cicloActivo={cicloSel}
+          isReadOnly={isReadOnly}
         />
       </Suspense>
     )}

@@ -6,6 +6,7 @@ import {
   normalizeSexo,
   calcEdadFromBirthdate,
   getMetodoLabel,
+  linkMetricasToCiclos,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
 import { dbPeek, dbGet, dbGetFresh, updateQueryCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
@@ -15,7 +16,7 @@ import { generateProgresoPDF } from "../../utils/pdf";
 import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../utils/helpers";
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
-  Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
+  Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
   UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
@@ -211,11 +212,12 @@ const emptyForm = () => ({
   checkin_descanso: "4",
   checkin_observaciones: "",
   checkin_ajustes: "",
+  ciclo_id: "",
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
-export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo }) {
+export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, isReadOnly: propReadOnly }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
   const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
@@ -264,6 +266,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     () => metricas.filter(m => !deletedIdsRef.current.has(String(m?.id))),
     [metricas]
   );
+
+  // Vincular evaluaciones al ciclo y filtrar según el plan seleccionado
+  const allLinkedMetricas = useMemo(() => {
+    return linkMetricasToCiclos(activeMetricas, ciclos);
+  }, [activeMetricas, ciclos]);
+
+  const [evalFilter, setEvalFilter] = useState("plan"); // "plan" | "all"
+  const currentCiclo = cicloActivo || cicloSel;
+  const isReadOnly = propReadOnly ?? Boolean(isMiPlan || (currentCiclo && !currentCiclo.activo));
+
+  const displayedMetricas = useMemo(() => {
+    if (evalFilter === "plan" && currentCiclo?.id && ciclos.length > 0) {
+      return allLinkedMetricas.filter(m => String(m.ciclo_id) === String(currentCiclo.id));
+    }
+    return allLinkedMetricas;
+  }, [evalFilter, currentCiclo?.id, ciclos.length, allLinkedMetricas]);
 
   useEffect(() => {
     if (mode) setSub(mode);
@@ -371,6 +389,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     if (cicloActivo?.id && cicloSel?.id !== cicloActivo.id) {
       setCicloSel(cicloActivo);
       loadCicloData(cicloActivo);
+      setEvalFilter("plan");
     }
   }, [cicloActivo, cicloSel?.id, loadCicloData]);
 
@@ -424,6 +443,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
 
   const openNewEvaluation = useCallback(() => {
     const base = emptyForm();
+    const targetCiclo = cicloActivo || cicloSel;
+    if (targetCiclo?.id) {
+      base.ciclo_id = targetCiclo.id;
+    }
     const prev = activeMetricas[0];
     if (prev) {
       if (prev.estatura) base.estatura = String(prev.estatura);
@@ -456,7 +479,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
-  }, [activeMetricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento]);
+  }, [activeMetricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, cicloActivo?.id, cicloSel?.id]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -558,6 +581,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     try {
       const rawData = {};
       if (!editingId) rawData.cliente_id = selected.id;
+      const targetCicloId = form.ciclo_id || (cicloActivo || cicloSel)?.id || null;
+      if (targetCicloId) {
+        rawData.ciclo_id = targetCicloId;
+      }
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
       const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion", "checkin_observaciones", "checkin_ajustes"]);
       Object.entries(form).forEach(([k, v]) => {
@@ -654,7 +681,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       if (editingId) deletedIdsRef.current.delete(String(editingId));
 
       // 1. Actualización optimista instantánea (0ms) en el estado de React:
-      const enrichedItem = enrichMetrica(savedRow);
+      const rowWithCiclo = { ...savedRow, ciclo_id: targetCicloId };
+      const enrichedItem = enrichMetrica(rowWithCiclo);
       setMetricas(prev => {
         const filtered = prev.filter(m => String(m.id) !== String(enrichedItem.id) && String(m.id) !== String(editingId));
         const next = [enrichedItem, ...filtered];
@@ -663,9 +691,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
 
       // 2. Actualizar caché de consulta (queryCache) de inmediato para evitar lecturas obsoletas:
       updateQueryCache("metricas_progreso", (cachedList) => {
-        if (!Array.isArray(cachedList)) return [savedRow];
+        if (!Array.isArray(cachedList)) return [rowWithCiclo];
         const filtered = cachedList.filter(m => String(m.id) !== String(savedRow.id) && String(m.id) !== String(editingId));
-        const next = [savedRow, ...filtered];
+        const next = [rowWithCiclo, ...filtered];
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
 
@@ -688,6 +716,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   const startEdit = (mRaw) => {
     const m = enrichMetrica(mRaw);
     const filled = emptyForm();
+    const targetCiclo = cicloActivo || cicloSel;
+    filled.ciclo_id = m.ciclo_id || targetCiclo?.id || "";
 
     // 1. Detección inteligente del método de evaluación si no está definido o es ambiguo
     let metodo = m.metodo_evaluacion || "";
@@ -890,7 +920,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
 
   if (loading) return <ListSkeleton rows={4} />;
 
-  const allClientPhotos = activeMetricas.flatMap(m =>
+  const allClientPhotos = (evalFilter === "plan" && displayedMetricas.length > 0 ? displayedMetricas : allLinkedMetricas).flatMap(m =>
     parseFotos(m.fotos)
       .filter(Boolean)
       .map(url => ({
@@ -932,23 +962,56 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       {/* ── EVALUACIONES ── */}
       {activeSection === "evaluaciones" && (
         <div>
-          <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-            <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({activeMetricas.length})</span></span>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="font-bold text-[#0B1929]">
+                Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({displayedMetricas.length})</span>
+              </span>
+              {currentCiclo?.id && ciclos.length > 1 && (
+                <div className="inline-flex items-center bg-[#F0F4FA] p-0.5 rounded-lg border border-[#E2E8F0] text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEvalFilter("plan")}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      evalFilter === "plan"
+                        ? "bg-white text-[var(--brand-primary)] shadow-2xs"
+                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                    }`}
+                  >
+                    Este plan ({allLinkedMetricas.filter(m => String(m.ciclo_id) === String(currentCiclo.id)).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEvalFilter("all")}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      evalFilter === "all"
+                        ? "bg-white text-[var(--brand-primary)] shadow-2xs"
+                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                    }`}
+                  >
+                    Histórico completo ({allLinkedMetricas.length})
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
-              {activeMetricas.length > 0 && (
-                <button onClick={() => generateProgresoPDF(selected, activeMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
+              {displayedMetricas.length > 0 && (
+                <button onClick={() => generateProgresoPDF(selected, displayedMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
                 </button>
               )}
-              <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm">
-                <Plus className="w-4 h-4" /> Nueva evaluación
-              </button>
+              {!isReadOnly && (
+                <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm">
+                  <Plus className="w-4 h-4" /> Nueva evaluación
+                </button>
+              )}
             </div>
           </div>
 
-          {activeMetricas.length > 0 && (
+          {displayedMetricas.length > 0 && (
             <EvolutionCharts
-              metricas={activeMetricas}
+              metricas={displayedMetricas}
               isLocked={isCivil && selected?.plan_tipo !== 'premium'}
               brandColor={brand?.color_primario}
             />
@@ -962,16 +1025,41 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
             />
           )}
 
-          {activeMetricas.length===0?(
-            <div className="text-center py-16 text-[#6B7A8D]">
+          {displayedMetricas.length === 0 ? (
+            <div className="text-center py-12 text-[#6B7A8D] bg-white rounded-2xl border border-dashed border-[#E2E8F0] p-6 mb-4">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><BarChart2 className="w-12 h-12" /></div>
-              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones aún</div>
-              <div className="text-[13px]">{(isMiPlan || isCivil) ? "Registra tu primera evaluación corporal." : "Registra la primera evaluación corporal del cliente."}</div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">
+                {evalFilter === "plan" && currentCiclo ? "Sin evaluaciones en este plan" : "Sin evaluaciones aún"}
+              </div>
+              <div className="text-[13px] max-w-sm mx-auto mb-4">
+                {evalFilter === "plan" && currentCiclo
+                  ? (isReadOnly
+                      ? `Este plan histórico (${currentCiclo.nombre?.split("|")[0]}) no tiene evaluaciones registradas.`
+                      : `Registra la primera evaluación corporal y check-in para ${currentCiclo.nombre?.split("|")[0] || "este plan"}.`)
+                  : ((isMiPlan || isCivil) ? "Registra tu primera evaluación corporal." : "Registra la primera evaluación corporal del cliente.")}
+              </div>
+              {!isReadOnly && (
+                <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm mx-auto">
+                  <Plus className="w-4 h-4" /> Registrar evaluación
+                </button>
+              )}
+              {evalFilter === "plan" && allLinkedMetricas.length > 0 && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEvalFilter("all")}
+                    className="text-xs text-[var(--brand-primary)] hover:underline font-bold cursor-pointer"
+                  >
+                    Ver {allLinkedMetricas.length} evaluación{allLinkedMetricas.length > 1 ? "es" : ""} del histórico completo
+                  </button>
+                </div>
+              )}
             </div>
-          ):activeMetricas.map((m,idx)=>{
-            const prev = activeMetricas[idx+1];
+          ) : displayedMetricas.map((m, idx) => {
+            const prev = displayedMetricas[idx + 1];
             const isFreemium = isCivil && selected?.plan_tipo !== 'premium';
             const isLocked = isFreemium && idx > 0;
+            const cycleName = ciclos.find(c => String(c.id) === String(m.ciclo_id))?.nombre?.split("|")[0];
             return (
               <div key={m.id} className="relative bg-white rounded-[14px] border border-[#E2E8F0] p-4 mb-3 shadow-sm overflow-hidden">
                 {isLocked && (
@@ -986,17 +1074,27 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5 whitespace-nowrap"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
                     {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap">Más reciente</span>}
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : m.metodo_evaluacion === 'basico' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
-                      {getMetodoLabel(m.metodo_evaluacion)}
-                    </span>
+                    {m.metodo_evaluacion && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : m.metodo_evaluacion === 'basico' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                        {getMetodoLabel(m.metodo_evaluacion)}
+                      </span>
+                    )}
+                    {evalFilter === "all" && cycleName && (
+                      <span className="bg-gray-100 text-[#0B1929] text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border border-gray-200">
+                        {cycleName}
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-1.5 self-start sm:self-auto">
-                    <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1">
-                      <Edit2 className="w-3.5 h-3.5" /> Editar
+                    <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1 cursor-pointer">
+                      {isReadOnly ? <Eye className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
+                      <span>{isReadOnly ? "Ver" : "Editar"}</span>
                     </button>
-                    <button onClick={()=>deleteMetrica(m.id)} className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1">
-                      <Trash2 className="w-3.5 h-3.5" /> Borrar
-                    </button>
+                    {!isReadOnly && (
+                      <button onClick={()=>deleteMetrica(m.id)} className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1 cursor-pointer">
+                        <Trash2 className="w-3.5 h-3.5" /> Borrar
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
@@ -1255,7 +1353,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
             const activeWeekNum = selectedNutriWeek || currentWeekNum;
             const activeWeekObj = validWeeks.find(s => s.weekNum === activeWeekNum) || currentWeekObj;
 
-            const pesoRef = Number(activeMetricas[0]?.peso || selected?.peso) || 0;
+            const pesoRef = Number(displayedMetricas[0]?.peso || activeMetricas[0]?.peso || selected?.peso) || 0;
             const defaultMetaAgua = pesoRef > 0 ? Math.round((pesoRef * 35) / 50) * 50 : 2500;
 
             let totalComidasSemana = 0;
@@ -1663,7 +1761,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                   <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
-                      {editingId ? "Editar Evaluación Corporal" : "Nueva Evaluación Corporal"}
+                      {isReadOnly ? "Consultar Evaluación Corporal" : editingId ? "Editar Evaluación Corporal" : "Nueva Evaluación Corporal"}
                     </h2>
                     <div className="text-[11px] text-[#6B7A8D] hidden sm:block truncate">
                       {selected?.nombre} • {getMetodoLabel(form.metodo_evaluacion)}
@@ -1675,21 +1773,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="hidden sm:inline-flex px-4 py-2 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
                   >
-                    Cancelar
+                    {isReadOnly ? "Cerrar" : "Cancelar"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={saveMetrica}
-                    disabled={saving}
-                    className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}</span>
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={saveMetrica}
+                      disabled={saving}
+                      className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}</span>
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {isReadOnly && (
+                <div className="bg-amber-50/90 border-t border-amber-200 px-4 md:px-8 py-2 text-xs text-amber-800 flex items-center gap-2 font-medium">
+                  <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Modo consulta: Esta evaluación está vinculada a un plan anterior o histórico y se muestra en modo solo lectura.</span>
+                </div>
+              )}
 
               {/* Mobile Live Indicators Strip (< lg) */}
               {hasLiveCalc && (
@@ -1763,8 +1870,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                             <button
                               key={n}
                               type="button"
-                              onClick={() => updForm(sc.key, String(n))}
-                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && updForm(sc.key, String(n))}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                isReadOnly ? "cursor-default" : "cursor-pointer"
+                              } ${
                                 Number(form[sc.key] || 4) === n
                                   ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                   : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
@@ -1786,10 +1896,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                       </label>
                       <input
                         type="text"
+                        readOnly={isReadOnly}
                         value={form.checkin_observaciones || ""}
-                        onChange={(e) => updForm("checkin_observaciones", e.target.value)}
+                        onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
                         placeholder="Ej. Buena energía, sin hambre, completó entrenamientos..."
-                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                       />
                     </div>
                     <div>
@@ -1798,10 +1909,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                       </label>
                       <input
                         type="text"
+                        readOnly={isReadOnly}
                         value={form.checkin_ajustes || ""}
-                        onChange={(e) => updForm("checkin_ajustes", e.target.value)}
+                        onChange={(e) => !isReadOnly && updForm("checkin_ajustes", e.target.value)}
                         placeholder="Ej. Variar fuentes de proteína, opciones más prácticas..."
-                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                       />
                     </div>
                   </div>
@@ -1815,24 +1927,27 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                         <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-auto">
                           <button
                             type="button"
-                            onClick={() => updForm("metodo_evaluacion", "basico")}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("metodo_evaluacion", "basico")}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
                           >
                             Básico
                           </button>
                           <button
                             type="button"
+                            disabled={isReadOnly}
                             onClick={() => {
-                              if (!isPlicometria) updForm("metodo_evaluacion", "plicometria_jp3");
+                              if (!isReadOnly && !isPlicometria) updForm("metodo_evaluacion", "plicometria_jp3");
                             }}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${isPlicometria ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${isPlicometria ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
                           >
                             Plicometría
                           </button>
                           <button
                             type="button"
-                            onClick={() => updForm("metodo_evaluacion", "inbody")}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold cursor-pointer ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("metodo_evaluacion", "inbody")}
+                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
                           >
                             Bioimpedancia
                           </button>
@@ -1844,15 +1959,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                         <div className="flex bg-[#F0F4FA] rounded-xl p-1">
                           <button
                             type="button"
-                            onClick={() => setEvalSexo("M")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && setEvalSexo("M")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${evalSexo === "M" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
                           >
                             Hombre
                           </button>
                           <button
                             type="button"
-                            onClick={() => setEvalSexo("F")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && setEvalSexo("F")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${evalSexo === "F" ? "bg-white text-[#0B1929] shadow-sm" : "text-[#6B7A8D]"}`}
                           >
                             Mujer
                           </button>
@@ -1862,16 +1979,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                           <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
                           <input
                             type="number"
+                            readOnly={isReadOnly}
                             value={evalEdad}
-                            onChange={e => setEvalEdad(Number(e.target.value) || 25)}
+                            onChange={e => !isReadOnly && setEvalEdad(Number(e.target.value) || 25)}
                             className="w-12 bg-transparent text-xs font-bold text-[#0B1929] text-center focus:outline-none"
                           />
                         </div>
 
                         <input
                           type="date"
+                          readOnly={isReadOnly}
                           value={form.fecha}
-                          onChange={e => updForm("fecha", e.target.value)}
+                          onChange={e => !isReadOnly && updForm("fecha", e.target.value)}
                           className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
                         />
                       </div>
@@ -1890,8 +2009,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                             <button
                               key={subP.id}
                               type="button"
-                              onClick={() => updForm("metodo_evaluacion", subP.id)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && updForm("metodo_evaluacion", subP.id)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${
                                 active
                                   ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                   : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
@@ -1920,10 +2040,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                           <input
                             type={f.type}
                             step={f.step || "any"}
+                            readOnly={isReadOnly}
                             value={form[f.key] ?? ""}
                             placeholder={f.placeholder || ""}
-                            className="bg-[#F8FAFC] focus:bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
-                            onChange={e => updForm(f.key, e.target.value)}
+                            className={`bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm font-semibold text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:bg-white focus:outline-none focus:border-[var(--brand-primary)]"} transition-colors`}
+                            onChange={e => !isReadOnly && updForm(f.key, e.target.value)}
                           />
                         </div>
                       ))}
@@ -1936,10 +2057,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">Notas y Observaciones Clínicas</label>
                     <textarea
+                      readOnly={isReadOnly}
                       value={form.notas || ""}
-                      onChange={e => updForm("notas", e.target.value)}
+                      onChange={e => !isReadOnly && updForm("notas", e.target.value)}
                       placeholder={(isMiPlan || isCivil) ? "Notas u observaciones de la evaluación…" : "Observaciones del nutriólogo…"}
-                      className="bg-[#F8FAFC] focus:bg-white border border-[#E2E8F0] rounded-xl px-4 py-2.5 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[90px]"
+                      className={`bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-2.5 text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:bg-white focus:outline-none focus:border-[var(--brand-primary)]"} min-h-[90px]`}
                     />
                   </div>
 
@@ -1950,30 +2072,34 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                         {existingFotos.map((url, i) => (
                           <div key={i} className="relative w-20 h-20">
                             <img src={url} onClick={() => setLightbox(url)} className="w-20 h-20 object-cover rounded-xl border border-[#E2E8F0] cursor-zoom-in" alt=""/>
-                            <button onClick={() => setExistingFotos(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
+                            {!isReadOnly && (
+                              <button onClick={() => setExistingFotos(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
+                            )}
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  <div>
-                    <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-wider flex items-center gap-1.5"><Camera className="w-4 h-4 text-[var(--brand-primary)]"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
-                    <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-xs sm:text-sm text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
-                      <Plus className="w-4 h-4" /> Agregar fotos
-                      <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
-                    </label>
-                    {previewUrls.length > 0 && (
-                      <div className="flex gap-2.5 flex-wrap mt-3">
-                        {previewUrls.map((url, i) => (
-                          <div key={i} className="relative w-20 h-20">
-                            <img src={url} className="w-20 h-20 object-cover rounded-xl border-2 border-[var(--brand-primary)]" alt=""/>
-                            <button onClick={() => removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {!isReadOnly && (
+                    <div>
+                      <div className="text-xs text-[#6B7A8D] font-bold mb-2 uppercase tracking-wider flex items-center gap-1.5"><Camera className="w-4 h-4 text-[var(--brand-primary)]"/> {editingId ? "Agregar más fotos" : "Fotos de progreso"}</div>
+                      <label className="inline-flex items-center gap-2 bg-white border border-dashed border-[var(--brand-primary)] rounded-xl px-4 py-2.5 cursor-pointer text-xs sm:text-sm text-[var(--brand-primary)] font-bold hover:bg-[var(--brand-primary)]/5 transition-colors">
+                        <Plus className="w-4 h-4" /> Agregar fotos
+                        <input type="file" accept="image/*" multiple onChange={handleFotos} className="hidden"/>
+                      </label>
+                      {previewUrls.length > 0 && (
+                        <div className="flex gap-2.5 flex-wrap mt-3">
+                          {previewUrls.map((url, i) => (
+                            <div key={i} className="relative w-20 h-20">
+                              <img src={url} className="w-20 h-20 object-cover rounded-xl border-2 border-[var(--brand-primary)]" alt=""/>
+                              <button onClick={() => removePendingFoto(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5 text-center cursor-pointer border-none font-bold shadow-xs">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

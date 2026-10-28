@@ -218,6 +218,7 @@ export function enrichMetrica(m) {
   return {
     ...m,
     ...meta,
+    ciclo_id: m.ciclo_id || meta.ciclo_id || null,
     notas: cleanNotas,
     _rawNotas: rawNotasStr,
     metodo_evaluacion: m.metodo_evaluacion || meta.metodo_evaluacion || null,
@@ -236,6 +237,44 @@ export function enrichMetrica(m) {
     checkin_observaciones: meta.checkin_observaciones ?? m.checkin_observaciones ?? "",
     checkin_ajustes: meta.checkin_ajustes ?? m.checkin_ajustes ?? "",
   };
+}
+
+/**
+ * Vincula evaluaciones corporales a sus respectivos planes/ciclos.
+ * Si una métrica ya tiene `ciclo_id`, se respeta.
+ * Si no lo tiene (métrica previa/legada), se asocia cronológicamente al ciclo correspondiente
+ * para que no contamine nuevos planes futuros.
+ */
+export function linkMetricasToCiclos(metricasList, ciclosList) {
+  if (!Array.isArray(metricasList) || metricasList.length === 0) return [];
+  if (!Array.isArray(ciclosList) || ciclosList.length === 0) return metricasList;
+
+  // Ordenar ciclos cronológicamente (del más antiguo al más reciente)
+  const sortedCycles = [...ciclosList].sort((a, b) => {
+    const tA = new Date(a.created_at || a.fecha_inicio || 0).getTime();
+    const tB = new Date(b.created_at || b.fecha_inicio || 0).getTime();
+    return tA - tB;
+  });
+
+  return metricasList.map(m => {
+    if (m.ciclo_id) return m;
+
+    if (sortedCycles.length === 1) {
+      return { ...m, ciclo_id: sortedCycles[0].id };
+    }
+
+    const evalTime = new Date((m.fecha ? m.fecha + "T12:00:00" : m.created_at) || 0).getTime();
+    let matchedCycle = sortedCycles[0];
+    for (const c of sortedCycles) {
+      const cycleTime = new Date(c.created_at || c.fecha_inicio || 0).getTime();
+      if (cycleTime <= evalTime) {
+        matchedCycle = c;
+      } else {
+        break;
+      }
+    }
+    return { ...m, ciclo_id: matchedCycle.id };
+  });
 }
 
 /**
@@ -258,6 +297,7 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   });
 
   // Metadatos críticos que SIEMPRE deben preservarse en notas (incluso si son columna de BD)
+  if (rawData.ciclo_id) extraMeta.ciclo_id = rawData.ciclo_id;
   if (rawData.metodo_evaluacion) extraMeta.metodo_evaluacion = rawData.metodo_evaluacion;
   if (rawData.evalSexo) extraMeta.sexo = rawData.evalSexo;
   if (rawData.evalEdad) extraMeta.edad = rawData.evalEdad;
