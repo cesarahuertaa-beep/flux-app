@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check } from "lucide-react";
+import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
 import { CachedImage } from "../../lib/mediaCache";
@@ -401,10 +401,15 @@ export default function Nutrition({
                       style={{ width: `${pctComidas}%` }}
                     />
                   </div>
-                  <p className="text-[10px] text-[#6B7A8D]">
-                    {pctComidas === 100
-                      ? "🎉 ¡Excelente! Cumpliste todas las comidas hoy."
-                      : "Marca cada comida cumplida con el botón ✓."}
+                  <p className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5">
+                    {pctComidas === 100 ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>¡Excelente! Cumpliste todas las comidas hoy.</span>
+                      </>
+                    ) : (
+                      <span>Marca cada comida cumplida con el botón de verificación.</span>
+                    )}
                   </p>
                 </>
               );
@@ -473,8 +478,9 @@ export default function Nutrition({
                           <span className="w-1 h-1 rounded-full bg-[#CBD5E1]" />
                         </>
                       )}
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${isDone ? "text-emerald-600" : "text-[var(--brand-primary)]"}`}>
-                        {label} {isDone && "✓"}
+                      <span className={`text-xs font-semibold uppercase tracking-wide flex items-center gap-1 ${isDone ? "text-emerald-600" : "text-[var(--brand-primary)]"}`}>
+                        <span>{label}</span>
+                        {isDone && <Check className="w-3 h-3 stroke-[3]" />}
                       </span>
                     </div>
                     <p className={`text-sm font-medium mt-0.5 truncate ${isDone ? "text-gray-500" : "text-[#0B1929]"}`}>

@@ -17,7 +17,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, TrendingUp, Layers, Clock
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, TrendingUp, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -1085,7 +1085,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
                         )}
                         {isFreemium && idx===0 && prev && (
-                          <div className="text-[10px] mt-0.5 text-amber-500 font-bold">📈 Premium</div>
+                          <div className="text-[10px] mt-0.5 text-amber-500 font-bold flex items-center justify-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-500" /> Premium
+                          </div>
                         )}
                       </div>
                     );
@@ -1100,10 +1102,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <Activity className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Check-in de Seguimiento
                       </span>
                       <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                        {m.checkin_energia && <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[var(--brand-primary)] font-bold">⚡ Energía {m.checkin_energia}/5</span>}
-                        {m.checkin_saciedad && <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-emerald-700 font-bold">🥗 Saciedad {m.checkin_saciedad}/5</span>}
-                        {m.checkin_digestion && <span className="px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-700 font-bold">🩺 Digestión {m.checkin_digestion}/5</span>}
-                        {m.checkin_descanso && <span className="px-2 py-0.5 rounded-md bg-white border border-amber-200 text-amber-700 font-bold">😴 Sueño {m.checkin_descanso}/5</span>}
+                        {m.checkin_energia && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[var(--brand-primary)] font-bold">
+                            <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> Energía {m.checkin_energia}/5
+                          </span>
+                        )}
+                        {m.checkin_saciedad && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-emerald-700 font-bold">
+                            <Utensils className="w-3 h-3 text-emerald-600" /> Saciedad {m.checkin_saciedad}/5
+                          </span>
+                        )}
+                        {m.checkin_digestion && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-700 font-bold">
+                            <Stethoscope className="w-3 h-3 text-purple-600" /> Digestión {m.checkin_digestion}/5
+                          </span>
+                        )}
+                        {m.checkin_descanso && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 text-amber-700 font-bold">
+                            <Moon className="w-3 h-3 text-indigo-500" /> Sueño {m.checkin_descanso}/5
+                          </span>
+                        )}
                       </div>
                     </div>
                     {m.checkin_observaciones && (
@@ -1548,8 +1566,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               <span className="font-bold text-sm text-[#0B1929] truncate">{d.nombre || d.rawLabel}</span>
                             </div>
                             {d.comidasPct === 100 && d.aguaPct >= 100 && (
-                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                ★ Día al 100%
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                <Star className="w-3 h-3 fill-emerald-600 text-emerald-600" /> Día al 100%
                               </span>
                             )}
                           </div>
@@ -1828,14 +1846,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   {/* 4 Escalas 1 a 5 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                     {[
-                      { key: "checkin_energia", label: "⚡ Energía diaria" },
-                      { key: "checkin_saciedad", label: "🥗 Control saciedad" },
-                      { key: "checkin_digestion", label: "🩺 Digestión" },
-                      { key: "checkin_descanso", label: "😴 Calidad de sueño" },
+                      { key: "checkin_energia", label: "Energía diaria", icon: <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> },
+                      { key: "checkin_saciedad", label: "Control saciedad", icon: <Utensils className="w-3.5 h-3.5 text-emerald-600" /> },
+                      { key: "checkin_digestion", label: "Digestión", icon: <Stethoscope className="w-3.5 h-3.5 text-purple-600" /> },
+                      { key: "checkin_descanso", label: "Calidad de sueño", icon: <Moon className="w-3.5 h-3.5 text-indigo-500" /> },
                     ].map((sc) => (
                       <div key={sc.key} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-[#0B1929]">{sc.label}</span>
+                          <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                            {sc.icon}
+                            <span>{sc.label}</span>
+                          </span>
                           <span className="text-xs font-extrabold text-[var(--brand-primary)]">
                             {form[sc.key] || 4}/5
                           </span>

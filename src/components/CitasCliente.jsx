@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from"react";
 import { dbPeek, dbGet, dbPost, dbPatch } from"../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
-  AlertCircle, Plus, CheckCircle2, ChevronRight, Star
+  AlertCircle, Plus, CheckCircle2, ChevronRight, Star, Lock
 } from"lucide-react";
 import { useBackButton } from"../lib/backButtonHandler";
 import { showFluxAlert } from"./ui/ConfirmModal";
@@ -508,7 +508,10 @@ export function CitasCliente({ cliente }) {
                                   :"bg-white border-[#E2E8F0] text-[#0B1929] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
                             }`}
                           >
-                            {slot.hora} {slot.ocupado &&"🔒"}
+                            <span className="flex items-center justify-center gap-1">
+                              <span>{slot.hora}</span>
+                              {slot.ocupado && <Lock className="w-3 h-3 text-[#CBD5E1]" />}
+                            </span>
                           </button>
                         ))}
                       </div>

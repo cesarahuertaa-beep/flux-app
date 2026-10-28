@@ -1227,7 +1227,10 @@ export default function Training({
               </div>
               <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 text-center">
                 <p className="text-[10px] font-bold text-amber-700 uppercase">Nuevos PR</p>
-                <p className="text-lg font-bold text-amber-600 mt-0.5">{sessionPRs.length} 🏆</p>
+                <p className="text-lg font-bold text-amber-600 mt-0.5 flex items-center justify-center gap-1">
+                  <span>{sessionPRs.length}</span>
+                  <Trophy className="w-4 h-4 text-amber-500 fill-amber-500/30" />
+                </p>
               </div>
             </div>
 

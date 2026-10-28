@@ -17,7 +17,11 @@ import {
   Sparkles,
   CheckCircle2,
   Lock,
-  Camera
+  Camera,
+  Zap,
+  Utensils,
+  Moon,
+  Stethoscope
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -522,8 +526,16 @@ export default function ProgresoHistoricoModal({
                               <div className="text-[11px] text-[#6B7A8D] bg-blue-50/50 rounded-lg p-2 border border-blue-100/60 space-y-1">
                                 <div className="flex items-center justify-between font-bold text-[#0B1929]">
                                   <span>Check-in consulta</span>
-                                  <span>
-                                    ⚡ {ev.checkin_energia || 4}/5 • 🥗 {ev.checkin_saciedad || 4}/5
+                                  <span className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                      {ev.checkin_energia || 4}/5
+                                    </span>
+                                    <span className="text-[#94A3B8]">•</span>
+                                    <span className="inline-flex items-center gap-1">
+                                      <Utensils className="w-3 h-3 text-emerald-600" />
+                                      {ev.checkin_saciedad || 4}/5
+                                    </span>
                                   </span>
                                 </div>
                                 {ev.checkin_observaciones && (
@@ -606,28 +618,36 @@ export default function ProgresoHistoricoModal({
                     Check-in y Adherencia de la Semana
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center">
-                      <span className="text-[10px] text-[#6B7A8D] block">Energía</span>
+                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-[#6B7A8D] flex items-center gap-1 mb-1 font-medium">
+                        <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> Energía
+                      </span>
                       <span className="text-sm font-bold text-[#0B1929]">
-                        ⚡ {selectedEval.checkin_energia || 4}/5
+                        {selectedEval.checkin_energia || 4}/5
                       </span>
                     </div>
-                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center">
-                      <span className="text-[10px] text-[#6B7A8D] block">Saciedad</span>
+                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-[#6B7A8D] flex items-center gap-1 mb-1 font-medium">
+                        <Utensils className="w-3 h-3 text-emerald-600" /> Saciedad
+                      </span>
                       <span className="text-sm font-bold text-[#0B1929]">
-                        🥗 {selectedEval.checkin_saciedad || 4}/5
+                        {selectedEval.checkin_saciedad || 4}/5
                       </span>
                     </div>
-                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center">
-                      <span className="text-[10px] text-[#6B7A8D] block">Digestión</span>
+                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-[#6B7A8D] flex items-center gap-1 mb-1 font-medium">
+                        <Stethoscope className="w-3 h-3 text-purple-600" /> Digestión
+                      </span>
                       <span className="text-sm font-bold text-[#0B1929]">
-                        🩺 {selectedEval.checkin_digestion || 4}/5
+                        {selectedEval.checkin_digestion || 4}/5
                       </span>
                     </div>
-                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center">
-                      <span className="text-[10px] text-[#6B7A8D] block">Descanso</span>
+                    <div className="bg-white rounded-xl p-2.5 border border-blue-100 text-center flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-[#6B7A8D] flex items-center gap-1 mb-1 font-medium">
+                        <Moon className="w-3 h-3 text-indigo-500" /> Descanso
+                      </span>
                       <span className="text-sm font-bold text-[#0B1929]">
-                        😴 {selectedEval.checkin_descanso || 4}/5
+                        {selectedEval.checkin_descanso || 4}/5
                       </span>
                     </div>
                   </div>

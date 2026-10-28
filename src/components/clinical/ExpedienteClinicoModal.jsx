@@ -14,7 +14,9 @@ import {
   User,
   Phone,
   Mail,
-  Target
+  Target,
+  Heart,
+  Ban
 } from "lucide-react";
 import {
   EMPTY_ANAMNESIS,
@@ -605,8 +607,9 @@ export default function ExpedienteClinicoModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Favoritos */}
                   <div className="bg-emerald-50/30 border border-emerald-200/80 rounded-2xl p-3.5 space-y-1.5">
-                    <label className="block text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                      💚 Comidas y alimentos favoritos (Predilectos)
+                    <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
+                      <span>Comidas y alimentos favoritos (Predilectos)</span>
                     </label>
                     <p className="text-[11px] text-[#6B7A8D]">
                       Alimentos que más disfruta comer para incluirlos en sus menús y asegurar apego.
@@ -622,8 +625,9 @@ export default function ExpedienteClinicoModal({
 
                   {/* Aversiones */}
                   <div className="bg-rose-50/30 border border-rose-200/80 rounded-2xl p-3.5 space-y-1.5">
-                    <label className="block text-xs font-bold text-rose-800 uppercase tracking-wider">
-                      🚫 Alimentos que rechaza o no le gustan (Aversiones)
+                    <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Ban className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Alimentos que rechaza o no le gustan (Aversiones)</span>
                     </label>
                     <p className="text-[11px] text-[#6B7A8D]">
                       Alimentos que detesta o evita. Nunca deben incluirse en su plan nutricional.

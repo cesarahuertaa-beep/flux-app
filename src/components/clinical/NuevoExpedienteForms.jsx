@@ -18,7 +18,9 @@ import {
   ChevronRight,
   X,
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  Lightbulb,
+  AlertTriangle
 } from "lucide-react";
 import {
   peekClinicalRecord,
@@ -428,7 +430,10 @@ export function NuevoExpedienteForms({
           </div>
 
           <div className="pt-4 border-t border-[#F0F4FA] flex justify-between items-center text-xs text-[#6B7A8D]">
-            <span>💡 Ningún campo es obligatorio salvo su email. Podrás editarlo en cualquier momento.</span>
+            <span className="flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span>Ningún campo es obligatorio salvo su email. Podrás editarlo en cualquier momento.</span>
+            </span>
             <button
               type="button"
               onClick={onBackToList}
@@ -483,8 +488,9 @@ export function NuevoExpedienteForms({
                 <span>Enviar invitación por WhatsApp</span>
               </a>
             ) : (
-              <div className="text-xs text-amber-600 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-                ⚠️ Este paciente no tiene número de teléfono registrado. Puedes agregarlo editando su perfil en Clientes.
+              <div className="text-xs text-amber-700 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Este paciente no tiene número de teléfono registrado. Puedes agregarlo editando su perfil en Clientes.</span>
               </div>
             )}
           </div>

@@ -6,7 +6,9 @@ import {
   Clock,
   ChevronDown,
   ShieldAlert,
-  Check
+  Check,
+  AlertTriangle,
+  X
 } from "lucide-react";
 import {
   extractClinicalHighlights,
@@ -133,7 +135,7 @@ export default function ClinicalAiSummaryCard({
           {/* Fila 1: Las 4 Tarjetas de Puntos Clave */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             
-            {/* 🔴 Card 1: Alertas Médicas & Clínicas */}
+            {/* Card 1: Alertas Médicas & Clínicas */}
             <div className={`p-3.5 rounded-xl border transition-all ${
               hayAlertasMedicas
                 ? "bg-red-50/40 border-red-200/80"
@@ -164,8 +166,9 @@ export default function ClinicalAiSummaryCard({
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {highlights.alergias.tags.length > 0 ? (
                           highlights.alergias.tags.map((t, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
-                              ⚠️ {t}
+                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
+                              <span>{t}</span>
                             </span>
                           ))
                         ) : (
@@ -221,7 +224,7 @@ export default function ClinicalAiSummaryCard({
               )}
             </div>
 
-            {/* 🚫 Card 2: Alimentos que Rechaza (Aversiones) */}
+            {/* Card 2: Alimentos que Rechaza (Aversiones) */}
             <div className="p-3.5 rounded-xl border bg-rose-50/40 border-rose-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-rose-900">
@@ -231,17 +234,19 @@ export default function ClinicalAiSummaryCard({
 
                 {highlights.aversiones.presente ? (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] text-rose-800 font-semibold leading-tight">
-                      🚫 No incluir en las opciones de comida:
+                    <p className="text-[11px] text-rose-800 font-semibold leading-tight flex items-center gap-1.5">
+                      <Ban className="w-3 h-3 text-rose-600 shrink-0" />
+                      <span>No incluir en las opciones de comida:</span>
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {highlights.aversiones.tags.length > 0 ? (
                         highlights.aversiones.tags.map((t, i) => (
                           <span
                             key={i}
-                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-rose-700 border border-rose-300 shadow-2xs"
+                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-rose-700 border border-rose-300 shadow-2xs inline-flex items-center gap-1"
                           >
-                            ✕ {t}
+                            <X className="w-3 h-3 text-rose-500 shrink-0" />
+                            <span>{t}</span>
                           </span>
                         ))
                       ) : (
@@ -262,7 +267,7 @@ export default function ClinicalAiSummaryCard({
               </span>
             </div>
 
-            {/* 💚 Card 3: Alimentos Favoritos (Preferencias) */}
+            {/* Card 3: Alimentos Favoritos (Preferencias) */}
             <div className="p-3.5 rounded-xl border bg-emerald-50/40 border-emerald-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-emerald-900">
@@ -272,17 +277,19 @@ export default function ClinicalAiSummaryCard({
 
                 {highlights.preferencias.presente ? (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] text-emerald-800 font-semibold leading-tight">
-                      💚 Priorizar como base en los menús:
+                    <p className="text-[11px] text-emerald-800 font-semibold leading-tight flex items-center gap-1.5">
+                      <Heart className="w-3 h-3 text-emerald-600 fill-emerald-600/30 shrink-0" />
+                      <span>Priorizar como base en los menús:</span>
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {highlights.preferencias.tags.length > 0 ? (
                         highlights.preferencias.tags.map((t, i) => (
                           <span
                             key={i}
-                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-emerald-700 border border-emerald-300 shadow-2xs"
+                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-emerald-700 border border-emerald-300 shadow-2xs inline-flex items-center gap-1"
                           >
-                            ✓ {t}
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>{t}</span>
                           </span>
                         ))
                       ) : (
