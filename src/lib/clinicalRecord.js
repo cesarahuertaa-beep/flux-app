@@ -7,11 +7,13 @@ export const EMPTY_ANAMNESIS = {
   medicacion_suplementos: "",
   alergias_intolerancias: "",
   sintomas_gi: "",
+  cirugias_lesiones: "",
   horas_sueno: "",
   nivel_estres: "3", // 1-5
   ocupacion_actividad: "",
   horarios_comida: "",
   consumo_agua_estimado: "",
+  consumo_alcohol_tabaco: "",
   preferencias_alimentos: "",
   aversiones_alimentos: "",
   r24h_desayuno: "",
@@ -19,6 +21,11 @@ export const EMPTY_ANAMNESIS = {
   r24h_comida: "",
   r24h_colacion_v: "",
   r24h_cena: "",
+  r24h_picoteos: "",
+  objetivo_principal: "",
+  objetivo_expectativas: "",
+  notas_consulta: "",
+  resumen_ia: null,
   updated_at: null,
   completado_por: null, // 'nutriologo' | 'paciente'
 };
@@ -153,6 +160,7 @@ export function hasAnamnesisData(anamnesis) {
     "medicacion_suplementos",
     "alergias_intolerancias",
     "sintomas_gi",
+    "cirugias_lesiones",
     "ocupacion_actividad",
     "horarios_comida",
     "preferencias_alimentos",
@@ -160,6 +168,9 @@ export function hasAnamnesisData(anamnesis) {
     "r24h_desayuno",
     "r24h_comida",
     "r24h_cena",
+    "r24h_picoteos",
+    "objetivo_principal",
+    "notas_consulta",
   ];
   return textKeys.some(
     (k) => typeof anamnesis[k] === "string" && anamnesis[k].trim().length > 0

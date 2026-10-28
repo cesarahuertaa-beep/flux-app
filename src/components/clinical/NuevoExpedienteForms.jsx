@@ -27,6 +27,7 @@ import {
   EMPTY_ANAMNESIS
 } from "../../lib/clinicalRecord";
 import { dbPatch, dbPost, storageUpload } from "../../lib/supabase";
+import { extractClinicalHighlights } from "../../lib/clinicalAi";
 
 function calcAge(birthdate) {
   if (!birthdate) return null;
@@ -255,6 +256,14 @@ export function NuevoExpedienteForms({
         objetivo_principal: targetObj,
         updated_at: new Date().toISOString(),
         completado_por: isPatientMode ? "paciente" : "nutriologo",
+      };
+
+      // Generar síntesis inicial de la IA
+      const highlights = extractClinicalHighlights(finalAnamnesis, { ...cliente, ...clientPatch });
+      finalAnamnesis.resumen_ia = {
+        texto: highlights.sintesisTexto,
+        origen: "estructurado",
+        generado_en: new Date().toISOString(),
       };
 
       const next = {

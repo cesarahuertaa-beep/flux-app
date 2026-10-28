@@ -565,42 +565,60 @@ export default function ExpedienteClinicoModal({
               {/* Alcohol / Tabaco */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Consumo de alcohol o tabaco
+                  Consumo de alcohol o tabaco (Opcional)
                 </label>
                 <input
                   type="text"
                   value={anamnesis.consumo_alcohol_tabaco || ""}
                   onChange={(e) => updAnamnesis("consumo_alcohol_tabaco", e.target.value)}
-                  placeholder="Ej. Social 1 vez por quincena, no fuma..."
+                  placeholder="Ej. Social fines de semana (cerveza) / No fuma..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
 
-              {/* Preferencias y Aversiones */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Alimentos preferidos
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.preferencias_alimentos}
-                    onChange={(e) => updAnamnesis("preferencias_alimentos", e.target.value)}
-                    placeholder="Ej. Pollo, huevo, avena, arroz, aguacate..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
+              {/* Preferencias y Gustos Alimentarios Destacados */}
+              <div className="pt-2 border-t border-[#F0F4FA] space-y-3">
+                <div className="flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Preferencias y Aversiones Alimentarias
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Alimentos que evita o no le gustan
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.aversiones_alimentos}
-                    onChange={(e) => updAnamnesis("aversiones_alimentos", e.target.value)}
-                    placeholder="Ej. Atún, brócoli, champiñones, hígado..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Favoritos */}
+                  <div className="bg-emerald-50/30 border border-emerald-200/80 rounded-2xl p-3.5 space-y-1.5">
+                    <label className="block text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                      💚 Comidas y alimentos favoritos (Predilectos)
+                    </label>
+                    <p className="text-[11px] text-[#6B7A8D]">
+                      Alimentos que más disfruta comer para incluirlos en sus menús y asegurar apego.
+                    </p>
+                    <textarea
+                      rows={2}
+                      value={anamnesis.preferencias_alimentos || ""}
+                      onChange={(e) => updAnamnesis("preferencias_alimentos", e.target.value)}
+                      placeholder="Ej. Pollo, huevo al desayuno, avena con fruta, arroz, aguacate..."
+                      className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-emerald-500 shadow-2xs resize-none"
+                    />
+                  </div>
+
+                  {/* Aversiones */}
+                  <div className="bg-rose-50/30 border border-rose-200/80 rounded-2xl p-3.5 space-y-1.5">
+                    <label className="block text-xs font-bold text-rose-800 uppercase tracking-wider">
+                      🚫 Alimentos que rechaza o no le gustan (Aversiones)
+                    </label>
+                    <p className="text-[11px] text-[#6B7A8D]">
+                      Alimentos que detesta o evita. Nunca deben incluirse en su plan nutricional.
+                    </p>
+                    <textarea
+                      rows={2}
+                      value={anamnesis.aversiones_alimentos || ""}
+                      onChange={(e) => updAnamnesis("aversiones_alimentos", e.target.value)}
+                      placeholder="Ej. Pescado/mariscos, brócoli, hígado, champiñones, mayonesa..."
+                      className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-rose-500 shadow-2xs resize-none"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -623,11 +641,12 @@ export default function ExpedienteClinicoModal({
               </div>
 
               {[
-                { key: "r24h_desayuno", label: "Desayuno habitual" },
-                { key: "r24h_colacion_m", label: "Colación matutina" },
-                { key: "r24h_comida", label: "Comida habitual" },
-                { key: "r24h_colacion_v", label: "Colación vespertina" },
-                { key: "r24h_cena", label: "Cena habitual" },
+                { key: "r24h_desayuno", label: "Desayuno habitual", ph: "Ej. 2 huevos con frijoles y café con azúcar" },
+                { key: "r24h_colacion_m", label: "Colación matutina (si aplica)", ph: "Ej. Manzana con galletas" },
+                { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pechuga de pollo, arroz, ensalada y agua de sabor" },
+                { key: "r24h_colacion_v", label: "Colación vespertina (si aplica)", ph: "Ej. Yogur griego o fruta picada" },
+                { key: "r24h_cena", label: "Cena habitual", ph: "Ej. Quesadillas con jamón o cereal con leche" },
+                { key: "r24h_picoteos", label: "Bebidas o picoteos entre horas", ph: "Ej. Refresco diario, café con galleta, papitas en la tarde..." },
               ].map((item) => (
                 <div key={item.key}>
                   <label className="block text-xs font-bold text-[#0B1929] mb-1">
@@ -637,27 +656,42 @@ export default function ExpedienteClinicoModal({
                     type="text"
                     value={anamnesis[item.key] || ""}
                     onChange={(e) => updAnamnesis(item.key, e.target.value)}
-                    placeholder="Alimentos y porciones aproximadas..."
+                    placeholder={item.ph}
                     className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
               ))}
 
-              <div>
-                <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Objetivo Principal y Expectativas del Paciente
-                </label>
-                <textarea
-                  rows={2}
-                  value={perfil.objetivo || anamnesis.objetivo_expectativas || anamnesis.objetivo_principal || ""}
-                  onChange={(e) => {
-                    updPerfil("objetivo", e.target.value);
-                    updAnamnesis("objetivo_principal", e.target.value);
-                    updAnamnesis("objetivo_expectativas", e.target.value);
-                  }}
-                  placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular, mejorar relación con la comida..."
-                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
-                />
+              <div className="pt-2 border-t border-[#F0F4FA] space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Objetivo Principal y Expectativas del Paciente
+                  </label>
+                  <input
+                    type="text"
+                    value={perfil.objetivo || anamnesis.objetivo_expectativas || anamnesis.objetivo_principal || ""}
+                    onChange={(e) => {
+                      updPerfil("objetivo", e.target.value);
+                      updAnamnesis("objetivo_principal", e.target.value);
+                      updAnamnesis("objetivo_expectativas", e.target.value);
+                    }}
+                    placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular, recomposición..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                    Notas y Observaciones de la Consulta (Opcional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={anamnesis.notas_consulta || ""}
+                    onChange={(e) => updAnamnesis("notas_consulta", e.target.value)}
+                    placeholder="Comentarios adicionales, motivación del paciente, acuerdos especiales, dudas..."
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
+                  />
+                </div>
               </div>
             </div>
           )}

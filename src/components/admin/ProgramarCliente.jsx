@@ -35,6 +35,7 @@ import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
 import SeguimientoClinicoCard from "../clinical/SeguimientoClinicoCard";
+import ClinicalAiSummaryCard from "../clinical/ClinicalAiSummaryCard";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -1827,6 +1828,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
           </div>
         )}
+
+      {/* ── Resumen Clínico Inteligente IA ── */}
+      {!isMiPlan && (clinicalRec?.anamnesis_completada || hasAnamnesisData(clinicalRec?.anamnesis)) && (
+        <ClinicalAiSummaryCard
+          cliente={selected}
+          clinicalRec={clinicalRec}
+          onOpenExpediente={() => setShowExpediente(true)}
+          onRecordUpdated={(rec) => setClinicalRec(rec)}
+        />
+      )}
 
       {/* ── Selector de Ciclos ── */}
       <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
