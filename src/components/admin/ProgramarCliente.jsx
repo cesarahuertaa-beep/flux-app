@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -27,7 +27,7 @@ import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo } from "../../lib/bodyComposition";
-import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData } from "../../lib/clinicalRecord";
+import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
@@ -110,6 +110,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) && ms.length > 0 ? ms[0] : null;
   });
+  const [clinicalLoaded, setClinicalLoaded] = useState(false);
   const [clinicalRec, setClinicalRec] = useState(() => {
     return selected?.id ? peekClinicalRecord(selected.id) : null;
   });
@@ -117,11 +118,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   useEffect(() => {
     let active = true;
     if (selected?.id) {
+      setClinicalLoaded(false);
       fetchClinicalRecord(selected.id).then(rec => {
-        if (active && rec) setClinicalRec(rec);
+        if (active) {
+          if (rec) setClinicalRec(rec);
+          setClinicalLoaded(true);
+        }
+      }).catch(() => {
+        if (active) setClinicalLoaded(true);
       });
     } else {
       setClinicalRec(null);
+      setClinicalLoaded(true);
     }
     return () => { active = false; };
   }, [selected?.id]);
@@ -1666,12 +1674,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }
 
   // ── Verificación de Expediente Inicial para Pacientes Nuevos ──
+  // Si aún no termina de cargar el expediente remoto desde Supabase Storage, mostrar loader sutil para evitar parpadeos
+  if (!isMiPlan && !clinicalLoaded) {
+    return (
+      <div className="w-full flex-1 flex flex-col items-center justify-center py-24 gap-3 bg-[#F8FAFC]">
+        <div className="w-8 h-8 rounded-full border-2 border-[var(--brand-primary)] border-t-transparent animate-spin" />
+        <span className="text-xs font-semibold text-[#6B7A8D]">Verificando expediente del paciente...</span>
+      </div>
+    );
+  }
+
+  const hasExistingPlan = rutinas.length > 0 || dias.length > 0 || (ciclos && ciclos.length > 0);
   const isExpedienteCompletado = Boolean(
     clinicalRec?.anamnesis_completada ||
     clinicalRec?.anamnesis?.completado_por ||
-    (hasAnamnesisData(clinicalRec?.anamnesis) && !clinicalRec?.draft_step) ||
-    rutinas.length > 0 ||
-    dias.length > 0 ||
+    hasExistingPlan ||
     isMiPlan
   );
 
@@ -1772,6 +1789,30 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   {clinicalRec?.solicitud_activa && (
                     <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("¿Deseas reiniciar o volver a realizar el cuestionario inicial de este paciente? Se limpiará el registro inicial para poder responderlo o solicitarlo nuevamente.")) {
+                      const next = {
+                        ...clinicalRec,
+                        anamnesis_completada: false,
+                        draft_step: null,
+                        draft_anamnesis: null,
+                        solicitud_activa: null,
+                        solicitud_fecha: null,
+                        anamnesis: { ...EMPTY_ANAMNESIS },
+                      };
+                      const saved = await saveClinicalRecord(selected.id, next);
+                      setClinicalRec(saved);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-[#E2E8F0] bg-white hover:bg-rose-50 text-[#6B7A8D] hover:text-rose-600 transition-all cursor-pointer shrink-0"
+                  title="Reiniciar cuestionario inicial para volver a evaluarlo desde cero"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Reiniciar Cuestionario</span>
                 </button>
 
                 <div className="h-4 w-px bg-[#E2E8F0] hidden sm:block mx-0.5" />

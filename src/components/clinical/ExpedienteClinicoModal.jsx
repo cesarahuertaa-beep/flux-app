@@ -10,6 +10,7 @@ import {
   HeartPulse,
   Utensils,
   Clock,
+  RotateCcw,
 } from "lucide-react";
 import {
   EMPTY_ANAMNESIS,
@@ -132,6 +133,35 @@ export default function ExpedienteClinicoModal({
 
       if (onSaved) onSaved(saved);
       if (mode === "paciente") onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetAnamnesis = async () => {
+    if (
+      !window.confirm(
+        "¿Deseas reiniciar el cuestionario inicial de este paciente? Se limpiarán las respuestas registradas y podrás volver a llenarlo o solicitarlo desde cero."
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const next = {
+        ...record,
+        anamnesis_completada: false,
+        draft_step: null,
+        draft_anamnesis: null,
+        solicitud_activa: null,
+        solicitud_fecha: null,
+        anamnesis: { ...EMPTY_ANAMNESIS },
+      };
+      const saved = await saveClinicalRecord(clienteId, next);
+      setRecord(saved);
+      setAnamnesis({ ...EMPTY_ANAMNESIS });
+      if (onSaved) onSaved(saved);
+      onClose();
     } finally {
       setSaving(false);
     }
@@ -692,28 +722,45 @@ export default function ExpedienteClinicoModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-xs font-bold text-[#6B7A8D] hover:bg-gray-50 cursor-pointer"
-          >
-            Cerrar
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={
-              activeTab === "historia" ? handleSaveAnamnesis : handleSaveCheckin
-            }
-            className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
-          >
-            {saving
-              ? "Guardando..."
-              : activeTab === "historia"
-              ? "Guardar Historia"
-              : "Registrar Check-in"}
-          </button>
+        <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
+          {mode === "nutriologo" && activeTab === "historia" ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleResetAnamnesis}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Borra la historia inicial para volver a realizar el cuestionario inicial de 3 páginas"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reiniciar Cuestionario Inicial</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-xs font-bold text-[#6B7A8D] hover:bg-gray-50 cursor-pointer"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={
+                activeTab === "historia" ? handleSaveAnamnesis : handleSaveCheckin
+              }
+              className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            >
+              {saving
+                ? "Guardando..."
+                : activeTab === "historia"
+                ? "Guardar Historia"
+                : "Registrar Check-in"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
