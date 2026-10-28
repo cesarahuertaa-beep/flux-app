@@ -133,8 +133,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
               options={[
                 { value: "", label: "Selecciona..." },
                 { value: "Femenino", label: "Femenino" },
-                { value: "Masculino", label: "Masculino" },
-                { value: "Otro", label: "Otro" }
+                { value: "Masculino", label: "Masculino" }
               ]}
             />
           </div>

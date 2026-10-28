@@ -33,8 +33,7 @@ import { CustomSelect } from "../ui/CustomSelect";
 const GENERO_OPTIONS = [
   { value: "", label: "Selecciona..." },
   { value: "Femenino", label: "Femenino" },
-  { value: "Masculino", label: "Masculino" },
-  { value: "Otro", label: "Otro" }
+  { value: "Masculino", label: "Masculino" }
 ];
 
 const normalizeGeneroVal = (val) => {
@@ -42,8 +41,7 @@ const normalizeGeneroVal = (val) => {
   const s = String(val).trim();
   if (s === "M" || s.toLowerCase() === "masculino" || s.toLowerCase() === "hombre") return "Masculino";
   if (s === "F" || s.toLowerCase() === "femenino" || s.toLowerCase() === "mujer") return "Femenino";
-  if (s.toLowerCase() === "otro") return "Otro";
-  return s;
+  return s.toLowerCase().startsWith("f") ? "Femenino" : "Masculino";
 };
 
 function calcAge(birthdate) {
