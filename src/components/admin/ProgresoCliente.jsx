@@ -463,7 +463,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       timer = setTimeout(() => {
         if (table === "metricas_progreso" || table === "*") {
           const fresh = dbPeek(`metricas_progreso?cliente_id=eq.${selected?.id}&order=fecha.desc`);
-          if (Array.isArray(fresh) && fresh.length > 0) {
+          if (Array.isArray(fresh)) {
             setMetricas(fresh.map(enrichMetrica));
           } else {
             load(false);
@@ -474,10 +474,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     };
 
     const onMetricasUpdated = (ev) => {
+      if (ev?.detail?.source === "ProgresoCliente") return;
       const targetId = ev?.detail?.clienteId;
       if (!targetId || targetId === selected?.id) {
         const fresh = dbPeek(`metricas_progreso?cliente_id=eq.${selected?.id}&order=fecha.desc`);
-        if (Array.isArray(fresh) && fresh.length > 0) {
+        if (Array.isArray(fresh)) {
           setMetricas(fresh.map(enrichMetrica));
         } else {
           load(true);
@@ -632,7 +633,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       // 1. Actualización optimista instantánea (0ms) en el estado de React:
       const enrichedItem = enrichMetrica(savedRow);
       setMetricas(prev => {
-        const filtered = prev.filter(m => m.id !== enrichedItem.id && m.id !== editingId);
+        const filtered = prev.filter(m => String(m.id) !== String(enrichedItem.id) && String(m.id) !== String(editingId));
         const next = [enrichedItem, ...filtered];
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
@@ -640,7 +641,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       // 2. Actualizar caché de consulta (queryCache) de inmediato para evitar lecturas obsoletas:
       updateQueryCache("metricas_progreso", (cachedList) => {
         if (!Array.isArray(cachedList)) return [savedRow];
-        const filtered = cachedList.filter(m => m.id !== savedRow.id && m.id !== editingId);
+        const filtered = cachedList.filter(m => String(m.id) !== String(savedRow.id) && String(m.id) !== String(editingId));
         const next = [savedRow, ...filtered];
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
@@ -649,7 +650,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       setSaving(false);
       await load(true);
       if (typeof window !== "undefined" && selected?.id) {
-        window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id } }));
+        window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id, source: "ProgresoCliente" } }));
       }
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);
@@ -774,16 +775,38 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       onConfirm: async () => {
         const prevMetricas = metricas;
         setConfirmDelete(null);
-        setMetricas(prev => prev.filter(m => m.id !== id));
+
+        // 1. Eliminación optimista instantánea (0ms) en el estado React
+        setMetricas(prev => prev.filter(m => String(m.id) !== String(id)));
+
+        // 2. Actualizar caché de consulta (queryCache) de inmediato para evitar lecturas obsoletas
         updateQueryCache("metricas_progreso", (cachedList) => {
-          if (!Array.isArray(cachedList)) return cachedList;
-          return cachedList.filter(m => m.id !== id);
+          if (!Array.isArray(cachedList)) return [];
+          return cachedList.filter(m => String(m.id) !== String(id));
         });
+
+        // 3. Sincronizar y limpiar check-in asociado en el expediente si existe
+        if (selected?.id && Array.isArray(clinicalRec?.checkins)) {
+          const filteredCheckins = clinicalRec.checkins.filter(c =>
+            String(c.id) !== `eval_${id}` && String(c.id) !== String(id)
+          );
+          if (filteredCheckins.length !== clinicalRec.checkins.length) {
+            const nextRec = { ...clinicalRec, checkins: filteredCheckins };
+            saveClinicalRecord(selected.id, nextRec).then(rec => setClinicalRec(rec)).catch(() => {});
+          }
+        }
+
         setMsg(<div className="flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-red-500" /> Evaluación eliminada</div>);
+
+        // Si es un ID temporal de memoria (aún no persistido en BD), no llamar a dbDel
+        if (String(id).startsWith("temp_")) return;
+
         try {
           await dbDel(`metricas_progreso?id=eq.${id}`);
           if (typeof window !== "undefined" && selected?.id) {
-            window.dispatchEvent(new CustomEvent("flux:metricas-updated", { detail: { clienteId: selected.id } }));
+            window.dispatchEvent(new CustomEvent("flux:metricas-updated", {
+              detail: { clienteId: selected.id, source: "ProgresoCliente" }
+            }));
           }
         } catch(err) {
           setMetricas(prevMetricas);
