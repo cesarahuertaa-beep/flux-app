@@ -1022,6 +1022,24 @@ export const authInvite = async (email, extraData = {}) => {
   return d;
 };
 
+export const invokeEdgeFunction = async (functionName, body = {}) => {
+  const token = getValidToken() || SUPA_KEY;
+  const r = await fetch(`${SUPA_URL}/functions/v1/${functionName}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(data.error || data.message || `Error en función ${functionName} (${r.status})`);
+  }
+  return data;
+};
+
 export const authResetPassword = async (email) => {
   const redirectUrl =
     typeof window !== "undefined" &&

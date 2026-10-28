@@ -2,6 +2,8 @@
 // Synthesizes clinical intake questionnaires, extracts key highlights, food preferences/aversions,
 // and produces actionable clinical diagnoses for nutritionists and coaches.
 
+import { invokeEdgeFunction } from "./supabase";
+
 /**
  * Splits comma-, semicolon-, slash-, or conjunction-separated strings into clean, deduplicated tags.
  */
@@ -260,6 +262,26 @@ export function getGeminiApiKey() {
  */
 export async function generateClinicalAiSynopsis(anamnesis, cliente) {
   const highlights = extractClinicalHighlights(anamnesis, cliente);
+
+  // 1. Intentar llamar a la Edge Function de Supabase (Backend seguro y centralizado)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const edgeRes = await invokeEdgeFunction("clinical-ai", { anamnesis, cliente });
+    clearTimeout(timeoutId);
+
+    if (edgeRes?.texto && edgeRes.texto.length > 30) {
+      return {
+        texto: edgeRes.texto,
+        origen: edgeRes.origen || "edge_function",
+        model: edgeRes.model || "gemini-2.0-flash",
+        generadoEn: edgeRes.generadoEn || new Date().toISOString(),
+        highlights,
+      };
+    }
+  } catch {
+    // Si la función de Supabase aún no está desplegada en el proyecto remoto o hay error de red, continuar
+  }
 
   // Lista consolidada de exclusiones
   const exclusionesUnicas = Array.from(
