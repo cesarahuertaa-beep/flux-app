@@ -35,6 +35,7 @@ import MacroCalculatorModal from "../clinical/MacroCalculatorModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
 import ClinicalAiSummaryCard from "../clinical/ClinicalAiSummaryCard";
+import ProgresoHistoricoModal from "./ProgresoHistoricoModal";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -238,11 +239,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
     };
+    const onOpenHistorico = () => setShowHistorico(true);
     window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     window.addEventListener("flux:metricas-updated", onMetricasUpdated);
+    window.addEventListener("flux:open-historico", onOpenHistorico);
     return () => {
       window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
       window.removeEventListener("flux:metricas-updated", onMetricasUpdated);
+      window.removeEventListener("flux:open-historico", onOpenHistorico);
     };
   }, [selected?.id]);
 
@@ -277,6 +281,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [completedCrop, setCompletedCrop] = useState(null);
   const imgCropRef = useRef(null);
   const pendingPhotoUploadsRef = useRef({});
+  const [showHistorico, setShowHistorico] = useState(false);
 
   useBackButton(!!cropModal, () => {
     if (cropModal?.objectUrl) {
@@ -284,6 +289,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
     setCropModal(null);
   }, 50);
+  useBackButton(showHistorico, () => setShowHistorico(false), 30);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
   useBackButton(!!templateModal, () => setTemplateModal(null), 40);
   useBackButton(!!showDiaModal, () => setShowDiaModal(false), 20);
@@ -2191,15 +2197,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
-                  onClick={() => setSubtab("historico")}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all shadow-2xs cursor-pointer shrink-0 ${
-                    subtab === "historico"
-                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
-                      : "border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929]"
-                  }`}
-                  title="Ver gráficas de progreso histórico plan a plan"
+                  onClick={() => setShowHistorico(true)}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
+                  title="Abrir progreso histórico plan a plan en pantalla completa"
                 >
-                  <TrendingUp className={`w-3.5 h-3.5 ${subtab === "historico" ? "text-white" : "text-[var(--brand-primary)]"}`} />
+                  <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
                   <span>Histórico</span>
                 </button>
 
@@ -2396,7 +2398,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Evaluación" },
           ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
           ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Entrenamiento" }] : []),
-          { k:"historico", ic: <TrendingUp className="w-4 h-4 shrink-0"/>, lb:"Histórico" },
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
@@ -2677,19 +2678,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           mode="evaluaciones"
           cicloActivo={cicloSel}
           isReadOnly={isReadOnly}
-        />
-      </Suspense>
-    )}
-
-    {subtab === "historico" && (
-      <Suspense fallback={<ListSkeleton rows={4} />}>
-        <ProgresoCliente
-          selected={selected}
-          setMsg={setMsg}
-          isMiPlan={isMiPlan}
-          mode="historico"
-          cicloActivo={cicloSel}
-          isReadOnly={false}
         />
       </Suspense>
     )}
@@ -3720,6 +3708,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             }
             setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Expediente clínico guardado</div>);
           }}
+        />
+      )}
+
+      {/* ── Progreso Histórico Plan a Plan a Pantalla Completa ── */}
+      {showHistorico && selected && (
+        <ProgresoHistoricoModal
+          isOpen={showHistorico}
+          onClose={() => setShowHistorico(false)}
+          cliente={selected}
+          ciclos={ciclos}
+          brand={brand}
         />
       )}
 

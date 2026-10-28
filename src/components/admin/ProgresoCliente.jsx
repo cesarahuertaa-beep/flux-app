@@ -946,7 +946,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         <div className="flex gap-1 mb-5 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
           {[
             { k: "evaluaciones", ic: <BarChart2 className="w-4 h-4 shrink-0" />, lb: "Evaluaciones" },
-            { k: "historico", ic: <TrendingUp className="w-4 h-4 shrink-0" />, lb: "Histórico" },
             ...(showRutinasSub ? [{ k: "rutinas", ic: <Dumbbell className="w-4 h-4 shrink-0" />, lb: "Adherencia Rutinas" }] : []),
             ...(showNutriSub ? [{ k: "nutricion", ic: <UtensilsCrossed className="w-4 h-4 shrink-0" />, lb: "Adherencia Nutrición" }] : [])
           ].map(({ k, ic, lb }) => (
@@ -977,6 +976,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-historico"))}
+                className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Abrir progreso histórico plan a plan en pantalla completa"
+              >
+                <TrendingUp className="w-4 h-4 text-[var(--brand-primary)]" />
+                <span className="hidden sm:inline">Histórico Completo</span>
+                <span className="sm:hidden">Histórico</span>
+              </button>
               {displayedMetricas.length > 0 && (
                 <button onClick={() => generateProgresoPDF(selected, displayedMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
@@ -1005,6 +1014,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm mx-auto">
                   <Plus className="w-4 h-4" /> Registrar evaluación
                 </button>
+              )}
+              {allLinkedMetricas.length > 0 && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent("flux:open-historico"))}
+                    className="text-xs text-[var(--brand-primary)] hover:underline font-bold cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Ver {allLinkedMetricas.length} evaluación{allLinkedMetricas.length !== 1 ? "es" : ""} en el Histórico Completo</span>
+                  </button>
+                </div>
               )}
             </div>
           ) : displayedMetricas.map((m, idx) => {
@@ -1127,197 +1148,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* ── PROGRESO HISTÓRICO PLAN A PLAN ── */}
-      {activeSection === "historico" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-[#0B1929]">
-                  Progreso Histórico Plan a Plan
-                </h3>
-                <p className="text-xs text-[#6B7A8D] mt-0.5">
-                  Evolución corporal en función del tiempo a través de todos los planes ({ciclos.length} planes • {allLinkedMetricas.length} evaluaciones)
-                </p>
-              </div>
-            </div>
-
-            {allLinkedMetricas.length > 0 && (
-              <button
-                onClick={() => generateProgresoPDF(selected, allLinkedMetricas, brand)}
-                className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer shadow-2xs shrink-0 self-start sm:self-auto"
-              >
-                <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
-                <span>PDF Histórico Completo</span>
-              </button>
-            )}
-          </div>
-
-          {/* Gráficas de Evolución en función del tiempo */}
-          {allLinkedMetricas.length > 0 ? (
-            <EvolutionCharts
-              metricas={allLinkedMetricas}
-              isLocked={isCivil && selected?.plan_tipo !== 'premium'}
-              brandColor={brand?.color_primario}
-            />
-          ) : (
-            <div className="text-center py-12 text-[#6B7A8D] bg-white rounded-2xl border border-dashed border-[#E2E8F0] p-6">
-              <div className="flex justify-center mb-3 text-[#CBD5E1]"><BarChart2 className="w-12 h-12" /></div>
-              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin evaluaciones registradas aún</div>
-              <div className="text-[13px] max-w-sm mx-auto mb-4">
-                En cuanto registres evaluaciones y check-ins en los planes del paciente, aquí se trazarán automáticamente sus curvas de peso, grasa, masa muscular y somatocarta en función del tiempo.
-              </div>
-            </div>
-          )}
-
-          {/* Comparador de Fotografías de Progreso */}
-          {allClientPhotos.length >= 2 && !(isCivil && selected?.plan_tipo !== 'premium') && (
-            <BeforeAfterComparator
-              photos={allClientPhotos}
-              brand={brand}
-              clienteNombre={selected?.nombre}
-            />
-          )}
-
-          {/* Desglose y Evaluaciones por Plan */}
-          {ciclos.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-2xs">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F0F4FA]">
-                <Layers className="w-4 h-4 text-[var(--brand-primary)]" />
-                <h4 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
-                  Desglose y Evaluaciones por Plan
-                </h4>
-              </div>
-
-              <div className="space-y-4">
-                {ciclos.map((c, cIdx) => {
-                  const planEvals = allLinkedMetricas.filter(m => String(m.ciclo_id) === String(c.id));
-                  const isCurrent = c.activo;
-                  const firstEval = planEvals[planEvals.length - 1]; // Más antigua de este plan
-                  const lastEval = planEvals[0]; // Más reciente de este plan
-                  const weightDelta = (firstEval?.peso && lastEval?.peso && firstEval.id !== lastEval.id)
-                    ? (Number(lastEval.peso) - Number(firstEval.peso)).toFixed(1)
-                    : null;
-
-                  return (
-                    <div
-                      key={c.id}
-                      className={`rounded-xl border p-4 transition-all ${
-                        isCurrent
-                          ? "border-[var(--brand-primary)]/40 bg-blue-50/20 shadow-2xs"
-                          : "border-[#E2E8F0] bg-white hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                            isCurrent
-                              ? "bg-[var(--brand-primary)] text-white shadow-2xs"
-                              : "bg-gray-100 text-[#6B7A8D]"
-                          }`}>
-                            {isCurrent ? "Plan Activo" : `Plan #${ciclos.length - cIdx}`}
-                          </span>
-                          <h5 className="text-sm font-bold text-[#0B1929]">
-                            {c.nombre?.split("|")[0]}
-                          </h5>
-                          {c.created_at && (
-                            <span className="text-xs text-[#6B7A8D] flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {fmtDate(c.created_at.split("T")[0])}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="text-[#6B7A8D]">
-                            {planEvals.length} evaluación{planEvals.length !== 1 ? "es" : ""}
-                          </span>
-                          {weightDelta !== null && (
-                            <span className={`font-bold px-2 py-0.5 rounded-md ${
-                              Number(weightDelta) < 0 ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-[var(--brand-primary)]"
-                            }`}>
-                              Δ {Number(weightDelta) > 0 ? `+${weightDelta}` : weightDelta} kg
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Evaluaciones del plan */}
-                      {planEvals.length === 0 ? (
-                        <div className="text-xs text-[#94A3B8] italic py-2">
-                          Sin evaluaciones registradas durante este plan.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2 border-t border-[#F0F4FA]">
-                          {planEvals.map((ev) => (
-                            <div
-                              key={ev.id}
-                              className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2 hover:bg-white transition-colors"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-[var(--brand-primary)]" />
-                                  {fmtDate(ev.fecha)}
-                                </span>
-                                {ev.metodo_evaluacion && (
-                                  <span className="text-[10px] font-bold text-[#6B7A8D] bg-white border border-[#E2E8F0] px-1.5 py-0.5 rounded">
-                                    {getMetodoLabel(ev.metodo_evaluacion)}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-3 text-xs">
-                                {ev.peso && (
-                                  <div>
-                                    <span className="text-[10px] text-[#6B7A8D] block">Peso</span>
-                                    <span className="font-bold text-[#0B1929]">{ev.peso} kg</span>
-                                  </div>
-                                )}
-                                {ev.grasa_pct && (
-                                  <div>
-                                    <span className="text-[10px] text-[#6B7A8D] block">Grasa</span>
-                                    <span className="font-bold text-[#0B1929]">{ev.grasa_pct}%</span>
-                                  </div>
-                                )}
-                                {ev.masa_libre_grasa && (
-                                  <div>
-                                    <span className="text-[10px] text-[#6B7A8D] block">M. Magra</span>
-                                    <span className="font-bold text-emerald-700">{ev.masa_libre_grasa} kg</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="flex items-center justify-between pt-1.5 border-t border-[#E2E8F0]/70 text-[11px]">
-                                {ev.checkin_energia ? (
-                                  <span className="text-[#6B7A8D]" title="Energía en check-in">
-                                    ⚡ {ev.checkin_energia}/5
-                                  </span>
-                                ) : <span />}
-                                <button
-                                  type="button"
-                                  onClick={() => startEdit(ev)}
-                                  className="text-[var(--brand-primary)] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  <span>Consultar</span>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
