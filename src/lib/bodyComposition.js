@@ -215,6 +215,7 @@ export function enrichMetrica(m) {
     (cintura > 0 && estatura > 0 ? Number((cintura / estatura).toFixed(2)) : null);
 
   return {
+    ...meta,
     ...m,
     notas: cleanNotas,
     _rawNotas: m.notas,
@@ -226,6 +227,12 @@ export function enrichMetrica(m) {
     somatotipo_endo: meta.somatotipo_endo ?? m.somatotipo_endo ?? "",
     somatotipo_meso: meta.somatotipo_meso ?? m.somatotipo_meso ?? "",
     somatotipo_ecto: meta.somatotipo_ecto ?? m.somatotipo_ecto ?? "",
+    checkin_energia: meta.checkin_energia ?? m.checkin_energia ?? "",
+    checkin_saciedad: meta.checkin_saciedad ?? m.checkin_saciedad ?? "",
+    checkin_digestion: meta.checkin_digestion ?? m.checkin_digestion ?? "",
+    checkin_descanso: meta.checkin_descanso ?? m.checkin_descanso ?? "",
+    checkin_observaciones: meta.checkin_observaciones ?? m.checkin_observaciones ?? "",
+    checkin_ajustes: meta.checkin_ajustes ?? m.checkin_ajustes ?? "",
   };
 }
 
@@ -235,8 +242,18 @@ export function enrichMetrica(m) {
  * los indicadores extendidos en `notas`.
  */
 export function prepareMetricaPayload(rawData, calcResult = {}) {
-  const merged = { ...rawData };
+  const merged = {};
   const extraMeta = {};
+
+  // Campos de rawData: si pertenecen a la BD van a merged, si son extendidos van a extraMeta
+  Object.entries(rawData || {}).forEach(([k, v]) => {
+    if (v === "" || v === null || v === undefined) return;
+    if (DB_METRICA_COLUMNS.has(k)) {
+      merged[k] = v;
+    } else {
+      extraMeta[k] = v;
+    }
+  });
 
   Object.entries(calcResult || {}).forEach(([k, v]) => {
     if (k === "imc_info" || k === "icc_info") return;

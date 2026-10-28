@@ -16,15 +16,14 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Send
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
-import SeguimientoClinicoModal from "../clinical/SeguimientoClinicoModal";
-import { peekClinicalRecord, fetchClinicalRecord } from "../../lib/clinicalRecord";
+import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
 
 const FIELDS_BASICAS = [
   { key: "peso", label: "Peso (kg)", type: "number", step: "0.1" },
@@ -204,6 +203,14 @@ const emptyForm = () => ({
 
   // Legacy/Calculated
   grasa_pct: "", musculo_pct: "", icc: "", glucosa: "", presion_arterial: "", notas: "",
+
+  // Check-in clínico integrado
+  checkin_energia: "4",
+  checkin_saciedad: "4",
+  checkin_digestion: "4",
+  checkin_descanso: "4",
+  checkin_observaciones: "",
+  checkin_ajustes: "",
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
@@ -234,7 +241,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   const [saving,       setSaving]       = useState(false);
   const [showModal,    setShowModal]    = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
-  const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
   const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo));
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
@@ -254,7 +260,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
   useBackButton(showModal, () => setShowModal(false), 20);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
-  useBackButton(showCheckinModal, () => setShowCheckinModal(false), 22);
 
   const loadCicloData = useCallback(async (ciclo) => {
     if (!selected) return;
@@ -392,12 +397,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
   }, [selected?.id]);
 
   useEffect(() => {
-    const handleOpenCheckin = () => {
-      setShowCheckinModal(true);
+    const handleOpen = () => {
+      openNewEvaluation();
     };
-    window.addEventListener("flux:open-checkin", handleOpenCheckin);
-    return () => window.removeEventListener("flux:open-checkin", handleOpenCheckin);
-  }, []);
+    window.addEventListener("flux:open-new-evaluation", handleOpen);
+    window.addEventListener("flux:open-checkin", handleOpen);
+    return () => {
+      window.removeEventListener("flux:open-new-evaluation", handleOpen);
+      window.removeEventListener("flux:open-checkin", handleOpen);
+    };
+  }, [openNewEvaluation]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -446,7 +455,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     });
   };
 
-  const openNewEvaluation = () => {
+  const openNewEvaluation = useCallback(() => {
     const base = emptyForm();
     const prev = metricas[0];
     if (prev) {
@@ -460,6 +469,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     } else {
       base.metodo_evaluacion = "plicometria_jp3";
     }
+
+    // Precargar respuesta reciente del paciente o del expediente si existe
+    const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
+    if (latestCheckin) {
+      if (latestCheckin.energia) base.checkin_energia = String(latestCheckin.energia);
+      if (latestCheckin.saciedad) base.checkin_saciedad = String(latestCheckin.saciedad);
+      if (latestCheckin.digestion) base.checkin_digestion = String(latestCheckin.digestion);
+      if (latestCheckin.descanso) base.checkin_descanso = String(latestCheckin.descanso);
+      if (latestCheckin.observaciones) base.checkin_observaciones = String(latestCheckin.observaciones);
+      if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
+    }
+
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setForm(base);
@@ -468,6 +489,40 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
+  }, [metricas, isCivil, clinicalRec?.checkins, selected?.genero, selected?.sexo, selected?.fecha_nacimiento]);
+
+  const toggleSolicitarPaciente = async () => {
+    if (!selected?.id) return;
+    const isRequested = clinicalRec?.solicitud_activa === "checkin_seguimiento";
+    try {
+      const next = {
+        ...clinicalRec,
+        solicitud_activa: isRequested ? null : "checkin_seguimiento",
+        solicitud_fecha: isRequested ? null : new Date().toISOString(),
+      };
+      const saved = await saveClinicalRecord(selected.id, next);
+      setClinicalRec(saved);
+
+      if (!isRequested && selected?.auth_id) {
+        await dbPost("notificaciones", {
+          profile_id: selected.auth_id,
+          titulo: "Check-in de Seguimiento Solicitado",
+          mensaje: "Tu especialista te ha solicitado registrar tu seguimiento y sensaciones de la semana.",
+          tipo: "alerta",
+          link_url: "perfil",
+          entidad_id: selected.id,
+        }).catch(() => {});
+      }
+
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-green-500" />
+          {isRequested ? "Solicitud cancelada" : `Seguimiento solicitado a ${selected.nombre}`}
+        </div>
+      );
+    } catch (e) {
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
+    }
   };
 
   const handleFotos = (e) => {
@@ -488,7 +543,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
       const rawData = {};
       if (!editingId) rawData.cliente_id = selected.id;
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
-      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion"]);
+      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion", "checkin_observaciones", "checkin_ajustes"]);
       Object.entries(form).forEach(([k, v]) => {
         if (IGNORED_KEYS.has(k)) return;
         if (v !== "" && v !== null && v !== undefined) {
@@ -548,6 +603,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
           }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
         }
       }
+
+      // Sincronizar check-in al expediente clínico
+      if (selected?.id && (form.checkin_observaciones || form.checkin_ajustes || form.checkin_energia)) {
+        const checkinEntry = {
+          id: `eval_${editingId || Date.now()}`,
+          fecha: form.fecha || new Date().toISOString().split("T")[0],
+          energia: Number(form.checkin_energia) || 4,
+          saciedad: Number(form.checkin_saciedad) || 4,
+          digestion: Number(form.checkin_digestion) || 4,
+          descanso: Number(form.checkin_descanso) || 4,
+          observaciones: (form.checkin_observaciones || "").trim(),
+          ajustes_solicitados: (form.checkin_ajustes || "").trim(),
+          autor: "nutriologo",
+        };
+        const prevCheckins = Array.isArray(clinicalRec?.checkins) ? clinicalRec.checkins : [];
+        const filtered = prevCheckins.filter(c => c.id !== checkinEntry.id && c.fecha !== checkinEntry.fecha);
+        const nextRec = {
+          ...clinicalRec,
+          checkins: [checkinEntry, ...filtered].slice(0, 50),
+          solicitud_activa: null,
+        };
+        saveClinicalRecord(selected.id, nextRec).then(rec => setClinicalRec(rec)).catch(() => {});
+      }
+
       closeModal();
       await load();
       if (typeof window !== "undefined" && selected?.id) {
@@ -725,25 +804,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
           <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <span className="font-bold text-[#0B1929]">Evaluaciones corporales <span className="text-[#6B7A8D] font-normal">({metricas.length})</span></span>
             <div className="flex flex-wrap items-center gap-2">
-              {!isMiPlan && (
-                <button
-                  type="button"
-                  onClick={() => setShowCheckinModal(true)}
-                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Ver o registrar check-in de seguimiento clínico"
-                >
-                  <Activity className="w-4 h-4 text-[var(--brand-primary)]" />
-                  <span>Check-in</span>
-                  {Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[var(--brand-primary)] rounded-full font-bold">
-                      {clinicalRec.checkins.length}
-                    </span>
-                  )}
-                  {clinicalRec?.solicitud_activa === "checkin_seguimiento" && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa al paciente" />
-                  )}
-                </button>
-              )}
               {metricas.length > 0 && (
                 <button onClick={() => generateProgresoPDF(selected, metricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
@@ -829,6 +889,36 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
                     );
                   })}
                 </div>
+
+                {/* Check-in de Seguimiento registrado con esta evaluación */}
+                {Boolean(m.checkin_energia || m.checkin_saciedad || m.checkin_observaciones || m.checkin_ajustes) && (
+                  <div className="mt-3 bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-100 rounded-xl p-3 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5 text-xs">
+                        <Activity className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Check-in de Seguimiento
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                        {m.checkin_energia && <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[var(--brand-primary)] font-bold">⚡ Energía {m.checkin_energia}/5</span>}
+                        {m.checkin_saciedad && <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-emerald-700 font-bold">🥗 Saciedad {m.checkin_saciedad}/5</span>}
+                        {m.checkin_digestion && <span className="px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-700 font-bold">🩺 Digestión {m.checkin_digestion}/5</span>}
+                        {m.checkin_descanso && <span className="px-2 py-0.5 rounded-md bg-white border border-amber-200 text-amber-700 font-bold">😴 Sueño {m.checkin_descanso}/5</span>}
+                      </div>
+                    </div>
+                    {m.checkin_observaciones && (
+                      <p className="text-[#0B1929] text-xs">
+                        <span className="font-bold text-[#6B7A8D]">Sensaciones: </span>
+                        {m.checkin_observaciones}
+                      </p>
+                    )}
+                    {m.checkin_ajustes && (
+                      <p className="text-[var(--brand-primary)] text-xs font-semibold">
+                        <span className="font-bold text-[#6B7A8D]">Ajustes de menú solicitados: </span>
+                        {m.checkin_ajustes}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {m.notas&&<div className="text-xs text-[#6B7A8D] bg-gray-50 p-2.5 rounded-lg border border-[#E2E8F0] mt-2.5 flex items-start gap-1.5">
                   <FileText className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> {m.notas}
                 </div>}
@@ -1497,6 +1587,121 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
             <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: Protocol & Anthropometric Fields */}
               <div className="lg:col-span-8 flex flex-col gap-5">
+                {/* Card 0: Check-in de Seguimiento y Sensaciones */}
+                <div className="bg-white rounded-2xl border border-blue-100 p-4 sm:p-6 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Check-in de Seguimiento y Sensaciones
+                          </h3>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[var(--brand-primary)] uppercase tracking-wider">
+                            Paso 1
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5">
+                          Registra o consulta las sensaciones del paciente sobre energía, saciedad, digestión y descanso.
+                        </p>
+                      </div>
+                    </div>
+
+                    {!isCivil && !isMiPlan && (
+                      <button
+                        type="button"
+                        onClick={toggleSolicitarPaciente}
+                        disabled={saving}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border shrink-0 ${
+                          clinicalRec?.solicitud_activa === "checkin_seguimiento"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
+                        }`}
+                        title="Solicitar al paciente que responda el check-in desde su app"
+                      >
+                        {clinicalRec?.solicitud_activa === "checkin_seguimiento" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Solicitado al paciente</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                            <span>Solicitar al paciente</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 4 Escalas 1 a 5 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    {[
+                      { key: "checkin_energia", label: "⚡ Energía diaria" },
+                      { key: "checkin_saciedad", label: "🥗 Control saciedad" },
+                      { key: "checkin_digestion", label: "🩺 Digestión" },
+                      { key: "checkin_descanso", label: "😴 Calidad de sueño" },
+                    ].map((sc) => (
+                      <div key={sc.key} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-[#0B1929]">{sc.label}</span>
+                          <span className="text-xs font-extrabold text-[var(--brand-primary)]">
+                            {form[sc.key] || 4}/5
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => updForm(sc.key, String(n))}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
+                                Number(form[sc.key] || 4) === n
+                                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                  : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Observaciones y Ajustes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                        Sensaciones y adherencia de la semana
+                      </label>
+                      <input
+                        type="text"
+                        value={form.checkin_observaciones || ""}
+                        onChange={(e) => updForm("checkin_observaciones", e.target.value)}
+                        placeholder="Ej. Buena energía, sin hambre, completó entrenamientos..."
+                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                        Ajustes solicitados o notas para el nuevo plan
+                      </label>
+                      <input
+                        type="text"
+                        value={form.checkin_ajustes || ""}
+                        onChange={(e) => updForm("checkin_ajustes", e.target.value)}
+                        placeholder="Ej. Variar fuentes de proteína, opciones más prácticas..."
+                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Card 1: Protocolo, Sexo, Edad y Fecha */}
                 <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
                   <div className="flex flex-col gap-3.5">
@@ -1760,16 +1965,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo 
         cliente={selected}
         mode="nutriologo"
         onSaved={(saved) => setClinicalRec(saved)}
-      />
-
-      {/* Modal de Check-in de Seguimiento Clínico */}
-      <SeguimientoClinicoModal
-        isOpen={showCheckinModal}
-        onClose={() => setShowCheckinModal(false)}
-        cliente={selected}
-        clinicalRec={clinicalRec}
-        onUpdated={(saved) => setClinicalRec(saved)}
-        setMsg={setMsg}
       />
 
       {/* Lightbox */}
