@@ -24,7 +24,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -222,6 +222,23 @@ const emptyForm = () => ({
   eval_objetivo: "",
   eval_faf: "",
   ciclo_id: "",
+
+  // Hábitos del ciclo
+  horas_sueno: "",
+  consumo_agua_estimado: "",
+  nivel_estres: "3",
+
+  // Preferencias y gustos alimentarios del ciclo (migrados del expediente)
+  preferencias_alimentos: "",
+  aversiones_alimentos: "",
+
+  // Recordatorio de 24 horas (R24H) del ciclo (migrado del expediente)
+  r24h_desayuno: "",
+  r24h_colacion_m: "",
+  r24h_comida: "",
+  r24h_colacion_v: "",
+  r24h_cena: "",
+  r24h_picoteos: "",
 });
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
@@ -452,9 +469,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     return () => window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
   }, [selected?.id]);
 
-  const openNewEvaluation = useCallback(() => {
+  const openNewEvaluation = useCallback((explicitCiclo = null) => {
     const base = emptyForm();
-    const targetCiclo = cicloActivo || cicloSel;
+    const targetCiclo = explicitCiclo || cicloActivo || cicloSel;
     if (targetCiclo?.id) {
       base.ciclo_id = targetCiclo.id;
     }
@@ -479,6 +496,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     base.eval_objetivo = prev?.eval_objetivo || fallbackGoal;
     base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(fallbackFaf);
 
+    // Precargar preferencias y R24H (de la evaluación previa o fallback de anamnesis)
+    base.preferencias_alimentos = prev?.preferencias_alimentos || clinicalRec?.anamnesis?.preferencias_alimentos || "";
+    base.aversiones_alimentos = prev?.aversiones_alimentos || clinicalRec?.anamnesis?.aversiones_alimentos || "";
+    base.r24h_desayuno = prev?.r24h_desayuno || clinicalRec?.anamnesis?.r24h_desayuno || "";
+    base.r24h_colacion_m = prev?.r24h_colacion_m || clinicalRec?.anamnesis?.r24h_colacion_m || "";
+    base.r24h_comida = prev?.r24h_comida || clinicalRec?.anamnesis?.r24h_comida || "";
+    base.r24h_colacion_v = prev?.r24h_colacion_v || clinicalRec?.anamnesis?.r24h_colacion_v || "";
+    base.r24h_cena = prev?.r24h_cena || clinicalRec?.anamnesis?.r24h_cena || "";
+    base.r24h_picoteos = prev?.r24h_picoteos || clinicalRec?.anamnesis?.r24h_picoteos || "";
+    base.horas_sueno = prev?.horas_sueno || clinicalRec?.anamnesis?.horas_sueno || "";
+    base.consumo_agua_estimado = prev?.consumo_agua_estimado || clinicalRec?.anamnesis?.consumo_agua_estimado || "";
+    base.nivel_estres = prev?.nivel_estres || clinicalRec?.anamnesis?.nivel_estres || "3";
+
     // Precargar respuesta reciente del paciente o del expediente si existe
     const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
     if (latestCheckin) {
@@ -502,8 +532,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, selected?.objetivo, cicloActivo, cicloSel]);
 
   useEffect(() => {
-    const handleOpen = () => {
-      openNewEvaluation();
+    const handleOpen = (ev) => {
+      const explicitCiclo = ev?.detail?.ciclo;
+      openNewEvaluation(explicitCiclo);
     };
     window.addEventListener("flux:open-new-evaluation", handleOpen);
     window.addEventListener("flux:open-checkin", handleOpen);
@@ -630,7 +661,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         rawData.ciclo_id = targetCicloId;
       }
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
-      const STRING_KEYS = new Set(["fecha", "presion_arterial", "notas", "metodo_evaluacion", "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf"]);
+      const STRING_KEYS = new Set([
+        "fecha", "presion_arterial", "notas", "metodo_evaluacion",
+        "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf",
+        "preferencias_alimentos", "aversiones_alimentos",
+        "r24h_desayuno", "r24h_colacion_m", "r24h_comida", "r24h_colacion_v", "r24h_cena", "r24h_picoteos",
+        "horas_sueno", "consumo_agua_estimado", "nivel_estres"
+      ]);
       Object.entries(form).forEach(([k, v]) => {
         if (IGNORED_KEYS.has(k)) return;
         if (v !== "" && v !== null && v !== undefined) {
@@ -1185,6 +1222,60 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <span className="font-bold text-[#6B7A8D]">Ajustes de menú solicitados: </span>
                         {m.checkin_ajustes}
                       </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Estilo de Vida y Preferencias de la Etapa */}
+                {Boolean(m.horas_sueno || m.consumo_agua_estimado || m.preferencias_alimentos || m.aversiones_alimentos || m.r24h_desayuno || m.r24h_comida) && (
+                  <div className="mt-3 bg-slate-50/70 border border-slate-200/80 rounded-xl p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5 text-xs">
+                        <Utensils className="w-3.5 h-3.5 text-emerald-600" /> Preferencias y Hábitos de la Etapa
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                        {m.horas_sueno && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[#0B1929]">
+                            <Clock className="w-3 h-3 text-[var(--brand-primary)]" /> {m.horas_sueno}h sueño
+                          </span>
+                        )}
+                        {m.consumo_agua_estimado && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[#0B1929]">
+                            <Droplets className="w-3 h-3 text-blue-500" /> {m.consumo_agua_estimado}
+                          </span>
+                        )}
+                        {m.nivel_estres && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[#0B1929]">
+                            Estrés {m.nivel_estres}/5
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {m.preferencias_alimentos && (
+                      <p className="text-emerald-900 bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
+                        <span className="font-bold text-emerald-800">Alimentos favoritos: </span>
+                        {m.preferencias_alimentos}
+                      </p>
+                    )}
+                    {m.aversiones_alimentos && (
+                      <p className="text-rose-900 bg-rose-50/50 p-2 rounded-lg border border-rose-100">
+                        <span className="font-bold text-rose-800">Alimentos que rechaza: </span>
+                        {m.aversiones_alimentos}
+                      </p>
+                    )}
+                    {Boolean(m.r24h_desayuno || m.r24h_comida || m.r24h_cena) && (
+                      <div className="text-[11px] text-[#6B7A8D] bg-white p-2 rounded-lg border border-slate-200">
+                        <span className="font-bold text-[#0B1929] block mb-0.5">R24H Previo:</span>
+                        {[
+                          m.r24h_desayuno && `Desayuno: ${m.r24h_desayuno}`,
+                          m.r24h_colacion_m && `Col. Matutina: ${m.r24h_colacion_m}`,
+                          m.r24h_comida && `Comida: ${m.r24h_comida}`,
+                          m.r24h_colacion_v && `Col. Vespertina: ${m.r24h_colacion_v}`,
+                          m.r24h_cena && `Cena: ${m.r24h_cena}`,
+                          m.r24h_picoteos && `Picoteos: ${m.r24h_picoteos}`,
+                        ].filter(Boolean).join(" • ")}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1961,6 +2052,165 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         placeholder="Ej. Variar fuentes de proteína, opciones más prácticas..."
                         className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                       />
+                    </div>
+                  </div>
+
+                  {/* Estilo de Vida y Hábitos del Ciclo */}
+                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-[var(--brand-primary)]" />
+                      <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                        Estilo de Vida y Hábitos del Ciclo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Horas de Sueño */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                          Horas de sueño promedio
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          readOnly={isReadOnly}
+                          value={form.horas_sueno || ""}
+                          onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
+                          placeholder="Ej. 7.5"
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                        />
+                      </div>
+
+                      {/* Consumo de Agua */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                          Consumo de agua estimado
+                        </label>
+                        <input
+                          type="text"
+                          readOnly={isReadOnly}
+                          value={form.consumo_agua_estimado || ""}
+                          onChange={(e) => !isReadOnly && updForm("consumo_agua_estimado", e.target.value)}
+                          placeholder="Ej. 2 a 2.5 L al día"
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                        />
+                      </div>
+
+                      {/* Nivel de Estrés */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                          Nivel de estrés ({form.nivel_estres || "3"}/5)
+                        </label>
+                        <div className="flex gap-1">
+                          {["1", "2", "3", "4", "5"].map((lvl) => (
+                            <button
+                              key={lvl}
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && updForm("nivel_estres", lvl)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                isReadOnly ? "cursor-default" : "cursor-pointer"
+                              } ${
+                                String(form.nivel_estres || "3") === lvl
+                                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                  : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-100"
+                              }`}
+                            >
+                              {lvl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preferencias y Aversiones de la Etapa */}
+                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <Utensils className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                        Preferencias Alimentarias de la Etapa
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Favoritos */}
+                      <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
+                          <span>Alimentos predilectos para este ciclo</span>
+                        </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Comidas que más se le antojan o facilitan su adherencia en este periodo.
+                        </p>
+                        <textarea
+                          rows={2}
+                          readOnly={isReadOnly}
+                          value={form.preferencias_alimentos || ""}
+                          onChange={(e) => !isReadOnly && updForm("preferencias_alimentos", e.target.value)}
+                          placeholder="Ej. Pollo, claras de huevo, arroz basmati, aguacate, plátano..."
+                          className={`w-full bg-white border border-emerald-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-emerald-500"}`}
+                        />
+                      </div>
+
+                      {/* Aversiones */}
+                      <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <Ban className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Alimentos que rechaza o no desea para este ciclo</span>
+                        </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Comidas que no quiere comer en esta etapa. Se excluirán al armar el menú.
+                        </p>
+                        <textarea
+                          rows={2}
+                          readOnly={isReadOnly}
+                          value={form.aversiones_alimentos || ""}
+                          onChange={(e) => !isReadOnly && updForm("aversiones_alimentos", e.target.value)}
+                          placeholder="Ej. Pescado/mariscos, hígado, brócoli, mayonesa..."
+                          className={`w-full bg-white border border-rose-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-rose-500"}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recordatorio de 24 Horas (R24H) del Momento de la Consulta */}
+                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                          Recordatorio de 24 Horas (R24H del día previo)
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-[#6B7A8D]">
+                        Ingesta habitual real antes de este nuevo ciclo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {[
+                        { key: "r24h_desayuno", label: "Desayuno", ph: "Ej. 2 huevos, frijoles y café con azúcar" },
+                        { key: "r24h_colacion_m", label: "Colación matutina", ph: "Ej. Manzana con galletas" },
+                        { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pollo, arroz, ensalada y agua de sabor" },
+                        { key: "r24h_colacion_v", label: "Colación vespertina", ph: "Ej. Yogur o barrita de avena" },
+                        { key: "r24h_cena", label: "Cena", ph: "Ej. 2 quesadillas o cereal con leche" },
+                        { key: "r24h_picoteos", label: "Bebidas / Picoteos", ph: "Ej. Refresco diario, botanas, dulces" },
+                      ].map((item) => (
+                        <div key={item.key}>
+                          <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                            {item.label}
+                          </label>
+                          <input
+                            type="text"
+                            readOnly={isReadOnly}
+                            value={form[item.key] || ""}
+                            onChange={(e) => !isReadOnly && updForm(item.key, e.target.value)}
+                            placeholder={item.ph}
+                            className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
 

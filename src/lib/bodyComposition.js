@@ -238,6 +238,17 @@ export function enrichMetrica(m) {
     checkin_ajustes: meta.checkin_ajustes ?? m.checkin_ajustes ?? "",
     eval_objetivo: meta.eval_objetivo ?? m.eval_objetivo ?? "",
     eval_faf: meta.eval_faf ?? m.eval_faf ?? "",
+    preferencias_alimentos: meta.preferencias_alimentos ?? m.preferencias_alimentos ?? "",
+    aversiones_alimentos: meta.aversiones_alimentos ?? m.aversiones_alimentos ?? "",
+    r24h_desayuno: meta.r24h_desayuno ?? m.r24h_desayuno ?? "",
+    r24h_colacion_m: meta.r24h_colacion_m ?? m.r24h_colacion_m ?? "",
+    r24h_comida: meta.r24h_comida ?? m.r24h_comida ?? "",
+    r24h_colacion_v: meta.r24h_colacion_v ?? m.r24h_colacion_v ?? "",
+    r24h_cena: meta.r24h_cena ?? m.r24h_cena ?? "",
+    r24h_picoteos: meta.r24h_picoteos ?? m.r24h_picoteos ?? "",
+    horas_sueno: meta.horas_sueno ?? m.horas_sueno ?? "",
+    consumo_agua_estimado: meta.consumo_agua_estimado ?? m.consumo_agua_estimado ?? "",
+    nivel_estres: meta.nivel_estres ?? m.nivel_estres ?? "3",
   };
 }
 
@@ -310,9 +321,19 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.checkin_energia !== undefined && rawData.checkin_energia !== "") extraMeta.checkin_energia = rawData.checkin_energia;
   if (rawData.checkin_saciedad !== undefined && rawData.checkin_saciedad !== "") extraMeta.checkin_saciedad = rawData.checkin_saciedad;
   if (rawData.checkin_digestion !== undefined && rawData.checkin_digestion !== "") extraMeta.checkin_digestion = rawData.checkin_digestion;
-  if (rawData.checkin_descanso !== undefined && rawData.checkin_descanso !== "") extraMeta.checkin_descanso = rawData.checkin_descanso;
   if (rawData.eval_objetivo !== undefined && rawData.eval_objetivo !== "") extraMeta.eval_objetivo = rawData.eval_objetivo;
   if (rawData.eval_faf !== undefined && rawData.eval_faf !== "") extraMeta.eval_faf = rawData.eval_faf;
+  if (rawData.preferencias_alimentos !== undefined && rawData.preferencias_alimentos !== "") extraMeta.preferencias_alimentos = rawData.preferencias_alimentos;
+  if (rawData.aversiones_alimentos !== undefined && rawData.aversiones_alimentos !== "") extraMeta.aversiones_alimentos = rawData.aversiones_alimentos;
+  if (rawData.r24h_desayuno !== undefined && rawData.r24h_desayuno !== "") extraMeta.r24h_desayuno = rawData.r24h_desayuno;
+  if (rawData.r24h_colacion_m !== undefined && rawData.r24h_colacion_m !== "") extraMeta.r24h_colacion_m = rawData.r24h_colacion_m;
+  if (rawData.r24h_comida !== undefined && rawData.r24h_comida !== "") extraMeta.r24h_comida = rawData.r24h_comida;
+  if (rawData.r24h_colacion_v !== undefined && rawData.r24h_colacion_v !== "") extraMeta.r24h_colacion_v = rawData.r24h_colacion_v;
+  if (rawData.r24h_cena !== undefined && rawData.r24h_cena !== "") extraMeta.r24h_cena = rawData.r24h_cena;
+  if (rawData.r24h_picoteos !== undefined && rawData.r24h_picoteos !== "") extraMeta.r24h_picoteos = rawData.r24h_picoteos;
+  if (rawData.horas_sueno !== undefined && rawData.horas_sueno !== "") extraMeta.horas_sueno = rawData.horas_sueno;
+  if (rawData.consumo_agua_estimado !== undefined && rawData.consumo_agua_estimado !== "") extraMeta.consumo_agua_estimado = rawData.consumo_agua_estimado;
+  if (rawData.nivel_estres !== undefined && rawData.nivel_estres !== "") extraMeta.nivel_estres = rawData.nivel_estres;
 
   Object.entries(calcResult || {}).forEach(([k, v]) => {
     if (k === "imc_info" || k === "icc_info") return;
@@ -1033,6 +1054,16 @@ export function generateSmartMacroPrescription({
     ...calc,
     rationale,
     clinicalNotes,
+    preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
+    aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
+    r24h: {
+      desayuno: enriched?.r24h_desayuno || anamnesis?.r24h_desayuno || "",
+      colacion_m: enriched?.r24h_colacion_m || anamnesis?.r24h_colacion_m || "",
+      comida: enriched?.r24h_comida || anamnesis?.r24h_comida || "",
+      colacion_v: enriched?.r24h_colacion_v || anamnesis?.r24h_colacion_v || "",
+      cena: enriched?.r24h_cena || anamnesis?.r24h_cena || "",
+      picoteos: enriched?.r24h_picoteos || anamnesis?.r24h_picoteos || "",
+    },
   };
 }
 

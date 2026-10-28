@@ -1045,7 +1045,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         setSubtab("progreso");
         setTimeout(() => {
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("flux:open-checkin"));
+            window.dispatchEvent(new CustomEvent("flux:open-new-evaluation", { detail: { ciclo: newCiclo } }));
+            window.dispatchEvent(new CustomEvent("flux:open-checkin", { detail: { ciclo: newCiclo } }));
           }
         }, 150);
         setMsg(
@@ -2637,6 +2638,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           <p className="leading-relaxed">
                             {smartPrescription.rationale}
                           </p>
+                        </div>
+                      )}
+
+                      {/* Preferencias y Aversiones evaluadas de la etapa */}
+                      {Boolean(smartPrescription.preferencias || smartPrescription.aversiones) && (
+                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {smartPrescription.preferencias && (
+                            <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/70 text-emerald-950">
+                              <span className="font-bold text-emerald-800 block text-[11px] uppercase tracking-wider mb-0.5">
+                                Favoritos de la etapa a incluir:
+                              </span>
+                              <span className="leading-snug">{smartPrescription.preferencias}</span>
+                            </div>
+                          )}
+                          {smartPrescription.aversiones && (
+                            <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/70 text-rose-950">
+                              <span className="font-bold text-rose-800 block text-[11px] uppercase tracking-wider mb-0.5">
+                                Aversiones / No incluir:
+                              </span>
+                              <span className="leading-snug">{smartPrescription.aversiones}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

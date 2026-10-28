@@ -3,8 +3,6 @@ import {
   X,
   ClipboardList,
   HeartPulse,
-  Utensils,
-  Clock,
   RotateCcw,
   Check,
   Send,
@@ -14,9 +12,7 @@ import {
   User,
   Phone,
   Mail,
-  Target,
-  Heart,
-  Ban
+  ShieldAlert,
 } from "lucide-react";
 import {
   EMPTY_ANAMNESIS,
@@ -65,7 +61,7 @@ export default function ExpedienteClinicoModal({
 }) {
   const clienteId = cliente?.id;
   const [record, setRecord] = useState(() => peekClinicalRecord(clienteId));
-  const [historiaStep, setHistoriaStep] = useState("clinico"); // 'clinico' | 'habitos' | 'r24h'
+  const [historiaStep, setHistoriaStep] = useState("perfil"); // 'perfil' | 'clinico'
   
   // Perfil del paciente editable
   const [perfil, setPerfil] = useState({
@@ -74,7 +70,6 @@ export default function ExpedienteClinicoModal({
     telefono: cliente?.telefono || "",
     sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || "Masculino"),
     fecha_nacimiento: cliente?.fecha_nacimiento || "",
-    objetivo: cliente?.objetivo || "",
   });
 
   const [anamnesis, setAnamnesis] = useState(() => {
@@ -82,8 +77,6 @@ export default function ExpedienteClinicoModal({
     return {
       ...EMPTY_ANAMNESIS,
       ...(local?.anamnesis || {}),
-      objetivo_principal: local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
-      objetivo_expectativas: local?.anamnesis?.objetivo_expectativas || local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
     };
   });
 
@@ -97,8 +90,6 @@ export default function ExpedienteClinicoModal({
     setAnamnesis({
       ...EMPTY_ANAMNESIS,
       ...(local?.anamnesis || {}),
-      objetivo_principal: local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
-      objetivo_expectativas: local?.anamnesis?.objetivo_expectativas || local?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
     });
     setPerfil({
       nombre: cliente?.nombre || "",
@@ -106,7 +97,6 @@ export default function ExpedienteClinicoModal({
       telefono: cliente?.telefono || local?.anamnesis?.telefono || "",
       fecha_nacimiento: cliente?.fecha_nacimiento || local?.anamnesis?.fecha_nacimiento || "",
       sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || local?.anamnesis?.sexo || "Masculino"),
-      objetivo: cliente?.objetivo || local?.anamnesis?.objetivo_principal || local?.anamnesis?.objetivo_expectativas || "",
     });
 
     fetchClinicalRecord(clienteId).then((fresh) => {
@@ -114,8 +104,6 @@ export default function ExpedienteClinicoModal({
       setAnamnesis({
         ...EMPTY_ANAMNESIS,
         ...(fresh?.anamnesis || {}),
-        objetivo_principal: fresh?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
-        objetivo_expectativas: fresh?.anamnesis?.objetivo_expectativas || fresh?.anamnesis?.objetivo_principal || cliente?.objetivo || "",
       });
       setPerfil((prev) => ({
         ...prev,
@@ -123,7 +111,6 @@ export default function ExpedienteClinicoModal({
         telefono: cliente?.telefono || fresh?.anamnesis?.telefono || prev.telefono,
         fecha_nacimiento: cliente?.fecha_nacimiento || fresh?.anamnesis?.fecha_nacimiento || prev.fecha_nacimiento,
         sexo: normalizeGeneroVal(cliente?.genero || cliente?.sexo || fresh?.anamnesis?.sexo || prev.sexo),
-        objetivo: cliente?.objetivo || fresh?.anamnesis?.objetivo_principal || fresh?.anamnesis?.objetivo_expectativas || prev.objetivo,
       }));
     });
   }, [isOpen, clienteId, cliente]);
@@ -145,7 +132,6 @@ export default function ExpedienteClinicoModal({
         telefono: perfil.telefono || null,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
         genero: perfil.sexo || "Masculino",
-        objetivo: perfil.objetivo || null,
       };
       await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
 
@@ -156,8 +142,6 @@ export default function ExpedienteClinicoModal({
         telefono: perfil.telefono,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
         sexo: perfil.sexo,
-        objetivo_principal: perfil.objetivo || null,
-        objetivo_expectativas: perfil.objetivo || anamnesis.objetivo_expectativas || null,
         updated_at: new Date().toISOString(),
         completado_por: anamnesis.completado_por || mode,
       };
@@ -259,7 +243,7 @@ export default function ExpedienteClinicoModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
-                {mode === "paciente" ? "Historia Clínica y Hábitos" : `Expediente · ${perfil.nombre || cliente.nombre}`}
+                {mode === "paciente" ? "Ficha Clínica Permanente" : `Expediente · ${perfil.nombre || cliente.nombre}`}
               </h2>
               {anamnesis.updated_at && (
                 <p className="text-[11px] text-[#6B7A8D]">
@@ -306,13 +290,12 @@ export default function ExpedienteClinicoModal({
           </div>
         </div>
 
-        {/* Sub-tabs de navegación de las 3 áreas del Expediente */}
+        {/* Sub-tabs de navegación de las 2 áreas del Expediente Atemporal */}
         <div className="px-5 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-1.5 w-full sm:w-auto">
             {[
-              { id: "clinico", label: "1. Perfil y Salud", icon: HeartPulse },
-              { id: "habitos", label: "2. Hábitos", icon: Clock },
-              { id: "r24h", label: "3. R24H y Meta", icon: Utensils },
+              { id: "perfil", label: "1. Ficha de Identificación", icon: User },
+              { id: "clinico", label: "2. Antecedentes Clínicos", icon: HeartPulse },
             ].map((st) => {
               const Icon = st.icon;
               const active = historiaStep === st.id;
@@ -343,10 +326,9 @@ export default function ExpedienteClinicoModal({
 
         {/* Body del Expediente */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {/* SECCIÓN 1: PERFIL Y CLÍNICO */}
-          {historiaStep === "clinico" && (
+          {/* SECCIÓN 1: IDENTIFICACIÓN PERMANENTE */}
+          {historiaStep === "perfil" && (
             <div className="space-y-4">
-              {/* Ficha de Identificación del Paciente */}
               <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 space-y-3.5">
                 <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
                   Ficha de Identificación del Paciente
@@ -395,24 +377,6 @@ export default function ExpedienteClinicoModal({
                     />
                   </div>
 
-                  {/* Objetivo Principal */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Objetivo Principal
-                    </label>
-                    <input
-                      type="text"
-                      value={perfil.objetivo}
-                      onChange={(e) => {
-                        updPerfil("objetivo", e.target.value);
-                        updAnamnesis("objetivo_principal", e.target.value);
-                        updAnamnesis("objetivo_expectativas", e.target.value);
-                      }}
-                      placeholder="Ej. Pérdida de grasa corporal, masa muscular..."
-                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] font-medium"
-                    />
-                  </div>
-
                   {/* Fecha de Nacimiento */}
                   <div>
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
@@ -426,10 +390,10 @@ export default function ExpedienteClinicoModal({
                     />
                   </div>
 
-                  {/* Género */}
-                  <div>
+                  {/* Género Biológico */}
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                      Género
+                      Género Biológico
                     </label>
                     <CustomSelect
                       value={perfil.sexo}
@@ -441,16 +405,54 @@ export default function ExpedienteClinicoModal({
                 </div>
               </div>
 
-              {/* Patologías */}
+              {/* Ocupación y contexto general */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Condiciones médicas o patologías
+                  Ocupación y contexto laboral / diario
                 </label>
                 <input
                   type="text"
-                  value={anamnesis.patologias}
+                  value={anamnesis.ocupacion_actividad || ""}
+                  onChange={(e) => updAnamnesis("ocupacion_actividad", e.target.value)}
+                  placeholder="Ej. Ingeniero de software sedentario 8h, estudiante, comerciante..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200/70 text-xs text-blue-900 leading-relaxed">
+                <span className="font-bold block text-blue-950 mb-0.5">Información Atemporal Permanente</span>
+                Los datos de esta ficha y sus antecedentes clínicos permanecen a lo largo del tiempo. Las preferencias de comidas, recordatorio de 24 horas y hábitos de la etapa se evalúan directamente en cada plan de progreso.
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 2: ANTECEDENTES CLÍNICOS Y MÉDICOS */}
+          {historiaStep === "clinico" && (
+            <div className="space-y-4">
+              {/* Patologías */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Condiciones médicas o patologías crónicas
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.patologias || ""}
                   onChange={(e) => updAnamnesis("patologias", e.target.value)}
-                  placeholder="Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."
+                  placeholder="Ej. Resistencia a la insulina, hipotiroidismo, hipertensión, SOP..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Antecedentes Heredofamiliares */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Antecedentes Heredofamiliares
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.antecedentes_heredofamiliares || ""}
+                  onChange={(e) => updAnamnesis("antecedentes_heredofamiliares", e.target.value)}
+                  placeholder="Ej. Diabetes tipo 2 (padre), hipertensión arterial (madre), cardiopatías..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
@@ -458,13 +460,13 @@ export default function ExpedienteClinicoModal({
               {/* Medicación */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Medicación y suplementación actual
+                  Medicación y suplementación crónica actual
                 </label>
                 <input
                   type="text"
-                  value={anamnesis.medicacion_suplementos}
+                  value={anamnesis.medicacion_suplementos || ""}
                   onChange={(e) => updAnamnesis("medicacion_suplementos", e.target.value)}
-                  placeholder="Ej. Creatina 5g, Omega 3, Metformina..."
+                  placeholder="Ej. Metformina 850mg c/12h, Levotiroxina 50mcg, Omega 3..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
@@ -473,25 +475,25 @@ export default function ExpedienteClinicoModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Alergias o intolerancias alimentarias
+                    Alergias o intolerancias alimentarias crónicas
                   </label>
                   <input
                     type="text"
-                    value={anamnesis.alergias_intolerancias}
+                    value={anamnesis.alergias_intolerancias || ""}
                     onChange={(e) => updAnamnesis("alergias_intolerancias", e.target.value)}
-                    placeholder="Ej. Lactosa, mariscos, cacahuate, gluten..."
+                    placeholder="Ej. Lactosa, mariscos, cacahuate, celiaquía/gluten..."
                     className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Digestión / Síntomas GI
+                    Síntomas digestivos o gastrointestinales crónicos
                   </label>
                   <input
                     type="text"
-                    value={anamnesis.sintomas_gi}
+                    value={anamnesis.sintomas_gi || ""}
                     onChange={(e) => updAnamnesis("sintomas_gi", e.target.value)}
-                    placeholder="Ej. Normal, reflujo, colitis, estreñimiento..."
+                    placeholder="Ej. Normal, reflujo gastroesofágico frecuente, colitis, estreñimiento..."
                     className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
@@ -500,219 +502,43 @@ export default function ExpedienteClinicoModal({
               {/* Cirugías o lesiones */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Cirugías previas o lesiones activas
+                  Cirugías previas o lesiones osteomusculares crónicas
                 </label>
                 <input
                   type="text"
                   value={anamnesis.cirugias_lesiones || ""}
                   onChange={(e) => updAnamnesis("cirugias_lesiones", e.target.value)}
-                  placeholder="Ej. Apendicectomía (2020), lesión menisco rodilla derecha..."
+                  placeholder="Ej. Apendicectomía (2020), lesión menisco rodilla derecha, hernia lumbar L4-L5..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
-            </div>
-          )}
 
-          {/* SECCIÓN 2: HÁBITOS Y ESTILO DE VIDA */}
-          {historiaStep === "habitos" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Ocupación y actividad diaria
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.ocupacion_actividad}
-                    onChange={(e) => updAnamnesis("ocupacion_actividad", e.target.value)}
-                    placeholder="Ej. Trabajo de oficina sentado 8h, entrena pesas 5pm..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Horas de sueño promedio
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={anamnesis.horas_sueno}
-                    onChange={(e) => updAnamnesis("horas_sueno", e.target.value)}
-                    placeholder="Ej. 7.5"
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Estrés y Agua */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Nivel de estrés autopercibido (1 a 5)
-                  </label>
-                  <div className="flex gap-1.5">
-                    {["1", "2", "3", "4", "5"].map((lvl) => (
-                      <button
-                        key={lvl}
-                        type="button"
-                        onClick={() => updAnamnesis("nivel_estres", lvl)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                          String(anamnesis.nivel_estres) === lvl
-                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                            : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0]"
-                        }`}
-                      >
-                        {lvl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Consumo de agua estimado
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.consumo_agua_estimado || ""}
-                    onChange={(e) => updAnamnesis("consumo_agua_estimado", e.target.value)}
-                    placeholder="Ej. 2 a 2.5 litros al día..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Alcohol / Tabaco */}
+              {/* Consumo alcohol o tabaco */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Consumo de alcohol o tabaco (Opcional)
+                  Toxicomanías: Consumo de alcohol o tabaco
                 </label>
                 <input
                   type="text"
                   value={anamnesis.consumo_alcohol_tabaco || ""}
                   onChange={(e) => updAnamnesis("consumo_alcohol_tabaco", e.target.value)}
-                  placeholder="Ej. Social fines de semana (cerveza) / No fuma..."
+                  placeholder="Ej. Social fines de semana (cerveza) / No fumador..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
 
-              {/* Preferencias y Gustos Alimentarios Destacados */}
-              <div className="pt-2 border-t border-[#F0F4FA] space-y-3">
-                <div className="flex items-center gap-2">
-                  <Utensils className="w-4 h-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                    Preferencias y Aversiones Alimentarias
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Favoritos */}
-                  <div className="bg-emerald-50/30 border border-emerald-200/80 rounded-2xl p-3.5 space-y-1.5">
-                    <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
-                      <span>Comidas y alimentos favoritos (Predilectos)</span>
-                    </label>
-                    <p className="text-[11px] text-[#6B7A8D]">
-                      Alimentos que más disfruta comer para incluirlos en sus menús y asegurar apego.
-                    </p>
-                    <textarea
-                      rows={2}
-                      value={anamnesis.preferencias_alimentos || ""}
-                      onChange={(e) => updAnamnesis("preferencias_alimentos", e.target.value)}
-                      placeholder="Ej. Pollo, huevo al desayuno, avena con fruta, arroz, aguacate..."
-                      className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-emerald-500 shadow-2xs resize-none"
-                    />
-                  </div>
-
-                  {/* Aversiones */}
-                  <div className="bg-rose-50/30 border border-rose-200/80 rounded-2xl p-3.5 space-y-1.5">
-                    <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Ban className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Alimentos que rechaza o no le gustan (Aversiones)</span>
-                    </label>
-                    <p className="text-[11px] text-[#6B7A8D]">
-                      Alimentos que detesta o evita. Nunca deben incluirse en su plan nutricional.
-                    </p>
-                    <textarea
-                      rows={2}
-                      value={anamnesis.aversiones_alimentos || ""}
-                      onChange={(e) => updAnamnesis("aversiones_alimentos", e.target.value)}
-                      placeholder="Ej. Pescado/mariscos, brócoli, hígado, champiñones, mayonesa..."
-                      className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-rose-500 shadow-2xs resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECCIÓN 3: R24H Y OBJETIVO */}
-          {historiaStep === "r24h" && (
-            <div className="space-y-3.5">
+              {/* Notas permanentes de la consulta */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Horarios habituales de comida
+                  Notas y pautas clínicas permanentes (Opcional)
                 </label>
-                <input
-                  type="text"
-                  value={anamnesis.horarios_comida}
-                  onChange={(e) => updAnamnesis("horarios_comida", e.target.value)}
-                  placeholder="Ej. Desayuno 8:00 am, Comida 2:30 pm, Cena 9:00 pm"
-                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                <textarea
+                  rows={3}
+                  value={anamnesis.notas_consulta || ""}
+                  onChange={(e) => updAnamnesis("notas_consulta", e.target.value)}
+                  placeholder="Comentarios clínicos de largo plazo, consideraciones éticas, estilo de vida general..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
                 />
-              </div>
-
-              {[
-                { key: "r24h_desayuno", label: "Desayuno habitual", ph: "Ej. 2 huevos con frijoles y café con azúcar" },
-                { key: "r24h_colacion_m", label: "Colación matutina (si aplica)", ph: "Ej. Manzana con galletas" },
-                { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pechuga de pollo, arroz, ensalada y agua de sabor" },
-                { key: "r24h_colacion_v", label: "Colación vespertina (si aplica)", ph: "Ej. Yogur griego o fruta picada" },
-                { key: "r24h_cena", label: "Cena habitual", ph: "Ej. Quesadillas con jamón o cereal con leche" },
-                { key: "r24h_picoteos", label: "Bebidas o picoteos entre horas", ph: "Ej. Refresco diario, café con galleta, papitas en la tarde..." },
-              ].map((item) => (
-                <div key={item.key}>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    {item.label}
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis[item.key] || ""}
-                    onChange={(e) => updAnamnesis(item.key, e.target.value)}
-                    placeholder={item.ph}
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-              ))}
-
-              <div className="pt-2 border-t border-[#F0F4FA] space-y-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Objetivo Principal y Expectativas del Paciente
-                  </label>
-                  <input
-                    type="text"
-                    value={perfil.objetivo || anamnesis.objetivo_expectativas || anamnesis.objetivo_principal || ""}
-                    onChange={(e) => {
-                      updPerfil("objetivo", e.target.value);
-                      updAnamnesis("objetivo_principal", e.target.value);
-                      updAnamnesis("objetivo_expectativas", e.target.value);
-                    }}
-                    placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular, recomposición..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Notas y Observaciones de la Consulta (Opcional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.notas_consulta || ""}
-                    onChange={(e) => updAnamnesis("notas_consulta", e.target.value)}
-                    placeholder="Comentarios adicionales, motivación del paciente, acuerdos especiales, dudas..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -726,10 +552,10 @@ export default function ExpedienteClinicoModal({
               disabled={saving}
               onClick={() => setShowConfirmReset(true)}
               className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Borra la historia inicial para volver a realizar el cuestionario de 3 páginas"
+              title="Borra la historia inicial para volver a realizar el cuestionario clínico"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reiniciar Cuestionario</span>
+              <span>Reiniciar Ficha</span>
             </button>
           ) : (
             <div />
@@ -760,8 +586,8 @@ export default function ExpedienteClinicoModal({
         isOpen={showConfirmReset}
         onClose={() => setShowConfirmReset(false)}
         onConfirm={executeResetAnamnesis}
-        title="¿Reiniciar Cuestionario Inicial?"
-        description="Se limpiará el registro inicial del paciente para que puedas volver a responder el cuestionario de 3 páginas o solicitárselo nuevamente."
+        title="¿Reiniciar Ficha Clínica?"
+        description="Se limpiará el registro de antecedentes clínicos del paciente para que puedas volver a responder el expediente o solicitárselo nuevamente."
         confirmText="Sí, reiniciar"
         cancelText="Cancelar"
         danger={false}

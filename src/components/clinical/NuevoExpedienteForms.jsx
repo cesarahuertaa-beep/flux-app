@@ -97,12 +97,12 @@ export function NuevoExpedienteForms({
   const [step, setStep] = useState(() => {
     const rec = peekClinicalRecord(clienteId);
     if (isPatientMode) {
-      if (rec?.draft_step && [1, 2, 3].includes(rec.draft_step)) {
+      if (rec?.draft_step && [1, 2].includes(rec.draft_step)) {
         return rec.draft_step;
       }
       return 1;
     }
-    if (rec?.draft_step && [1, 2, 3].includes(rec.draft_step)) {
+    if (rec?.draft_step && [1, 2].includes(rec.draft_step)) {
       return rec.draft_step;
     }
     if (rec?.solicitud_activa === "historia_inicial") {
@@ -139,13 +139,13 @@ export function NuevoExpedienteForms({
     fetchClinicalRecord(clienteId).then((fresh) => {
       setRecord(fresh);
       if (isPatientMode) {
-        if (fresh?.draft_step && [1, 2, 3].includes(fresh.draft_step)) {
+        if (fresh?.draft_step && [1, 2].includes(fresh.draft_step)) {
           setStep(fresh.draft_step);
         } else {
           setStep((prev) => (typeof prev === "number" ? prev : 1));
         }
       } else {
-        if (fresh?.draft_step && [1, 2, 3].includes(fresh.draft_step)) {
+        if (fresh?.draft_step && [1, 2].includes(fresh.draft_step)) {
           setStep((prev) => (prev === 0 ? fresh.draft_step : prev));
         } else if (fresh?.solicitud_activa === "historia_inicial") {
           setStep((prev) => (prev === 0 ? "pending_patient" : prev));
@@ -395,7 +395,7 @@ export function NuevoExpedienteForms({
                   Llenar en consulta ahora
                 </h3>
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
-                  Responde las 3 páginas de la entrevista clínica tú mismo junto al paciente. Guarda borrador cuando gustes.
+                  Completa los datos de identificación y antecedentes médicos inamovibles. Podrás guardar borrador en cualquier momento.
                 </p>
               </div>
               <div className="mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--brand-primary)]">
@@ -462,7 +462,7 @@ export function NuevoExpedienteForms({
             ¡Cuestionario solicitado a {cliente.nombre}!
           </h2>
           <p className="text-sm text-[#6B7A8D] max-w-md mx-auto mb-6 leading-relaxed">
-            Se ha activado la solicitud en su aplicación FLUX. El paciente podrá responder sus 3 páginas de antecedentes, hábitos y alimentación desde su dispositivo.
+            Se ha activado la solicitud en su aplicación FLUX. El paciente podrá responder sus datos personales y antecedentes médicos inamovibles desde su dispositivo.
           </p>
 
           {/* Tarjeta de invitación WhatsApp */}
@@ -608,9 +608,9 @@ export function NuevoExpedienteForms({
   }
 
   // ══════════════════════════════════════════════════════════════
-  // FORMULARIO DE 3 PÁGINAS (ESTILO GOOGLE FORMS CON PROGRESS BAR)
+  // FORMULARIO DE 2 PÁGINAS ATEMPORALES (HISTORIAL CLÍNICO ESTRUCTURAL)
   // ══════════════════════════════════════════════════════════════
-  const progressPct = step === 1 ? 33 : step === 2 ? 66 : 100;
+  const progressPct = step === 1 ? 50 : 100;
 
   return (
     <div className="max-w-3xl mx-auto w-full py-6 md:py-10 px-4 flex flex-col gap-6 animate-in fade-in duration-200">
@@ -620,12 +620,11 @@ export function NuevoExpedienteForms({
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)] bg-blue-50 px-2.5 py-1 rounded-lg">
-              Paso {step} de 3
+              Paso {step} de 2
             </span>
             <span className="text-sm font-bold text-[#0B1929] truncate">
-              {step === 1 && (isPatientMode ? "Tus Datos y Antecedentes de Salud" : "Perfil y Antecedentes Clínicos")}
-              {step === 2 && (isPatientMode ? "Tus Hábitos y Preferencias Alimentarias" : "Estilo de Vida y Hábitos")}
-              {step === 3 && (isPatientMode ? "Tu Día de Comidas (R24H) y Objetivos" : "Recordatorio de 24 Horas y Objetivos")}
+              {step === 1 && (isPatientMode ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
+              {step === 2 && (isPatientMode ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
             </span>
           </div>
 
@@ -657,21 +656,14 @@ export function NuevoExpedienteForms({
             onClick={() => setStep(1)}
             className={`hover:text-[#0B1929] transition-colors ${step === 1 ? "text-[var(--brand-primary)] font-bold" : ""}`}
           >
-            1. {isPatientMode ? "Salud & Datos" : "Perfil & Clínico"}
+            1. {isPatientMode ? "Datos Personales" : "Ficha de Identificación"}
           </button>
           <button
             type="button"
             onClick={() => setStep(2)}
             className={`hover:text-[#0B1929] transition-colors ${step === 2 ? "text-[var(--brand-primary)] font-bold" : ""}`}
           >
-            2. {isPatientMode ? "Hábitos & Gustos" : "Hábitos"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep(3)}
-            className={`hover:text-[#0B1929] transition-colors ${step === 3 ? "text-[var(--brand-primary)] font-bold" : ""}`}
-          >
-            3. {isPatientMode ? "Comidas & Meta" : "R24H & Metas"}
+            2. {isPatientMode ? "Historial Clínico" : "Antecedentes Médicos"}
           </button>
         </div>
       </div>
@@ -680,19 +672,19 @@ export function NuevoExpedienteForms({
       <div className="bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-8 shadow-sm">
         
         {/* ═══════════════════════════════════════════════════════
-            PÁGINA 1: DATOS GENERALES Y ANTECEDENTES CLÍNICOS
+            PÁGINA 1: FICHA DE IDENTIFICACIÓN Y DATOS PERSONALES
         ═══════════════════════════════════════════════════════ */}
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
               <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
                 <User className="w-4 h-4 text-[var(--brand-primary)]" />
-                {isPatientMode ? "Tus Datos de Contacto y Personales" : "Datos Generales del Paciente"}
+                {isPatientMode ? "Tus Datos de Contacto y Personales" : "Ficha de Identificación del Paciente"}
               </h3>
               <p className="text-xs text-[#6B7A8D]">
                 {isPatientMode
-                  ? "Verifica tu información básica para que tu especialista pueda comunicarse contigo."
-                  : "Información de contacto y demográfica básica."}
+                  ? "Información básica y biológica que servirá de base permanente para tu seguimiento."
+                  : "Información demográfica, de contacto y perfil biológico inmutable del paciente."}
               </p>
             </div>
 
@@ -743,7 +735,7 @@ export function NuevoExpedienteForms({
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  Género
+                  Género Biológico
                 </label>
                 <CustomSelect
                   value={perfil.sexo}
@@ -775,309 +767,146 @@ export function NuevoExpedienteForms({
                 </div>
               </div>
             </div>
-
-            {/* Separador de sección */}
-            <div className="pt-4 border-t border-[#F0F4FA]">
-              <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-                <HeartPulse className="w-4 h-4 text-red-500" />
-                {isPatientMode ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos"}
-              </h3>
-              <p className="text-xs text-[#6B7A8D] mb-4">
-                {isPatientMode
-                  ? "Esta información le permite a tu especialista cuidar tu salud y adaptar tus requerimientos."
-                  : "Condiciones que impactan la pauta nutricional y deportiva."}
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o Diagnósticos Médicos"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.patologias || ""}
-                    onChange={(e) => updAnam("patologias", e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Hipotiroidismo, resistencia a la insulina, hipertensión, ninguna..." : "Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación Actual y/o Suplementos"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.medicacion_suplementos || ""}
-                    onChange={(e) => updAnam("medicacion_suplementos", e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Levotiroxina 50mcg, Creatina monohidrato, ninguno..." : "Ej. Metformina 850mg, Levotiroxina 50mcg, Creatina monohidrato..."}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                      {isPatientMode ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o Intolerancias Alimentarias"}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={anamnesis.alergias_intolerancias || ""}
-                      onChange={(e) => updAnam("alergias_intolerancias", e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                      placeholder={isPatientMode ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                      {isPatientMode ? "¿Sueles presentar molestias digestivas?" : "Síntomas Gastrointestinales Frecuentes"}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={anamnesis.sintomas_gi || ""}
-                      onChange={(e) => updAnam("sintomas_gi", e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                      placeholder={isPatientMode ? "Ej. Inflamación por las tardes, acidez, reflujo, estreñimiento..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "¿Has tenido cirugías previas o tienes alguna lesión física?" : "Cirugías Previas o Lesiones Físicas"}
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.cirugias_lesiones || ""}
-                    onChange={(e) => updAnam("cirugias_lesiones", e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Operación de menisco en rodilla derecha, molestia en hombro, ninguna..." : "Ej. Hernia discal L4-L5, operación de menisco rodilla derecha..."}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════
-            PÁGINA 2: ESTILO DE VIDA Y HÁBITOS
+            PÁGINA 2: ANTECEDENTES CLÍNICOS, PATOLÓGICOS Y MÉDICOS
         ═══════════════════════════════════════════════════════ */}
         {step === 2 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
               <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
-                {isPatientMode ? "Tu Estilo de Vida y Rutina Diaria" : "Estilo de Vida y Rutina Diaria"}
+                <HeartPulse className="w-4 h-4 text-red-500" />
+                {isPatientMode ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos Inamovibles"}
               </h3>
               <p className="text-xs text-[#6B7A8D]">
                 {isPatientMode
-                  ? "Tus horarios, nivel de descanso y actividades para ajustar los tiempos de tu plan."
-                  : "Horarios, ocupación y descanso para adaptar los tiempos de comida."}
+                  ? "Esta información le permite a tu especialista cuidar tu salud y adaptar tus requerimientos permanentemente."
+                  : "Condiciones de salud atemporales que guían la seguridad clínica en todos sus ciclos."}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
+            <div className="space-y-4">
+              <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  {isPatientMode ? "¿A qué te dedicas y cómo es tu actividad en el día?" : "Ocupación y Nivel de Actividad Laboral"}
+                  {isPatientMode ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o Diagnósticos Médicos"}
                 </label>
-                <input
-                  type="text"
-                  value={anamnesis.ocupacion_actividad || ""}
-                  onChange={(e) => updAnam("ocupacion_actividad", e.target.value)}
+                <textarea
+                  rows={2}
+                  value={anamnesis.patologias || ""}
+                  onChange={(e) => updAnam("patologias", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. Trabajo en oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Maestro de obras (activo)"}
+                  placeholder={isPatientMode ? "Ej. Hipotiroidismo, resistencia a la insulina, hipertensión, ninguna..." : "Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."}
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  {isPatientMode ? "¿Cuántas horas duermes habitualmente por noche?" : "Horas de Sueño Promedio"}
+                  {isPatientMode ? "Antecedentes familiares de salud (Padres o abuelos con diabetes, hipertensión, etc.)" : "Antecedentes Heredo-Familiares"}
                 </label>
-                <input
-                  type="text"
-                  value={anamnesis.horas_sueno || ""}
-                  onChange={(e) => updAnam("horas_sueno", e.target.value)}
+                <textarea
+                  rows={2}
+                  value={anamnesis.antecedentes_heredofamiliares || ""}
+                  onChange={(e) => updAnam("antecedentes_heredofamiliares", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. 7 horas (duermo a las 11pm y despierto a las 6am)" : "Ej. 6 a 7 horas diarias (duerme a las 11pm)"}
+                  placeholder="Ej. Diabetes tipo 2 (padre), hipertensión (madre), cardiopatías..."
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  {isPatientMode ? "¿Cuánta agua natural tomas al día aproximadamente?" : "Consumo Estimado de Agua Natural"}
+                  {isPatientMode ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación Actual y/o Suplementos Prescritos"}
                 </label>
-                <input
-                  type="text"
-                  value={anamnesis.consumo_agua_estimado || ""}
-                  onChange={(e) => updAnam("consumo_agua_estimado", e.target.value)}
+                <textarea
+                  rows={2}
+                  value={anamnesis.medicacion_suplementos || ""}
+                  onChange={(e) => updAnam("medicacion_suplementos", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder="Ej. 1.5 a 2 litros al día"
+                  placeholder={isPatientMode ? "Ej. Levotiroxina 50mcg, Creatina monohidrato, ninguno..." : "Ej. Metformina 850mg, Levotiroxina 50mcg, Creatina monohidrato..."}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  {isPatientMode ? "¿Cómo calificarías tu nivel de estrés habitualmente?" : "Nivel de Estrés Percibido (1 = Bajo, 5 = Muy Alto)"}
-                </label>
-                <div className="flex gap-2">
-                  {["1", "2", "3", "4", "5"].map((lvl) => (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => updAnam("nivel_estres", lvl)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
-                        String(anamnesis.nivel_estres) === lvl
-                          ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                          : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-100"
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  {isPatientMode ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo de Alcohol / Tabaco (Opcional)"}
-                </label>
-                <input
-                  type="text"
-                  value={anamnesis.consumo_alcohol_tabaco || ""}
-                  onChange={(e) => updAnam("consumo_alcohol_tabaco", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. Social fines de semana (cerveza) / No fumo" : "Ej. Social fines de semana (cerveza) / No fuma"}
-                />
-              </div>
-            </div>
-
-            {/* Separador de gustos */}
-            <div className="pt-4 border-t border-[#F0F4FA]">
-              <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-emerald-600" />
-                {isPatientMode ? "Tus Gustos y Preferencias de Comida" : "Preferencias y Gustos Alimentarios"}
-              </h3>
-              <p className="text-xs text-[#6B7A8D] mb-4">
-                {isPatientMode
-                  ? "Para que disfrutes tu alimentación, cuéntanos qué comidas te encantan y cuáles prefieres evitar."
-                  : "Facilita la adherencia incluyendo lo que le gusta y excluyendo lo que detesta."}
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "Comidas o alimentos que más te gustan (Tus favoritos)" : "Alimentos Predilectos (Los que le encantan)"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.preferencias_alimentos || ""}
-                    onChange={(e) => updAnam("preferencias_alimentos", e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Huevo al desayuno, pollo a la plancha, avena con fruta, aguacate, café..." : "Ej. Huevo al desayuno, pollo a la plancha, avena, frutas cítricas, aguacate..."}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-red-600 uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "Alimentos que no te gustan o prefieres no comer" : "Alimentos que Rechaza o Desagradan"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.aversiones_alimentos || ""}
-                    onChange={(e) => updAnam("aversiones_alimentos", e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder="Ej. Pescado/mariscos, brócoli, hígado, mayonesa..."
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════
-            PÁGINA 3: RECORDATORIO DE 24 HORAS (R24H) Y METAS
-        ═══════════════════════════════════════════════════════ */}
-        {step === 3 && (
-          <div className="space-y-6 animate-in fade-in duration-150">
-            <div>
-              <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
-                {isPatientMode ? "Tu Alimentación Habitual en un Día Común" : "Recordatorio de 24 Horas (R24H)"}
-              </h3>
-              <p className="text-xs text-[#6B7A8D]">
-                {isPatientMode
-                  ? "¿Cómo sueles comer normalmente en tu día a día? Esto nos ayuda a entender tu punto de partida."
-                  : "¿Cómo comía el paciente en un día habitual antes de venir a consulta?"}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                ["r24h_desayuno", isPatientMode ? "¿Qué desayunas normalmente?" : "Desayuno habitual", "Ej. 2 huevos con frijoles y café con azúcar"],
-                ["r24h_colacion_m", isPatientMode ? "Colación de la mañana (si acostumbras)" : "Colación matutina (si aplica)", "Ej. Manzana con galletas"],
-                ["r24h_comida", isPatientMode ? "¿Qué comes en tu comida principal?" : "Comida principal", "Ej. Pechuga de pollo, arroz, ensalada y agua fresca"],
-                ["r24h_colacion_v", isPatientMode ? "Colación de la tarde (si acostumbras)" : "Colación vespertina (si aplica)", "Ej. Yogur griego o fruta picada"],
-                ["r24h_cena", isPatientMode ? "¿Qué sueles cenar habitualmente?" : "Cena habitual", "Ej. Quesadillas con jamón o cereal con leche"],
-                ["r24h_picoteos", isPatientMode ? "¿Bebes algo azucarado o picoteas entre comidas?" : "Bebidas o picoteos entre horas", "Ej. Refresco diario, botanas en la tarde, café con galleta..."]
-              ].map(([key, label, placeholder]) => (
-                <div key={key}>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {label}
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis[key] || ""}
-                    onChange={(e) => updAnam(key, e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={placeholder}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Separador de Objetivo */}
-            <div className="pt-4 border-t border-[#F0F4FA]">
-              <h3 className="text-base font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                {isPatientMode ? "Tus Objetivos y Expectativas" : "Objetivo y Expectativas"}
-              </h3>
-              <p className="text-xs text-[#6B7A8D] mb-4">
-                {isPatientMode
-                  ? "Cuéntale a tu especialista qué meta deseas alcanzar para enfocar tu plan."
-                  : "La meta que guiará el diseño de su primer plan."}
-              </p>
-
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "¿Cuál es tu objetivo principal?" : "Objetivo Principal del Paciente"}
+                    {isPatientMode ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o Intolerancias Alimentarias Crónicas"}
                   </label>
-                  <input
-                    type="text"
-                    value={anamnesis.objetivo_principal || perfil.objetivo || ""}
-                    onChange={(e) => {
-                      updAnam("objetivo_principal", e.target.value);
-                      updPerfil("objetivo", e.target.value);
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm font-semibold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder="Ej. Pérdida de grasa corporal manteniendo masa muscular"
+                  <textarea
+                    rows={2}
+                    value={anamnesis.alergias_intolerancias || ""}
+                    onChange={(e) => updAnam("alergias_intolerancias", e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                    placeholder={isPatientMode ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                    {isPatientMode ? "¿Algún comentario o duda adicional para tu especialista? (Opcional)" : "Notas y Observaciones de la Consulta (Opcional)"}
+                    {isPatientMode ? "¿Sueles presentar molestias digestivas crónicas?" : "Síntomas Gastrointestinales Crónicos"}
                   </label>
                   <textarea
                     rows={2}
-                    value={anamnesis.notas_consulta || ""}
-                    onChange={(e) => updAnam("notas_consulta", e.target.value)}
+                    value={anamnesis.sintomas_gi || ""}
+                    onChange={(e) => updAnam("sintomas_gi", e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Suelo viajar fines de semana, me cuesta trabajo cenar temprano..." : "Comentarios adicionales, motivación del paciente, acuerdos especiales..."}
+                    placeholder={isPatientMode ? "Ej. Reflujo nocturno, distensión vespertina, estreñimiento frecuente..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                  {isPatientMode ? "¿Has tenido cirugías previas o tienes alguna lesión física crónica?" : "Cirugías Previas o Lesiones Físicas Crónicas"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.cirugias_lesiones || ""}
+                  onChange={(e) => updAnam("cirugias_lesiones", e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPatientMode ? "Ej. Operación de menisco en rodilla derecha, molestia en hombro, ninguna..." : "Ej. Hernia discal L4-L5, operación de menisco rodilla derecha..."}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                    {isPatientMode ? "¿A qué te dedicas y cómo es tu actividad laboral habitual?" : "Ocupación y Nivel de Actividad Laboral"}
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.ocupacion_actividad || ""}
+                    onChange={(e) => updAnam("ocupacion_actividad", e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                    placeholder={isPatientMode ? "Ej. Oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Trabajo activo"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                    {isPatientMode ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo Habitual de Alcohol / Tabaco"}
+                  </label>
+                  <input
+                    type="text"
+                    value={anamnesis.consumo_alcohol_tabaco || ""}
+                    onChange={(e) => updAnam("consumo_alcohol_tabaco", e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                    placeholder="Ej. Social fines de semana (cerveza) / No fuma"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                  {isPatientMode ? "¿Algún antecedente o comentario adicional importante para tu expediente?" : "Notas y Acuerdos Clínicos Permanentes"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={anamnesis.notas_consulta || ""}
+                  onChange={(e) => updAnam("notas_consulta", e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder="Pautas permanentes a considerar a lo largo de toda su historia clínica..."
+                />
               </div>
             </div>
           </div>
@@ -1088,20 +917,20 @@ export function NuevoExpedienteForms({
       {/* ── Footer de Navegación ── */}
       <div className="flex items-center justify-between gap-3 pt-2">
         <div>
-          {step > 1 ? (
+          {step === 2 ? (
             <button
               type="button"
-              onClick={() => setStep(step - 1)}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+              onClick={() => setStep(1)}
+              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Anterior</span>
+              <span>Anterior: Datos Personales</span>
             </button>
           ) : isPatientMode ? (
             <button
               type="button"
               onClick={onBackToList}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <X className="w-4 h-4" />
               <span>Cerrar</span>
@@ -1110,7 +939,7 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Volver a Opciones</span>
@@ -1124,19 +953,19 @@ export function NuevoExpedienteForms({
             type="button"
             onClick={handleTerminarMasTarde}
             disabled={saving}
-            className="px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+            className="px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
           >
             Guardar borrador
           </button>
 
           {/* Siguiente o Finalizar */}
-          {step < 3 ? (
+          {step === 1 ? (
             <button
               type="button"
-              onClick={() => setStep(step + 1)}
-              className="px-5 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm"
+              onClick={() => setStep(2)}
+              className="px-5 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm cursor-pointer"
             >
-              <span>Siguiente</span>
+              <span>Siguiente: Antecedentes Clínicos</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : (
@@ -1144,15 +973,15 @@ export function NuevoExpedienteForms({
               type="button"
               onClick={handleFinalizar}
               disabled={saving}
-              className="px-6 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md disabled:opacity-50 cursor-pointer"
             >
               {isPatientMode ? <Send className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
               <span>
                 {saving
-                  ? "Enviando..."
+                  ? "Finalizando..."
                   : isPatientMode
                   ? "Enviar a mi Especialista"
-                  : "Finalizar y Comenzar Plan"}
+                  : "Finalizar Expediente"}
               </span>
             </button>
           )}
