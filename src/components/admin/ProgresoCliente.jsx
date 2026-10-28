@@ -17,7 +17,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, TrendingUp, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -976,16 +976,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-historico"))}
-                className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="Abrir progreso histórico plan a plan en pantalla completa"
-              >
-                <TrendingUp className="w-4 h-4 text-[var(--brand-primary)]" />
-                <span className="hidden sm:inline">Histórico Completo</span>
-                <span className="sm:hidden">Histórico</span>
-              </button>
               {displayedMetricas.length > 0 && (
                 <button onClick={() => generateProgresoPDF(selected, displayedMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
@@ -1014,18 +1004,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm mx-auto">
                   <Plus className="w-4 h-4" /> Registrar evaluación
                 </button>
-              )}
-              {allLinkedMetricas.length > 0 && (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new CustomEvent("flux:open-historico"))}
-                    className="text-xs text-[var(--brand-primary)] hover:underline font-bold cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span>Ver {allLinkedMetricas.length} evaluación{allLinkedMetricas.length !== 1 ? "es" : ""} en el Histórico Completo</span>
-                  </button>
-                </div>
               )}
             </div>
           ) : displayedMetricas.map((m, idx) => {
