@@ -393,7 +393,7 @@ export async function auditMacroPrescriptionWithAi({
       return {
         ...edgeRes.prescription,
         origen: edgeRes.origen || "edge_function",
-        model: edgeRes.model || "gemini-2.0-flash",
+        model: edgeRes.model || "gemini-3.5-flash-lite",
         generadoEn: edgeRes.generadoEn || new Date().toISOString(),
       };
     }
