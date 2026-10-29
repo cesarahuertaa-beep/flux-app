@@ -29,7 +29,7 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi } from "../../lib/clinicalAi";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
@@ -205,6 +205,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"" });
   const [aiOptimizingIndex, setAiOptimizingIndex] = useState(null);
+  const [isAuditingDay, setIsAuditingDay] = useState(false);
+  const [dayAuditResult, setDayAuditResult] = useState(null);
   const [aiGeneratingDishIndex, setAiGeneratingDishIndex] = useState(null);
   const [ingredientSearchMap, setIngredientSearchMap] = useState({});
   const [ingredientCatMap, setIngredientCatMap] = useState({});
@@ -2015,6 +2017,117 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     cs[mealIdx] = c;
     return { ...p, comidas: cs };
   });
+
+  const handleAuditDayWithAi = async () => {
+    if (!diaForm.comidas || diaForm.comidas.length === 0) {
+      alert("Agrega al menos una comida al día para auditar.");
+      return;
+    }
+    const hasAnyContent = diaForm.comidas.some(
+      (c) =>
+        (c.opciones?.[0] || c.opcion1 || "").trim().length > 0 ||
+        Number(c.calorias) > 0
+    );
+    if (!hasAnyContent) {
+      alert(
+        "Escribe o selecciona alimentos en al menos una comida para poder auditar el día."
+      );
+      return;
+    }
+
+    setIsAuditingDay(true);
+    setMsg(
+      <div className="flex items-center gap-2 text-purple-700">
+        <Sparkles className="w-4 h-4 animate-spin text-purple-600" />
+        <span>Auditando menú del día completo con IA Clínica FLUX...</span>
+      </div>
+    );
+
+    try {
+      const res = await auditFullDayWithAi({
+        comidas: diaForm.comidas,
+        clinicalRec,
+        smartPrescription,
+        targetMacros: {
+          calorias: macros.calorias || smartPrescription?.targetKcal,
+          proteina: macros.proteina || smartPrescription?.proteinG,
+          carbohidratos: macros.carbohidratos || smartPrescription?.carbsG,
+          grasas: macros.grasas || smartPrescription?.fatsG,
+        },
+        cliente: selected,
+      });
+
+      if (res?.comidasAuditadas && Array.isArray(res.comidasAuditadas)) {
+        let totalAutofilled = 0;
+        let totalAlerts = 0;
+
+        setDiaForm((p) => {
+          const nextComidas = p.comidas.map((meal, idx) => {
+            const audited =
+              res.comidasAuditadas.find((item) => item.index === idx) ||
+              res.comidasAuditadas[idx];
+            if (!audited) return meal;
+
+            const updated = { ...meal };
+            const currentKcal = Number(updated.calorias) || 0;
+
+            // Rellenar macros si estaban en 0 o vacíos y la IA los calculó
+            if (currentKcal === 0 && audited.calorias > 0) {
+              updated.calorias = audited.calorias;
+              updated.proteina = audited.proteina;
+              updated.carbohidratos = audited.carbohidratos;
+              updated.grasas = audited.grasas;
+              updated.macrosCalculadosPorIa = true;
+              totalAutofilled++;
+            }
+
+            // Inyectar alertas y evaluación clínica
+            updated.alertaClinica = audited.alertaClinica || null;
+            if (audited.alertaClinica) {
+              totalAlerts++;
+            }
+            if (audited.evaluacion) {
+              updated.evaluacionClinica = {
+                tipo: audited.alertaClinica ? "advertencia" : "exito",
+                mensaje: audited.evaluacion,
+              };
+            }
+            return updated;
+          });
+
+          return { ...p, comidas: nextComidas };
+        });
+
+        if (res.resumenGlobal) {
+          setDayAuditResult(res.resumenGlobal);
+        }
+
+        setMsg(
+          <div className="flex items-center gap-2 text-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>
+              Auditoría completada
+              {totalAutofilled > 0
+                ? ` • ${totalAutofilled} comida(s) calculada(s) con macros bromatológicos`
+                : ""}
+              {totalAlerts > 0
+                ? ` • ${totalAlerts} advertencia(s) detectada(s)`
+                : " • 100% compatible"}
+            </span>
+          </div>
+        );
+      }
+    } catch (err) {
+      console.error("Error auditando día con IA:", err);
+      setMsg(
+        <div className="text-amber-600 text-xs">
+          ⚠️ {err.message || "No se pudo auditar el día completo."}
+        </div>
+      );
+    } finally {
+      setIsAuditingDay(false);
+    }
+  };
 
   const handleOptimizeComidaWithAi = async (mealIdx) => {
     const meal = diaForm.comidas[mealIdx];
@@ -4096,13 +4209,106 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
               {/* Right Column: Lista de Comidas (Siempre Desplegadas y Visibles) */}
               <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
-                <div className="mb-5">
-                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
-                    <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
-                    Comidas y Distribución ({diaForm.comidas.length})
-                  </h3>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra desde el icono izquierdo para reordenar las tomas</p>
+                <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
+                      <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
+                      Comidas y Distribución ({diaForm.comidas.length})
+                    </h3>
+                    <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra desde el icono izquierdo para reordenar las tomas</p>
+                  </div>
+
+                  {/* Botón Auditar con IA */}
+                  <button
+                    type="button"
+                    onClick={handleAuditDayWithAi}
+                    disabled={isAuditingDay || diaForm.comidas.length === 0}
+                    className="text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50 shadow-xs cursor-pointer"
+                    title="Auditar menú completo del día con IA Clínica"
+                  >
+                    {isAuditingDay ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                        <span>Auditando día completo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Auditar con IA</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+
+                {/* Banner / Dictamen de Auditoría del Día */}
+                {dayAuditResult && (
+                  <div className={`mb-5 p-3.5 sm:p-4 rounded-2xl border transition-all animate-in fade-in ${
+                    dayAuditResult.estado === "critico"
+                      ? "bg-rose-50/80 border-rose-200/90 text-rose-950"
+                      : dayAuditResult.estado === "advertencia"
+                      ? "bg-amber-50/80 border-amber-200/90 text-amber-950"
+                      : "bg-indigo-50/70 border-indigo-200/80 text-indigo-950"
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        {dayAuditResult.estado === "aprobado" ? (
+                          <div className="p-1.5 rounded-xl bg-indigo-100/80 text-indigo-700 shrink-0 mt-0.5">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="p-1.5 rounded-xl bg-amber-100/80 text-amber-700 shrink-0 mt-0.5">
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                              Dictamen de Auditoría del Día (IA FLUX)
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                              dayAuditResult.estado === "aprobado"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200/60"
+                                : "bg-amber-100 text-amber-800 border border-amber-200/60"
+                            }`}>
+                              {dayAuditResult.estado === "aprobado" ? "Alineado" : "Con Advertencias"}
+                            </span>
+                            {dayAuditResult.caloriasTotales != null && (
+                              <span className="text-xs font-semibold text-[#475569]">
+                                Total: <strong className="text-[#0B1929]">{dayAuditResult.caloriasTotales} kcal</strong>
+                                {macros.calorias ? ` / ${macros.calorias} kcal meta` : ""}
+                                {dayAuditResult.desvioKcalPct !== undefined && (
+                                  <span className={`ml-1 text-[11px] font-bold ${
+                                    Math.abs(dayAuditResult.desvioKcalPct) <= 5 ? "text-emerald-700" : "text-amber-700"
+                                  }`}>
+                                    ({dayAuditResult.desvioKcalPct > 0 ? `+${dayAuditResult.desvioKcalPct}%` : `${dayAuditResult.desvioKcalPct}%`})
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#334155] leading-relaxed">
+                            {dayAuditResult.dictamenGeneral}
+                          </p>
+                          {Array.isArray(dayAuditResult.recomendaciones) && dayAuditResult.recomendaciones.length > 0 && (
+                            <ul className="text-[11px] text-[#475569] list-disc list-inside mt-1 space-y-0.5">
+                              {dayAuditResult.recomendaciones.map((rec, rIdx) => (
+                                <li key={rIdx}>{rec}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDayAuditResult(null)}
+                        className="text-[#94A3B8] hover:text-[#0B1929] p-1 rounded-lg hover:bg-white/60 transition-colors shrink-0"
+                        title="Cerrar dictamen"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {diaForm.comidas.length === 0 ? (
                   <div className="text-center py-12 border-2 border-dashed border-[#E2E8F0] rounded-2xl bg-gray-50/50">
@@ -4142,26 +4348,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         Comida {i + 1}
                                       </span>
 
-                                      {/* Botón Optimizar con IA */}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOptimizeComidaWithAi(i)}
-                                        disabled={aiOptimizingIndex === i}
-                                        className="text-xs font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
-                                        title="Optimizar con IA"
-                                      >
-                                        {aiOptimizingIndex === i ? (
-                                          <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Optimizando...</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                                            <span>Optimizar con IA</span>
-                                          </>
-                                        )}
-                                      </button>
+                                      {c.macrosCalculadosPorIa && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/70 flex items-center gap-1 animate-in fade-in">
+                                          <Sparkles className="w-3 h-3 text-purple-600" />
+                                          <span>Macros calculados con IA</span>
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       <button 

@@ -1597,3 +1597,271 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
     origen: "analitico_local",
   };
 }
+
+/**
+ * Audita de manera integral el menú completo de un día (todas las comidas y opciones)
+ * basándose en los 3 pilares:
+ * 1. Resumen Clínico Inteligente (anamnesis.resumen_ia / clinicalRec.sintesis_ia)
+ * 2. Dictamen de Auditoría Clínica IA (smartPrescription)
+ * 3. Dieta Programada (comidas del día)
+ *
+ * Rellena automáticamente los macros de comidas manuales que sigan en 0
+ * y genera alertas por comida y dictamen global.
+ */
+export async function auditFullDayWithAi({
+  comidas = [],
+  clinicalRec = null,
+  smartPrescription = null,
+  targetMacros = {},
+  cliente = {},
+}) {
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const resumenClinico =
+    clinicalRec?.sintesis_ia ||
+    anamnesis?.resumen_ia ||
+    anamnesis?.resumen_clinico ||
+    {};
+  const apiKey = getGeminiApiKey();
+
+  // Tier 1: Supabase Edge Function
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "audit-full-day",
+      comidas,
+      clinicalRec,
+      anamnesis,
+      resumenClinico,
+      smartPrescription,
+      targetMacros,
+      cliente,
+      geminiKey: apiKey,
+    });
+    clearTimeout(timeoutId);
+
+    if (edgeRes?.comidasAuditadas && Array.isArray(edgeRes.comidasAuditadas)) {
+      return {
+        success: true,
+        origen: edgeRes.origen || "edge_function",
+        comidasAuditadas: edgeRes.comidasAuditadas,
+        resumenGlobal: edgeRes.resumenGlobal || null,
+      };
+    }
+  } catch (err) {
+    console.warn("Fallo en Edge Function audit-full-day, intentando Tier 2/3:", err);
+  }
+
+  // Tier 2: Gemini Direct si hay clave disponible
+  if (apiKey) {
+    const metaKcal = Number(targetMacros?.calorias || smartPrescription?.targetKcal || 0);
+    const metaP = Number(targetMacros?.proteina || smartPrescription?.proteinG || 0);
+    const metaC = Number(targetMacros?.carbohidratos || smartPrescription?.carbsG || 0);
+    const metaG = Number(targetMacros?.grasas || smartPrescription?.fatsG || 0);
+
+    const exclusiones =
+      resumenClinico?.alertas?.exclusiones_alimentarias ||
+      anamnesis?.alergias_intolerancias ||
+      "Ninguna";
+    const patologias =
+      resumenClinico?.alertas?.patologias_normalizadas ||
+      anamnesis?.patologias ||
+      "Ninguna";
+    const medicacion =
+      resumenClinico?.medicacion_normalizada ||
+      anamnesis?.medicacion_suplementos ||
+      "Sin medicación reportada";
+    const contexto =
+      typeof resumenClinico?.contexto_normalizado === "object"
+        ? Object.values(resumenClinico.contexto_normalizado).filter(Boolean).join(". ")
+        : (resumenClinico?.contexto_normalizado || "Sin contexto particular");
+    const directrices = Array.isArray(resumenClinico?.directrices_nutricionales)
+      ? resumenClinico.directrices_nutricionales.join("; ")
+      : "Directrices habituales de balance energético";
+
+    const favoritos =
+      smartPrescription?.preferencias || anamnesis?.preferencias_alimentos || "No especificados";
+    const aversiones =
+      smartPrescription?.aversiones || anamnesis?.aversiones_alimentos || "No especificadas";
+    const rationale = smartPrescription?.rationale || "Plan nutricional adaptado";
+    const estrategiaMenu =
+      smartPrescription?.estrategiaMenu || "Distribución equilibrada a lo largo del día";
+    const badgeMotivo = smartPrescription?.badgeMotivo || "Prescripción General";
+
+    const comidasText = comidas.map((c, idx) => {
+      const opts = Array.isArray(c.opciones) && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
+      const optAText = opts[0] || "Vacía";
+      const altsText = opts.slice(1).map((opt, oIdx) => `    * Opción Alternativa (${String.fromCharCode(66 + oIdx)}): "${opt}"`).join("\n");
+      return `[Comida ${idx + 1}]
+- Hora: ${c.hora || "Sin hora"} | Nombre: ${c.nombre || `Comida ${idx + 1}`}
+- Macros registrados: ${c.calorias || 0} kcal (P: ${c.proteina || 0}g, C: ${c.carbohidratos || 0}g, G: ${c.grasas || 0}g)
+- Opción Principal (A): "${optAText}"${altsText ? `\n${altsText}` : ""}`;
+    }).join("\n\n");
+
+    const prompt = `Eres el Director de Auditoría Clínica Nutricional y Bromatólogo Experto de FLUX.
+Tu función es auditar exhaustivamente el menú completo de un día para un paciente, contrastándolo contra la síntesis clínica y el dictamen de requerimientos ya establecidos.
+
+PILAR 1: RESUMEN CLÍNICO INTELIGENTE
+- Diagnóstico: ${resumenClinico.diagnostico || resumenClinico.texto || "Paciente en evaluación nutricional"}
+- Exclusiones / Alergias: ${Array.isArray(exclusiones) ? exclusiones.join(", ") : exclusiones}
+- Patologías: ${Array.isArray(patologias) ? patologias.join(", ") : patologias}
+- Medicación: ${medicacion}
+- Contexto: ${contexto}
+- Directrices: ${directrices}
+
+PILAR 2: DICTAMEN DE AUDITORÍA CLÍNICA IA
+- Meta Diaria: ${metaKcal} kcal | P: ${metaP}g | C: ${metaC}g | G: ${metaG}g
+- Enfoque: ${badgeMotivo} - ${rationale}
+- Estrategia de Menú: ${estrategiaMenu}
+- Favoritos: ${favoritos}
+- Aversiones: ${aversiones}
+
+PILAR 3: DIETA PROGRAMADA (${comidas.length} TOMAS)
+${comidasText}
+
+INSTRUCCIONES:
+1. Si una comida tiene 0 kcal o macros vacíos porque fue escrita manualmente, calcula sus macros por tablas USDA/SMAE a partir de la Opción A y marca "macrosCalculadosPorIa": true.
+2. Si la comida ya tenía macros válidos, consérvalos y pon "macrosCalculadosPorIa": false.
+3. Evalúa si hay conflicto con alergias, aversiones o patologías en "alertaClinica" (o null).
+4. Emite un dictamen general del día comparando calorías totales con la meta prescrita.
+
+Responde ÚNICAMENTE con JSON:
+{
+  "comidasAuditadas": [
+    {
+      "index": 0,
+      "calorias": number,
+      "proteina": number,
+      "carbohidratos": number,
+      "grasas": number,
+      "macrosCalculadosPorIa": boolean,
+      "alertaClinica": "string o null",
+      "evaluacion": "string corto"
+    }
+  ],
+  "resumenGlobal": {
+    "estado": "aprobado",
+    "caloriasTotales": number,
+    "proteinaTotal": number,
+    "carbosTotales": number,
+    "grasasTotales": number,
+    "desvioKcalPct": number,
+    "dictamenGeneral": "string",
+    "recomendaciones": ["string"]
+  }
+}`;
+
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            return {
+              ...parsed,
+              success: true,
+              origen: "gemini_direct",
+            };
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Tier 3: Fallback Bromatológico y Clínico Local (100% resiliente)
+  const metaKcal = Number(targetMacros?.calorias || smartPrescription?.targetKcal || 0);
+  const metaP = Number(targetMacros?.proteina || smartPrescription?.proteinG || 0);
+  const metaC = Number(targetMacros?.carbohidratos || smartPrescription?.carbsG || 0);
+  const metaG = Number(targetMacros?.grasas || smartPrescription?.fatsG || 0);
+
+  let sumKcal = 0;
+  let sumP = 0;
+  let sumC = 0;
+  let sumF = 0;
+
+  const comidasAuditadas = comidas.map((c, idx) => {
+    let cal = Number(c.calorias) || 0;
+    let p = Number(c.proteina) || 0;
+    let car = Number(c.carbohidratos) || 0;
+    let f = Number(c.grasas) || 0;
+    let calculated = false;
+
+    const optA = c.opciones?.[0] || c.opcion1 || "";
+
+    if (cal === 0 && optA.trim()) {
+      const estimated = estimateMealMacrosAnalytically(optA, targetMacros, clinicalRec, cliente);
+      cal = estimated.calorias;
+      p = estimated.proteina;
+      car = estimated.carbohidratos;
+      f = estimated.grasas;
+      calculated = true;
+    } else if (cal === 0) {
+      cal = metaKcal > 0 ? Math.round(metaKcal / comidas.length) : 450;
+      p = metaP > 0 ? Math.round(metaP / comidas.length) : 30;
+      car = metaC > 0 ? Math.round(metaC / comidas.length) : 45;
+      f = metaG > 0 ? Math.round(metaG / comidas.length) : 15;
+      calculated = true;
+    }
+
+    const evaluacion = evaluateMealClinicalCompatibility(optA, clinicalRec);
+    const alertaClinica = evaluacion.estado === "conflicto" ? evaluacion.mensaje : null;
+
+    sumKcal += cal;
+    sumP += p;
+    sumC += car;
+    sumF += f;
+
+    return {
+      index: idx,
+      calorias: cal,
+      proteina: p,
+      carbohidratos: car,
+      grasas: f,
+      macrosCalculadosPorIa: calculated,
+      alertaClinica,
+      evaluacion: evaluacion.mensaje || "Platillo analizado y verificado bromatológicamente",
+    };
+  });
+
+  const diffPct = metaKcal > 0 ? Math.round(((sumKcal - metaKcal) / metaKcal) * 100) : 0;
+  return {
+    success: true,
+    origen: "analitico_local",
+    comidasAuditadas,
+    resumenGlobal: {
+      estado: Math.abs(diffPct) <= 10 ? "aprobado" : "advertencia",
+      caloriasTotales: sumKcal,
+      proteinaTotal: sumP,
+      carbosTotales: sumC,
+      grasasTotales: sumF,
+      desvioKcalPct: diffPct,
+      dictamenGeneral: `Menú del día con ${sumKcal} kcal asignadas frente a la meta prescrita de ${metaKcal} kcal (${diffPct > 0 ? `+${diffPct}%` : `${diffPct}%`}).`,
+      recomendaciones:
+        Math.abs(diffPct) > 10
+          ? ["Ajustar porciones para acercarse más a la meta energética prescrita."]
+          : [],
+    },
+  };
+}

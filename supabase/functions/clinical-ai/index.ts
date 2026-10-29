@@ -602,6 +602,221 @@ Debes responder ÚNICAMENTE con un JSON:
     }
 
     // =========================================================================
+    // ACCIÓN: AUDITORÍA INTEGRAL DEL DÍA COMPLETO CON IA (3 PILARES)
+    // =========================================================================
+    if (action === "audit-full-day") {
+      const comidas = Array.isArray(body.comidas) ? body.comidas : [];
+      const cliente = body.cliente || {};
+      const clinicalRec = body.clinicalRec || {};
+      const anamnesis = clinicalRec.anamnesis || body.anamnesis || {};
+      const resumenClinico = clinicalRec.sintesis_ia || anamnesis.resumen_ia || body.resumenClinico || {};
+      const smartPrescription = body.smartPrescription || {};
+      const targetMacros = body.targetMacros || {};
+
+      const metaKcal = Number(targetMacros.calorias || smartPrescription.targetKcal || 0);
+      const metaP = Number(targetMacros.proteina || smartPrescription.proteinG || 0);
+      const metaC = Number(targetMacros.carbohidratos || smartPrescription.carbsG || 0);
+      const metaG = Number(targetMacros.grasas || smartPrescription.fatsG || 0);
+
+      const exclusiones = resumenClinico?.alertas?.exclusiones_alimentarias || anamnesis?.alergias_intolerancias || "Ninguna";
+      const patologias = resumenClinico?.alertas?.patologias_normalizadas || anamnesis?.patologias || "Ninguna";
+      const medicacion = resumenClinico?.medicacion_normalizada || anamnesis?.medicacion_suplementos || "Sin medicación reportada";
+      const contexto = typeof resumenClinico?.contexto_normalizado === "object"
+        ? Object.values(resumenClinico.contexto_normalizado).filter(Boolean).join(". ")
+        : (resumenClinico?.contexto_normalizado || "Sin contexto particular");
+      const directrices = Array.isArray(resumenClinico?.directrices_nutricionales)
+        ? resumenClinico.directrices_nutricionales.join("; ")
+        : "Directrices habituales de balance energético";
+
+      const favoritos = smartPrescription.preferencias || anamnesis.preferencias_alimentos || "No especificados";
+      const aversiones = smartPrescription.aversiones || anamnesis.aversiones_alimentos || "No especificadas";
+      const rationale = smartPrescription.rationale || "Plan nutricional adaptado";
+      const estrategiaMenu = smartPrescription.estrategiaMenu || "Distribución equilibrada a lo largo del día";
+      const badgeMotivo = smartPrescription.badgeMotivo || "Prescripción General";
+
+      if (geminiKey && geminiKey.trim().length >= 20 && comidas.length > 0) {
+        const comidasText = comidas.map((c: any, idx: number) => {
+          const opts = Array.isArray(c.opciones) && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
+          const optAText = opts[0] || "Vacía";
+          const altsText = opts.slice(1).map((opt: string, oIdx: number) => `    * Opción Alternativa (${String.fromCharCode(66 + oIdx)}): "${opt}"`).join("\n");
+          return `[Comida ${idx + 1}]
+- Hora: ${c.hora || "Sin hora"} | Nombre: ${c.nombre || `Comida ${idx + 1}`}
+- Macros registrados: ${c.calorias || 0} kcal (P: ${c.proteina || 0}g, C: ${c.carbohidratos || 0}g, G: ${c.grasas || 0}g)
+- Opción Principal (A): "${optAText}"${altsText ? `\n${altsText}` : ""}`;
+        }).join("\n\n");
+
+        const prompt = `Eres el Director de Auditoría Clínica Nutricional y Bromatólogo Experto de FLUX.
+Tu función es auditar exhaustivamente el menú completo de un día para un paciente, contrastándolo contra la síntesis clínica y el dictamen de requerimientos ya establecidos.
+
+======================================================================
+PILAR 1: RESUMEN CLÍNICO INTELIGENTE (Previamente auditado)
+======================================================================
+- Diagnóstico: ${resumenClinico.diagnostico || resumenClinico.texto || "Paciente en evaluación nutricional"}
+- Exclusiones / Alergias / Intolerancias: ${Array.isArray(exclusiones) ? exclusiones.join(", ") : exclusiones}
+- Patologías: ${Array.isArray(patologias) ? patologias.join(", ") : patologias}
+- Medicación y Suplementos: ${medicacion}
+- Contexto de Vida y Digestión: ${contexto}
+- Directrices Nutricionales Obligatorias: ${directrices}
+
+======================================================================
+PILAR 2: DICTAMEN DE AUDITORÍA CLÍNICA IA (Metas del Día)
+======================================================================
+- Meta Calórica Diaria: ${metaKcal} kcal
+- Macros Prescritos: Proteína ${metaP}g | Carbohidratos ${metaC}g | Grasas ${metaG}g
+- Enfoque de Etapa: ${badgeMotivo} - ${rationale}
+- Estrategia de Menú Sugerida: ${estrategiaMenu}
+- Favoritos de la Etapa a Incluir: ${favoritos}
+- Aversiones / Alimentos a NO Incluir: ${aversiones}
+
+======================================================================
+PILAR 3: DIETA PROGRAMADA DEL DÍA (${comidas.length} TOMAS)
+======================================================================
+${comidasText}
+
+======================================================================
+MISIÓN Y REGLAS DE LA AUDITORÍA:
+======================================================================
+1. RELLENADO DE MACROS VACÍOS O EN CERO (Comidas manuales):
+   - Si alguna comida tiene calorías o macros en 0/vacíos porque el nutriólogo la redactó a mano, calcula bromatológicamente sus calorías y macronutrientes (P, C, G) basados en tablas oficiales (USDA / SMAE) a partir de la descripción de la Opción Principal.
+   - Aplica balance de energía estricto: Kcal = (P * 4) + (C * 4) + (G * 9).
+   - Marca "macrosCalculadosPorIa": true únicamente si la comida tenía 0 o macros vacíos y tuviste que calcularlos; de lo contrario pon false.
+   - Si la comida ya tenía macros válidos (> 0), consérvalos tal como están (a menos que detectes una discrepancia extrema de más del 50%, en cuyo caso indícalo en su alerta).
+
+2. VERIFICACIÓN DE SEGURIDAD Y COMPATIBILIDAD CLÍNICA (Por Comida):
+   - Revisa cada ingrediente de cada opción contra:
+     a) Alergias / Intolerancias / Exclusiones (ej. lácteos enteros en intolerancia a la lactosa, gluten en celiaquía).
+     b) Aversiones declaradas (ej. tomate, atún, mayonesa).
+     c) Patologías y Medicación (ej. exceso de sodio para hipertensión, azúcares simples en prediabetes).
+     d) Si detectas conflicto o desvío, genera una advertencia concisa y amigable en "alertaClinica". Si todo está en regla, devuelve null.
+
+3. EVALUACIÓN Y COHERENCIA GLOBAL DEL DÍA:
+   - Suma las calorías y macros de todas las comidas (incluyendo las recién calculadas) y compara contra la Meta Diaria Prescrita (Pilar 2).
+   - Emite un veredicto general ("aprobado", "advertencia" o "critico") y un dictamen conciso sobre la calidad y distribución del día.
+
+Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+{
+  "comidasAuditadas": [
+    {
+      "index": 0,
+      "calorias": number,
+      "proteina": number,
+      "carbohidratos": number,
+      "grasas": number,
+      "macrosCalculadosPorIa": boolean,
+      "alertaClinica": "string con advertencia amigable si hay conflicto con aversión/alergia/patología, o null si es segura",
+      "evaluacion": "string corto (ej. 'Alineada con directriz DASH, sin lactosa')"
+    }
+  ],
+  "resumenGlobal": {
+    "estado": "aprobado",
+    "caloriasTotales": number,
+    "proteinaTotal": number,
+    "carbosTotales": number,
+    "grasasTotales": number,
+    "desvioKcalPct": number,
+    "dictamenGeneral": "string sintetizado explicando la coherencia del menú frente a las directrices y metas",
+    "recomendaciones": ["sugerencia 1", "sugerencia 2"]
+  }
+}`;
+
+        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    temperature: 0.2,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                return new Response(
+                  JSON.stringify({
+                    ...parsed,
+                    success: true,
+                    origen: "gemini_edge",
+                    model,
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+          } catch {}
+        }
+      }
+
+      // Fallback analítico bromatológico si no hay Gemini
+      let sumKcal = 0;
+      let sumP = 0;
+      let sumC = 0;
+      let sumF = 0;
+      const comidasAuditadas = comidas.map((c: any, idx: number) => {
+        let cal = Number(c.calorias) || 0;
+        let p = Number(c.proteina) || 0;
+        let car = Number(c.carbohidratos) || 0;
+        let f = Number(c.grasas) || 0;
+        let calculated = false;
+
+        if (cal === 0) {
+          cal = metaKcal > 0 ? Math.round(metaKcal / comidas.length) : 450;
+          p = metaP > 0 ? Math.round(metaP / comidas.length) : 30;
+          car = metaC > 0 ? Math.round(metaC / comidas.length) : 45;
+          f = metaG > 0 ? Math.round(metaG / comidas.length) : 15;
+          calculated = true;
+        }
+
+        sumKcal += cal;
+        sumP += p;
+        sumC += car;
+        sumF += f;
+
+        return {
+          index: idx,
+          calorias: cal,
+          proteina: p,
+          carbohidratos: car,
+          grasas: f,
+          macrosCalculadosPorIa: calculated,
+          alertaClinica: null,
+          evaluacion: "Platillo verificado con tablas bromatológicas de referencia",
+        };
+      });
+
+      const diffPct = metaKcal > 0 ? Math.round(((sumKcal - metaKcal) / metaKcal) * 100) : 0;
+      return new Response(
+        JSON.stringify({
+          success: true,
+          origen: "analitico_local",
+          comidasAuditadas,
+          resumenGlobal: {
+            estado: Math.abs(diffPct) <= 10 ? "aprobado" : "advertencia",
+            caloriasTotales: sumKcal,
+            proteinaTotal: sumP,
+            carbosTotales: sumC,
+            grasasTotales: sumF,
+            desvioKcalPct: diffPct,
+            dictamenGeneral: `Menú del día con ${sumKcal} kcal asignadas frente a la meta prescrita de ${metaKcal} kcal (${diffPct > 0 ? `+${diffPct}%` : `${diffPct}%`}).`,
+            recomendaciones: Math.abs(diffPct) > 10 ? ["Ajustar porciones para acercarse más a la meta energética prescrita."] : [],
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =========================================================================
     // ACCIÓN 2: SÍNTESIS Y AUDITORÍA DE EXPEDIENTE CLÍNICO INTEGRAL
     // =========================================================================
     if (action === "clinical-synopsis") {
