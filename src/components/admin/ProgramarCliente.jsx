@@ -26,7 +26,7 @@ import { dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, dbUpsert, storageUpl
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
-import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription } from "../../lib/bodyComposition";
+import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi } from "../../lib/clinicalAi";
@@ -426,6 +426,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [showMacroCalc, setShowMacroCalc] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [metaPrescritaCollapsed, setMetaPrescritaCollapsed] = useState(true);
+  const [metaEntrenoCollapsed, setMetaEntrenoCollapsed] = useState(true);
   const [allMetricas, setAllMetricas] = useState(() => {
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) ? ms.map(enrichMetrica) : [];
@@ -480,6 +481,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       cicloNombre: cicloSel?.nombre || "",
     });
   }, [selected, cycleMetrica, clinicalRec, cicloSel]);
+
+  const smartTrainingPrescription = useMemo(() => {
+    return generateSmartTrainingPrescription({
+      cliente: selected,
+      metrica: cycleMetrica,
+      clinicalRec,
+      ciclo: cicloSel,
+      cicloNombre: cicloSel?.nombre || "",
+      smartPrescription,
+    });
+  }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription]);
 
   useEffect(() => {
     let active = true;
@@ -3534,6 +3546,221 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         {entrenoView === "programar" ? (
           <>
+            {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
+            {(() => {
+              if (!smartTrainingPrescription) return null;
+              const p = smartTrainingPrescription;
+
+              return (
+                <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
+                  {/* Cabecera de la tarjeta (Colapsable) */}
+                  <div
+                    onClick={() => setMetaEntrenoCollapsed((prev) => !prev)}
+                    className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                      metaEntrenoCollapsed ? "hover:bg-[#F8FAFC]" : "pb-3 border-b border-[#F0F4FA] bg-[#F8FAFC]/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border bg-blue-50 text-[var(--brand-primary)] border-blue-200/60">
+                        <Dumbbell className="w-4 h-4 text-[var(--brand-primary)]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-[#0B1929]">
+                            Directriz de Entrenamiento Prescrita
+                          </h4>
+                          {/* Badge de Modalidad */}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-indigo-50 text-indigo-700 border-indigo-200/70">
+                            <Sparkles className="w-3 h-3 text-indigo-600" />
+                            <span>Auditado con IA</span>
+                          </span>
+
+                          {/* Badge de Objetivo */}
+                          {p.goalTitle && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                              <Target className="w-3 h-3 shrink-0" />
+                              <span>{p.goalTitle}</span>
+                            </span>
+                          )}
+
+                          {/* Badge de Frecuencia */}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
+                            <Flame className="w-3 h-3 shrink-0" />
+                            <span>{p.frecuenciaLabel}</span>
+                          </span>
+
+                          {/* Badge de Lesión o Biomecánica */}
+                          {p.tieneLesiones ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/70">
+                              <ShieldAlert className="w-3 h-3 shrink-0 text-rose-600" />
+                              <span>Adaptación por Lesión</span>
+                            </span>
+                          ) : (
+                            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                              <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-600" />
+                              <span>Sin Lesiones Declaradas</span>
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#6B7A8D] truncate mt-0.5">
+                          {p.evalFecha
+                            ? `Evaluación más reciente (${fmtDate(p.evalFecha)}) • Nivel: ${p.nivelPrevio} • FAF: ${p.fafVal}`
+                            : `Basado en expediente clínico • Nivel: ${p.nivelPrevio} • FAF: ${p.fafVal}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Control de Colapso */}
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <span className="text-[11px] font-semibold text-[#6B7A8D] hidden sm:inline">
+                        {metaEntrenoCollapsed ? "Ver directriz" : "Ocultar"}
+                      </span>
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] bg-white shadow-2xs border border-[#E2E8F0] transition-transform cursor-pointer"
+                        title={metaEntrenoCollapsed ? "Desplegar directriz" : "Colapsar"}
+                      >
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            metaEntrenoCollapsed ? "" : "rotate-180"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cuerpo de la Tarjeta (Desplegable) */}
+                  {!metaEntrenoCollapsed && (
+                    <div className="p-4 pt-1">
+                      {/* Los 4 Bloques Principales de Programación */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                        {/* 1. Frecuencia Semanal */}
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-[#6B7A8D] block">Frecuencia Semanal</span>
+                          <span className="text-base sm:text-lg font-extrabold text-[var(--brand-primary)]">
+                            {p.diasSugeridos} <span className="text-xs font-medium text-[#6B7A8D]">días / sem</span>
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {p.fafInfo?.short || "Meta de microciclo"}
+                          </span>
+                        </div>
+
+                        {/* 2. Split Sugerido */}
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-indigo-700 block">División Sugerida</span>
+                          <span className="text-xs sm:text-sm font-extrabold text-[#0B1929] block line-clamp-1">
+                            {p.splitSugerido}
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {p.splitSubtext}
+                          </span>
+                        </div>
+
+                        {/* 3. Enfoque Fisiológico */}
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-emerald-700 block">Enfoque de Etapa</span>
+                          <span className="text-xs sm:text-sm font-extrabold text-[#0B1929] block line-clamp-1">
+                            {p.enfoqueFisiologico}
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {p.enfoqueSubtext}
+                          </span>
+                        </div>
+
+                        {/* 4. Volumen & RPE */}
+                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                          <span className="text-[11px] font-semibold text-amber-700 block">Volumen & RPE</span>
+                          <span className="text-xs sm:text-sm font-extrabold text-[#0B1929] block line-clamp-1">
+                            {p.volumenRpe}
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                            {p.volumenSubtext}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dictamen Biomecánico & Criterio IA */}
+                      {p.rationaleBiomecanico && (
+                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100 text-indigo-950">
+                          <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                          <div className="leading-relaxed flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <strong className="text-indigo-900 font-bold">
+                                Dictamen Biomecánico IA:
+                              </strong>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                                {p.badgeMotivo}
+                              </span>
+                            </div>
+                            <p className="text-[#334155] leading-relaxed">{p.rationaleBiomecanico}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Comparativas Inferiores: Lesiones vs Preferencias */}
+                      <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {/* Lesiones / Precauciones */}
+                        <div className={`p-2.5 rounded-xl border ${
+                          p.tieneLesiones
+                            ? "bg-rose-50/70 border-rose-200/80 text-rose-950"
+                            : "bg-emerald-50/60 border-emerald-200/70 text-emerald-950"
+                        }`}>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {p.tieneLesiones ? (
+                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            )}
+                            <span className={`font-bold text-[11px] uppercase tracking-wider ${
+                              p.tieneLesiones ? "text-rose-800" : "text-emerald-800"
+                            }`}>
+                              {p.tieneLesiones ? "Lesiones & Precauciones Biomecánicas:" : "Estado Biomecánico:"}
+                            </span>
+                          </div>
+                          <p className="leading-snug">
+                            {p.tieneLesiones
+                              ? `${p.lesionesRaw}. ${p.precaucionesLesion || ""}`
+                              : "Sin antecedentes de lesiones ni cirugías articulares que limiten rangos de movimiento."}
+                          </p>
+                        </div>
+
+                        {/* Preferencias de Modalidad & Deporte */}
+                        <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200/70 text-blue-950">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Dumbbell className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="font-bold text-blue-800 block text-[11px] uppercase tracking-wider">
+                              Modalidad & Preferencias a Incluir:
+                            </span>
+                          </div>
+                          <p className="leading-snug">
+                            {p.deportePref}
+                            {p.horario ? ` • Horario habitual: ${p.horario}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Fila de Transición de Actividad Física */}
+                      <div className="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 flex items-center justify-between gap-3 text-xs flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-slate-600 shrink-0" />
+                          <span>
+                            <strong className="text-slate-900">Historial Previo:</strong> {p.nivelPrevio} ({p.frecuenciaPrevia} días previos)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                          <span>➔</span>
+                          <span>
+                            <strong className="text-slate-900">Meta Proyectada:</strong> {p.diasSugeridos} días/semana
+                            {p.fafNotas ? ` (${p.fafNotas})` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
               <div className="flex items-center gap-2.5 flex-wrap min-w-0">
                 <span className="font-semibold text-[#0B1929]">

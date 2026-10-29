@@ -1214,3 +1214,199 @@ export function generateSmartMacroPrescription({
   };
 }
 
+/**
+ * Motor Inteligente de Prescripción de Entrenamiento y Biomecánica Clínica.
+ * Combina el Expediente Clínico (lesiones, cirugías, sedentarismo/experiencia previa, patologías)
+ * con la Evaluación de la Etapa (objetivo, FAF proyectado, días de ejercicio, notas de disponibilidad).
+ */
+export function generateSmartTrainingPrescription({
+  cliente = {},
+  metrica = null,
+  clinicalRec = null,
+  ciclo = null,
+  cicloNombre = "",
+  smartPrescription = null,
+}) {
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const sintesisIa = clinicalRec?.sintesis_ia || anamnesis?.resumen_ia || {};
+  const enriched = metrica ? enrichMetrica(metrica) : null;
+
+  // 1. Lesiones y Cirugías (Pilar Biomecánico Crítico)
+  const lesionesRaw = (
+    anamnesis.cirugias_lesiones ||
+    sintesisIa?.alertas?.cirugias_normalizadas ||
+    ""
+  ).trim();
+  const tieneLesiones =
+    Boolean(lesionesRaw) &&
+    lesionesRaw.length > 2 &&
+    !/^(no|ningun[ao]s?|nada|n\/a|sin|ninguna\.)/i.test(lesionesRaw);
+
+  // 2. Nivel de Actividad Previo (Historial)
+  const ocupacion = (anamnesis.ocupacion_actividad || "").trim();
+  const freqPreviaRaw = (
+    anamnesis.dias_entrenamiento ||
+    anamnesis.frecuencia_ejercicio ||
+    ""
+  ).trim();
+  const tipoPrevioRaw = (anamnesis.tipo_entrenamiento || "").trim();
+
+  let nivelPrevio = "Sedentario / Principiante";
+  const freqPreviaNum = parseInt(freqPreviaRaw, 10);
+  if (!isNaN(freqPreviaNum) && freqPreviaNum >= 4) {
+    nivelPrevio = "Activo / Intermedio";
+  } else if (/avanzad|atleta|compet|alto rendimiento/i.test(tipoPrevioRaw)) {
+    nivelPrevio = "Avanzado / Atleta";
+  } else if (/recreativ|regular|gym|pesas|3 d[ií]as/i.test(freqPreviaRaw + " " + tipoPrevioRaw)) {
+    nivelPrevio = "Intermedio / Recreativo";
+  } else if (/sedentar|oficina|ningun|0 d[ií]as|poco/i.test(ocupacion + " " + freqPreviaRaw)) {
+    nivelPrevio = "Sedentario / Re-inicio";
+  }
+
+  // 3. FAF y Frecuencia Proyectada en la Etapa Actual
+  const fafVal =
+    parseFloat(enriched?.eval_faf) ||
+    smartPrescription?.faf ||
+    inferFafFromAnamnesis(anamnesis);
+  const fafInfo = getActivityFactorInfo(fafVal) || ACTIVITY_FACTORS[2];
+
+  let diasSugeridos = 4;
+  const diasActualRaw = enriched?.dias_ejercicio_actual;
+  if (diasActualRaw && !isNaN(parseInt(diasActualRaw, 10))) {
+    diasSugeridos = Math.min(7, Math.max(1, parseInt(diasActualRaw, 10)));
+  } else if (fafVal <= 1.2) {
+    diasSugeridos = 2;
+  } else if (fafVal <= 1.375) {
+    diasSugeridos = 3;
+  } else if (fafVal <= 1.55) {
+    diasSugeridos = 4;
+  } else if (fafVal <= 1.725) {
+    diasSugeridos = 5;
+  } else {
+    diasSugeridos = 6;
+  }
+
+  // 4. Objetivo de Etapa
+  const cycleParts = String(ciclo?.nombre || cicloNombre || "").split("|");
+  const cycleEnfoque = cycleParts[4] || ciclo?.enfoque || "";
+  const goalTitle =
+    enriched?.eval_objetivo ||
+    (cycleEnfoque ? inferGoalFromText(cycleEnfoque) : "") ||
+    smartPrescription?.goalInfo?.title ||
+    cliente?.objetivo ||
+    "Recomposición Corporal";
+
+  // 5. Inferencia de los 4 Bloques Prescriptivos de Entrenamiento
+  // A. Frecuencia
+  const frecuenciaLabel = `${diasSugeridos} días / semana`;
+
+  // B. Split / División Sugerida
+  let splitSugerido = "Torso / Pierna (Upper / Lower)";
+  let splitSubtext = "Distribución óptima de estímulo y descanso";
+  if (diasSugeridos <= 2) {
+    splitSugerido = "Full Body (Cuerpo Completo)";
+    splitSubtext = "2 sesiones globales con 72h de recuperación";
+  } else if (diasSugeridos === 3) {
+    splitSugerido = "Full Body (3x) o PPL básico";
+    splitSubtext = "Lunes, Miércoles y Viernes con frecuencia 2-3";
+  } else if (diasSugeridos === 4) {
+    splitSugerido = "Torso / Pierna (Upper / Lower)";
+    splitSubtext = "2 días de tren superior y 2 de tren inferior";
+  } else if (diasSugeridos === 5) {
+    splitSugerido = "Push / Pull / Legs + Torso / Pierna";
+    splitSubtext = "Frecuencia híbrida con alta especificidad";
+  } else {
+    splitSugerido = "Push / Pull / Legs (Rotación 2x)";
+    splitSubtext = "Microciclo de 6 días para avanzados";
+  }
+
+  // C. Enfoque Fisiológico
+  let enfoqueFisiologico = "Hipertrofia & Fuerza Base";
+  let enfoqueSubtext = "Rango de 6-12 reps con sobrecarga progresiva";
+  if (/fuerza/i.test(goalTitle)) {
+    enfoqueFisiologico = "Fuerza Máxima & Densidad Neural";
+    enfoqueSubtext = "Rango de 3-6 reps, descansos completos (>2 min)";
+  } else if (/p[eé]rdida|definici[oó]n|grasa/i.test(goalTitle)) {
+    enfoqueFisiologico = "Preservación Muscular & Gasto Metabólico";
+    enfoqueSubtext = "Mantener intensidad de carga, series efectivas en rango 8-15";
+  } else if (/rendimiento|funcional|resistencia/i.test(goalTitle)) {
+    enfoqueFisiologico = "Capacidad Metabólica & Potencia Funcional";
+    enfoqueSubtext = "Circuitos mixtos y entrenamiento concurrente";
+  } else {
+    enfoqueFisiologico = "Recomposición & Hipertrofia Miofibrilar";
+    enfoqueSubtext = "Estímulo mecánico en rangos de 8 a 15 repeticiones";
+  }
+
+  // D. Volumen & RPE Objetivo
+  let volumenRpe = "RPE 7-8 • 10-14 series/grupo";
+  let volumenSubtext = "Cargas con 2-3 repeticiones en recámara (RIR 2-3)";
+  if (nivelPrevio.includes("Sedentario") || nivelPrevio.includes("Principiante")) {
+    volumenRpe = "RPE 6-7 • 8-10 series/grupo";
+    volumenSubtext = "Fase de adaptación anatómica y aprendizaje de técnica";
+  } else if (nivelPrevio.includes("Avanzado")) {
+    volumenRpe = "RPE 8-9 • 14-18 series/grupo";
+    volumenSubtext = "Cercanía al fallo técnico (RIR 1-2)";
+  }
+
+  // 6. Dictamen Biomecánico & Estrategia de Rutina
+  const fafNotas = (enriched?.eval_faf_notas || "").trim();
+  const horario = (enriched?.horario_ejercicio || anamnesis?.horario_entrenamiento || "").trim();
+  const deportePref = (anamnesis?.tipo_entrenamiento || anamnesis?.deporte_favorito || "Entrenamiento de fuerza en gimnasio").trim();
+
+  let rationaleBiomecanico = "";
+  if (tieneLesiones) {
+    rationaleBiomecanico = `El paciente presenta reporte de ${lesionesRaw}. Se establece un diseño con adaptaciones biomecánicas obligatorias: priorizar patrones con soporte guiado (máquinas o bancos) y trabajo unilateral para corregir asimetrías, evitando sobrecargas axiales compresivas en las articulaciones afectadas. Esquema de ${diasSugeridos} días estructurado en ${splitSugerido} con control estricto de tempo y rango de movimiento indoloro.`;
+  } else if (nivelPrevio.includes("Sedentario")) {
+    rationaleBiomecanico = `Paciente en transición de un nivel ${nivelPrevio.toLowerCase()} (${ocupacion || "actividad laboral habitual"}) hacia una frecuencia de ${diasSugeridos} días semanales. Se prescribe una fase de acondicionamiento neuromuscular enfocada en dominar los patrones básicos de movimiento (bisagra de cadera, empuje, tracción y dominante de rodilla) a intensidad moderada (${volumenRpe}) para inducir adaptaciones en tejido conectivo sin generar fatiga excesiva.`;
+  } else {
+    rationaleBiomecanico = `Perfil con experiencia previa favorable (${nivelPrevio.toLowerCase()}) orientado al objetivo de ${goalTitle}. Se recomienda implementar una división de ${splitSugerido} en ${diasSugeridos} sesiones semanales, priorizando sobrecarga progresiva en los ejercicios compuestos base y complementando con aislamiento metabólico en ${volumenRpe}.`;
+  }
+
+  // 7. Adaptaciones específicas de lesiones
+  let precaucionesLesion = null;
+  if (tieneLesiones) {
+    const lLower = lesionesRaw.toLowerCase();
+    const tips = [];
+    if (/hombro|manguito|clav[ií]cula/i.test(lLower)) {
+      tips.push("Modificar press militar con barra libre por press con mancuernas en agarre neutro o máquina convergente. Evitar tirones tras nuca.");
+    }
+    if (/rodilla|menisc|ligamento|cruzado|patela/i.test(lLower)) {
+      tips.push("Cuidar ángulos profundos con carga libre. Priorizar sentadilla búlgara o prensa a 90° con tempo controlado y trabajo isométrico de cuádriceps/isquiotibiales.");
+    }
+    if (/espalda|lumbar|hernia|disco|ci[aá]tic/i.test(lLower)) {
+      tips.push("Evitar carga axial directa (sentadilla libre trasera pesada / peso muerto convencional con barra). Sustituir por sentadilla goblet, prensa inclinada con soporte lumbar y jalones al pecho con apoyo de pecho.");
+    }
+    if (/muñeca|codo|epicondil|t[uú]nel/i.test(lLower)) {
+      tips.push("Utilizar barras Z, agarres neutros o correas de agarre para eliminar tensión en antebrazos.");
+    }
+    precaucionesLesion = tips.length > 0 ? tips.join(" ") : `Ajustar rangos de movimiento a zona indolora y evitar impactos directos sobre la zona de ${lesionesRaw}.`;
+  }
+
+  return {
+    hasEvaluation: Boolean(enriched),
+    evalFecha: enriched?.fecha || null,
+    diasSugeridos,
+    frecuenciaLabel,
+    splitSugerido,
+    splitSubtext,
+    enfoqueFisiologico,
+    enfoqueSubtext,
+    volumenRpe,
+    volumenSubtext,
+    goalTitle,
+    fafVal,
+    fafInfo,
+    fafNotas,
+    horario,
+    nivelPrevio,
+    frecuenciaPrevia: freqPreviaRaw || "No reportada",
+    ocupacion: ocupacion || "Actividad general",
+    tieneLesiones,
+    lesionesRaw: tieneLesiones ? lesionesRaw : null,
+    precaucionesLesion,
+    deportePref,
+    rationaleBiomecanico,
+    badgeMotivo: tieneLesiones ? "Adaptación Biomecánica" : "Sobrecarga Progresiva",
+  };
+}
+
