@@ -1504,11 +1504,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {getMetodoLabel(m.metodo_evaluacion)}
                       </span>
                     )}
-                    {cycleName && (
-                      <span className="bg-gray-100 text-[#0B1929] text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border border-gray-200">
-                        {cycleName}
-                      </span>
-                    )}
                     {m.eval_objetivo && (() => {
                       const g = getGoalPresetInfo(m.eval_objetivo);
                       return g ? (
@@ -1586,7 +1581,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Check-in de Seguimiento registrado con esta evaluación */}
-                {Boolean(m.checkin_energia || m.checkin_saciedad || m.checkin_observaciones || m.checkin_ajustes) && (
+                {Boolean(m.checkin_energia || m.checkin_saciedad || m.checkin_digestion || m.checkin_descanso || m.nivel_estres || m.checkin_observaciones || m.checkin_ajustes) && (
                   <div className="mt-3 bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-100 rounded-xl p-3 text-xs space-y-1.5">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className="font-bold text-[#0B1929] flex items-center gap-1.5 text-xs">
@@ -1609,8 +1604,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </span>
                         )}
                         {m.checkin_descanso && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 text-amber-700 font-bold">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700 font-bold">
                             <Moon className="w-3 h-3 text-indigo-500" /> Sueño {m.checkin_descanso}/5
+                          </span>
+                        )}
+                        {m.nivel_estres && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white font-bold border ${
+                            Number(m.nivel_estres) >= 4
+                              ? "border-rose-200 text-rose-700"
+                              : Number(m.nivel_estres) === 3
+                              ? "border-amber-200 text-amber-700"
+                              : "border-blue-200 text-[var(--brand-primary)]"
+                          }`}>
+                            <AlertCircle className={`w-3 h-3 ${Number(m.nivel_estres) >= 4 ? "text-rose-500" : Number(m.nivel_estres) === 3 ? "text-amber-500" : "text-blue-500"}`} /> Estrés {m.nivel_estres}/5
                           </span>
                         )}
                       </div>
@@ -1631,7 +1637,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 )}
 
                 {/* Estilo de Vida y Preferencias de la Etapa */}
-                {Boolean(m.horas_sueno || m.consumo_agua_estimado || m.preferencias_alimentos || m.aversiones_alimentos || m.r24h_desayuno || m.r24h_comida) && (
+                {Boolean(m.horas_sueno || m.consumo_agua_estimado || m.preferencias_alimentos || m.aversiones_alimentos || m.r24h_desayuno || m.r24h_comida || m.r24h_cena) && (
                   <div className="mt-3 bg-slate-50/70 border border-slate-200/80 rounded-xl p-3 text-xs space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className="font-bold text-[#0B1929] flex items-center gap-1.5 text-xs">
@@ -1646,11 +1652,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {m.consumo_agua_estimado && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[#0B1929]">
                             <Droplets className="w-3 h-3 text-blue-500" /> {m.consumo_agua_estimado}
-                          </span>
-                        )}
-                        {m.nivel_estres && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[#0B1929]">
-                            Estrés {m.nivel_estres}/5
                           </span>
                         )}
                       </div>
