@@ -942,53 +942,9 @@ export function generateSmartMacroPrescription({
   const goalInfo = getGoalPresetInfo(rawGoalId) || GOAL_PRESETS[1]; // Default: Déficit -15%
   let goalPct = goalInfo.pct;
 
-  // 4. Ajuste clínico inteligente de Proteína y Grasas (g/kg)
-  const patologiasStr = `${anamnesis?.patologias || ""} ${anamnesis?.medicacion_suplementos || ""}`.toLowerCase();
-  const tieneCondicionMetabolica = /(insulina|diabetes|sop|ovario poliqu|hipotiroid|tiroid|metabolic)/i.test(patologiasStr);
-  const tieneCondicionRenal = /(renal|riñon|rinon|nefro)/i.test(patologiasStr);
-
-  // Detectar si hay porcentaje de grasa elevado para escalar proteína de forma realista
-  const highBodyFat =
-    (sexo === "M" && grasaPct >= 26) ||
-    (sexo === "F" && grasaPct >= 34) ||
-    (peso > 0 && estatura > 0 && peso / ((estatura / 100) ** 2) >= 29);
-
-  let protGKg = 2.0;
-  let fatGKg = 0.9;
-
-  if (tieneCondicionRenal) {
-    protGKg = 1.4;
-  } else if (goalPct < 0) {
-    // En déficit calórico se eleva proteína para proteger masa magra
-    protGKg = highBodyFat ? 1.8 : fafInfo.value >= 1.55 ? 2.2 : 2.0;
-  } else if (goalPct > 0) {
-    // En superávit calórico los carbohidratos ejercen ahorro proteico
-    protGKg = 1.9;
-  } else {
-    protGKg = 1.9;
-  }
-
-  if (tieneCondicionMetabolica) {
-    // En resistencia a la insulina / SOP / hipotiroidismo se prioriza saciedad y control glucémico
-    fatGKg = 1.0;
-  } else if (goalPct <= -15) {
-    fatGKg = 0.85;
-  } else if (goalPct > 0) {
-    fatGKg = 0.95;
-  } else {
-    fatGKg = 0.9;
-  }
-
-  // Ajuste sutil si en el check-in de la evaluación reportó hambre severa o baja energía (<=2/5)
-  const lowEnergyOrSatiety =
-    (enriched?.checkin_energia && Number(enriched.checkin_energia) <= 2) ||
-    (enriched?.checkin_saciedad && Number(enriched.checkin_saciedad) <= 2);
-
-  if (lowEnergyOrSatiety && goalPct <= -20) {
-    goalPct = -15; // Modera déficit agresivo para sostener adherencia
-  }
-
-  const calc = calculateEnergyPrescription({
+  // 4. CÁLCULO MATEMÁTICO PURO (ESTÁNDAR CLÍNICO ESTRICTO)
+  // Basado exclusivamente en TMB teórica × FAF × Preset de objetivo matemático
+  const calcMatematico = calculateEnergyPrescription({
     formula,
     peso,
     estatura,
@@ -997,44 +953,142 @@ export function generateSmartMacroPrescription({
     mlg,
     biaBmr,
     faf: fafInfo.value,
-    goalPct,
+    goalPct: goalInfo.pct,
     mode: "g_kg",
-    protGKg,
-    fatGKg,
+    protGKg: 2.0,
+    fatGKg: 0.9,
   });
 
-  // 5. Construir explicación clínica clara y etiquetas de respaldo
-  const clinicalNotes = [];
-  if (enriched) {
-    clinicalNotes.push(`Evaluación ${enriched.fecha || "actual"}`);
-  } else {
-    clinicalNotes.push("Basado en Perfil y Expediente");
+  // 5. ANÁLISIS CLÍNICO Y CONTEXTUAL DE LA IA (AUDITORÍA EXPEDIENTE + R24H + CHECK-IN)
+  const r24hObj = {
+    desayuno: (enriched?.r24h_desayuno || anamnesis?.r24h_desayuno || "").trim(),
+    colacion_m: (enriched?.r24h_colacion_m || anamnesis?.r24h_colacion_m || "").trim(),
+    comida: (enriched?.r24h_comida || anamnesis?.r24h_comida || "").trim(),
+    colacion_v: (enriched?.r24h_colacion_v || anamnesis?.r24h_colacion_v || "").trim(),
+    cena: (enriched?.r24h_cena || anamnesis?.r24h_cena || "").trim(),
+    picoteos: (enriched?.r24h_picoteos || anamnesis?.r24h_picoteos || "").trim(),
+  };
+  const r24hCombined = Object.values(r24hObj).join(" ").toLowerCase();
+  const tieneR24h = Object.values(r24hObj).some((v) => v.length > 2);
+
+  const patologiasStr = `${anamnesis?.patologias || ""} ${anamnesis?.medicacion_suplementos || ""}`.toLowerCase();
+  const tieneCondicionMetabolica = /(insulina|diabetes|sop|ovario poliqu|hipotiroid|tiroid|metabolic)/i.test(patologiasStr);
+  const tieneCondicionRenal = /(renal|riñon|rinon|nefro)/i.test(patologiasStr);
+  const tieneHipertension = /(hipertensi|presi[oó]n alta)/i.test(patologiasStr);
+
+  const highBodyFat =
+    (sexo === "M" && grasaPct >= 26) ||
+    (sexo === "F" && grasaPct >= 34) ||
+    (peso > 0 && estatura > 0 && peso / ((estatura / 100) ** 2) >= 29);
+
+  // Hábitos del check-in
+  const stressLevel = Number(enriched?.nivel_estres || 3);
+  const hungerLevel = Number(enriched?.checkin_saciedad || 4); // 1 = mucha hambre, 5 = saciado
+  const energyLevel = Number(enriched?.checkin_energia || 4); // 1 = fatiga, 5 = óptima
+  const digestionLevel = Number(enriched?.checkin_digestion || 4); // 1 = malestares
+  const sleepHours = parseFloat(enriched?.horas_sueno || 7.5);
+
+  // Patrones en el R24H
+  const hasFrequentSnacking = /(refresco|coca|jugo|galleta|pan dulce|sabritas|frituras|papas|pastel|cerveza|alcohol|chocolat|botana)/i.test(r24hCombined);
+  const skipsBreakfast = /^(nada|solo caf|ayuno|sin desayuno|no desayun)/i.test(r24hObj.desayuno);
+  const heavyDinner = /(pizza|hamburguesa|tacos|torta|abundant|mucho|pesad|frito)/i.test(r24hObj.cena);
+
+  let goalPctIa = goalInfo.pct;
+  const aiFindings = [];
+  const aiAdjustments = [];
+
+  // A) Ajuste energético por R24H y tolerancia metabólica
+  if (goalPctIa < 0) {
+    if (hasFrequentSnacking && goalPctIa <= -15) {
+      goalPctIa = -10;
+      aiFindings.push("Brecha de consumo actual: El R24H reporta alimentos de alta densidad y bebidas calóricas. Un corte drástico causará rechazo temprano.");
+      aiAdjustments.push("Déficit de transición escalonado (-10% en lugar de -15%): Mitiga el choque calórico inicial.");
+    } else if (hungerLevel <= 2 || energyLevel <= 2 || stressLevel >= 4 || sleepHours < 6) {
+      goalPctIa = Math.max(goalPctIa, -12);
+      if (stressLevel >= 4) {
+        aiFindings.push("Estrés elevado / cortisol alto: El estrés crónico promueve catabolismo proteico y retención.");
+      }
+      if (hungerLevel <= 2) {
+        aiFindings.push("Hambre frecuente reportada en el check-in: Se requiere volumen alimentario y mayor saciedad.");
+      }
+      aiAdjustments.push("Protección de adherencia (-12%): Déficit moderado para resguardar energía diaria y evitar atracones.");
+    }
+  } else if (goalPctIa > 0) {
+    if (fafInfo.value <= 1.375) {
+      goalPctIa = 7;
+      aiFindings.push("Actividad física moderada-baja para volumen: Evitar acumulación desmedida de tejido adiposo.");
+      aiAdjustments.push("Superávit limpio (+7%): Ganancia muscular controlada con mínimo impacto graso.");
+    }
   }
-  clinicalNotes.push(formulaLabel);
-  clinicalNotes.push(`FAF ${fafInfo.short} (${fafInfo.label})`);
-  clinicalNotes.push(`${goalInfo.title} (${goalPct > 0 ? `+${goalPct}` : goalPct}%)`);
+
+  // B) Ajuste de Macronutrientes por IA
+  let protGKgIa = 2.0;
+  let fatGKgIa = 0.9;
+
+  if (tieneCondicionRenal) {
+    protGKgIa = 1.35;
+    aiFindings.push("Antecedente de compromiso renal en expediente clínico.");
+    aiAdjustments.push("Proteína controlada a 1.35 g/kg para no sobrecargar el filtrado glomerular.");
+  } else if (goalPctIa < 0) {
+    protGKgIa = highBodyFat ? 1.85 : 2.2;
+    if (highBodyFat) {
+      aiAdjustments.push("Proteína escalada a 1.85 g/kg para no sobreestimar la dosis sobre el peso graso.");
+    } else {
+      aiAdjustments.push(`Proteína reforzada a ${protGKgIa} g/kg para máxima preservación de masa muscular magra.`);
+    }
+  } else if (goalPctIa > 0) {
+    protGKgIa = 1.9;
+  }
 
   if (tieneCondicionMetabolica) {
-    clinicalNotes.push("Ajuste glucémico/endocrino (Expediente)");
-  }
-  if (lowEnergyOrSatiety) {
-    clinicalNotes.push("Protección de saciedad/energía (Check-in)");
-  }
-  if (estaturaEstimada && formula !== "katch" && formula !== "bia") {
-    clinicalNotes.push(`Estatura ref. ${estatura} cm`);
+    fatGKgIa = 1.05;
+    aiFindings.push("Condición metabólica/endocrina (Resistencia a Insulina, SOP o Tiroides) en expediente.");
+    aiAdjustments.push("Grasas saludables a 1.05 g/kg y control de carbohidratos netos para estabilizar glucosa e insulina.");
+  } else if (digestionLevel <= 2) {
+    fatGKgIa = 0.8;
+    aiFindings.push("Malestares digestivos reportados en check-in.");
+    aiAdjustments.push("Grasas moderadas a 0.80 g/kg para acelerar vaciamiento gástrico y evitar reflujo/pesadez.");
   }
 
-  const sourceLabel = enriched
-    ? "Evaluación del Plan"
-    : "Perfil y Expediente Clínico";
+  // Cálculo de los macros de la IA
+  const calcIa = calculateEnergyPrescription({
+    formula,
+    peso,
+    estatura,
+    edad,
+    sexo,
+    mlg,
+    biaBmr,
+    faf: fafInfo.value,
+    goalPct: goalPctIa,
+    mode: "g_kg",
+    protGKg: protGKgIa,
+    fatGKg: fatGKgIa,
+  });
+
+  const diferenciaKcal = calcIa.targetKcal - calcMatematico.targetKcal;
+  let badgeMotivo = "Prescripción Óptima";
+  if (diferenciaKcal > 0) badgeMotivo = `+${diferenciaKcal} kcal · Déficit Escalonado`;
+  else if (diferenciaKcal < 0) badgeMotivo = `${diferenciaKcal} kcal · Ajuste Metabólico`;
+  else if (aiAdjustments.length > 0) badgeMotivo = "Modulación de Macros";
+
+  // Redacción de la recomendación de la IA
+  let estrategiaMenu = "Distribuir comidas de forma regular a lo largo del día.";
+  if (skipsBreakfast) {
+    estrategiaMenu = "El paciente suele omitir el desayuno; se aconseja estructurar el plan en 3 comidas sólidas y 1 colación sin forzar ingesta matutina.";
+  } else if (heavyDinner) {
+    estrategiaMenu = "Reporta cenas copiosas; concentrar la proteína saciante y los carbohidratos complejos en la tarde/noche para evitar picoteo descontrolado.";
+  } else if (hasFrequentSnacking) {
+    estrategiaMenu = "Sustituir bebidas azucaradas y picoteos por hidratación electrolítica sin calorías y snacks de fruta con proteína.";
+  }
 
   const rationale =
     peso > 0
-      ? `Prescripción calculada desde la ${sourceLabel} mediante ${formulaLabel} (TMB ${calc.tmb} kcal × FAF ${fafInfo.short} = ${calc.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalPct > 0 ? `+${goalPct}` : goalPct}%), se establecen ${calc.targetKcal} kcal con ${calc.protGKg} g/kg de proteína (${calc.proteinasG}g) para preservar masa muscular, ${calc.fatGKg} g/kg de grasas (${calc.grasasG}g) y ${calc.carbohidratosG}g de carbohidratos.`
+      ? `Prescripción calculada mediante ${formulaLabel} (TMB ${calcMatematico.tmb} kcal × FAF ${fafInfo.short} = ${calcMatematico.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalInfo.pct > 0 ? `+${goalInfo.pct}` : goalInfo.pct}%), la fórmula matemática establece ${calcMatematico.targetKcal} kcal con ${calcMatematico.protGKg} g/kg de proteína (${calcMatematico.proteinasG}g) y ${calcMatematico.fatGKg} g/kg de grasas (${calcMatematico.grasasG}g).`
       : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
 
   return {
-    hasEnoughData: peso > 0 && calc.targetKcal > 0,
+    hasEnoughData: peso > 0 && calcMatematico.targetKcal > 0,
     hasEvaluation: Boolean(enriched),
     hasExplicitEvalParams: Boolean(enriched?.eval_objetivo && enriched?.eval_faf),
     peso,
@@ -1046,26 +1100,82 @@ export function generateSmartMacroPrescription({
     biaBmr,
     formula,
     formulaLabel,
+    formulaShort: formula === "katch" ? "Katch-McArdle" : formula === "bia" ? "InBody BMR" : "Mifflin-St Jeor",
     faf: fafInfo.value,
     fafInfo,
     goalId: goalInfo.id,
     goalInfo,
-    goalPct,
-    protGKg,
-    fatGKg,
-    ...calc,
+    goalPct: goalInfo.pct,
+
+    // Motor Matemático Puro
+    matematico: {
+      targetKcal: calcMatematico.targetKcal,
+      tmb: calcMatematico.tmb,
+      get: calcMatematico.get,
+      proteinG: calcMatematico.proteinasG,
+      carbsG: calcMatematico.carbohidratosG,
+      fatsG: calcMatematico.grasasG,
+      protGKg: calcMatematico.protGKg,
+      carbGKg: calcMatematico.carbGKg,
+      fatGKg: calcMatematico.fatGKg,
+      proteinPct: calcMatematico.protPct,
+      carbsPct: calcMatematico.carbPct,
+      fatsPct: calcMatematico.fatPct,
+      goalPct: goalInfo.pct,
+      modeLabel: "Matemático (Fórmula)",
+    },
+
+    // Motor Sugerido por IA
+    ia: {
+      targetKcal: calcIa.targetKcal,
+      tmb: calcIa.tmb,
+      get: calcIa.get,
+      proteinG: calcIa.proteinasG,
+      carbsG: calcIa.carbohidratosG,
+      fatsG: calcIa.grasasG,
+      protGKg: calcIa.protGKg,
+      carbGKg: calcIa.carbGKg,
+      fatGKg: calcIa.fatGKg,
+      proteinPct: calcIa.protPct,
+      carbsPct: calcIa.carbPct,
+      fatsPct: calcIa.fatPct,
+      goalPct: goalPctIa,
+      diferenciaKcal,
+      badgeMotivo,
+      modeLabel: "Sugerido IA",
+    },
+
+    // Criterio y Auditoría Contextual IA
+    aiRationale: {
+      badgeMotivo,
+      diferenciaKcal,
+      findings: aiFindings,
+      adjustments: aiAdjustments,
+      estrategiaMenu,
+      resumenTexto:
+        aiAdjustments.length > 0
+          ? `La IA sugiere ajustar a ${calcIa.targetKcal} kcal (${diferenciaKcal > 0 ? `+${diferenciaKcal} kcal` : diferenciaKcal < 0 ? `${diferenciaKcal} kcal` : "mismas kcal"} vs fórmula) con ${calcIa.protGKg} g/kg de proteína (${calcIa.proteinasG}g) y ${calcIa.fatGKg} g/kg de grasa (${calcIa.grasasG}g) para mitigar choque calórico y alinear con sus hábitos.`
+          : `La IA valida el cálculo matemático de ${calcMatematico.targetKcal} kcal como óptimo para este ciclo.`,
+    },
+
+    // Propiedades planas para máxima retrocompatibilidad
+    targetKcal: calcMatematico.targetKcal,
+    tmb: calcMatematico.tmb,
+    get: calcMatematico.get,
+    proteinG: calcMatematico.proteinasG,
+    carbsG: calcMatematico.carbohidratosG,
+    fatsG: calcMatematico.grasasG,
+    protGKg: calcMatematico.protGKg,
+    carbGKg: calcMatematico.carbGKg,
+    fatGKg: calcMatematico.fatGKg,
+    proteinPct: calcMatematico.protPct,
+    carbsPct: calcMatematico.carbPct,
+    fatsPct: calcMatematico.fatPct,
     rationale,
-    clinicalNotes,
+
     preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
-    r24h: {
-      desayuno: enriched?.r24h_desayuno || anamnesis?.r24h_desayuno || "",
-      colacion_m: enriched?.r24h_colacion_m || anamnesis?.r24h_colacion_m || "",
-      comida: enriched?.r24h_comida || anamnesis?.r24h_comida || "",
-      colacion_v: enriched?.r24h_colacion_v || anamnesis?.r24h_colacion_v || "",
-      cena: enriched?.r24h_cena || anamnesis?.r24h_cena || "",
-      picoteos: enriched?.r24h_picoteos || anamnesis?.r24h_picoteos || "",
-    },
+    r24h: r24hObj,
   };
 }
 

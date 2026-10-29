@@ -276,6 +276,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
   const [autoSyncMacros, setAutoSyncMacros] = useState(true);
+  const [prescriptionMode, setPrescriptionMode] = useState("matematico"); // "matematico" | "ia" | "manual"
+  const [manualMacros, setManualMacros] = useState({
+    targetKcal: "",
+    proteinG: "",
+    carbsG: "",
+    fatsG: ""
+  });
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
@@ -562,6 +569,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
     setForm(base);
     setAutoSyncMacros(true);
+    setPrescriptionMode("matematico");
+    setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
     setEditingId(null);
     setExistingFotos([]);
     setPendingFotos([]);
@@ -688,6 +697,50 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       cicloNombre: currentCiclo?.nombre || "",
     });
   }, [form, liveCalculations, activeMetricas, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
+
+  const activePrescription = useMemo(() => {
+    if (!liveSmartMacros) return null;
+    if (prescriptionMode === "ia" && liveSmartMacros.ia) {
+      return {
+        ...liveSmartMacros.ia,
+        mode: "ia",
+        modeLabel: "Sugerido IA",
+        hasEnoughData: liveSmartMacros.hasEnoughData,
+      };
+    }
+    if (prescriptionMode === "manual") {
+      const p = parseFloat(form.peso) || parseFloat(liveSmartMacros.peso) || 0;
+      const kcal = Number(manualMacros.targetKcal) || liveSmartMacros.targetKcal || 0;
+      const prot = Number(manualMacros.proteinG) || 0;
+      const carbs = Number(manualMacros.carbsG) || 0;
+      const fats = Number(manualMacros.fatsG) || 0;
+      const totalCalc = prot * 4 + carbs * 4 + fats * 9 || kcal;
+      return {
+        targetKcal: kcal,
+        tmb: liveSmartMacros.tmb,
+        get: liveSmartMacros.get,
+        proteinG: prot,
+        carbsG: carbs,
+        fatsG: fats,
+        protGKg: p > 0 ? Number((prot / p).toFixed(2)) : 0,
+        carbGKg: p > 0 ? Number((carbs / p).toFixed(2)) : 0,
+        fatGKg: p > 0 ? Number((fats / p).toFixed(2)) : 0,
+        proteinPct: totalCalc > 0 ? Math.round(((prot * 4) / totalCalc) * 100) : 0,
+        carbsPct: totalCalc > 0 ? Math.round(((carbs * 4) / totalCalc) * 100) : 0,
+        fatsPct: totalCalc > 0 ? Math.round(((fats * 9) / totalCalc) * 100) : 0,
+        goalPct: liveSmartMacros.goalPct,
+        mode: "manual",
+        modeLabel: "Manual",
+        hasEnoughData: kcal > 0,
+      };
+    }
+    return {
+      ...(liveSmartMacros.matematico || liveSmartMacros),
+      mode: "matematico",
+      modeLabel: "Matemático (Fórmula)",
+      hasEnoughData: liveSmartMacros.hasEnoughData,
+    };
+  }, [prescriptionMode, liveSmartMacros, manualMacros, form.peso]);
 
   const routineDaysCount = useMemo(() => {
     if (!Array.isArray(rutinas) || rutinas.length === 0) return 0;
@@ -875,7 +928,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
 
-      const macrosToSync = (autoSyncMacros && !isReadOnly && liveSmartMacros?.hasEnoughData) ? liveSmartMacros : null;
+      const macrosToSync = (autoSyncMacros && !isReadOnly && activePrescription?.targetKcal > 0)
+        ? {
+            ...activePrescription,
+            prescriptionMode,
+          }
+        : null;
 
       closeModal();
       setSaving(false);
@@ -985,6 +1043,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEvalEdad(detectedEdad);
     setForm(filled);
     setAutoSyncMacros(true);
+    setPrescriptionMode("matematico");
+    setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
     setPendingFotos([]);
@@ -2841,70 +2901,287 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   )}
                 </div>
 
-                {/* Prescripción Energética & Macros IA en Vivo */}
-                <div className="bg-white rounded-2xl border border-indigo-100 p-5 shadow-sm relative overflow-hidden">
+                {/* Prescripción de Macros: Matemático, Sugerido IA o Manual */}
+                <div className="bg-white rounded-2xl border border-indigo-100 p-4 sm:p-5 shadow-sm relative overflow-hidden space-y-3.5">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
-                  <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-[#F0F4FA]">
+                  
+                  {/* Cabecera */}
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#F0F4FA]">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <Calculator className="w-4 h-4 text-indigo-600" />
                       <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                        Prescripción de Macros IA
+                        Prescripción de Macros
                       </h3>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                      {liveSmartMacros.formulaShort}
-                    </span>
+                    {liveSmartMacros?.formulaShort && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {liveSmartMacros.formulaShort}
+                      </span>
+                    )}
                   </div>
 
-                  {!liveSmartMacros.hasEnoughData ? (
+                  {/* Selector de 3 Modos: Matemático, Sugerido IA, Manual */}
+                  <div className="flex bg-[#F0F4FA] rounded-xl p-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPrescriptionMode("matematico")}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        prescriptionMode === "matematico"
+                          ? "bg-white shadow-xs text-[#0B1929]"
+                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                      }`}
+                    >
+                      <Calculator className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Matemático</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrescriptionMode("ia")}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        prescriptionMode === "ia"
+                          ? "bg-indigo-600 shadow-xs text-white"
+                          : "text-indigo-600 hover:text-indigo-800"
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Sugerido IA</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrescriptionMode("manual");
+                        if (!manualMacros.targetKcal && activePrescription) {
+                          setManualMacros({
+                            targetKcal: String(activePrescription.targetKcal || ""),
+                            proteinG: String(activePrescription.proteinG || ""),
+                            carbsG: String(activePrescription.carbsG || ""),
+                            fatsG: String(activePrescription.fatsG || ""),
+                          });
+                        }
+                      }}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        prescriptionMode === "manual"
+                          ? "bg-white shadow-xs text-[#0B1929]"
+                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                      }`}
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Manual</span>
+                    </button>
+                  </div>
+
+                  {!activePrescription?.hasEnoughData ? (
                     <div className="text-center py-6 text-xs text-[#6B7A8D]">
-                      Ingresa el peso corporal para generar automáticamente la prescripción calórica y de macronutrientes de esta etapa.
+                      Ingresa el peso corporal en las mediciones para calcular la prescripción energética de esta etapa.
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {/* Fila 1: TMB Basal, GET, Meta Etapa */}
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-[#F8FAFC] rounded-xl p-2.5 border border-[#E2E8F0] text-center">
                           <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">TMB Basal</div>
-                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.tmb}</div>
-                          <div className="text-[9px] text-[#6B7A8D]">kcal</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{activePrescription.tmb}</div>
+                          <div className="text-[9px] text-[#6B7A8D]">kcal/día</div>
                         </div>
                         <div className="bg-[#F8FAFC] rounded-xl p-2.5 border border-[#E2E8F0] text-center">
-                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">GET (×{liveSmartMacros.faf})</div>
-                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.get}</div>
-                          <div className="text-[9px] text-[#6B7A8D]">kcal</div>
+                          <div className="text-[10px] font-bold text-[#6B7A8D] uppercase">GET (×{activePrescription.faf || liveSmartMacros.faf})</div>
+                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{activePrescription.get}</div>
+                          <div className="text-[9px] text-[#6B7A8D]">kcal/día</div>
                         </div>
-                        <div className="bg-[var(--brand-primary)]/10 rounded-xl p-2.5 border border-[var(--brand-primary)]/30 text-center">
+                        <div className="bg-[var(--brand-primary)]/10 rounded-xl p-2.5 border border-[var(--brand-primary)]/30 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-[var(--brand-primary)] uppercase">Meta Etapa</div>
-                          <div className="text-base font-black text-[var(--brand-primary)] font-['Rajdhani']">{liveSmartMacros.targetKcal}</div>
+                          {prescriptionMode === "manual" ? (
+                            <input
+                              type="number"
+                              disabled={isReadOnly}
+                              value={manualMacros.targetKcal}
+                              onChange={(e) => setManualMacros((p) => ({ ...p, targetKcal: e.target.value }))}
+                              placeholder="Kcal"
+                              className="w-full text-center text-sm font-black text-[var(--brand-primary)] bg-white border border-blue-300 rounded-lg py-0.5 px-1 focus:outline-none"
+                            />
+                          ) : (
+                            <div className="text-base font-black text-[var(--brand-primary)] font-['Rajdhani']">
+                              {activePrescription.targetKcal}
+                            </div>
+                          )}
                           <div className="text-[9px] font-bold text-[var(--brand-primary)]">
-                            {liveSmartMacros.goalPct > 0 ? `+${liveSmartMacros.goalPct}%` : `${liveSmartMacros.goalPct}%`} kcal
+                            {activePrescription.goalPct > 0 ? `+${activePrescription.goalPct}%` : `${activePrescription.goalPct}%`} kcal
                           </div>
                         </div>
                       </div>
 
+                      {/* Fila 2: Proteína, Carbos, Grasas */}
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-2.5 text-center">
+                        {/* Proteína */}
+                        <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-blue-700 uppercase">Proteína</div>
-                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.proteinG}g</div>
-                          <div className="text-[10px] text-blue-700 font-semibold">{liveSmartMacros.protGKg} g/kg · {liveSmartMacros.proteinPct}%</div>
+                          {prescriptionMode === "manual" ? (
+                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                              <input
+                                type="number"
+                                disabled={isReadOnly}
+                                value={manualMacros.proteinG}
+                                onChange={(e) => setManualMacros((p) => ({ ...p, proteinG: e.target.value }))}
+                                placeholder="g"
+                                className="w-14 text-center text-xs font-black text-blue-900 bg-white border border-blue-300 rounded py-0.5 px-1 focus:outline-none"
+                              />
+                              <span className="text-[10px] font-bold text-blue-700">g</span>
+                            </div>
+                          ) : (
+                            <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
+                              {activePrescription.proteinG}g
+                            </div>
+                          )}
+                          <div className="text-[10px] text-blue-700 font-semibold truncate">
+                            {activePrescription.protGKg} g/kg · {activePrescription.proteinPct}%
+                          </div>
                         </div>
-                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-center">
+
+                        {/* Carbos */}
+                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-emerald-700 uppercase">Carbos</div>
-                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.carbsG}g</div>
-                          <div className="text-[10px] text-emerald-700 font-semibold">{liveSmartMacros.carbsGKg} g/kg · {liveSmartMacros.carbsPct}%</div>
+                          {prescriptionMode === "manual" ? (
+                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                              <input
+                                type="number"
+                                disabled={isReadOnly}
+                                value={manualMacros.carbsG}
+                                onChange={(e) => setManualMacros((p) => ({ ...p, carbsG: e.target.value }))}
+                                placeholder="g"
+                                className="w-14 text-center text-xs font-black text-emerald-900 bg-white border border-emerald-300 rounded py-0.5 px-1 focus:outline-none"
+                              />
+                              <span className="text-[10px] font-bold text-emerald-700">g</span>
+                            </div>
+                          ) : (
+                            <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
+                              {activePrescription.carbsG}g
+                            </div>
+                          )}
+                          <div className="text-[10px] text-emerald-700 font-semibold truncate">
+                            {activePrescription.carbGKg} g/kg · {activePrescription.carbsPct}%
+                          </div>
                         </div>
-                        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 text-center">
+
+                        {/* Grasas */}
+                        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-amber-700 uppercase">Grasas</div>
-                          <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">{liveSmartMacros.fatsG}g</div>
-                          <div className="text-[10px] text-amber-700 font-semibold">{liveSmartMacros.fatGKg} g/kg · {liveSmartMacros.fatsPct}%</div>
+                          {prescriptionMode === "manual" ? (
+                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                              <input
+                                type="number"
+                                disabled={isReadOnly}
+                                value={manualMacros.fatsG}
+                                onChange={(e) => setManualMacros((p) => ({ ...p, fatsG: e.target.value }))}
+                                placeholder="g"
+                                className="w-14 text-center text-xs font-black text-amber-900 bg-white border border-amber-300 rounded py-0.5 px-1 focus:outline-none"
+                              />
+                              <span className="text-[10px] font-bold text-amber-700">g</span>
+                            </div>
+                          ) : (
+                            <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
+                              {activePrescription.fatsG}g
+                            </div>
+                          )}
+                          <div className="text-[10px] text-amber-700 font-semibold truncate">
+                            {activePrescription.fatGKg} g/kg · {activePrescription.fatsPct}%
+                          </div>
                         </div>
                       </div>
 
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-[11px] text-[#6B7A8D] leading-relaxed">
-                        <span className="font-bold text-[#0B1929]">Criterio Clínico IA: </span>
-                        {liveSmartMacros.rationale}
+                      {/* Bloque de Análisis Clínico Contextual IA */}
+                      <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                            <span className="text-xs font-bold text-[#0B1929]">
+                              Auditoría y Recomendación de la IA
+                            </span>
+                          </div>
+                          {liveSmartMacros.ia?.badgeMotivo && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                              {liveSmartMacros.ia.badgeMotivo}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-[#475569] leading-relaxed">
+                          {liveSmartMacros.aiRationale?.resumenTexto}
+                        </p>
+
+                        {/* Variables detectadas en R24H, Check-in o Expediente */}
+                        {liveSmartMacros.aiRationale?.findings?.length > 0 && (
+                          <div className="space-y-1 pt-1 border-t border-indigo-100/70">
+                            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                              Variables del paciente detectadas:
+                            </span>
+                            <ul className="text-[11px] text-[#475569] space-y-1 list-disc pl-3.5">
+                              {liveSmartMacros.aiRationale.findings.map((finding, idx) => (
+                                <li key={idx} className="leading-tight">{finding}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Estrategia recomendada para el menú */}
+                        {liveSmartMacros.aiRationale?.estrategiaMenu && (
+                          <div className="p-2 rounded-lg bg-white/90 border border-indigo-100/80 text-[11px] text-[#334155] flex items-start gap-1.5">
+                            <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="leading-snug">
+                              <strong className="text-[#0B1929]">Estrategia recomendada: </strong>
+                              {liveSmartMacros.aiRationale.estrategiaMenu}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Botón de Acción según el Modo */}
+                        {prescriptionMode === "matematico" && (
+                          <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && setPrescriptionMode("ia")}
+                            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Aplicar sugerencias de la IA ({liveSmartMacros.ia.targetKcal} kcal)</span>
+                          </button>
+                        )}
+
+                        {prescriptionMode === "ia" && (
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
+                            <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Sugerencias de la IA activas
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
+                              className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] underline cursor-pointer"
+                            >
+                              Volver a cálculo matemático
+                            </button>
+                          </div>
+                        )}
+
+                        {prescriptionMode === "manual" && (
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
+                            <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
+                              <Edit2 className="w-3.5 h-3.5 text-amber-600" />
+                              Valores manuales activos
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
+                              className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] underline cursor-pointer"
+                            >
+                              Restablecer a matemático
+                            </button>
+                          </div>
+                        )}
                       </div>
 
+                      {/* Sincronización Automática con el Plan Nutricional */}
                       {!isReadOnly && (
                         <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100 cursor-pointer">
                           <input
@@ -2914,7 +3191,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             className="mt-0.5 rounded border-indigo-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
                           />
                           <span className="text-[11px] font-semibold text-[#0B1929] leading-snug">
-                            Sincronizar automáticamente estas metas de kcal y macros al Plan Nutricional activo al guardar la evaluación
+                            Sincronizar automáticamente estas metas ({activePrescription.targetKcal} kcal · {activePrescription.modeLabel}) al Plan Nutricional activo al guardar
                           </span>
                         </label>
                       )}
