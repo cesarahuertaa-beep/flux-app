@@ -110,6 +110,11 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
     r24h.desayuno || r24h.comida || r24h.cena || r24h.colacion_m || r24h.colacion_v || r24h.picoteos
   );
 
+  // Antecedentes Heredofamiliares
+  const heredoRaw = (ana.antecedentes_heredofamiliares || "").trim();
+  const heredo = parseTags(heredoRaw);
+  const tieneHeredo = heredo.length > 0 || (heredoRaw.length > 2 && !/^(no|ningun|nada|n\/a)/i.test(heredoRaw));
+
   // 10. Generación de Diagnóstico Clínico Estructurado (Motor Analítico Local Limpio)
   const sexoStr = cliente?.genero === "F" || cliente?.sexo === "F" ? "Paciente femenina" : "Paciente masculino";
   let sintesisParts = [];
@@ -130,53 +135,41 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
     } else if (isHipertension) {
       sintesisParts.push(`${sexoStr} con hipertensión arterial, aconsejándose un estricto control de sodio y equilibrio electrolítico en el plan.`);
     } else {
-      sintesisParts.push(`${sexoStr} con perfil clínico condicionado por ${patologiasRaw}, orientado hacia la meta de ${objetivo ? objetivo.toLowerCase() : "optimización de la salud"}.`);
+      sintesisParts.push(`${sexoStr} con perfil clínico condicionado por ${patologiasRaw}, requiriendo pautas adaptadas a sus antecedentes.`);
     }
   } else {
-    sintesisParts.push(`${sexoStr} sin patologías crónicas reportadas, con función metabólica favorable orientada a ${objetivo ? objetivo.toLowerCase() : "la mejora de la composición corporal"}.`);
+    sintesisParts.push(`${sexoStr} sin patologías crónicas reportadas, con función metabólica favorable como punto de partida clínico.`);
   }
 
-  // Oración 2: Exclusiones de alimentos (Deduplicadas para evitar repetir mariscos + mariscos)
-  const exclusionesMap = new Map();
-  [...alergias, ...aversiones].forEach((item) => {
-    const k = item.toLowerCase();
-    if (!exclusionesMap.has(k)) exclusionesMap.set(k, item.toLowerCase());
-  });
-  const itemsExcluir = Array.from(exclusionesMap.values());
-
-  if (itemsExcluir.length > 0) {
-    sintesisParts.push(`Se establece la exclusión estricta de ${joinSpanishList(itemsExcluir)} para garantizar la seguridad clínica frente a alergias y asegurar apego total al plan.`);
+  // Oración 2: Alergias o intolerancias alimentarias crónicas (exclusión estricta)
+  if (tieneAlergias) {
+    sintesisParts.push(`Se establece la exclusión estricta de ${joinSpanishList(alergias)} para garantizar la seguridad clínica y prevenir reacciones adversas.`);
   }
 
-  // Oración 3: Alimentos favoritos integrados estratégicamente
-  if (tienePreferencias) {
-    const favsLower = preferencias.map((p) => p.toLowerCase());
-    sintesisParts.push(`Se recomienda capitalizar ${joinSpanishList(favsLower)} en cortes magros y porciones equilibradas como fuente principal de nutrientes de alto valor biológico.`);
+  // Oración 3: Medicación o Antecedentes Heredofamiliares
+  if (tieneMedicacion && tieneHeredo) {
+    sintesisParts.push(`Bajo tratamiento actual con ${medicacionRaw}, registrando además antecedentes familiares de ${heredoRaw} para vigilancia metabólica preventiva.`);
+  } else if (tieneMedicacion) {
+    sintesisParts.push(`Reporta consumo de ${medicacionRaw}, a considerar en posibles interacciones farmacológicas.`);
+  } else if (tieneHeredo) {
+    sintesisParts.push(`Registra antecedentes familiares de ${heredoRaw}, indicativo para monitorización preventiva.`);
   }
 
-  // Oración 4: Digestión y Hábitos
-  let habsList = [];
+  // Oración 4: Digestión, cirugías y contexto
+  let clinList = [];
   if (isNormalGI) {
-    habsList.push("función digestiva conservada");
+    clinList.push("función digestiva conservada");
   } else if (tieneSintomasGI) {
-    habsList.push(`atención a sintomatología de ${digestivoRaw.toLowerCase()}`);
+    clinList.push(`atención a sintomatología gastrointestinal (${digestivoRaw.toLowerCase()})`);
   }
-
-  if (sueno) {
-    const sLimpio = sueno.replace(/horas?|hrs?/i, "").trim();
-    habsList.push(`${sLimpio} horas de sueño`);
+  if (tieneLesiones) {
+    clinList.push(`antecedente de ${lesionesRaw}`);
   }
-  if (estresNivel <= 2) {
-    habsList.push("bajo nivel de estrés");
-  } else if (estresNivel >= 4) {
-    habsList.push("estrés elevado que requiere preparación sencilla");
+  if (ocupacion) {
+    clinList.push(`contexto de ${ocupacion}`);
   }
-  if (agua) {
-    habsList.push(`hidratación de ${agua}`);
-  }
-
-  if (habsList.length > 0) {
-    sintesisParts.push(`Presenta ${joinSpanishList(habsList)}, base favorable para consolidar la adherencia y el balance metabólico.`);
+  if (clinList.length > 0) {
+    sintesisParts.push(`Presenta ${joinSpanishList(clinList)}, base favorable para consolidar la adherencia y el balance integral.`);
   }
 
   const sintesisTexto = sintesisParts.join(" ");
@@ -193,6 +186,11 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
       tags: alergias,
       raw: alergiasRaw,
       presente: tieneAlergias,
+    },
+    heredo: {
+      tags: heredo,
+      raw: heredoRaw,
+      presente: tieneHeredo,
     },
     lesiones: {
       tags: lesiones,
@@ -283,32 +281,25 @@ export async function generateClinicalAiSynopsis(anamnesis, cliente) {
     // Si la función de Supabase aún no está desplegada en el proyecto remoto o hay error de red, continuar
   }
 
-  // Lista consolidada de exclusiones
-  const exclusionesUnicas = Array.from(
-    new Set([...highlights.alergias.tags.map((t) => t.toLowerCase()), ...highlights.aversiones.tags.map((t) => t.toLowerCase())])
-  );
-  const exclusionesStr = exclusionesUnicas.length > 0 ? exclusionesUnicas.join(", ") : (highlights.aversiones.raw || highlights.alergias.raw || "Ninguna");
-
   const prompt = `Eres una IA médica y de nutrición clínica de FLUX.
-Analiza la siguiente información de expediente y redacta un DIAGNÓSTICO CLÍNICO-NUTRICIONAL EJECUTIVO (exactamente 1 párrafo de 3 a 4 oraciones) para el especialista.
+Analiza la siguiente información de expediente atemporal y redacta un DIAGNÓSTICO CLÍNICO-NUTRICIONAL EJECUTIVO (exactamente 1 párrafo de 3 a 4 oraciones) para el especialista.
 
 NO concatenes ni enumeres los datos tal cual. Proporciona un criterio clínico inteligente de especialista:
-1. Evalúa el impacto metabólico de sus patologías (ej. si dice 'Dabetes tipo 1', corrígelo a Diabetes Mellitus Tipo 1, explicando el conteo de carbohidratos, índice glucémico y prevención de picos).
-2. Considera sus alergias y aversiones (${exclusionesStr}) como exclusiones obligatorias consolidadas sin repetir alimentos. Si la digestión o síntomas GI es 'Norml' o 'Normal', reconoce que su función gastrointestinal es óptima (¡NUNCA digas que se debe excluir la digestión normal!).
-3. Explica cómo capitalizar sus alimentos favoritos (${highlights.preferencias.raw || "ninguno"}) estratégicamente (ej. cortes magros de carne roja para hierro y proteína de alto valor biológico).
-4. Integra su estilo de vida (${highlights.habitos.sueno || "8h"} de sueño, estrés ${highlights.habitos.estresEtiqueta.toLowerCase()}, agua ${highlights.habitos.agua || "2L"}) como base favorable para la formulación del plan.
+1. Evalúa el impacto metabólico de sus patologías (ej. si dice 'Dabetes tipo 1', corrígelo a Diabetes Mellitus Tipo 1, explicando consideraciones clínicas relevantes).
+2. Considera sus alergias e intolerancias alimentarias crónicas (${highlights.alergias.raw || "Ninguna"}) como exclusiones de seguridad médica obligatorias. Si los síntomas GI son 'Normal' o 'Saludable', reconoce que su función gastrointestinal es óptima (¡NUNCA digas que se debe excluir la digestión normal!).
+3. Considera su medicación crónica actual (${highlights.medicacion.raw || "Ninguna"}) y antecedentes heredofamiliares (${highlights.heredo.raw || "Ninguno"}) para vigilancia preventiva.
+4. Integra su contexto ocupacional (${highlights.habitos.ocupacion || "No especificada"}) y cirugías/lesiones (${highlights.lesiones.raw || "Ninguna"}) como base para el diseño del plan.
 
 DATOS DEL PACIENTE:
 - Sexo: ${cliente?.genero === "F" || cliente?.sexo === "F" ? "Femenino" : "Masculino"}
-- Objetivo: ${highlights.objetivo || "Mejorar salud"}
-- Diagnósticos: ${highlights.patologias.raw || "Ninguno"}
-- Alergias: ${highlights.alergias.raw || "Ninguna"}
+- Diagnósticos y Patologías Crónicas: ${highlights.patologias.raw || "Ninguno"}
+- Alergias e Intolerancias Alimentarias: ${highlights.alergias.raw || "Ninguna"}
+- Antecedentes Heredofamiliares: ${highlights.heredo.raw || "Ninguno"}
+- Medicación y Suplementos Actuales: ${highlights.medicacion.raw || "Ninguno"}
+- Cirugías y Lesiones Previas: ${highlights.lesiones.raw || "Ninguno"}
 - Digestión / Síntomas GI: ${highlights.digestivo.isNormal ? "Normal / Saludable" : highlights.digestivo.raw || "Normal"}
-- Alimentos que evita o rechaza: ${highlights.aversiones.raw || "Ninguno"}
-- Alimentos favoritos: ${highlights.preferencias.raw || "Ninguno"}
-- Sueño: ${highlights.habitos.sueno || "No especificado"}
-- Estrés: ${highlights.habitos.estresNivel}/5
-- Agua: ${highlights.habitos.agua || "No especificado"}
+- Ocupación / Actividad diaria: ${highlights.habitos.ocupacion || "No especificada"}
+- Toxicomanías (Alcohol/Tabaco): ${highlights.habitos.alcoholTabaco || "No reportado"}
 
 Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado con lenguaje médico profesional y directo. Sin listas ni viñetas.`;
 

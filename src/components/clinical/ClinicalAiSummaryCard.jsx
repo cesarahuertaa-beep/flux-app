@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Sparkles,
-  Heart,
-  Ban,
-  Clock,
   ChevronDown,
   ShieldAlert,
   Check,
   AlertTriangle,
-  X
+  Pill,
+  HeartPulse,
+  Briefcase,
+  Activity,
 } from "lucide-react";
 import {
   extractClinicalHighlights,
@@ -33,7 +33,7 @@ export default function ClinicalAiSummaryCard({
     return extractClinicalHighlights(anamnesis, cliente);
   }, [anamnesis, cliente]);
 
-  // Si no hay diagnóstico guardado o era la versión con fallas antiguas, enriquecer automáticamente con IA
+  // Si no hay diagnóstico guardado o era la versión con campos antiguos, enriquecer automáticamente con IA
   useEffect(() => {
     const existing = anamnesis?.resumen_ia?.texto;
     const esTextoAntiguoConFallas =
@@ -44,12 +44,14 @@ export default function ClinicalAiSummaryCard({
         existing.includes("sintomatología GI") ||
         existing.includes("y hidratación") ||
         existing.includes("8 de descanso") ||
-        existing.includes("alergia confirmada"));
+        existing.includes("alergia confirmada") ||
+        existing.includes("comidas predilectas") ||
+        existing.includes("alimentos que le desagraden"));
 
     if (existing && !esTextoAntiguoConFallas) {
       setAiSynopsis(existing);
     } else {
-      // Mostrar primero la síntesis limpia local y luego actualizar con Gemini
+      // Mostrar primero la síntesis limpia local y luego actualizar con IA
       setAiSynopsis(highlights.sintesisTexto);
       if (cliente?.id && !loadingAi) {
         setLoadingAi(true);
@@ -82,9 +84,7 @@ export default function ClinicalAiSummaryCard({
 
   const hayAlertasMedicas =
     highlights.patologias.presente ||
-    highlights.alergias.presente ||
-    highlights.lesiones.presente ||
-    highlights.digestivo.presente;
+    highlights.alergias.presente;
 
   return (
     <div className="mb-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white rounded-2xl border border-blue-200/80 shadow-sm overflow-hidden transition-all duration-200">
@@ -112,7 +112,7 @@ export default function ClinicalAiSummaryCard({
         {/* Right: Flecha para extender / colapsar */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-semibold text-[#6B7A8D] hidden sm:inline">
-            {collapsed ? "Ver diagnóstico y alertas" : "Ocultar"}
+            {collapsed ? "Ver diagnóstico y antecedentes" : "Ocultar"}
           </span>
           <button
             type="button"
@@ -132,224 +132,177 @@ export default function ClinicalAiSummaryCard({
       {!collapsed && (
         <div className="p-4 sm:p-5 pt-1 space-y-3.5 border-t border-blue-100/60 animate-in fade-in duration-150">
           
-          {/* Fila 1: Las 4 Tarjetas de Puntos Clave */}
+          {/* Fila 1: Las 4 Tarjetas de Puntos Clave del Expediente */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             
-            {/* Card 1: Alertas Médicas & Clínicas */}
-            <div className={`p-3.5 rounded-xl border transition-all ${
+            {/* Card 1: Diagnósticos y Alergias Médicas */}
+            <div className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all ${
               hayAlertasMedicas
                 ? "bg-red-50/40 border-red-200/80"
                 : "bg-emerald-50/30 border-emerald-200/60"
             }`}>
-              <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider">
+                  {hayAlertasMedicas ? (
+                    <>
+                      <ShieldAlert className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <span className="text-red-900">Alertas & Diagnósticos</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-emerald-900">Salud & Alertas</span>
+                    </>
+                  )}
+                </div>
+
                 {hayAlertasMedicas ? (
-                  <>
-                    <ShieldAlert className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                    <span className="text-red-900">Alertas Médicas</span>
-                  </>
+                  <div className="space-y-2">
+                    {/* Alergias / Intolerancias */}
+                    {highlights.alergias.presente && (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-0.5">
+                          Alergias / Intolerancias:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {highlights.alergias.tags.length > 0 ? (
+                            highlights.alergias.tags.map((t, i) => (
+                              <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
+                                <span>{t}</span>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-[#0B1929]">{highlights.alergias.raw}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Patologías */}
+                    {highlights.patologias.presente && (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-800 block mb-0.5">
+                          Patologías / Condiciones:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {highlights.patologias.tags.length > 0 ? (
+                            highlights.patologias.tags.map((t, i) => (
+                              <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-900 border border-red-200">
+                                {t}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-[#0B1929]">{highlights.patologias.raw}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="text-emerald-900">Salud & Alertas</span>
-                  </>
+                  <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                    Sin patologías crónicas ni alergias reportadas en el expediente.
+                  </p>
                 )}
               </div>
+              <span className="text-[10px] text-red-700/80 mt-2 block font-medium">
+                Condición clínica basal
+              </span>
+            </div>
 
-              {hayAlertasMedicas ? (
-                <div className="space-y-1.5">
-                  {/* Alergias / Intolerancias */}
-                  {highlights.alergias.presente && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
-                        Alergias / Intolerancias:
-                      </span>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {highlights.alergias.tags.length > 0 ? (
-                          highlights.alergias.tags.map((t, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
-                              <span>{t}</span>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-[#0B1929]">{highlights.alergias.raw}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+            {/* Card 2: Medicación y Suplementación */}
+            <div className="p-3.5 rounded-xl border bg-indigo-50/40 border-indigo-200/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-indigo-900">
+                  <Pill className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Medicación & Suplementos</span>
+                </div>
 
-                  {/* Patologías */}
-                  {highlights.patologias.presente && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-red-800 block">
-                        Diagnósticos:
-                      </span>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {highlights.patologias.tags.length > 0 ? (
-                          highlights.patologias.tags.map((t, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-900 border border-red-200">
-                              {t}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-[#0B1929]">{highlights.patologias.raw}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                {highlights.medicacion.presente ? (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 block">
+                      Tratamiento actual:
+                    </span>
+                    <p className="text-xs text-[#0B1929] font-medium leading-snug">
+                      {highlights.medicacion.raw}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#6B7A8D] italic">
+                    No reporta medicación ni suplementación actual.
+                  </p>
+                )}
+              </div>
+              <span className="text-[10px] text-indigo-700/80 mt-2 block font-medium">
+                Vigilancia fármaco-nutriente
+              </span>
+            </div>
 
-                  {/* Lesiones */}
+            {/* Card 3: Antecedentes Heredofamiliares */}
+            <div className="p-3.5 rounded-xl border bg-purple-50/40 border-purple-200/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-purple-900">
+                  <HeartPulse className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span>Riesgo Heredofamiliar</span>
+                </div>
+
+                {highlights.heredo?.presente ? (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block">
+                      Antecedentes en la familia:
+                    </span>
+                    <p className="text-xs text-[#0B1929] font-medium leading-snug">
+                      {highlights.heredo.raw}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#6B7A8D] italic">
+                    Sin antecedentes familiares de riesgo reportados.
+                  </p>
+                )}
+              </div>
+              <span className="text-[10px] text-purple-700/80 mt-2 block font-medium">
+                Prevención metabólica y cardiovascular
+              </span>
+            </div>
+
+            {/* Card 4: Contexto Ocupacional, Cirugías & Salud GI */}
+            <div className="p-3.5 rounded-xl border bg-blue-50/40 border-blue-200/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-blue-900">
+                  <Briefcase className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                  <span>Contexto & Cirugías</span>
+                </div>
+
+                <div className="space-y-1 text-xs">
                   {highlights.lesiones.presente && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-orange-800 block">
-                        Lesiones / Cirugías:
-                      </span>
-                      <span className="text-xs text-[#0B1929] font-medium block">
-                        {highlights.lesiones.raw}
-                      </span>
+                    <div className="truncate">
+                      <strong className="text-[#0B1929]">Cirugías/Lesiones:</strong>{" "}
+                      <span className="text-[#6B7A8D]">{highlights.lesiones.raw}</span>
                     </div>
                   )}
-
-                  {/* Digestión / GI */}
-                  {highlights.digestivo.presente && (
-                    <div className="text-[11px] text-[#6B7A8D]">
-                      <strong className="text-[#0B1929]">Síntomas GI:</strong> {highlights.digestivo.raw}
+                  {highlights.habitos.ocupacion && (
+                    <div className="truncate">
+                      <strong className="text-[#0B1929]">Ocupación:</strong>{" "}
+                      <span className="text-[#6B7A8D]">{highlights.habitos.ocupacion}</span>
                     </div>
                   )}
-                </div>
-              ) : (
-                <p className="text-xs text-emerald-800 font-medium leading-relaxed">
-                  Sin patologías, cirugías ni alergias reportadas en su cuestionario.
-                </p>
-              )}
-            </div>
-
-            {/* Card 2: Alimentos que Rechaza (Aversiones) */}
-            <div className="p-3.5 rounded-xl border bg-rose-50/40 border-rose-200/80 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-rose-900">
-                  <Ban className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span>Alimentos a Evitar</span>
-                </div>
-
-                {highlights.aversiones.presente ? (
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] text-rose-800 font-semibold leading-tight flex items-center gap-1.5">
-                      <Ban className="w-3 h-3 text-rose-600 shrink-0" />
-                      <span>No incluir en las opciones de comida:</span>
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {highlights.aversiones.tags.length > 0 ? (
-                        highlights.aversiones.tags.map((t, i) => (
-                          <span
-                            key={i}
-                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-rose-700 border border-rose-300 shadow-2xs inline-flex items-center gap-1"
-                          >
-                            <X className="w-3 h-3 text-rose-500 shrink-0" />
-                            <span>{t}</span>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-[#0B1929] font-medium bg-white px-2 py-1 rounded-lg border border-rose-200">
-                          {highlights.aversiones.raw}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#6B7A8D] italic">
-                    El paciente no especificó alimentos que le desagraden.
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] text-rose-700/80 mt-2 block font-medium">
-                Garantiza adherencia al plan
-              </span>
-            </div>
-
-            {/* Card 3: Alimentos Favoritos (Preferencias) */}
-            <div className="p-3.5 rounded-xl border bg-emerald-50/40 border-emerald-200/80 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-wider text-emerald-900">
-                  <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600 shrink-0" />
-                  <span>Favoritos del Paciente</span>
-                </div>
-
-                {highlights.preferencias.presente ? (
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] text-emerald-800 font-semibold leading-tight flex items-center gap-1.5">
-                      <Heart className="w-3 h-3 text-emerald-600 fill-emerald-600/30 shrink-0" />
-                      <span>Priorizar como base en los menús:</span>
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {highlights.preferencias.tags.length > 0 ? (
-                        highlights.preferencias.tags.map((t, i) => (
-                          <span
-                            key={i}
-                            className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white text-emerald-700 border border-emerald-300 shadow-2xs inline-flex items-center gap-1"
-                          >
-                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                            <span>{t}</span>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-[#0B1929] font-medium bg-white px-2 py-1 rounded-lg border border-emerald-200">
-                          {highlights.preferencias.raw}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#6B7A8D] italic">
-                    No registró comidas predilectas específicas.
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] text-emerald-700/80 mt-2 block font-medium">
-                Facilita opciones atractivas
-              </span>
-            </div>
-
-            {/* ⏱️ Card 4: Estilo de Vida & Hábitos */}
-            <div className="p-3.5 rounded-xl border bg-blue-50/40 border-blue-200/80 space-y-1.5">
-              <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold uppercase tracking-wider text-blue-900">
-                <Clock className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
-                <span>Hábitos & Rutina</span>
-              </div>
-
-              <div className="space-y-1 text-xs">
-                {highlights.objetivo && (
-                  <div className="truncate">
-                    <strong className="text-[#0B1929]">Meta:</strong>{" "}
-                    <span className="text-[var(--brand-primary)] font-semibold">{highlights.objetivo}</span>
-                  </div>
-                )}
-                {highlights.habitos.sueno && (
                   <div>
-                    <strong className="text-[#0B1929]">Sueño:</strong>{" "}
-                    <span className="text-[#6B7A8D]">{highlights.habitos.sueno}</span>
+                    <strong className="text-[#0B1929]">Función digestiva:</strong>{" "}
+                    <span className="text-[#6B7A8D]">
+                      {highlights.digestivo.isNormal ? "Digestión conservada" : highlights.digestivo.raw}
+                    </span>
                   </div>
-                )}
-                <div>
-                  <strong className="text-[#0B1929]">Estrés:</strong>{" "}
-                  <span className={`font-semibold ${
-                    highlights.habitos.estresNivel >= 4 ? "text-amber-700" : "text-[#6B7A8D]"
-                  }`}>
-                    {highlights.habitos.estresEtiqueta} ({highlights.habitos.estresNivel}/5)
-                  </span>
+                  {highlights.habitos.alcoholTabaco && (
+                    <div className="truncate text-amber-800">
+                      <strong>Alcohol/Tabaco:</strong> {highlights.habitos.alcoholTabaco}
+                    </div>
+                  )}
                 </div>
-                {highlights.habitos.agua && (
-                  <div className="truncate">
-                    <strong className="text-[#0B1929]">Agua:</strong>{" "}
-                    <span className="text-[#6B7A8D]">{highlights.habitos.agua}</span>
-                  </div>
-                )}
-                {highlights.r24h.picoteos && !/^(no|ningun|nada)/i.test(highlights.r24h.picoteos) && (
-                  <div className="truncate text-amber-800">
-                    <strong>Picoteo:</strong> {highlights.r24h.picoteos}
-                  </div>
-                )}
               </div>
+              <span className="text-[10px] text-blue-700/80 mt-2 block font-medium">
+                Adaptación biomecánica y de rutina
+              </span>
             </div>
 
           </div>
