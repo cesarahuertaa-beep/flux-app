@@ -2644,7 +2644,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             {activeP} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
                           </span>
                           <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {pPct}% • {refWeight > 0 ? (activeP / refWeight).toFixed(1) : "-"} g/kg
+                            {smartPrescription.proteinPct || pPct}% • {smartPrescription.protGKg || (refWeight > 0 ? (activeP / refWeight).toFixed(1) : "-")} g/kg
                           </span>
                         </div>
 
@@ -2654,7 +2654,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             {activeC} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
                           </span>
                           <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {cPct}% • {refWeight > 0 ? (activeC / refWeight).toFixed(1) : "-"} g/kg
+                            {smartPrescription.carbsPct || cPct}% • {smartPrescription.carbGKg || (refWeight > 0 ? (activeC / refWeight).toFixed(1) : "-")} g/kg
                           </span>
                         </div>
 
@@ -2664,7 +2664,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             {activeF} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
                           </span>
                           <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {fPct}% • {refWeight > 0 ? (activeF / refWeight).toFixed(1) : "-"} g/kg
+                            {smartPrescription.fatsPct || fPct}% • {smartPrescription.fatGKg || (refWeight > 0 ? (activeF / refWeight).toFixed(1) : "-")} g/kg
                           </span>
                         </div>
                       </div>
@@ -2681,13 +2681,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           ) : (
                             <Activity className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
                           )}
-                          <div className="leading-relaxed">
+                          <div className="leading-relaxed flex-1">
                             {prescMode === "ia" && (
-                              <strong className="text-indigo-900 block font-bold mb-0.5">
-                                Dictamen de Auditoría Clínica IA:
-                              </strong>
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <strong className="text-indigo-900 font-bold">
+                                  Dictamen de Auditoría Clínica IA:
+                                </strong>
+                                {smartPrescription.badgeMotivo && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                                    {smartPrescription.badgeMotivo}
+                                  </span>
+                                )}
+                              </div>
                             )}
-                            <p>{smartPrescription.rationale}</p>
+                            <p className="text-[#334155] leading-relaxed">{smartPrescription.rationale}</p>
+                            {smartPrescription.estrategiaMenu && (
+                              <p className="mt-1.5 text-indigo-900 text-[11px] leading-relaxed">
+                                <span className="font-bold text-indigo-950">Estrategia de menú sugerida: </span>
+                                {smartPrescription.estrategiaMenu}
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}

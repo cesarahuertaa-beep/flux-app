@@ -864,9 +864,9 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
   const fafInfo = getActivityFactorInfo(fafVal);
   const goalPreset = getGoalPresetInfo(latest?.eval_objetivo);
 
-  const protG = prescMacros?.proteinasG || aiAudit?.proteinasG || manualMacros?.proteinasG || latest?.proteinas_g || null;
-  const carbG = prescMacros?.carbosG || aiAudit?.carbosG || manualMacros?.carbosG || latest?.carbos_g || null;
-  const fatG = prescMacros?.grasasG || aiAudit?.grasasG || manualMacros?.grasasG || latest?.grasas_g || null;
+  const protG = prescMacros?.proteinG || prescMacros?.proteinasG || aiAudit?.proteinG || aiAudit?.proteinasG || manualMacros?.proteinG || manualMacros?.proteinasG || latest?.proteinas_g || null;
+  const carbG = prescMacros?.carbsG || prescMacros?.carbosG || aiAudit?.carbsG || aiAudit?.carbosG || manualMacros?.carbsG || manualMacros?.carbosG || latest?.carbos_g || null;
+  const fatG = prescMacros?.fatsG || prescMacros?.grasasG || aiAudit?.fatsG || aiAudit?.grasasG || manualMacros?.fatsG || manualMacros?.grasasG || latest?.grasas_g || null;
   const aguaMl = prescMacros?.aguaMl || aiAudit?.aguaMl || null;
   const aguaL = aguaMl ? (Number(aguaMl) / 1000).toFixed(1) : null;
 
@@ -1239,22 +1239,28 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
 
     <!-- DICTAMEN DE AUDITORÍA IA / CRITERIO CLÍNICO -->
     ${
-      aiAudit?.criterioClinico || aiAudit?.justificacionFisiologica
+      (aiAudit?.analisisClinico || aiAudit?.criterioClinico || aiAudit?.justificacionFisiologica || prescMacros?.analisisClinico)
         ? `
       <div class="clinical-box ia-box">
-        <div class="clinical-box-title" style="color:#4338CA">
-          ✨ Dictamen Clínico de la Prescripción Auditada por Inteligencia Artificial
+        <div class="clinical-box-title" style="color:#4338CA;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>✨ Dictamen Clínico de la Prescripción Auditada por Inteligencia Artificial</span>
+          ${(aiAudit?.badgeMotivo || prescMacros?.badgeMotivo) ? `<span style="font-size:9px;background:#EEF2FF;color:#4338CA;padding:2px 8px;border-radius:6px;border:1px solid #C7D2FE;font-weight:700;">${escapeHtml(aiAudit?.badgeMotivo || prescMacros?.badgeMotivo)}</span>` : ""}
         </div>
-        <div style="color:#1E1B4B;margin-bottom:4px;">
-          ${escapeHtml(aiAudit.criterioClinico || aiAudit.justificacionFisiologica)}
+        <div style="color:#1E1B4B;margin-bottom:4px;line-height:1.45;">
+          ${escapeHtml(aiAudit?.analisisClinico || prescMacros?.analisisClinico || aiAudit?.criterioClinico || aiAudit?.justificacionFisiologica)}
         </div>
         ${
-          aiAudit.ajusteKcal
-            ? `<div style="font-size:10px;color:#4338CA;font-weight:700;">Ajuste calórico aplicado: ${escapeHtml(aiAudit.ajusteKcal)}</div>`
+          aiAudit?.estrategiaMenu || prescMacros?.estrategiaMenu
+            ? `<div style="font-size:10px;color:#3730A3;margin-top:4px;"><strong>Estrategia de menú sugerida:</strong> ${escapeHtml(aiAudit?.estrategiaMenu || prescMacros?.estrategiaMenu)}</div>`
             : ""
         }
         ${
-          aiAudit.enfoqueEntrenamiento
+          aiAudit?.ajusteKcal
+            ? `<div style="font-size:10px;color:#4338CA;font-weight:700;margin-top:2px;">Ajuste calórico aplicado: ${escapeHtml(aiAudit.ajusteKcal)}</div>`
+            : ""
+        }
+        ${
+          aiAudit?.enfoqueEntrenamiento
             ? `<div style="font-size:10px;color:#0B1929;margin-top:2px;"><strong>Directriz de entrenamiento:</strong> ${escapeHtml(aiAudit.enfoqueEntrenamiento)}</div>`
             : ""
         }

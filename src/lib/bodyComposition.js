@@ -988,6 +988,33 @@ export function generateSmartMacroPrescription({
   const ai = enriched?.ai_audit_result;
   const mm = enriched?.manual_macros;
 
+  const extractMacroVal = (source, keys) => {
+    if (!source || typeof source !== "object") return null;
+    for (const k of keys) {
+      if (source[k] !== undefined && source[k] !== null && source[k] !== "") {
+        const n = parseFloat(source[k]);
+        if (!isNaN(n) && n > 0) return Math.round(n);
+      }
+    }
+    return null;
+  };
+
+  const extractPerKg = (source, keys) => {
+    if (!source || typeof source !== "object") return null;
+    for (const k of keys) {
+      if (source[k] !== undefined && source[k] !== null && source[k] !== "") {
+        const n = parseFloat(source[k]);
+        if (!isNaN(n) && n > 0) return Number(n.toFixed(2));
+      }
+    }
+    return null;
+  };
+
+  const PROT_KEYS = ["proteinG", "proteinaG", "proteinasG", "proteina", "proteinas", "protein", "proteins"];
+  const CARB_KEYS = ["carbsG", "carbosG", "carbohidratosG", "carbohidratos", "carbos", "carbs"];
+  const FAT_KEYS = ["fatsG", "grasasG", "grasaG", "grasas", "grasa", "fats", "fat"];
+  const KCAL_KEYS = ["targetKcal", "calorias", "kcal", "calories"];
+
   let finalTargetKcal = calcMatematico.targetKcal;
   let finalProteinG = calcMatematico.proteinasG;
   let finalCarbsG = calcMatematico.carbohidratosG;
@@ -1004,37 +1031,81 @@ export function generateSmartMacroPrescription({
       : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
 
   let finalRationale = mathRationale;
+  let finalBadgeMotivo = null;
+  let finalAnalisisClinico = null;
+  let finalEstrategiaMenu = null;
+  let finalAjustesSugeridos = [];
 
   if (activeMode === "ia" && (pm || ai)) {
-    finalTargetKcal = Number(pm?.targetKcal || ai?.targetKcal) || calcMatematico.targetKcal;
-    finalProteinG = Number(pm?.proteinasG || ai?.proteinasG) || calcMatematico.proteinasG;
-    finalCarbsG = Number(pm?.carbosG || ai?.carbosG) || calcMatematico.carbohidratosG;
-    finalFatsG = Number(pm?.grasasG || ai?.grasasG) || calcMatematico.grasasG;
-    if (peso > 0) {
-      finalProtGKg = Number((finalProteinG / peso).toFixed(1));
-      finalCarbGKg = Number((finalCarbsG / peso).toFixed(1));
-      finalFatGKg = Number((finalFatsG / peso).toFixed(1));
-    }
+    finalTargetKcal = extractMacroVal(pm, KCAL_KEYS) || extractMacroVal(ai, KCAL_KEYS) || calcMatematico.targetKcal;
+    finalProteinG = extractMacroVal(pm, PROT_KEYS) || extractMacroVal(ai, PROT_KEYS) || calcMatematico.proteinasG;
+    finalCarbsG = extractMacroVal(pm, CARB_KEYS) || extractMacroVal(ai, CARB_KEYS) || calcMatematico.carbohidratosG;
+    finalFatsG = extractMacroVal(pm, FAT_KEYS) || extractMacroVal(ai, FAT_KEYS) || calcMatematico.grasasG;
+
+    finalProtGKg =
+      extractPerKg(pm, ["protGKg", "proteinaGKg"]) ||
+      extractPerKg(ai, ["protGKg", "proteinaGKg"]) ||
+      (peso > 0 ? Number((finalProteinG / peso).toFixed(1)) : calcMatematico.protGKg);
+    finalCarbGKg =
+      extractPerKg(pm, ["carbGKg", "carbohidratosGKg"]) ||
+      extractPerKg(ai, ["carbGKg", "carbohidratosGKg"]) ||
+      (peso > 0 ? Number((finalCarbsG / peso).toFixed(1)) : calcMatematico.carbGKg);
+    finalFatGKg =
+      extractPerKg(pm, ["fatGKg", "grasasGKg"]) ||
+      extractPerKg(ai, ["fatGKg", "grasasGKg"]) ||
+      (peso > 0 ? Number((finalFatsG / peso).toFixed(1)) : calcMatematico.fatGKg);
+
+    finalProtPct = extractMacroVal(pm, ["proteinPct", "protPct", "proteinaPct", "proteinasPct"]) || extractMacroVal(ai, ["proteinPct", "protPct", "proteinaPct"]);
+    finalCarbPct = extractMacroVal(pm, ["carbsPct", "carbPct", "carbohidratosPct"]) || extractMacroVal(ai, ["carbsPct", "carbPct", "carbohidratosPct"]);
+    finalFatPct = extractMacroVal(pm, ["fatsPct", "fatPct", "grasasPct"]) || extractMacroVal(ai, ["fatsPct", "fatPct", "grasasPct"]);
+
     const totalKcal = finalProteinG * 4 + finalCarbsG * 4 + finalFatsG * 9;
-    if (totalKcal > 0) {
-      finalProtPct = Math.round(((finalProteinG * 4) / totalKcal) * 100);
-      finalCarbPct = Math.round(((finalCarbsG * 4) / totalKcal) * 100);
-      finalFatPct = Math.round(((finalFatsG * 9) / totalKcal) * 100);
+    if (!finalProtPct || !finalCarbPct || !finalFatPct) {
+      if (totalKcal > 0) {
+        finalProtPct = Math.round(((finalProteinG * 4) / totalKcal) * 100);
+        finalCarbPct = Math.round(((finalCarbsG * 4) / totalKcal) * 100);
+        finalFatPct = Math.round(((finalFatsG * 9) / totalKcal) * 100);
+      }
     }
-    const aiText = ai?.criterioClinico || ai?.justificacionFisiologica || "";
-    finalRationale = aiText
-      ? `${aiText}${ai?.ajusteKcal ? ` • Ajuste: ${ai.ajusteKcal}` : ""}`
+
+    finalBadgeMotivo = ai?.badgeMotivo || pm?.badgeMotivo || null;
+    finalAnalisisClinico =
+      ai?.analisisClinico ||
+      pm?.analisisClinico ||
+      ai?.criterioClinico ||
+      pm?.criterioClinico ||
+      ai?.justificacionFisiologica ||
+      pm?.justificacionFisiologica ||
+      null;
+    finalEstrategiaMenu = ai?.estrategiaMenu || pm?.estrategiaMenu || null;
+    finalAjustesSugeridos = Array.isArray(ai?.ajustesSugeridos)
+      ? ai.ajustesSugeridos
+      : Array.isArray(pm?.ajustesSugeridos)
+      ? pm.ajustesSugeridos
+      : [];
+
+    finalRationale = finalAnalisisClinico
+      ? `${finalAnalisisClinico}${ai?.ajusteKcal ? ` • Ajuste: ${ai.ajusteKcal}` : ""}`
       : `Prescripción auditada y optimizada con IA Clínica para ${goalInfo.title} (${finalTargetKcal} kcal).`;
   } else if (activeMode === "manual" && (pm || mm)) {
-    finalTargetKcal = Number(pm?.targetKcal || mm?.targetKcal) || calcMatematico.targetKcal;
-    finalProteinG = Number(pm?.proteinasG || mm?.proteinasG) || calcMatematico.proteinasG;
-    finalCarbsG = Number(pm?.carbosG || mm?.carbosG) || calcMatematico.carbohidratosG;
-    finalFatsG = Number(pm?.grasasG || mm?.grasasG) || calcMatematico.grasasG;
-    if (peso > 0) {
-      finalProtGKg = Number((finalProteinG / peso).toFixed(1));
-      finalCarbGKg = Number((finalCarbsG / peso).toFixed(1));
-      finalFatGKg = Number((finalFatsG / peso).toFixed(1));
-    }
+    finalTargetKcal = extractMacroVal(pm, KCAL_KEYS) || extractMacroVal(mm, KCAL_KEYS) || calcMatematico.targetKcal;
+    finalProteinG = extractMacroVal(pm, PROT_KEYS) || extractMacroVal(mm, PROT_KEYS) || calcMatematico.proteinasG;
+    finalCarbsG = extractMacroVal(pm, CARB_KEYS) || extractMacroVal(mm, CARB_KEYS) || calcMatematico.carbohidratosG;
+    finalFatsG = extractMacroVal(pm, FAT_KEYS) || extractMacroVal(mm, FAT_KEYS) || calcMatematico.grasasG;
+
+    finalProtGKg =
+      extractPerKg(pm, ["protGKg", "proteinaGKg"]) ||
+      extractPerKg(mm, ["protGKg", "proteinaGKg"]) ||
+      (peso > 0 ? Number((finalProteinG / peso).toFixed(1)) : calcMatematico.protGKg);
+    finalCarbGKg =
+      extractPerKg(pm, ["carbGKg", "carbohidratosGKg"]) ||
+      extractPerKg(mm, ["carbGKg", "carbohidratosGKg"]) ||
+      (peso > 0 ? Number((finalCarbsG / peso).toFixed(1)) : calcMatematico.carbGKg);
+    finalFatGKg =
+      extractPerKg(pm, ["fatGKg", "grasasGKg"]) ||
+      extractPerKg(mm, ["fatGKg", "grasasGKg"]) ||
+      (peso > 0 ? Number((finalFatsG / peso).toFixed(1)) : calcMatematico.fatGKg);
+
     const totalKcal = finalProteinG * 4 + finalCarbsG * 4 + finalFatsG * 9;
     if (totalKcal > 0) {
       finalProtPct = Math.round(((finalProteinG * 4) / totalKcal) * 100);
@@ -1130,6 +1201,10 @@ export function generateSmartMacroPrescription({
     carbsPct: finalCarbPct,
     fatsPct: finalFatPct,
     rationale: finalRationale,
+    badgeMotivo: finalBadgeMotivo,
+    analisisClinico: finalAnalisisClinico,
+    estrategiaMenu: finalEstrategiaMenu,
+    ajustesSugeridos: finalAjustesSugeridos,
 
     preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
