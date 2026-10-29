@@ -4008,11 +4008,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   
                                   {/* Meal Card Top Header */}
                                   <div className="flex justify-between items-center mb-3.5 pb-2.5 border-b border-[#E2E8F0]/70">
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                       {dragHandle}
                                       <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929]">
                                         Comida {i + 1}
                                       </span>
+
+                                      {/* Botón Optimizar con IA */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOptimizeComidaWithAi(i)}
+                                        disabled={aiOptimizingIndex === i}
+                                        className="text-xs font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
+                                        title="Optimizar con IA"
+                                      >
+                                        {aiOptimizingIndex === i ? (
+                                          <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Optimizando...</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                            <span>Optimizar con IA</span>
+                                          </>
+                                        )}
+                                      </button>
+
                                       <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-100">
                                         {mealKcal} kcal {mealPct > 0 ? `• ${mealPct}% del día` : ''}
                                       </span>
@@ -4117,28 +4139,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           </button>
                                         </div>
                                       </div>
-
-                                      {(c.modoEdicion || "platillo") === "platillo" && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleOptimizeComidaWithAi(i)}
-                                          disabled={aiOptimizingIndex === i}
-                                          className="text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
-                                          title="Calcula macros con IA, audita aversiones/alergias del expediente y busca foto de referencia"
-                                        >
-                                          {aiOptimizingIndex === i ? (
-                                            <>
-                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                              <span>Analizando...</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                                              <span>Optimizar con IA</span>
-                                            </>
-                                          )}
-                                        </button>
-                                      )}
                                     </div>
 
                                     {(c.modoEdicion || "platillo") === "platillo" ? (
@@ -4367,6 +4367,51 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                          </div>
                                        </div>
                                      ) : null}
+                                    {/* Foto de Referencia Visual integrada en Opción Principal */}
+                                    <div className="mt-3 pt-3 border-t border-[#E2E8F0]/80">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+                                          <Camera className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                          Foto de Referencia Visual (Opción Principal)
+                                        </label>
+                                        {c.foto_url && (
+                                          <button 
+                                            type="button" 
+                                            onClick={() => updComida(i, "foto_url", "")} 
+                                            className="text-red-400 hover:text-red-600 text-xs font-semibold flex items-center gap-1"
+                                          >
+                                            <Trash2 className="w-3 h-3" /> Quitar foto
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 flex-wrap">
+                                        {c.foto_url && (
+                                          <CachedImage 
+                                            src={c.foto_url} 
+                                            alt="referencia" 
+                                            className="w-14 h-14 object-cover rounded-xl border border-[#E2E8F0] shadow-2xs" 
+                                          />
+                                        )}
+                                        <label className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
+                                          <Camera className="w-3.5 h-3.5" />
+                                          <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
+                                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                        </label>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setCatalogCategory("Todos");
+                                            setCatalogSearch("");
+                                            setPhotoCatalogModal({ mealIndex: i });
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] bg-gray-50 hover:bg-gray-100 rounded-xl text-[#0B1929] text-xs font-bold transition-colors cursor-pointer"
+                                        >
+                                          <Search className="w-3.5 h-3.5 text-[#6B7A8D]" />
+                                          <span>🔍 Catálogo FLUX</span>
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
 
                                   {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) */}
@@ -4432,52 +4477,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </>
                                       )}
                                     </button>
-                                  </div>
-
-                                  {/* Row 4: Foto de referencia visual */}
-                                  <div className="mb-4 p-3 bg-white rounded-xl border border-[#E2E8F0]">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">
-                                        Foto de Referencia Visual (Opción Principal)
-                                      </label>
-                                    </div>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                      {c.foto_url && (
-                                        <CachedImage 
-                                          src={c.foto_url} 
-                                          alt="referencia" 
-                                          className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0] shadow-2xs" 
-                                        />
-                                      )}
-                                      <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
-                                        <Camera className="w-4 h-4" />
-                                        <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
-                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                                      </label>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setCatalogCategory("Todos");
-                                          setCatalogSearch("");
-                                          setPhotoCatalogModal({ mealIndex: i });
-                                        }}
-                                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-gray-50 hover:bg-gray-100 rounded-xl text-[#0B1929] text-xs font-bold transition-colors"
-                                      >
-                                        <Search className="w-3.5 h-3.5 text-[#6B7A8D]" />
-                                        <span>🔍 Catálogo FLUX</span>
-                                      </button>
-
-                                      {c.foto_url && (
-                                        <button 
-                                          type="button" 
-                                          onClick={() => updComida(i, "foto_url", "")} 
-                                          className="text-red-400 hover:text-red-600 p-2 text-xs font-semibold flex items-center gap-1"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" /> Quitar
-                                        </button>
-                                      )}
-                                    </div>
                                   </div>
 
                                   {/* Row 5: Macronutrientes por comida */}
