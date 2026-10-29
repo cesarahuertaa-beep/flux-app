@@ -48,12 +48,14 @@ const sanitizeWhatsAppPhone = (phone) => {
 };
 
 
-const TIME_PRESETS = [
-  { time: "08:00 AM", name: "Desayuno", short: "08:00 AM Desayuno" },
-  { time: "11:30 AM", name: "Colación Matutina", short: "11:30 AM Colación" },
-  { time: "02:30 PM", name: "Comida Principal", short: "02:30 PM Comida" },
-  { time: "05:30 PM", name: "Pre-entreno / Snack", short: "05:30 PM Snack" },
-  { time: "08:30 PM", name: "Cena", short: "08:30 PM Cena" },
+const HORAS_ESTANDAR_AM_PM = [
+  "05:00 AM", "05:30 AM", "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM",
+  "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
+  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM",
+  "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM",
+  "05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM",
+  "08:00 PM", "08:30 PM", "09:00 PM", "09:30 PM", "10:00 PM", "10:30 PM",
+  "11:00 PM", "11:30 PM", "12:00 AM"
 ];
 
 const isOfflineError = (e) => {
@@ -1414,7 +1416,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       comidas:[{ 
         _dndId: Math.random().toString(36).slice(2,9), 
         hora:"08:00 AM", 
-        nombre:"Comida 1: Desayuno", 
+        nombre:"", 
         opciones: [""],
         opcion1:"", 
         opcion2:"", 
@@ -1731,7 +1733,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       {
         _dndId: Math.random().toString(36).slice(2, 9),
         hora: "08:00 AM",
-        nombre: `Comida ${p.comidas.length + 1}`,
+        nombre: "",
         opciones: [""],
         opcion1: "",
         opcion2: "",
@@ -1753,7 +1755,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       ...target,
       _dndId: Math.random().toString(36).slice(2, 9),
       id: undefined,
-      nombre: target.nombre ? `${target.nombre} (Copia)` : `Comida ${i + 1} (Copia)`,
+      nombre: target.nombre ? `${target.nombre} (Copia)` : "",
       opciones: [...(target.opciones && target.opciones.length > 0 ? target.opciones : [target.opcion1 || ""])],
       alertaClinica: null
     };
@@ -1845,9 +1847,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (res.carbohidratos != null) c.carbohidratos = res.carbohidratos;
         if (res.grasas != null) c.grasas = res.grasas;
         if (autoPhoto) c.foto_url = autoPhoto;
-        if (res.nombreNormalizado && (!c.nombre || c.nombre.startsWith("Comida "))) {
-          c.nombre = res.nombreNormalizado;
-        }
+        // No sobreescribir el nombre de la toma con IA, respetar lo que escriba el nutriólogo
         c.alertaClinica = res.alertaClinica || null;
         c.evaluacionClinica = res.evaluacionClinica || null;
         cs[mealIdx] = c;
@@ -3972,36 +3972,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         <Clock className="w-3.5 h-3.5 text-blue-500" />
                                         Hora sugerida (AM/PM)
                                       </label>
-                                      <input 
-                                        className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
-                                        value={c.hora || ""} 
-                                        onChange={e => updComida(i, "hora", e.target.value)} 
-                                        placeholder="Ej. 08:00 AM" 
-                                      />
-                                      {/* Preset chips */}
-                                      <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {TIME_PRESETS.map(preset => (
-                                          <button
-                                            key={preset.time}
-                                            type="button"
-                                            onClick={() => {
-                                              updComida(i, "hora", preset.time);
-                                              if (!c.nombre || c.nombre.startsWith("Comida ")) {
-                                                updComida(i, "nombre", preset.name);
-                                              }
-                                            }}
-                                            className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[#6B7A8D]"
-                                          >
-                                            {preset.time}
-                                          </button>
-                                        ))}
+                                      <div className="relative">
+                                        <select 
+                                          className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] font-medium focus:outline-none focus:border-[var(--brand-primary)] appearance-none cursor-pointer hover:border-[#CBD5E1] transition-colors" 
+                                          value={c.hora || ""} 
+                                          onChange={e => updComida(i, "hora", e.target.value)} 
+                                        >
+                                          <option value="">-- Seleccionar hora --</option>
+                                          {c.hora && !HORAS_ESTANDAR_AM_PM.includes(c.hora) && (
+                                            <option value={c.hora}>{c.hora} (Actual)</option>
+                                          )}
+                                          {HORAS_ESTANDAR_AM_PM.map(hora => (
+                                            <option key={hora} value={hora}>{hora}</option>
+                                          ))}
+                                        </select>
+                                        <Clock className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                        <ChevronDown className="w-4 h-4 text-[#94A3B8] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                       </div>
                                     </div>
 
                                     <div>
-                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la toma</label>
+                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                                        Nombre de la toma (opcional)
+                                      </label>
                                       <input 
-                                        className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
+                                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] hover:border-[#CBD5E1] transition-colors" 
                                         value={c.nombre || ""} 
                                         onChange={e => updComida(i, "nombre", e.target.value)} 
                                         placeholder="Ej. Desayuno, Pre-entreno, Comida, Cena..." 
