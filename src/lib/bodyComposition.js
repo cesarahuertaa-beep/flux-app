@@ -977,10 +977,67 @@ export function generateSmartMacroPrescription({
     picoteos: (enriched?.r24h_picoteos || anamnesis?.r24h_picoteos || "").trim(),
   };
 
-  const rationale =
-    peso > 0
-      ? `Prescripción calculada mediante ${formulaLabel} (TMB ${calcMatematico.tmb} kcal × FAF ${fafInfo.short} = ${calcMatematico.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalInfo.pct > 0 ? `+${goalInfo.pct}` : goalInfo.pct}%), la fórmula matemática establece ${calcMatematico.targetKcal} kcal con ${calcMatematico.protGKg} g/kg de proteína (${calcMatematico.proteinasG}g) y ${calcMatematico.fatGKg} g/kg de grasas (${calcMatematico.grasasG}g).`
-      : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
+  const activeMode =
+    enriched?.prescription_mode ||
+    (enriched?.ai_audit_result
+      ? "ia"
+      : enriched?.manual_macros
+      ? "manual"
+      : "matematico");
+  const pm = enriched?.prescribed_macros;
+  const ai = enriched?.ai_audit_result;
+  const mm = enriched?.manual_macros;
+
+  let finalTargetKcal = calcMatematico.targetKcal;
+  let finalProteinG = calcMatematico.proteinasG;
+  let finalCarbsG = calcMatematico.carbohidratosG;
+  let finalFatsG = calcMatematico.grasasG;
+  let finalProtGKg = calcMatematico.protGKg;
+  let finalCarbGKg = calcMatematico.carbGKg;
+  let finalFatGKg = calcMatematico.fatGKg;
+  let finalProtPct = calcMatematico.protPct;
+  let finalCarbPct = calcMatematico.carbPct;
+  let finalFatPct = calcMatematico.fatPct;
+  let finalRationale = rationale;
+
+  if (activeMode === "ia" && (pm || ai)) {
+    finalTargetKcal = Number(pm?.targetKcal || ai?.targetKcal) || calcMatematico.targetKcal;
+    finalProteinG = Number(pm?.proteinasG || ai?.proteinasG) || calcMatematico.proteinasG;
+    finalCarbsG = Number(pm?.carbosG || ai?.carbosG) || calcMatematico.carbohidratosG;
+    finalFatsG = Number(pm?.grasasG || ai?.grasasG) || calcMatematico.grasasG;
+    if (peso > 0) {
+      finalProtGKg = Number((finalProteinG / peso).toFixed(1));
+      finalCarbGKg = Number((finalCarbsG / peso).toFixed(1));
+      finalFatGKg = Number((finalFatsG / peso).toFixed(1));
+    }
+    const totalKcal = finalProteinG * 4 + finalCarbsG * 4 + finalFatsG * 9;
+    if (totalKcal > 0) {
+      finalProtPct = Math.round(((finalProteinG * 4) / totalKcal) * 100);
+      finalCarbPct = Math.round(((finalCarbsG * 4) / totalKcal) * 100);
+      finalFatPct = Math.round(((finalFatsG * 9) / totalKcal) * 100);
+    }
+    const aiText = ai?.criterioClinico || ai?.justificacionFisiologica || "";
+    finalRationale = aiText
+      ? `${aiText}${ai?.ajusteKcal ? ` • Ajuste: ${ai.ajusteKcal}` : ""}`
+      : `Prescripción auditada y optimizada con IA Clínica para ${goalInfo.title} (${finalTargetKcal} kcal).`;
+  } else if (activeMode === "manual" && (pm || mm)) {
+    finalTargetKcal = Number(pm?.targetKcal || mm?.targetKcal) || calcMatematico.targetKcal;
+    finalProteinG = Number(pm?.proteinasG || mm?.proteinasG) || calcMatematico.proteinasG;
+    finalCarbsG = Number(pm?.carbosG || mm?.carbosG) || calcMatematico.carbohidratosG;
+    finalFatsG = Number(pm?.grasasG || mm?.grasasG) || calcMatematico.grasasG;
+    if (peso > 0) {
+      finalProtGKg = Number((finalProteinG / peso).toFixed(1));
+      finalCarbGKg = Number((finalCarbsG / peso).toFixed(1));
+      finalFatGKg = Number((finalFatsG / peso).toFixed(1));
+    }
+    const totalKcal = finalProteinG * 4 + finalCarbsG * 4 + finalFatsG * 9;
+    if (totalKcal > 0) {
+      finalProtPct = Math.round(((finalProteinG * 4) / totalKcal) * 100);
+      finalCarbPct = Math.round(((finalCarbsG * 4) / totalKcal) * 100);
+      finalFatPct = Math.round(((finalFatsG * 9) / totalKcal) * 100);
+    }
+    finalRationale = `Prescripción nutricional personalizada ajustada manualmente por el profesional de la nutrición (${finalTargetKcal} kcal).`;
+  }
 
   return {
     hasEnoughData: peso > 0 && calcMatematico.targetKcal > 0,
@@ -1002,7 +1059,7 @@ export function generateSmartMacroPrescription({
     goalInfo,
     goalPct: goalInfo.pct,
 
-    // Motor Matemático Clínico Puro
+    // Motor Matemático Clínico Puro (Base teórica)
     matematico: {
       targetKcal: calcMatematico.targetKcal,
       tmb: calcMatematico.tmb,
@@ -1040,20 +1097,34 @@ export function generateSmartMacroPrescription({
       },
     },
 
-    // Propiedades directas para retrocompatibilidad
-    targetKcal: calcMatematico.targetKcal,
+    // Prescripción Activa de la Evaluación (IA, Manual o Matemática)
+    prescriptionMode: activeMode,
+    modeLabel:
+      activeMode === "ia"
+        ? "Auditado por IA Clínica"
+        : activeMode === "manual"
+        ? "Prescripción Manual"
+        : "Matemático (Fórmula)",
+    aiAudit: ai || null,
+    manualMacros: mm || null,
+    prescribedMacros: pm || null,
+    evalFecha: enriched?.fecha || null,
+    weight: peso,
+
+    // Propiedades directas activas
+    targetKcal: finalTargetKcal,
     tmb: calcMatematico.tmb,
     get: calcMatematico.get,
-    proteinG: calcMatematico.proteinasG,
-    carbsG: calcMatematico.carbohidratosG,
-    fatsG: calcMatematico.grasasG,
-    protGKg: calcMatematico.protGKg,
-    carbGKg: calcMatematico.carbGKg,
-    fatGKg: calcMatematico.fatGKg,
-    proteinPct: calcMatematico.protPct,
-    carbsPct: calcMatematico.carbPct,
-    fatsPct: calcMatematico.fatPct,
-    rationale,
+    proteinG: finalProteinG,
+    carbsG: finalCarbsG,
+    fatsG: finalFatsG,
+    protGKg: finalProtGKg,
+    carbGKg: finalCarbGKg,
+    fatGKg: finalFatGKg,
+    proteinPct: finalProtPct,
+    carbsPct: finalCarbPct,
+    fatsPct: finalFatPct,
+    rationale: finalRationale,
 
     preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",

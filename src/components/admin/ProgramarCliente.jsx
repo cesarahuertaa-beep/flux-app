@@ -52,6 +52,15 @@ const isOfflineError = (e) => {
 };
 
 // ── Helpers de Tiempos y Ciclos ──
+const fmtDate = (d) => {
+  if (!d) return "";
+  try {
+    return new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+  } catch {
+    return d;
+  }
+};
+
 const toDateStr = (d) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -203,10 +212,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (!Array.isArray(allMetricas) || allMetricas.length === 0) return latestMetrica;
     const linked = linkMetricasToCiclos(allMetricas, ciclos);
     if (cicloSel?.id) {
-      const forCycle = linked.find((m) => String(m.ciclo_id) === String(cicloSel.id));
-      if (forCycle) return forCycle;
+      const forCycle = linked.filter((m) => String(m.ciclo_id) === String(cicloSel.id));
+      if (forCycle.length > 0) {
+        return [...forCycle].sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"))[0];
+      }
     }
-    return linked[0] || latestMetrica;
+    return linked.length > 0
+      ? [...linked].sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"))[0]
+      : latestMetrica;
   }, [allMetricas, ciclos, cicloSel?.id, latestMetrica]);
 
   const smartPrescription = useMemo(() => {
@@ -287,6 +300,44 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       window.removeEventListener("flux:open-historico", onOpenHistorico);
     };
   }, [selected?.id]);
+
+  // Sincronización automática transparente de macros con la evaluación más actual del plan
+  useEffect(() => {
+    if (!selected?.id || isReadOnly || !smartPrescription?.targetKcal) return;
+    const sKcal = Number(smartPrescription.targetKcal) || 0;
+    const sP = Number(smartPrescription.proteinG) || 0;
+    const sC = Number(smartPrescription.carbsG) || 0;
+    const sF = Number(smartPrescription.fatsG) || 0;
+    if (sKcal <= 0) return;
+
+    const curKcal = Number(macros.calorias) || 0;
+    const curP = Number(macros.proteina) || 0;
+    const curC = Number(macros.carbohidratos) || 0;
+    const curF = Number(macros.grasas) || 0;
+
+    if (curKcal !== sKcal || curP !== sP || curC !== sC || curF !== sF) {
+      const nextMacros = {
+        calorias: sKcal,
+        proteina: sP,
+        carbohidratos: sC,
+        grasas: sF,
+      };
+      setMacros(nextMacros);
+      const targetCicloId = cicloSel?.id || null;
+      const cycleQuery = targetCicloId ? `ciclo_id=eq.${targetCicloId}` : `ciclo_id=is.null`;
+      dbGetFresh(`nutricion?cliente_id=eq.${selected.id}&${cycleQuery}&limit=1`).then(rows => {
+        if (rows && rows.length > 0) {
+          dbPatch(`nutricion?id=eq.${rows[0].id}`, nextMacros).catch(() => {});
+        } else {
+          dbPost("nutricion", {
+            cliente_id: selected.id,
+            ...nextMacros,
+            ...(targetCicloId ? { ciclo_id: targetCicloId } : {})
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly]);
 
   const parsedActiveCycle = useMemo(() => {
     return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
@@ -2473,35 +2524,72 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <>
                 {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
                 {(() => {
-                  const activeKcal = Number(macros.calorias) || 0;
-                  const hasPlanMacros = activeKcal > 0;
-                  const targetKcal = hasPlanMacros ? activeKcal : smartPrescription.targetKcal;
-                  const activeP = hasPlanMacros ? (Number(macros.proteina) || 0) : smartPrescription.proteinG;
-                  const activeC = hasPlanMacros ? (Number(macros.carbohidratos) || 0) : smartPrescription.carbsG;
-                  const activeF = hasPlanMacros ? (Number(macros.grasas) || 0) : smartPrescription.fatsG;
-                  const isSyncedWithAi = hasPlanMacros && Math.abs(activeKcal - smartPrescription.targetKcal) <= 5 && activeP === smartPrescription.proteinG;
+                  const hasEvaluation = Boolean(smartPrescription.hasEvaluation && smartPrescription.targetKcal > 0);
+                  const targetKcal = hasEvaluation ? smartPrescription.targetKcal : (Number(macros.calorias) || smartPrescription.targetKcal);
+                  const activeP = hasEvaluation ? smartPrescription.proteinG : (Number(macros.proteina) || smartPrescription.proteinG);
+                  const activeC = hasEvaluation ? smartPrescription.carbsG : (Number(macros.carbohidratos) || smartPrescription.carbsG);
+                  const activeF = hasEvaluation ? smartPrescription.fatsG : (Number(macros.grasas) || smartPrescription.fatsG);
                   const pPct = targetKcal > 0 ? Math.round((activeP * 4 / targetKcal) * 100) : 0;
                   const cPct = targetKcal > 0 ? Math.round((activeC * 4 / targetKcal) * 100) : 0;
                   const fPct = targetKcal > 0 ? Math.round((activeF * 9 / targetKcal) * 100) : 0;
                   const refWeight = smartPrescription.weight || Number(selected?.peso) || 0;
+                  const prescMode = smartPrescription.prescriptionMode || "matematico";
 
                   return (
                     <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors">
                       {/* Cabecera de la tarjeta */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#F0F4FA]">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-200/60">
-                            <Sparkles className="w-4 h-4" />
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                            prescMode === "ia"
+                              ? "bg-indigo-50 text-indigo-600 border-indigo-200/60"
+                              : prescMode === "manual"
+                              ? "bg-amber-50 text-amber-600 border-amber-200/60"
+                              : "bg-blue-50 text-[var(--brand-primary)] border-blue-200/60"
+                          }`}>
+                            {prescMode === "ia" ? (
+                              <Sparkles className="w-4 h-4 text-indigo-600" />
+                            ) : prescMode === "manual" ? (
+                              <Edit2 className="w-4 h-4 text-amber-600" />
+                            ) : (
+                              <Calculator className="w-4 h-4 text-[var(--brand-primary)]" />
+                            )}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-sm font-bold text-[#0B1929]">
-                                {hasPlanMacros ? "Meta Diaria Prescrita" : "Prescripción Inteligente Sugerida (IA)"}
+                                Meta Diaria Prescrita
                               </h4>
+                              {/* Badge de Modalidad */}
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                                prescMode === "ia"
+                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200/70"
+                                  : prescMode === "manual"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200/70"
+                                  : "bg-blue-50 text-blue-700 border-blue-200/70"
+                              }`}>
+                                {prescMode === "ia" ? (
+                                  <>
+                                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                                    <span>Auditado con IA</span>
+                                  </>
+                                ) : prescMode === "manual" ? (
+                                  <>
+                                    <Edit2 className="w-3 h-3 text-amber-600" />
+                                    <span>Manual</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Calculator className="w-3 h-3 text-blue-600" />
+                                    <span>Matemático</span>
+                                  </>
+                                )}
+                              </span>
+
                               {smartPrescription.goalInfo?.title && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
                                   <Target className="w-3 h-3 shrink-0" />
-                                  <span>{smartPrescription.goalInfo.title}</span>
+                                  <span>{smartPrescription.goalInfo.title} ({smartPrescription.goalInfo.pct > 0 ? `+${smartPrescription.goalInfo.pct}%` : `${smartPrescription.goalInfo.pct}%`})</span>
                                 </span>
                               )}
                               {smartPrescription.fafInfo?.label && (
@@ -2511,50 +2599,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 </span>
                               )}
                               <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#6B7A8D]">
-                                {smartPrescription.formula}
+                                {smartPrescription.formulaShort || smartPrescription.formula}
                               </span>
                             </div>
                             <p className="text-[11px] text-[#6B7A8D] truncate">
-                              {hasPlanMacros
-                                ? `Plan activo del ciclo • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`
-                                : `Calculado automáticamente de la última evaluación clínica (${smartPrescription.weight} kg)`}
+                              {cycleMetrica?.fecha
+                                ? `Evaluación más reciente del plan (${fmtDate(cycleMetrica.fecha)}) • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`
+                                : `Sin evaluación vinculada • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`}
                             </p>
                           </div>
                         </div>
 
                         {/* Botones de acción rápida */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          {!hasPlanMacros && !isReadOnly && (
-                            <button
-                              type="button"
-                              onClick={() => handleApplyPrescribedMacros({
-                                calorias: smartPrescription.targetKcal,
-                                proteinas: smartPrescription.proteinG,
-                                carbohidratos: smartPrescription.carbsG,
-                                grasas: smartPrescription.fatsG,
-                              })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
-                            >
-                              <Sparkles className="w-3.5 h-3.5" />
-                              <span>Aplicar Prescripción IA</span>
-                            </button>
-                          )}
-                          {hasPlanMacros && !isSyncedWithAi && !isReadOnly && (
-                            <button
-                              type="button"
-                              onClick={() => handleApplyPrescribedMacros({
-                                calorias: smartPrescription.targetKcal,
-                                proteinas: smartPrescription.proteinG,
-                                carbohidratos: smartPrescription.carbsG,
-                                grasas: smartPrescription.fatsG,
-                              })}
-                              title="Alinear calorías y macronutrientes con la prescripción de la evaluación actual"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 text-[var(--brand-primary)] hover:bg-blue-100 border border-blue-200/80 text-xs font-semibold transition-colors cursor-pointer"
-                            >
-                              <RefreshCw className="w-3 h-3" />
-                              <span className="hidden sm:inline">Sincronizar IA</span> ({smartPrescription.targetKcal} kcal)
-                            </button>
-                          )}
                           {!isReadOnly && (
                             <button
                               type="button"
@@ -2611,13 +2668,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         </div>
                       </div>
 
-                      {/* Explicación clínica IA */}
+                      {/* Explicación clínica IA / Criterio */}
                       {smartPrescription.rationale && (
-                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2 text-xs text-[#6B7A8D]">
-                          <Sparkles className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0 mt-0.5" />
-                          <p className="leading-relaxed">
-                            {smartPrescription.rationale}
-                          </p>
+                        <div className={`mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl ${
+                          prescMode === "ia"
+                            ? "bg-indigo-50/60 border border-indigo-100 text-indigo-950"
+                            : "bg-slate-50 border border-slate-200/70 text-[#6B7A8D]"
+                        }`}>
+                          {prescMode === "ia" ? (
+                            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <Activity className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                          )}
+                          <div className="leading-relaxed">
+                            {prescMode === "ia" && (
+                              <strong className="text-indigo-900 block font-bold mb-0.5">
+                                Dictamen de Auditoría Clínica IA:
+                              </strong>
+                            )}
+                            <p>{smartPrescription.rationale}</p>
+                          </div>
                         </div>
                       )}
 
@@ -3184,10 +3254,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const totProt = diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0);
         const totCarbs = diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0);
         const totFat = diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0);
-        const metaKcal = Number(macros.calorias) || 0;
-        const metaProt = Number(macros.proteina) || 0;
-        const metaCarbs = Number(macros.carbohidratos) || 0;
-        const metaFat = Number(macros.grasas) || 0;
+        const metaKcal = Number(macros.calorias) || smartPrescription.targetKcal || 0;
+        const metaProt = Number(macros.proteina) || smartPrescription.proteinG || 0;
+        const metaCarbs = Number(macros.carbohidratos) || smartPrescription.carbsG || 0;
+        const metaFat = Number(macros.grasas) || smartPrescription.fatsG || 0;
 
         return (
           <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
