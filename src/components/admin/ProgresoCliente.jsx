@@ -302,6 +302,23 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const currentCiclo = cicloActivo || cicloSel;
   const isReadOnly = propReadOnly ?? Boolean(isMiPlan || (currentCiclo && !currentCiclo.activo));
 
+  const cycleInfo = useMemo(() => {
+    if (!currentCiclo?.nombre) {
+      return {
+        nombreBase: "Plan actual",
+        semanas: 4,
+        dias: 28,
+        enfoque: ""
+      };
+    }
+    const parts = currentCiclo.nombre.split("|");
+    const nombreBase = parts[0] || "Plan actual";
+    const semanas = parseInt(parts[1], 10) || 4;
+    const dias = parseInt(parts[3], 10) || (semanas * 7);
+    const enfoque = (parts[4] || "").trim();
+    return { nombreBase, semanas, dias, enfoque };
+  }, [currentCiclo?.nombre]);
+
   const displayedMetricas = useMemo(() => {
     if (mode === "historico" || sub === "historico") {
       return allLinkedMetricas;
@@ -1061,14 +1078,34 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {activeSection === "evaluaciones" && (
         <div>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-            <div className="flex items-center gap-2.5">
-              <span className="font-bold text-[#0B1929]">
-                Evaluación del plan: <span className="text-[var(--brand-primary)]">{currentCiclo?.nombre?.split("|")[0] || "Plan actual"}</span>
-                <span className="text-[#6B7A8D] font-normal ml-1.5">({displayedMetricas.length})</span>
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <span className="font-bold text-[#0B1929] text-sm sm:text-base">
+                {cycleInfo.enfoque ? (
+                  <>
+                    <span>{cycleInfo.enfoque}</span>
+                    <span className="text-xs sm:text-sm font-semibold text-[var(--brand-primary)] ml-1.5">
+                      · {cycleInfo.nombreBase}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>Evaluación del plan:</span>{" "}
+                    <span className="text-[var(--brand-primary)]">{cycleInfo.nombreBase}</span>
+                  </>
+                )}
+                <span className="text-[#6B7A8D] font-normal ml-1.5">
+                  ({displayedMetricas.length})
+                </span>
               </span>
+
+              {Boolean(cycleInfo.dias && cycleInfo.semanas) && (
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                  {cycleInfo.dias} días • {cycleInfo.semanas} sem
+                </span>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {displayedMetricas.length > 0 && (
                 <button onClick={() => generateProgresoPDF(selected, displayedMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
@@ -1090,8 +1127,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               </div>
               <div className="text-[13px] max-w-sm mx-auto mb-4">
                 {isReadOnly
-                  ? `Este plan histórico (${currentCiclo?.nombre?.split("|")[0] || "seleccionado"}) no tiene evaluaciones registradas.`
-                  : `Registra la primera evaluación corporal y check-in para ${currentCiclo?.nombre?.split("|")[0] || "este plan"}.`}
+                  ? `Este plan histórico (${cycleInfo.nombreBase}) no tiene evaluaciones registradas.`
+                  : `Registra la primera evaluación corporal y check-in para ${cycleInfo.enfoque ? `${cycleInfo.enfoque} (${cycleInfo.nombreBase})` : cycleInfo.nombreBase}.`}
               </div>
               {!isReadOnly && (
                 <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm mx-auto">

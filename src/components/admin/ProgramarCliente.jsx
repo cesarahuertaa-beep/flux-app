@@ -2415,26 +2415,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       {/* ── Solo mostrar herramientas inferiores si existe al menos un plan creado ── */}
       {ciclos.length > 0 && (
         <>
-          {/* Subtítulo / Enfoque del plan activo (si existe) */}
-          {parsedActiveCycle.enfoque && (
-            <div className="mb-4 bg-white rounded-2xl border border-blue-100 p-3.5 sm:px-5 sm:py-3 shadow-2xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-full bg-[var(--brand-primary)] shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-                    Enfoque del {parsedActiveCycle.nombreBase}
-                  </span>
-                  <h4 className="text-sm font-bold text-[#0B1929] truncate">
-                    {parsedActiveCycle.enfoque}
-                  </h4>
-                </div>
-              </div>
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
-                {parsedActiveCycle.dias} días • {parsedActiveCycle.semanas} sem
-              </span>
-            </div>
-          )}
-
       {/* ── Sub-tabs ── */}
       <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
         {[
@@ -2667,7 +2647,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 })()}
 
             <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
-              <span className="font-semibold">Días del plan <span className="text-[#6B7A8D] font-normal">({dias.length})</span></span>
+              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                <span className="font-semibold text-[#0B1929]">
+                  {parsedActiveCycle.enfoque ? (
+                    <>
+                      <span>{parsedActiveCycle.enfoque}</span>
+                      <span className="text-xs font-semibold text-[var(--brand-primary)] ml-1.5">
+                        · Días del plan
+                      </span>
+                    </>
+                  ) : (
+                    <span>Días del plan</span>
+                  )}
+                  <span className="text-[#6B7A8D] font-normal ml-1.5">({dias.length})</span>
+                </span>
+                {Boolean(parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                    {parsedActiveCycle.dias} días • {parsedActiveCycle.semanas} sem
+                  </span>
+                )}
+              </div>
               <div className="flex items-center flex-wrap gap-2">
                 {!isReadOnly && (
                   <button
@@ -2795,8 +2794,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         {entrenoView === "programar" ? (
           <>
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-semibold">Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span></span>
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                <span className="font-semibold text-[#0B1929]">
+                  {parsedActiveCycle.enfoque ? (
+                    <>
+                      <span>{parsedActiveCycle.enfoque}</span>
+                      <span className="text-xs font-semibold text-[var(--brand-primary)] ml-1.5">
+                        · Rutinas
+                      </span>
+                    </>
+                  ) : (
+                    <span>Rutinas</span>
+                  )}
+                  <span className="text-[#6B7A8D] font-normal ml-1.5">({rutinas.length})</span>
+                </span>
+                {Boolean(parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                    {parsedActiveCycle.dias} días • {parsedActiveCycle.semanas} sem
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {!isReadOnly && (
                   <button
