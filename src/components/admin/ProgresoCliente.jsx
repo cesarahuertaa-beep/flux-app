@@ -222,6 +222,7 @@ const emptyForm = () => ({
   checkin_ajustes: "",
   eval_objetivo: "",
   eval_faf: "",
+  eval_faf_notas: "",
   ciclo_id: "",
 
   // Hábitos del ciclo y actividad física actual
@@ -543,6 +544,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     const fallbackFaf = inferFafFromAnamnesis(clinicalRec?.anamnesis);
     base.eval_objetivo = prev?.eval_objetivo || fallbackGoal;
     base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(calculatedFaf || fallbackFaf || 1.375);
+    base.eval_faf_notas = prev?.eval_faf_notas || "";
 
     // Precargar preferencias y R24H (de la evaluación previa o fallback de anamnesis)
     base.preferencias_alimentos = prev?.preferencias_alimentos || clinicalRec?.anamnesis?.preferencias_alimentos || "";
@@ -833,6 +835,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           ...(liveSmartMacros.contextoClinico?.habitos || {}),
           dias_ejercicio_actuales: form.dias_ejercicio_actual || liveSmartMacros.contextoClinico?.habitos?.dias_ejercicio_actuales || "0",
           faf_proyectado_etapa: liveSmartMacros.fafInfo?.label || "Moderado (3 a 5 días/semana)",
+          faf_notas: form.eval_faf_notas || "",
         },
         calcMatematico: {
           formulaLabel: liveSmartMacros.formulaLabel,
@@ -1021,7 +1024,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
       const STRING_KEYS = new Set([
         "fecha", "presion_arterial", "notas", "metodo_evaluacion",
-        "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf",
+        "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf", "eval_faf_notas",
         "preferencias_alimentos", "aversiones_alimentos",
         "r24h_desayuno", "r24h_colacion_m", "r24h_comida", "r24h_colacion_v", "r24h_cena", "r24h_picoteos",
         "horas_sueno", "consumo_agua_estimado", "nivel_estres",
@@ -1279,6 +1282,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
     if (!filled.eval_faf) {
       filled.eval_faf = String(inferFafFromAnamnesis(clinicalRec?.anamnesis));
+    }
+    if (!filled.eval_faf_notas && m.eval_faf_notas) {
+      filled.eval_faf_notas = String(m.eval_faf_notas);
     }
 
     // 3. Cruzar check-in del expediente clínico si faltaban observaciones o escalas
@@ -1799,6 +1805,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {m.ai_audit_result.estrategiaMenu}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {m.eval_faf_notas && (
+                  <div className="text-xs text-[#0B1929] bg-amber-50/60 p-2.5 rounded-lg border border-amber-200/70 mt-2.5 flex items-start gap-1.5">
+                    <Flame className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-600" />
+                    <div>
+                      <span className="font-bold text-amber-800">Notas de actividad física: </span>
+                      <span>{m.eval_faf_notas}</span>
+                    </div>
                   </div>
                 )}
 
@@ -2975,6 +2991,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Notas de actividad física y disponibilidad */}
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1">
+                        Notas de actividad física y disponibilidad (opcional)
+                      </label>
+                      <textarea
+                        disabled={isReadOnly}
+                        value={form.eval_faf_notas || ""}
+                        onChange={(e) => updForm("eval_faf_notas", e.target.value)}
+                        placeholder="Ej. Paciente menciona que entrena de lunes a jueves de 5 a 7 pm (4 días), o no tiene tiempo para entrenar entre semana..."
+                        rows={2}
+                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white resize-none transition-colors"
+                      />
                     </div>
                   </div>
                 </div>

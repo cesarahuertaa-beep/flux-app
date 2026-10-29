@@ -1170,6 +1170,7 @@ export function generateSmartMacroPrescription({
         consumo_agua: enriched?.consumo_agua_estimado || "",
         dias_ejercicio_actuales: enriched?.dias_ejercicio_actual || anamnesis?.dias_entrenamiento || anamnesis?.frecuencia_ejercicio || "0",
         faf_proyectado_etapa: fafInfo?.label || "Moderado (3 a 5 días/semana)",
+        faf_notas: enriched?.eval_faf_notas || "",
       },
     },
 
@@ -1208,6 +1209,7 @@ export function generateSmartMacroPrescription({
 
     preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
+    fafNotas: enriched?.eval_faf_notas || "",
     r24h: r24hObj,
   };
 }

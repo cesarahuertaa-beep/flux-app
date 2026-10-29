@@ -2739,6 +2739,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               )}
                             </div>
                           )}
+
+                          {/* Notas de actividad física del paciente evaluadas */}
+                          {Boolean(smartPrescription.fafNotas) && (
+                            <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] text-xs">
+                              <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/70 text-amber-950 flex items-start gap-2">
+                                <Flame className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-bold text-amber-800 block text-[11px] uppercase tracking-wider mb-0.5">
+                                    Disponibilidad y notas de actividad física (Evaluación):
+                                  </span>
+                                  <span className="leading-snug">{smartPrescription.fafNotas}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
