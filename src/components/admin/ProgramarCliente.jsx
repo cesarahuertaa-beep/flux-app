@@ -256,7 +256,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (res.titulo) {
           c.nombre = res.titulo;
         }
-        const dishText = res.texto || "";
+        const dishText = res.titulo && res.texto && !res.texto.startsWith(res.titulo)
+          ? `${res.titulo}\n\n${res.texto}`
+          : (res.texto || res.titulo || "");
         const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
         opts[0] = dishText;
         c.opciones = opts;

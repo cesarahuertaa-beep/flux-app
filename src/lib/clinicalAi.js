@@ -1454,12 +1454,39 @@ export async function generateDishFromIngredientsWithAi({ ingredientes = [], cli
 
   // Tier 2: Gemini Direct
   if (apiKey) {
-    const prompt = `Con estos ingredientes: ${itemsText}, propón un solo platillo real del mundo que los combine. Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
+    const prompt = `Eres un chef profesional y nutriólogo de FLUX.
+A partir de la siguiente lista de ingredientes seleccionados por el nutriólogo, propón un solo platillo real y conocido del mundo culinario que los combine con armonía gastronómica.
 
-Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
+═══════════════════════════════════════════════════════════
+EJEMPLO MAESTRO DE TONO Y ESTRUCTURA (Imita este estilo exacto):
+═══════════════════════════════════════════════════════════
+Ingredientes proporcionados: Tortilla, Carne de res molida, Chile chipotle, Aguacate
+Respuesta esperada:
 {
-  "titulo": "string con el nombre del platillo como título",
-  "texto": "un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades"
+  "titulo": "Tacos de res enchilada al chipotle con aguacate",
+  "texto": "Tus ingredientes forman unos clásicos tacos de picadillo de res al chipotle; todos combinan a la perfección y ninguno sobra, aunque para que la carne quede jugosa conviene licuar el chipotle con jitomate, cebolla y ajo para armar la salsa, rematando con un toque de limón fresco y sal al servir."
+}
+
+═══════════════════════════════════════════════════════════
+REGLAS ESTRICTAS DE REDACCIÓN:
+═══════════════════════════════════════════════════════════
+1. "titulo": Nombre atractivo, culinario y real del platillo (ej. "Tacos de res enchilada al chipotle", "Cazuela cremosa de pollo campirano con vegetales", "Pastel rústico de pollo con puré de papa").
+2. "texto": Un solo texto corrido breve (máximo 4 a 5 líneas) con estas pautas obligatorias:
+   a) Debe INICIAR nombrando el platillo gastronómico con calidez y naturalidad: "Tus ingredientes forman unos clásicos [Nombre]...", "Con esta base puedes preparar una deliciosa [Nombre]...", o "Tus ingredientes se integran perfectamente en una reconfortante [Nombre]...". NUNCA comiences diciendo impersonalmente "Para preparar este platillo resulta ideal...".
+   b) Explica brevemente cómo se combinan e integran los ingredientes al cocinar.
+   c) Indica con amabilidad y naturalidad si sobra algún ingrediente que desentone con la armonía del platillo (ej. "el aguacate y los frijoles negros sobran en esta receta caliente y es mejor reservarlos...").
+   d) Sugiere los ingredientes básicos de cocina faltantes para completarlo con éxito (ej. cebolla, ajo, limón, caldo o aceite).
+   e) PROHIBIDO hablar de beneficios nutricionales, vitaminas, calorías o propiedades medicinales. Enfócate 100% en el sabor, ensamble culinario y preparación.
+
+═══════════════════════════════════════════════════════════
+INGREDIENTES SELECCIONADOS:
+═══════════════════════════════════════════════════════════
+${itemsText}
+
+Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
+{
+  "titulo": "Nombre del platillo",
+  "texto": "Texto corrido en un solo párrafo comenzando por bautizar el platillo..."
 }`;
 
     for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
