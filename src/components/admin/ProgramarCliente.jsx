@@ -2738,15 +2738,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
               </div>
               <div className="flex items-center flex-wrap gap-2">
-                {!isReadOnly && (
-                  <button
-                    onClick={() => setShowMacroCalc(true)}
-                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] font-semibold shadow-sm transition-colors cursor-pointer"
-                  >
-                    <Calculator className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                    <span>Calcular Macros</span>
-                  </button>
-                )}
                 {dias.length > 0 && (
                   <button
                     onClick={() => generateNutriPDF(selected, nutri, dias, brand)}
