@@ -1417,3 +1417,95 @@ Debes responder ÚNICAMENTE con un JSON:
     origen: "analitico_local",
   };
 }
+
+/**
+ * Propone un platillo real del mundo a partir de una lista de ingredientes seleccionados.
+ * Directriz: Con estos ingredientes: [lista], propón un solo platillo real del mundo que los combine.
+ * Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra
+ * algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
+ */
+export async function generateDishFromIngredientsWithAi({ ingredientes = [], cliente = {}, clinicalRec = null }) {
+  const lista = Array.isArray(ingredientes) ? ingredientes : [ingredientes];
+  const itemsText = lista.filter(Boolean).join(", ").trim();
+  if (!itemsText) {
+    throw new Error("Selecciona al menos un ingrediente para generar el platillo.");
+  }
+
+  const apiKey = getGeminiApiKey();
+
+  // Tier 1: Supabase Edge Function
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "dish-from-ingredients",
+      ingredientes: lista,
+      geminiKey: apiKey,
+    });
+    clearTimeout(timeoutId);
+    if (edgeRes?.titulo && edgeRes?.texto) {
+      return {
+        titulo: String(edgeRes.titulo).trim(),
+        texto: String(edgeRes.texto).trim(),
+        origen: edgeRes.origen || "edge_function",
+      };
+    }
+  } catch {}
+
+  // Tier 2: Gemini Direct
+  if (apiKey) {
+    const prompt = `Con estos ingredientes: ${itemsText}, propón un solo platillo real del mundo que los combine. Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
+
+Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
+{
+  "titulo": "string con el nombre del platillo como título",
+  "texto": "un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades"
+}`;
+
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            return {
+              titulo: (parsed.titulo || "Platillo sugerido").trim(),
+              texto: (parsed.texto || "").trim(),
+              origen: "gemini_direct",
+            };
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Tier 3: Respaldo analítico estructurado
+  const titulo = `Preparación con ${lista.slice(0, 3).join(", ")}`;
+  return {
+    titulo,
+    texto: `Tus ingredientes (${itemsText}) se pueden combinar en un platillo tradicional; combinan bien y ninguno sobra, aunque para completarlo conviene sumar una pizca de sal, pimienta y unas gotas de aceite o limón al servir.`,
+    origen: "analitico_local",
+  };
+}

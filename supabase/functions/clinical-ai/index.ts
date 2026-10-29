@@ -413,6 +413,64 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
     // =========================================================================
     // ACCIÓN: GENERAR RECETA DESDE DESPENSA CON GEMINI
     // =========================================================================
+    // =========================================================================
+    // ACCIÓN: GENERAR PLATILLO REAL A PARTIR DE INGREDIENTES
+    // =========================================================================
+    if (action === "dish-from-ingredients") {
+      const ingredientes = Array.isArray(body.ingredientes)
+        ? body.ingredientes.join(", ")
+        : String(body.ingredientes || "").trim();
+
+      if (geminiKey && geminiKey.trim().length >= 20 && ingredientes) {
+        const promptDish = `Con estos ingredientes: ${ingredientes}, propón un solo platillo real del mundo que los combine. Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
+
+Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
+{
+  "titulo": "string con el nombre del platillo como título",
+  "texto": "un solo texto corrido breve que indique si sobra algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades"
+}`;
+
+        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptDish }] }],
+                  generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                return new Response(
+                  JSON.stringify({
+                    titulo: parsed.titulo || "Platillo sugerido",
+                    texto: parsed.texto || "",
+                    origen: "gemini_edge",
+                    model,
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    // =========================================================================
     if (action === "pantry-meal") {
       const ingredientesDisponibles = (body.ingredientesDisponibles || "").trim();
       const targetMacros = body.targetMacros || {};

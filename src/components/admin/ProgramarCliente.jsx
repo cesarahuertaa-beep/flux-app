@@ -29,7 +29,8 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi } from "../../lib/clinicalAi";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi } from "../../lib/clinicalAi";
+import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
@@ -204,6 +205,81 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"" });
   const [aiOptimizingIndex, setAiOptimizingIndex] = useState(null);
+  const [aiGeneratingDishIndex, setAiGeneratingDishIndex] = useState(null);
+  const [ingredientSearchMap, setIngredientSearchMap] = useState({});
+  const [ingredientCatMap, setIngredientCatMap] = useState({});
+
+  const toggleIngrediente = (mealIdx, ingredienteNombre) => {
+    setDiaForm(p => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const list = [...(c.ingredientesSeleccionados || [])];
+      const exists = list.includes(ingredienteNombre);
+      if (exists) {
+        c.ingredientesSeleccionados = list.filter(x => x !== ingredienteNombre);
+      } else {
+        c.ingredientesSeleccionados = [...list, ingredienteNombre];
+      }
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+  };
+
+  const handleGenerateDishFromIngredients = async (mealIdx) => {
+    const meal = diaForm.comidas[mealIdx];
+    const items = meal?.ingredientesSeleccionados || [];
+    if (items.length === 0) {
+      alert("Selecciona al menos 2 ingredientes marcando sus casillas para generar un platillo.");
+      return;
+    }
+    setAiGeneratingDishIndex(mealIdx);
+    try {
+      const res = await generateDishFromIngredientsWithAi({
+        ingredientes: items,
+        cliente: selected,
+        clinicalRec,
+      });
+
+      let autoPhoto = meal.foto_url;
+      if (!autoPhoto && res?.titulo) {
+        try {
+          const match = await searchDishPhotoInCatalog(res.titulo, [res.titulo, ...items]);
+          if (match?.foto_url) {
+            autoPhoto = match.foto_url;
+          }
+        } catch {}
+      }
+
+      setDiaForm(p => {
+        const cs = [...p.comidas];
+        const c = { ...cs[mealIdx] };
+        if (res.titulo) {
+          c.nombre = res.titulo;
+        }
+        const dishText = res.texto || "";
+        const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+        opts[0] = dishText;
+        c.opciones = opts;
+        c.opcion1 = dishText;
+        if (autoPhoto) c.foto_url = autoPhoto;
+        // Conmutar automáticamente a modo platillo para revisar la receta generada
+        c.modoEdicion = "platillo";
+        cs[mealIdx] = c;
+        return { ...p, comidas: cs };
+      });
+
+      setMsg(
+        <div className="flex items-center gap-1.5 text-purple-700">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          <span>¡Platillo generado con IA! Puedes revisarlo o calcular sus macros.</span>
+        </div>
+      );
+    } catch (err) {
+      alert("No se pudo generar el platillo con IA: " + (err?.message || "Error"));
+    } finally {
+      setAiGeneratingDishIndex(null);
+    }
+  };
   const [aiAltIndex, setAiAltIndex] = useState(null);
   const [photoCatalogModal, setPhotoCatalogModal] = useState(null);
   const [catalogCategory, setCatalogCategory] = useState("Todos");
@@ -3888,22 +3964,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
               {/* Right Column: Lista de Comidas (Siempre Desplegadas y Visibles) */}
               <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-2 mb-5">
-                  <div>
-                    <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
-                      <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
-                      Comidas y Distribución ({diaForm.comidas.length})
-                    </h3>
-                    <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra desde el icono izquierdo para reordenar las tomas</p>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={addComida}
-                    className="text-xs flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--brand-primary)]/40 bg-blue-50/50 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white transition-all font-bold shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar Comida</span>
-                  </button>
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
+                    Comidas y Distribución ({diaForm.comidas.length})
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">Arrastra desde el icono izquierdo para reordenar las tomas</p>
                 </div>
 
                 {diaForm.comidas.length === 0 ? (
@@ -4004,42 +4070,240 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   </div>
 
-                                  {/* Row 2: Opción Principal (A) con Botón Optimizar con IA */}
+                                  {/* Row 2: Opción Principal (A) con Switch Platillo vs Ingredientes */}
                                   <div className="mb-3.5 p-3.5 rounded-xl bg-white border border-[#E2E8F0]">
-                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                      <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                                      <div className="flex items-center gap-2.5 flex-wrap">
                                         <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                           Opción Principal (A)
                                         </span>
-                                        <span className="text-[11px] text-[#6B7A8D]">Receta base obligatoria</span>
+                                        {/* Switch Platillo vs Ingredientes */}
+                                        <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
+                                          <button
+                                            type="button"
+                                            onClick={() => updComida(i, "modoEdicion", "platillo")}
+                                            className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 ${
+                                              (c.modoEdicion || "platillo") === "platillo"
+                                                ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
+                                                : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                            }`}
+                                          >
+                                            <span>🍲</span>
+                                            <span>Platillo</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => updComida(i, "modoEdicion", "ingredientes")}
+                                            className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 ${
+                                              c.modoEdicion === "ingredientes"
+                                                ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                                                : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                            }`}
+                                          >
+                                            <span>🥑</span>
+                                            <span>Ingredientes</span>
+                                            {c.ingredientesSeleccionados?.length > 0 && (
+                                              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                                                {c.ingredientesSeleccionados.length}
+                                              </span>
+                                            )}
+                                          </button>
+                                        </div>
                                       </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOptimizeComidaWithAi(i)}
-                                        disabled={aiOptimizingIndex === i}
-                                        className="text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
-                                        title="Calcula macros con IA, audita aversiones/alergias del expediente y busca foto de referencia"
-                                      >
-                                        {aiOptimizingIndex === i ? (
-                                          <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Analizando...</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                                            <span>Optimizar con IA</span>
-                                          </>
-                                        )}
-                                      </button>
+
+                                      {(c.modoEdicion || "platillo") === "platillo" && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOptimizeComidaWithAi(i)}
+                                          disabled={aiOptimizingIndex === i}
+                                          className="text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
+                                          title="Calcula macros con IA, audita aversiones/alergias del expediente y busca foto de referencia"
+                                        >
+                                          {aiOptimizingIndex === i ? (
+                                            <>
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                              <span>Analizando...</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                              <span>Optimizar con IA</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
                                     </div>
 
-                                    <textarea 
-                                      className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[72px]" 
-                                      value={opcionesList[0] || ""} 
-                                      onChange={e => updMealOption(i, 0, e.target.value)} 
-                                      placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
-                                    />
+                                    {(c.modoEdicion || "platillo") === "platillo" ? (
+                                      <textarea 
+                                        className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[72px]" 
+                                        value={opcionesList[0] || ""} 
+                                        onChange={e => updMealOption(i, 0, e.target.value)} 
+                                        placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
+                                      />
+                                    ) : (
+                                      /* Constructor por Ingredientes con Checkboxes */
+                                      <div className="space-y-2.5">
+                                        {/* Barra de búsqueda */}
+                                        <div className="relative">
+                                          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                          <input
+                                            type="text"
+                                            value={ingredientSearchMap[i] || ""}
+                                            onChange={e => setIngredientSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
+                                            placeholder="Buscar ingrediente (ej. Tortilla, Carne molida, Chipotle, Aguacate, Huevo)..."
+                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                                          />
+                                          {ingredientSearchMap[i] && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setIngredientSearchMap(prev => ({ ...prev, [i]: "" }))}
+                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {/* Filtros de Categorías */}
+                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                                          {CATEGORIAS_INGREDIENTES.map(cat => {
+                                            const activeCat = ingredientCatMap[i] || "todos";
+                                            const isSelected = activeCat === cat.id;
+                                            return (
+                                              <button
+                                                key={cat.id}
+                                                type="button"
+                                                onClick={() => setIngredientCatMap(prev => ({ ...prev, [i]: cat.id }))}
+                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border ${
+                                                  isSelected
+                                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
+                                                }`}
+                                              >
+                                                <span>{cat.icono}</span>
+                                                <span>{cat.nombre}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {/* Bandeja de seleccionados */}
+                                        {c.ingredientesSeleccionados?.length > 0 && (
+                                          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
+                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                              <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
+                                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                {c.ingredientesSeleccionados.length} ingredientes seleccionados:
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => updComida(i, "ingredientesSeleccionados", [])}
+                                                className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
+                                              >
+                                                Limpiar selección
+                                              </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {c.ingredientesSeleccionados.map(ing => (
+                                                <span
+                                                  key={ing}
+                                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white border border-emerald-300 text-xs font-semibold text-emerald-900 shadow-2xs"
+                                                >
+                                                  {ing}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => toggleIngrediente(i, ing)}
+                                                    className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                  >
+                                                    <X className="w-3 h-3" />
+                                                  </button>
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Grid de Ingredientes con Checkboxes */}
+                                        <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-56 overflow-y-auto">
+                                          {(() => {
+                                            const items = buscarIngredientes(
+                                              ingredientSearchMap[i] || "",
+                                              ingredientCatMap[i] || "todos"
+                                            );
+                                            if (items.length === 0) {
+                                              return (
+                                                <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                                                  No se encontraron ingredientes con ese término.
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                                                {items.map(item => {
+                                                  const isChecked = (c.ingredientesSeleccionados || []).includes(item.nombre);
+                                                  return (
+                                                    <div
+                                                      key={item.id}
+                                                      onClick={() => toggleIngrediente(i, item.nombre)}
+                                                      className={`flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                                                        isChecked
+                                                          ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                          : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
+                                                      }`}
+                                                    >
+                                                      <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => {}}
+                                                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer shrink-0"
+                                                      />
+                                                      <img
+                                                        src={item.foto}
+                                                        alt={item.nombre}
+                                                        className="w-6 h-6 object-contain rounded shrink-0 bg-white"
+                                                        loading="lazy"
+                                                        onError={e => { e.currentTarget.style.display = 'none'; }}
+                                                      />
+                                                      <span className="text-xs font-medium text-[#0B1929] truncate flex-1" title={item.nombre}>
+                                                        {item.nombre}
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+
+                                        {/* Pie del Constructor: Botón Generar con IA */}
+                                        <div className="pt-1 flex items-center justify-between gap-3 flex-wrap">
+                                          <span className="text-[11px] text-[#6B7A8D]">
+                                            {(c.ingredientesSeleccionados || []).length >= 2 
+                                              ? "Combina tus ingredientes en un platillo real del mundo."
+                                              : "Selecciona al menos 2 ingredientes para generar el platillo."}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleGenerateDishFromIngredients(i)}
+                                            disabled={aiGeneratingDishIndex === i || (c.ingredientesSeleccionados || []).length === 0}
+                                            className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                                          >
+                                            {aiGeneratingDishIndex === i ? (
+                                              <>
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <span>Creando platillo...</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                <span>Generar Platillo con IA {(c.ingredientesSeleccionados || []).length > 0 ? `(${c.ingredientesSeleccionados.length})` : ""}</span>
+                                              </>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
 
                                     {/* Alerta clínica de alergias o aversiones */}
                                     {c.evaluacionClinica ? (
