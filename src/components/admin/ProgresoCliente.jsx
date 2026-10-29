@@ -2077,12 +2077,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               {/* Left Column: Protocol & Anthropometric Fields */}
               <div className="lg:col-span-8 flex flex-col gap-5">
                 {/* Paso 1: Check-in de Seguimiento */}
-                <div className="bg-white rounded-2xl border border-blue-100 p-4 sm:p-6 shadow-sm relative overflow-hidden space-y-4">
+                {/* Paso 1: Check-in de Seguimiento */}
+                <div className="bg-white rounded-2xl border border-blue-100 p-4 sm:p-6 shadow-sm relative overflow-hidden space-y-5">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
                   
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
                         <Activity className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -2095,95 +2096,121 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </h3>
                         </div>
                         <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
-                          Registra las sensaciones del paciente basado en lo que ha experimentado a partir de la última sesión (o si es su primera sesión, cómo suele sentirse en el día a día). Pondera del 1 (lo menor o más desfavorable) al 5 (lo mayor u óptimo).
+                          Registra las sensaciones y hábitos del paciente basado en su experiencia reciente (o su día a día habitual si es consulta inicial). Pondera del 1 (lo menor o más desfavorable) al 5 (lo mayor u óptimo).
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 5 Escalas 1 a 5 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                  {/* Panel Unificado de Ponderación (5 Escalas) */}
+                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl divide-y divide-[#E2E8F0] overflow-hidden">
                     {[
                       {
                         key: "checkin_energia",
                         label: "Energía diaria",
-                        icon: <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />,
-                        minHelp: "1: Mínima",
-                        maxHelp: "5: Óptima"
+                        icon: <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />,
+                        badgeColor: "bg-amber-50 text-amber-700 border-amber-200/80",
+                        minHelp: "Fatiga o baja energía",
+                        maxHelp: "Energía plena y constante",
+                        labels: { 1: "Muy baja", 2: "Baja", 3: "Moderada", 4: "Buena", 5: "Óptima" },
                       },
                       {
                         key: "checkin_saciedad",
-                        label: "Control saciedad",
-                        icon: <Utensils className="w-3.5 h-3.5 text-emerald-600" />,
-                        minHelp: "1: Mucha hambre",
-                        maxHelp: "5: Saciado"
+                        label: "Control de saciedad",
+                        icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+                        badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+                        minHelp: "Mucha hambre o ansiedad",
+                        maxHelp: "Apetito bien saciado y controlado",
+                        labels: { 1: "Mucha hambre", 2: "Ansiedad", 3: "Aceptable", 4: "Controlada", 5: "Excelente" },
                       },
                       {
                         key: "checkin_digestion",
-                        label: "Digestión",
-                        icon: <Stethoscope className="w-3.5 h-3.5 text-purple-600" />,
-                        minHelp: "1: Malestares",
-                        maxHelp: "5: Excelente"
+                        label: "Digestión y confort estomacal",
+                        icon: <Stethoscope className="w-4 h-4 text-purple-600" />,
+                        badgeColor: "bg-purple-50 text-purple-700 border-purple-200/80",
+                        minHelp: "Malestares o inflamación",
+                        maxHelp: "Digestión ligera y sin pesadez",
+                        labels: { 1: "Inflamado", 2: "Pesadez", 3: "Normal", 4: "Muy buena", 5: "Óptima" },
                       },
                       {
                         key: "checkin_descanso",
                         label: "Calidad de sueño",
-                        icon: <Moon className="w-3.5 h-3.5 text-indigo-500" />,
-                        minHelp: "1: Deficiente",
-                        maxHelp: "5: Reparador"
+                        icon: <Moon className="w-4 h-4 text-indigo-500" />,
+                        badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200/80",
+                        minHelp: "Insomnio o sueño interrumpido",
+                        maxHelp: "Sueño profundo y reparador",
+                        labels: { 1: "Deficiente", 2: "Interrumpido", 3: "Regular", 4: "Reparador", 5: "Profundo" },
                       },
                       {
                         key: "nivel_estres",
                         label: "Nivel de estrés",
-                        icon: <Activity className="w-3.5 h-3.5 text-rose-500" />,
-                        minHelp: "1: Mínimo / Relajado",
-                        maxHelp: "5: Severo / Máximo"
+                        icon: <Activity className="w-4 h-4 text-rose-500" />,
+                        badgeColor: "bg-rose-50 text-rose-700 border-rose-200/80",
+                        minHelp: "Mínimo / Muy relajado",
+                        maxHelp: "Muy elevado / Severo",
+                        labels: { 1: "Mínimo", 2: "Leve", 3: "Moderado", 4: "Alto", 5: "Severo" },
                       },
                     ].map((sc) => {
                       const currentVal = Number(form[sc.key] || (sc.key === "nivel_estres" ? 3 : 4));
+                      const statusLabel = sc.labels[currentVal] || `${currentVal}/5`;
                       return (
-                        <div key={sc.key} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5 truncate">
-                                {sc.icon}
-                                <span className="truncate">{sc.label}</span>
-                              </span>
-                              <span className="text-xs font-extrabold text-[var(--brand-primary)] shrink-0 ml-1">
-                                {currentVal}/5
-                              </span>
+                        <div
+                          key={sc.key}
+                          className="p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-white/70 transition-colors"
+                        >
+                          {/* Izquierda: Icono + Título + Badge de estado + Leyenda descriptiva */}
+                          <div className="flex items-start sm:items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs flex items-center justify-center shrink-0">
+                              {sc.icon}
                             </div>
-                            <div className="flex items-center justify-between text-[9px] text-[#6B7A8D] mb-2 font-medium">
-                              <span className="truncate">{sc.minHelp}</span>
-                              <span className="truncate text-right">{sc.maxHelp}</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs sm:text-sm font-bold text-[#0B1929]">
+                                  {sc.label}
+                                </span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${sc.badgeColor}`}>
+                                  {currentVal}/5 · {statusLabel}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#6B7A8D] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span className="text-gray-400 font-medium">Escala:</span>
+                                <span className="font-medium text-gray-600">1 = {sc.minHelp}</span>
+                                <span className="text-gray-300">|</span>
+                                <span className="font-medium text-gray-600">5 = {sc.maxHelp}</span>
+                              </p>
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <button
-                                key={n}
-                                type="button"
-                                disabled={isReadOnly}
-                                onClick={() => !isReadOnly && updForm(sc.key, String(n))}
-                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
-                                  isReadOnly ? "cursor-default" : "cursor-pointer"
-                                } ${
-                                  currentVal === n
-                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
-                                }`}
-                              >
-                                {n}
-                              </button>
-                            ))}
+
+                          {/* Derecha: Selector de 5 botones (1 al 5) */}
+                          <div className="flex items-center gap-1 self-stretch md:self-auto justify-end shrink-0 bg-white p-1 rounded-xl border border-[#E2E8F0] shadow-2xs">
+                            {[1, 2, 3, 4, 5].map((n) => {
+                              const isSel = currentVal === n;
+                              return (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => !isReadOnly && updForm(sc.key, String(n))}
+                                  className={`flex-1 md:flex-none w-9 h-8 sm:w-10 sm:h-9 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
+                                    isReadOnly ? "cursor-default" : "cursor-pointer"
+                                  } ${
+                                    isSel
+                                      ? "bg-[var(--brand-primary)] text-white shadow-xs font-extrabold scale-102"
+                                      : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100/70"
+                                  }`}
+                                >
+                                  {n}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Hábitos de Sueño, Agua y Actividad Física */}
-                  <div className="pt-3 border-t border-blue-100/80 space-y-2.5">
+                  {/* Hábitos de Sueño, Agua y Actividad Física (2x2 Grid) */}
+                  <div className="pt-2 border-t border-blue-100/80 space-y-3">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-[var(--brand-primary)]" />
                       <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
@@ -2191,12 +2218,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       {/* Horas de Sueño */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                          Horas de sueño promedio
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                          <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Horas de sueño promedio</span>
                         </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Promedio de descanso por noche.
+                        </p>
                         <input
                           type="number"
                           step="0.5"
@@ -2204,30 +2235,38 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.horas_sueno || ""}
                           onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
                           placeholder="Ej. 7.5 hrs"
-                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
                       {/* Consumo de Agua */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                          Consumo de agua estimado
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                          <Droplets className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Consumo de agua estimado</span>
                         </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Líquidos / agua natural promedio al día.
+                        </p>
                         <input
                           type="text"
                           readOnly={isReadOnly}
                           value={form.consumo_agua_estimado || ""}
                           onChange={(e) => !isReadOnly && updForm("consumo_agua_estimado", e.target.value)}
                           placeholder="Ej. 2 a 2.5 L al día"
-                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
                       {/* Días de Ejercicio Actuales */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                          Días de ejercicio actuales
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                          <Dumbbell className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Días de ejercicio actuales</span>
                         </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Frecuencia semanal de entrenamiento (0 a 7 días).
+                        </p>
                         <input
                           type="number"
                           min="0"
@@ -2235,23 +2274,27 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           readOnly={isReadOnly}
                           value={form.dias_ejercicio_actual || ""}
                           onChange={(e) => !isReadOnly && updForm("dias_ejercicio_actual", e.target.value)}
-                          placeholder="Ej. 3 o 4 días/sem"
-                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          placeholder="Ej. 3 o 4 días por semana"
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
                       {/* Horario Disponible para Entrenar */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                          Horario habitual de entreno
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
+                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Horario habitual de entreno</span>
                         </label>
+                        <p className="text-[11px] text-[#6B7A8D]">
+                          Momento del día en el que suele entrenar.
+                        </p>
                         <input
                           type="text"
                           readOnly={isReadOnly}
                           value={form.horario_ejercicio || ""}
                           onChange={(e) => !isReadOnly && updForm("horario_ejercicio", e.target.value)}
-                          placeholder="Ej. Mañanas 7 AM, Tardes..."
-                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          placeholder="Ej. Mañanas (7:00 AM), Tardes (6:00 PM)..."
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
                     </div>
@@ -2259,10 +2302,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   {/* Sensaciones y Adherencia del Ciclo (Solo para segundas evaluaciones en adelante) */}
                   {!isFirstEvaluationEver && (
-                    <div className="pt-3 border-t border-blue-100/80 space-y-2">
+                    <div className="pt-2 border-t border-blue-100/80 space-y-2.5">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <label className="block text-xs font-bold text-[#0B1929]">
-                          Sensaciones y adherencia del ciclo previo
+                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
+                          <span>Sensaciones y adherencia del ciclo previo</span>
                         </label>
                         {adherenceSummary?.summaryText && (
                           <button
@@ -2278,9 +2322,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 );
                               }
                             }}
-                            className="text-[11px] font-bold text-[var(--brand-primary)] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            className="text-[11px] font-bold text-[var(--brand-primary)] hover:underline inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <Sparkles className="w-3 h-3" />
                             <span>Auto-completar desde app</span>
                           </button>
                         )}
@@ -2294,13 +2338,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       )}
 
-                      <input
-                        type="text"
+                      <textarea
+                        rows={2}
                         readOnly={isReadOnly}
                         value={form.checkin_observaciones || ""}
                         onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
-                        placeholder="Ej. Buena energía, apego al 90%, sin hambre excesiva..."
-                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                        placeholder="Ej. Buena energía a lo largo del día, apego al 90%, sin hambre excesiva ni atracones..."
+                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] resize-none shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                       />
                     </div>
                   )}
@@ -2498,7 +2542,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {ACTIVITY_FACTORS.map((f) => {
                         const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
                         const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
