@@ -31,7 +31,7 @@ import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnes
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
-import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE } from "../../lib/foodPhotoCatalog";
+import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
@@ -208,6 +208,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [aiGeneratingDishIndex, setAiGeneratingDishIndex] = useState(null);
   const [ingredientSearchMap, setIngredientSearchMap] = useState({});
   const [ingredientCatMap, setIngredientCatMap] = useState({});
+  const [dishCatalogOpenMap, setDishCatalogOpenMap] = useState({});
+  const [dishCatalogSearchMap, setDishCatalogSearchMap] = useState({});
+  const [dishCatalogCatMap, setDishCatalogCatMap] = useState({});
+
+  const handleSelectDishFromCatalog = (mealIdx, dish) => {
+    setDiaForm(p => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const recipeText = dish.texto || dish.nombre;
+      const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+      opts[0] = recipeText;
+      c.opciones = opts;
+      c.opcion1 = recipeText;
+      if (dish.foto_url) {
+        c.foto_url = dish.foto_url;
+      }
+      if (dish.calorias) c.calorias = dish.calorias;
+      if (dish.proteina) c.proteina = dish.proteina;
+      if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
+      if (dish.grasas) c.grasas = dish.grasas;
+      c.modoEdicion = "platillo";
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+    setDishCatalogOpenMap(prev => ({ ...prev, [mealIdx]: false }));
+    setMsg(
+      <div className="flex items-center gap-1.5 text-purple-700">
+        <Sparkles className="w-4 h-4 text-purple-600" />
+        <span>Platillo "{dish.nombre}" cargado exitosamente.</span>
+      </div>
+    );
+  };
 
   const toggleIngrediente = (mealIdx, ingredienteNombre) => {
     setDiaForm(p => {
@@ -4367,6 +4399,120 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                          </div>
                                        </div>
                                      ) : null}
+                                    {/* Menú Desplegable de Platillos FLUX (al pulsar la lupa) */}
+                                    {dishCatalogOpenMap[i] && (
+                                      <div className="mt-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                                            <Utensils className="w-3.5 h-3.5 text-purple-600" />
+                                            Catálogo de Platillos FLUX
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: false }))}
+                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                                            title="Cerrar catálogo"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+
+                                        {/* Barra de búsqueda */}
+                                        <div className="relative mb-2">
+                                          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                          <input
+                                            type="text"
+                                            value={dishCatalogSearchMap[i] || ""}
+                                            onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
+                                            placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón, Chilaquiles)..."
+                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
+                                          />
+                                          {dishCatalogSearchMap[i] && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setDishCatalogSearchMap(prev => ({ ...prev, [i]: "" }))}
+                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {/* Filtros de Categorías */}
+                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
+                                          {CATEGORIAS_PLATILLOS.map(cat => {
+                                            const activeCat = dishCatalogCatMap[i] || "todos";
+                                            const isSelected = activeCat === cat.id;
+                                            return (
+                                              <button
+                                                key={cat.id}
+                                                type="button"
+                                                onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [i]: cat.id }))}
+                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
+                                                  isSelected
+                                                    ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
+                                                }`}
+                                              >
+                                                <span>{cat.icono}</span>
+                                                <span>{cat.nombre}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {/* Grid de Platillos en formato visual similar a ingredientes */}
+                                        <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
+                                          {(() => {
+                                            const platillos = buscarPlatillosCatalogo(
+                                              dishCatalogSearchMap[i] || "",
+                                              dishCatalogCatMap[i] || "todos"
+                                            );
+                                            if (platillos.length === 0) {
+                                              return (
+                                                <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                                                  No se encontraron platillos para esa búsqueda.
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                {platillos.map(item => (
+                                                  <div
+                                                    key={item.id}
+                                                    onClick={() => handleSelectDishFromCatalog(i, item)}
+                                                    className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
+                                                  >
+                                                    <img
+                                                      src={item.foto_url}
+                                                      alt={item.nombre}
+                                                      className="w-12 h-12 object-cover rounded-lg shrink-0 border border-gray-100 group-hover:scale-105 transition-transform"
+                                                      loading="lazy"
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                      <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
+                                                        {item.nombre}
+                                                      </p>
+                                                      <div className="flex items-center gap-2 mt-1">
+                                                        {item.calorias && (
+                                                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                            {item.calorias} kcal
+                                                          </span>
+                                                        )}
+                                                        <span className="text-[10px] text-[#6B7A8D] capitalize">
+                                                          {item.categoria}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+
                                     {/* Foto de Referencia Visual integrada en Opción Principal */}
                                     <div className="mt-3 pt-3 border-t border-[#E2E8F0]/80">
                                       <div className="flex items-center justify-between mb-2">
@@ -4398,17 +4544,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
                                         </label>
 
+                                        {/* Botón Lupa de Catálogo FLUX */}
                                         <button
                                           type="button"
-                                          onClick={() => {
-                                            setCatalogCategory("Todos");
-                                            setCatalogSearch("");
-                                            setPhotoCatalogModal({ mealIndex: i });
-                                          }}
-                                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] bg-gray-50 hover:bg-gray-100 rounded-xl text-[#0B1929] text-xs font-bold transition-colors cursor-pointer"
+                                          onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: !prev[i] }))}
+                                          className={`flex items-center justify-center p-2 border rounded-xl transition-all cursor-pointer ${
+                                            dishCatalogOpenMap[i]
+                                              ? "bg-purple-100 text-purple-700 border-purple-300 shadow-2xs ring-1 ring-purple-300"
+                                              : "bg-gray-50 hover:bg-gray-100 text-[#0B1929] border-[#E2E8F0]"
+                                          }`}
+                                          title={dishCatalogOpenMap[i] ? "Cerrar catálogo de platillos" : "Explorar catálogo de platillos FLUX"}
                                         >
-                                          <Search className="w-3.5 h-3.5 text-[#6B7A8D]" />
-                                          <span>🔍 Catálogo FLUX</span>
+                                          <Search className="w-4 h-4 text-[#0B1929]" />
                                         </button>
                                       </div>
                                     </div>
