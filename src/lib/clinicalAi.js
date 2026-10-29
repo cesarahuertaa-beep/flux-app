@@ -633,11 +633,13 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
  * Optimiza y calcula automáticamente los macros de una comida a partir de su texto e ingredientes,
  * y realiza una auditoría clínica contra las aversiones, alergias y expediente del paciente.
  */
-export async function optimizeMealWithAi({ textoComida, targetKcal = 0, clinicalRec = null, cliente = {} }) {
-  if (!textoComida || !textoComida.trim()) {
+export async function optimizeMealWithAi({ textoComida, mealText, targetKcal = 0, targetMacros = {}, clinicalRec = null, cliente = {} }) {
+  const text = (textoComida || mealText || "").trim();
+  if (!text) {
     throw new Error("Escribe los ingredientes o descripción del platillo para optimizar con IA.");
   }
 
+  const effectiveKcal = Number(targetKcal) || Number(targetMacros?.calorias) || 0;
   const anamnesis = clinicalRec?.anamnesis || {};
   const apiKey = getGeminiApiKey();
 
@@ -647,14 +649,17 @@ export async function optimizeMealWithAi({ textoComida, targetKcal = 0, clinical
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const edgeRes = await invokeEdgeFunction("clinical-ai", {
       action: "optimize-meal",
-      textoComida: textoComida.trim(),
-      targetKcal,
+      textoComida: text,
+      targetKcal: effectiveKcal,
       anamnesis,
       cliente,
       geminiKey: apiKey,
     });
     clearTimeout(timeoutId);
     if (edgeRes?.calorias || edgeRes?.proteina) {
+      if (!edgeRes.palabrasClaveFoto && edgeRes.palabrasClave) {
+        edgeRes.palabrasClaveFoto = edgeRes.palabrasClave;
+      }
       return edgeRes;
     }
   } catch {}
@@ -666,15 +671,15 @@ Analiza la siguiente comida/receta diseñada para un paciente y calcula con máx
 Adicionalmente, coteja los ingredientes contra el expediente del paciente para detectar si hay algún conflicto con alergias o aversiones personales.
 
 EXPEDIENTE DEL PACIENTE:
-- Nombre: ${cliente.nombre || "Paciente"} (${cliente.genero === "F" ? "Mujer" : "Hombre"})
+- Nombre: ${cliente?.nombre || "Paciente"} (${cliente?.genero === "F" ? "Mujer" : "Hombre"})
 - Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Aversiones alimentarias (no le gusta comer): ${anamnesis.aversiones_alimentos || "Ninguna"}
 - Preferencias / favoritos: ${anamnesis.preferencias_alimentos || "Ninguna"}
 - Patologías: ${anamnesis.patologias || "Ninguna"}
 
 COMIDA A ANALIZAR:
-"${textoComida.trim()}"
-${targetKcal > 0 ? `(Meta de referencia para esta toma: ~${targetKcal} kcal)` : ""}
+"${text}"
+${effectiveKcal > 0 ? `(Meta de referencia para esta toma: ~${effectiveKcal} kcal)` : ""}
 
 INSTRUCCIONES:
 1. Calcula calorías totales, gramos de proteína, carbohidratos y grasas con coherencia química (Kcal = P*4 + C*4 + G*9).
@@ -693,7 +698,7 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
   "resumenNutricional": "string breve de 1 oración sobre la calidad de la toma"
 }`;
 
-    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -714,9 +719,11 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
         );
         if (res.ok) {
           const data = await res.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (text) {
-            return JSON.parse(text);
+          const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            parsed.palabrasClaveFoto = parsed.palabrasClaveFoto || parsed.palabrasClave || [];
+            return parsed;
           }
         }
       } catch {}
@@ -771,7 +778,7 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
   "nombreNormalizado": "string breve del platillo alternativo"
 }`;
 
-    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -842,7 +849,7 @@ Debes responder ÚNICAMENTE con un JSON:
   "grasas": number
 }`;
 
-    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,

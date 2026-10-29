@@ -28,6 +28,9 @@ import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
+import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi } from "../../lib/clinicalAi";
+import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
