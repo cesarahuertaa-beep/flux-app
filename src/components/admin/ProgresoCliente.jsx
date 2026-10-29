@@ -285,7 +285,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     fatsG: ""
   });
   const [manualSimMode, setManualSimMode] = useState("g_kg"); // "g_kg" | "pct"
-  const [manualSimCollapsed, setManualSimCollapsed] = useState(true);
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [isAuditingAi, setIsAuditingAi] = useState(false);
   const [aiAuditError, setAiAuditError] = useState(null);
@@ -577,7 +576,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
     setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
-    setManualSimCollapsed(true);
     setAiAuditResult(null);
     setIsAuditingAi(false);
     setAiAuditError(null);
@@ -1340,7 +1338,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
     setIsAuditingAi(false);
     setAiAuditError(null);
-    setManualSimCollapsed(true);
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
     setPendingFotos([]);
@@ -3596,77 +3593,45 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Bloque de Prescripción Dinámica / Simulador (Modo Manual) */}
                       {prescriptionMode === "manual" && (
-                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl shadow-xs overflow-hidden transition-all duration-200">
-                          {/* Cabecera del Simulador Inline (Colapsable, cerrado por defecto) */}
-                          <div
-                            onClick={() => setManualSimCollapsed((p) => !p)}
-                            className="p-3.5 sm:px-4 sm:py-3 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-amber-100/40 transition-colors"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200/80">
-                                <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" />
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                <span className="text-xs font-bold text-[#0B1929]">
-                                  Simulador & Ajustes Manuales
-                                </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100/90 text-amber-800 border border-amber-200/60">
-                                  Ajuste Fino
-                                </span>
-                              </div>
+                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl p-4 space-y-3.5 shadow-xs">
+                          {/* Cabecera del Simulador Inline */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                              <span className="text-xs font-bold text-[#0B1929]">
+                                Simulador & Ajustes Manuales
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200/60">
+                                Ajuste Fino
+                              </span>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[11px] font-semibold text-amber-900 hidden sm:inline">
-                                {manualSimCollapsed ? "Desplegar simulador" : "Ocultar"}
-                              </span>
+                            {/* Switcher: g/kg vs % */}
+                            <div className="flex bg-amber-100/60 p-0.5 rounded-lg border border-amber-200/70">
                               <button
                                 type="button"
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-800 bg-white shadow-2xs border border-amber-200/80 transition-transform cursor-pointer"
-                                title={manualSimCollapsed ? "Desplegar simulador" : "Colapsar"}
+                                onClick={() => setManualSimMode("g_kg")}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  manualSimMode === "g_kg"
+                                    ? "bg-white text-amber-900 shadow-2xs"
+                                    : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                }`}
                               >
-                                <ChevronDown
-                                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                                    manualSimCollapsed ? "" : "rotate-180"
-                                  }`}
-                                />
+                                g / kg
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setManualSimMode("pct")}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  manualSimMode === "pct"
+                                    ? "bg-white text-amber-900 shadow-2xs"
+                                    : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                }`}
+                              >
+                                % Calorías
                               </button>
                             </div>
                           </div>
-
-                          {/* Contenido Desplegable (Cerrado por defecto) */}
-                          {!manualSimCollapsed && (
-                            <div className="p-4 pt-1 border-t border-amber-200/60 space-y-3.5">
-                              {/* Barra de Controles: Switcher g/kg vs % */}
-                              <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
-                                <span className="text-[11px] font-bold text-[#475569]">
-                                  Modo de cálculo dinámico:
-                                </span>
-                                <div className="flex bg-amber-100/60 p-0.5 rounded-lg border border-amber-200/70">
-                                  <button
-                                    type="button"
-                                    onClick={() => setManualSimMode("g_kg")}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                                      manualSimMode === "g_kg"
-                                        ? "bg-white text-amber-900 shadow-2xs"
-                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                    }`}
-                                  >
-                                    g / kg peso
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setManualSimMode("pct")}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                                      manualSimMode === "pct"
-                                        ? "bg-white text-amber-900 shadow-2xs"
-                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                    }`}
-                                  >
-                                    % Calorías
-                                  </button>
-                                </div>
-                              </div>
 
                           {/* Presets Rápidos de Objetivo Calórico */}
                           <div className="space-y-1.5">
@@ -3942,8 +3907,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
                         </div>
                       )}
-                    </div>
-                  )}
 
                       {/* Sincronización Automática con el Plan Nutricional */}
                       {!isReadOnly && (

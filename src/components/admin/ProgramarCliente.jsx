@@ -196,6 +196,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [templateModal, setTemplateModal] = useState(null); // 'nutri' | 'rutina' | null
   const [showMacroCalc, setShowMacroCalc] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
+  const [metaPrescritaCollapsed, setMetaPrescritaCollapsed] = useState(true);
   const [allMetricas, setAllMetricas] = useState(() => {
     const ms = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
     return Array.isArray(ms) ? ms.map(enrichMetrica) : [];
@@ -2537,10 +2538,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   const prescMode = smartPrescription.prescriptionMode || "matematico";
 
                   return (
-                    <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors">
-                      {/* Cabecera de la tarjeta */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#F0F4FA]">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
+                      {/* Cabecera de la tarjeta (Colapsable) */}
+                      <div
+                        onClick={() => setMetaPrescritaCollapsed((p) => !p)}
+                        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                          metaPrescritaCollapsed ? "hover:bg-[#F8FAFC]" : "pb-3 border-b border-[#F0F4FA] bg-[#F8FAFC]/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
                             prescMode === "ia"
                               ? "bg-indigo-50 text-indigo-600 border-indigo-200/60"
@@ -2556,7 +2562,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               <Calculator className="w-4 h-4 text-[var(--brand-primary)]" />
                             )}
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-sm font-bold text-[#0B1929]">
                                 Meta Diaria Prescrita
@@ -2603,111 +2609,134 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 {smartPrescription.formulaShort || smartPrescription.formula}
                               </span>
                             </div>
-                            <p className="text-[11px] text-[#6B7A8D] truncate">
+                            <p className="text-[11px] text-[#6B7A8D] truncate mt-0.5">
                               {cycleMetrica?.fecha
                                 ? `Evaluación más reciente del plan (${fmtDate(cycleMetrica.fecha)}) • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`
                                 : `Sin evaluación vinculada • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`}
                             </p>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Cuadrícula de Macronutrientes */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3">
-                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
-                          <span className="text-[11px] font-semibold text-[#6B7A8D] block">Energía Diaria</span>
-                          <span className="text-base sm:text-lg font-extrabold text-[var(--brand-primary)]">
-                            {targetKcal} <span className="text-xs font-medium text-[#6B7A8D]">kcal</span>
+                        {/* Control de Colapso con Flecha */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <span className="text-[11px] font-semibold text-[#6B7A8D] hidden sm:inline">
+                            {metaPrescritaCollapsed ? "Ver desglose" : "Ocultar"}
                           </span>
-                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            TMB {smartPrescription.tmb} • GET {smartPrescription.get}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
-                          <span className="text-[11px] font-semibold text-emerald-700 block">Proteínas</span>
-                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
-                            {activeP} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
-                          </span>
-                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {smartPrescription.proteinPct || pPct}% • {smartPrescription.protGKg || (refWeight > 0 ? (activeP / refWeight).toFixed(1) : "-")} g/kg
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
-                          <span className="text-[11px] font-semibold text-amber-700 block">Carbohidratos</span>
-                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
-                            {activeC} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
-                          </span>
-                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {smartPrescription.carbsPct || cPct}% • {smartPrescription.carbGKg || (refWeight > 0 ? (activeC / refWeight).toFixed(1) : "-")} g/kg
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
-                          <span className="text-[11px] font-semibold text-rose-700 block">Grasas</span>
-                          <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
-                            {activeF} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
-                          </span>
-                          <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {smartPrescription.fatsPct || fPct}% • {smartPrescription.fatGKg || (refWeight > 0 ? (activeF / refWeight).toFixed(1) : "-")} g/kg
-                          </span>
+                          <button
+                            type="button"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] bg-white shadow-2xs border border-[#E2E8F0] transition-transform cursor-pointer"
+                            title={metaPrescritaCollapsed ? "Desplegar meta prescrita" : "Colapsar"}
+                          >
+                            <ChevronDown
+                              className={`w-4 h-4 transition-transform duration-200 ${
+                                metaPrescritaCollapsed ? "" : "rotate-180"
+                              }`}
+                            />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Explicación clínica IA / Criterio */}
-                      {smartPrescription.rationale && (
-                        <div className={`mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl ${
-                          prescMode === "ia"
-                            ? "bg-indigo-50/60 border border-indigo-100 text-indigo-950"
-                            : "bg-slate-50 border border-slate-200/70 text-[#6B7A8D]"
-                        }`}>
-                          {prescMode === "ia" ? (
-                            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                          ) : (
-                            <Activity className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
-                          )}
-                          <div className="leading-relaxed flex-1">
-                            {prescMode === "ia" && (
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <strong className="text-indigo-900 font-bold">
-                                  Dictamen de Auditoría Clínica IA:
-                                </strong>
-                                {smartPrescription.badgeMotivo && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
-                                    {smartPrescription.badgeMotivo}
-                                  </span>
+                      {/* Cuerpo de la Tarjeta (Desplegable, cerrado por defecto) */}
+                      {!metaPrescritaCollapsed && (
+                        <div className="p-4 pt-1">
+                          {/* Cuadrícula de Macronutrientes */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                            <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                              <span className="text-[11px] font-semibold text-[#6B7A8D] block">Energía Diaria</span>
+                              <span className="text-base sm:text-lg font-extrabold text-[var(--brand-primary)]">
+                                {targetKcal} <span className="text-xs font-medium text-[#6B7A8D]">kcal</span>
+                              </span>
+                              <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                                TMB {smartPrescription.tmb} • GET {smartPrescription.get}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                              <span className="text-[11px] font-semibold text-emerald-700 block">Proteínas</span>
+                              <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                                {activeP} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                              </span>
+                              <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                                {smartPrescription.proteinPct || pPct}% • {smartPrescription.protGKg || (refWeight > 0 ? (activeP / refWeight).toFixed(1) : "-")} g/kg
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                              <span className="text-[11px] font-semibold text-amber-700 block">Carbohidratos</span>
+                              <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                                {activeC} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                              </span>
+                              <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                                {smartPrescription.carbsPct || cPct}% • {smartPrescription.carbGKg || (refWeight > 0 ? (activeC / refWeight).toFixed(1) : "-")} g/kg
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#F0F4FA]">
+                              <span className="text-[11px] font-semibold text-rose-700 block">Grasas</span>
+                              <span className="text-base sm:text-lg font-extrabold text-[#0B1929]">
+                                {activeF} <span className="text-xs font-medium text-[#6B7A8D]">g</span>
+                              </span>
+                              <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
+                                {smartPrescription.fatsPct || fPct}% • {smartPrescription.fatGKg || (refWeight > 0 ? (activeF / refWeight).toFixed(1) : "-")} g/kg
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Explicación clínica IA / Criterio */}
+                          {smartPrescription.rationale && (
+                            <div className={`mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl ${
+                              prescMode === "ia"
+                                ? "bg-indigo-50/60 border border-indigo-100 text-indigo-950"
+                                : "bg-slate-50 border border-slate-200/70 text-[#6B7A8D]"
+                            }`}>
+                              {prescMode === "ia" ? (
+                                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                              ) : (
+                                <Activity className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                              )}
+                              <div className="leading-relaxed flex-1">
+                                {prescMode === "ia" && (
+                                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <strong className="text-indigo-900 font-bold">
+                                      Dictamen de Auditoría Clínica IA:
+                                    </strong>
+                                    {smartPrescription.badgeMotivo && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                                        {smartPrescription.badgeMotivo}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <p className="text-[#334155] leading-relaxed">{smartPrescription.rationale}</p>
+                                {smartPrescription.estrategiaMenu && (
+                                  <p className="mt-1.5 text-indigo-900 text-[11px] leading-relaxed">
+                                    <span className="font-bold text-indigo-950">Estrategia de menú sugerida: </span>
+                                    {smartPrescription.estrategiaMenu}
+                                  </p>
                                 )}
                               </div>
-                            )}
-                            <p className="text-[#334155] leading-relaxed">{smartPrescription.rationale}</p>
-                            {smartPrescription.estrategiaMenu && (
-                              <p className="mt-1.5 text-indigo-900 text-[11px] leading-relaxed">
-                                <span className="font-bold text-indigo-950">Estrategia de menú sugerida: </span>
-                                {smartPrescription.estrategiaMenu}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Preferencias y Aversiones evaluadas de la etapa */}
-                      {Boolean(smartPrescription.preferencias || smartPrescription.aversiones) && (
-                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {smartPrescription.preferencias && (
-                            <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/70 text-emerald-950">
-                              <span className="font-bold text-emerald-800 block text-[11px] uppercase tracking-wider mb-0.5">
-                                Favoritos de la etapa a incluir:
-                              </span>
-                              <span className="leading-snug">{smartPrescription.preferencias}</span>
                             </div>
                           )}
-                          {smartPrescription.aversiones && (
-                            <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/70 text-rose-950">
-                              <span className="font-bold text-rose-800 block text-[11px] uppercase tracking-wider mb-0.5">
-                                Aversiones / No incluir:
-                              </span>
-                              <span className="leading-snug">{smartPrescription.aversiones}</span>
+
+                          {/* Preferencias y Aversiones evaluadas de la etapa */}
+                          {Boolean(smartPrescription.preferencias || smartPrescription.aversiones) && (
+                            <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              {smartPrescription.preferencias && (
+                                <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/70 text-emerald-950">
+                                  <span className="font-bold text-emerald-800 block text-[11px] uppercase tracking-wider mb-0.5">
+                                    Favoritos de la etapa a incluir:
+                                  </span>
+                                  <span className="leading-snug">{smartPrescription.preferencias}</span>
+                                </div>
+                              )}
+                              {smartPrescription.aversiones && (
+                                <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/70 text-rose-950">
+                                  <span className="font-bold text-rose-800 block text-[11px] uppercase tracking-wider mb-0.5">
+                                    Aversiones / No incluir:
+                                  </span>
+                                  <span className="leading-snug">{smartPrescription.aversiones}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
