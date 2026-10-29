@@ -2375,14 +2375,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                     {/* Favoritos */}
-                    <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 space-y-1.5">
+                    <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 space-y-2">
                       <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
-                        <span>Alimentos predilectos / Favoritos</span>
+                        <span>Alimentos e ingredientes o platillos favoritos</span>
                       </label>
-                      <p className="text-[11px] text-[#6B7A8D]">
-                        Ingredientes, comidas o preparaciones que más se le antojan o facilitan su apego.
-                      </p>
                       <textarea
                         rows={3}
                         readOnly={isReadOnly}
@@ -2394,14 +2391,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
 
                     {/* Aversiones */}
-                    <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3.5 space-y-1.5">
+                    <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3.5 space-y-2">
                       <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Ban className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Alimentos que rechaza o prefiere evitar</span>
+                        <span>Alimentos, ingredientes o comidas que prefiero evitar</span>
                       </label>
-                      <p className="text-[11px] text-[#6B7A8D]">
-                        Comidas o ingredientes que no le agradan y no desea en sus menús por gusto personal (no por alergia).
-                      </p>
                       <textarea
                         rows={3}
                         readOnly={isReadOnly}
