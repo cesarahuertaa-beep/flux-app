@@ -1,6 +1,15 @@
 import { escapeHtml, parseFotos } from "./helpers";
 import { registerBackAction } from "../lib/backButtonHandler";
-import { enrichMetrica, getMetodoLabel } from "../lib/bodyComposition";
+import {
+  enrichMetrica,
+  getMetodoLabel,
+  getGoalPresetInfo,
+  getActivityFactorInfo,
+  classifyIMC,
+  classifyICC,
+  normalizeSexo,
+  calcEdadFromBirthdate,
+} from "../lib/bodyComposition";
 
 // Darkens a hex color by reducing RGB values
 const darken = (hex, amt = 60) => {
@@ -805,39 +814,153 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
   const nombre = escapeHtml(brand?.nombre_marca || "FLUX Sport Supplements");
   const accent = brand?.color_primario || "#1A6FD4";
   const dark = darken(accent, 60);
-  const light = tint(accent, 210);
+  const light = tint(accent, 220);
 
-  const fmtDate = (d) =>
-    new Date(d + "T12:00:00").toLocaleDateString("es-MX", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const fmtDate = (d) => {
+    if (!d) return "—";
+    try {
+      return new Date(d + "T12:00:00").toLocaleDateString("es-MX", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return d;
+    }
+  };
 
   const latest = metricas.length > 0 ? metricas[0] : null;
+  const prev = metricas.length > 1 ? metricas[1] : null;
   const clienteNombre = escapeHtml(cliente.nombre || "Paciente");
-  const clienteObjetivo = escapeHtml(cliente.objetivo || "\u2014");
+  const clienteObjetivo = escapeHtml(cliente.objetivo || "—");
+  const clienteSexo = normalizeSexo(cliente?.genero || cliente?.sexo || latest?.sexo || "M");
+  const clienteEdad = calcEdadFromBirthdate(cliente?.fecha_nacimiento, latest?.edad ? Number(latest.edad) : null);
   const fechaHoy = new Date().toLocaleDateString("es-MX", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progreso_${clienteNombre}</title>
+  // Helper para renderizar semáforo de puntos 1-5
+  const renderDots = (val, max = 5, filledColor = accent) => {
+    const v = parseInt(val, 10) || 0;
+    let s = "";
+    for (let i = 1; i <= max; i++) {
+      s += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 1.5px;background:${i <= v ? filledColor : '#E2E8F0'};vertical-align:middle;"></span>`;
+    }
+    return `<span style="margin-left:5px;display:inline-flex;align-items:center;">${s}</span>`;
+  };
+
+  // 1. Datos de Prescripción Energética y Macronutrientes
+  const prescMode = latest?.prescription_mode || (latest?.ai_audit_result ? "ia" : latest?.manual_macros ? "manual" : "matematico");
+  const aiAudit = latest?.ai_audit_result;
+  const manualMacros = latest?.manual_macros;
+  const prescMacros = latest?.prescribed_macros;
+
+  const targetKcal = prescMacros?.targetKcal || aiAudit?.targetKcal || manualMacros?.targetKcal || latest?.targetKcal || null;
+  const targetTmb = prescMacros?.tmb || latest?.tmb || null;
+  const targetGet = prescMacros?.get || latest?.get || null;
+  const fafVal = latest?.eval_faf || prescMacros?.faf || null;
+  const fafInfo = getActivityFactorInfo(fafVal);
+  const goalPreset = getGoalPresetInfo(latest?.eval_objetivo);
+
+  const protG = prescMacros?.proteinasG || aiAudit?.proteinasG || manualMacros?.proteinasG || latest?.proteinas_g || null;
+  const carbG = prescMacros?.carbosG || aiAudit?.carbosG || manualMacros?.carbosG || latest?.carbos_g || null;
+  const fatG = prescMacros?.grasasG || aiAudit?.grasasG || manualMacros?.grasasG || latest?.grasas_g || null;
+  const aguaMl = prescMacros?.aguaMl || aiAudit?.aguaMl || null;
+  const aguaL = aguaMl ? (Number(aguaMl) / 1000).toFixed(1) : null;
+
+  const pesoNum = parseFloat(latest?.peso) || 0;
+  const protGKg = prescMacros?.protGKg || (pesoNum > 0 && protG ? (Number(protG) / pesoNum).toFixed(1) : null);
+  const carbGKg = prescMacros?.carbGKg || (pesoNum > 0 && carbG ? (Number(carbG) / pesoNum).toFixed(1) : null);
+  const fatGKg = prescMacros?.fatGKg || (pesoNum > 0 && fatG ? (Number(fatG) / pesoNum).toFixed(1) : null);
+
+  const totalMacroKcal = (protG ? Number(protG) * 4 : 0) + (carbG ? Number(carbG) * 4 : 0) + (fatG ? Number(fatG) * 9 : 0);
+  const protPct = prescMacros?.proteinasPct || (totalMacroKcal > 0 && protG ? Math.round(((Number(protG) * 4) / totalMacroKcal) * 100) : null);
+  const carbPct = prescMacros?.carbosPct || (totalMacroKcal > 0 && carbG ? Math.round(((Number(carbG) * 4) / totalMacroKcal) * 100) : null);
+  const fatPct = prescMacros?.grasasPct || (totalMacroKcal > 0 && fatG ? Math.round(((Number(fatG) * 9) / totalMacroKcal) * 100) : null);
+
+  // 2. Check-in de Seguimiento Clínico
+  const hasCheckin = Boolean(
+    latest?.checkin_energia ||
+    latest?.checkin_saciedad ||
+    latest?.checkin_digestion ||
+    latest?.checkin_descanso ||
+    latest?.nivel_estres ||
+    latest?.checkin_observaciones ||
+    latest?.checkin_ajustes
+  );
+
+  // 3. Estilo de Vida y Hábitos
+  const hasHabits = Boolean(
+    latest?.horas_sueno ||
+    latest?.consumo_agua_estimado ||
+    latest?.preferencias_alimentos ||
+    latest?.aversiones_alimentos ||
+    latest?.r24h_desayuno ||
+    latest?.r24h_colacion_m ||
+    latest?.r24h_comida ||
+    latest?.r24h_colacion_v ||
+    latest?.r24h_cena ||
+    latest?.r24h_picoteos
+  );
+
+  // 4. Métricas y Clasificaciones
+  const imcInfo = classifyIMC(latest?.imc);
+  const iccInfo = classifyICC(latest?.icc, clienteSexo);
+  const metodoLabel = getMetodoLabel(latest?.metodo_evaluacion || latest?.metodo || "basico");
+  const isPlicometria = String(latest?.metodo_evaluacion || latest?.metodo || "").includes("plicometria") || String(latest?.metodo_evaluacion || latest?.metodo || "") === "manual";
+  const isInBody = String(latest?.metodo_evaluacion || latest?.metodo || "") === "inbody";
+
+  const has4Masas = Boolean(latest?.calc_masa_grasa && latest?.calc_masa_muscular && latest?.calc_masa_osea);
+  const hasSomatotipo = Boolean(latest?.somatotipo_endo && latest?.somatotipo_meso && latest?.somatotipo_ecto);
+  const hasPliegues = Boolean(
+    latest?.pliegue_triceps ||
+    latest?.pliegue_subescapular ||
+    latest?.pliegue_biceps ||
+    latest?.pliegue_cresta_iliaca ||
+    latest?.pliegue_supraespinal ||
+    latest?.pliegue_abdominal ||
+    latest?.pliegue_muslo ||
+    latest?.pliegue_pantorrilla ||
+    latest?.sum_pliegues
+  );
+  const hasDiametros = Boolean(latest?.diametro_muneca || latest?.diametro_codo || latest?.diametro_rodilla);
+  const hasCircunferencias = Boolean(
+    latest?.cintura ||
+    latest?.cadera ||
+    latest?.cuello ||
+    latest?.pecho ||
+    latest?.brazo_relajado ||
+    latest?.brazo_contraido ||
+    latest?.muslo ||
+    latest?.pantorrilla
+  );
+  const hasClinicos = Boolean(latest?.glucosa || latest?.colesterol || latest?.trigliceridos || latest?.presion_arterial);
+
+  const delta = (curr, prevVal) => {
+    const c = parseFloat(curr);
+    const p = parseFloat(prevVal);
+    if (isNaN(c) || isNaN(p)) return null;
+    return c - p;
+  };
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Expediente_Evaluacion_${clienteNombre}</title>
   <style>
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page {
       size: A4 portrait;
-      margin: 14mm 12mm 16mm 12mm;
+      margin: 12mm 12mm 14mm 12mm;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: #0B1929;
       background: #fff;
-      padding: 24px 20px;
+      padding: 16px 14px;
       margin: 0 auto;
-      max-width: 800px;
-      line-height: 1.45;
+      max-width: 820px;
+      line-height: 1.4;
+      font-size: 11px;
     }
     @media print {
       body {
@@ -862,194 +985,621 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
       clear: both;
     }
     .header {
-      text-align: center;
-      border-bottom: 3px solid ${accent};
-      padding-bottom: 16px;
-      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2.5px solid ${accent};
+      padding-bottom: 12px;
+      margin-bottom: 14px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .brand-logo { max-height: 75px; max-width: 220px; object-fit: contain; margin-bottom: 6px; }
-    .brand-name { font-size: 28px; font-weight: 900; color: ${dark}; letter-spacing: 3px; }
-    .brand-sub { font-size: 11px; color: ${accent}; letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
-    .client-info {
-      background: ${light};
+    .brand-logo { max-height: 60px; max-width: 200px; object-fit: contain; }
+    .brand-name { font-size: 22px; font-weight: 900; color: ${dark}; letter-spacing: 2px; }
+    .brand-sub { font-size: 10px; color: ${accent}; letter-spacing: 1.5px; margin-top: 2px; text-transform: uppercase; font-weight: 700; }
+    .header-right { text-align: right; }
+    .doc-folio { font-size: 11px; font-weight: 800; color: ${dark}; letter-spacing: 0.5px; }
+    .doc-date { font-size: 10px; color: #64748B; margin-top: 2px; }
+
+    .client-card {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
       border-left: 4px solid ${accent};
+      border-radius: 8px;
       padding: 10px 14px;
-      border-radius: 6px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
+    .client-col { flex: 1; }
+    .client-name { font-size: 15px; font-weight: 800; color: #0B1929; margin-bottom: 2px; }
+    .client-detail { font-size: 11px; color: #64748B; line-height: 1.45; }
+    .client-detail strong { color: #0B1929; }
+
     .title-sec {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 800;
       color: ${dark};
-      margin-top: 20px;
-      margin-bottom: 10px;
+      margin-top: 16px;
+      margin-bottom: 8px;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #E2E8F0;
+      padding-bottom: 4px;
       page-break-inside: avoid;
       break-inside: avoid;
       page-break-after: avoid;
       break-after: avoid;
     }
-    .macros {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-      page-break-inside: avoid;
-      break-inside: avoid;
+
+    .badge {
+      display: inline-block;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 5px;
+      text-transform: none;
+      letter-spacing: 0;
+      vertical-align: middle;
     }
-    .macro-box {
-      background: ${dark};
-      color: white;
-      border-radius: 8px;
-      padding: 10px;
+    .badge-ia { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+    .badge-manual { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
+    .badge-math { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+    .badge-goal { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
+    .badge-faf { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+
+    .metric-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 7px;
+      padding: 8px 10px;
       text-align: center;
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .macro-val { font-size: 20px; font-weight: 900; }
-    .macro-lbl { font-size: 10px; opacity: .85; margin-top: 2px; }
+    .metric-card.accent-bg {
+      background: ${dark};
+      color: white;
+      border-color: ${dark};
+    }
+    .metric-card.accent-bg .metric-val { color: white; }
+    .metric-card.accent-bg .metric-lbl { color: rgba(255,255,255,0.85); }
+    .metric-val { font-size: 17px; font-weight: 900; color: #0B1929; line-height: 1.2; }
+    .metric-lbl { font-size: 9.5px; color: #64748B; text-transform: uppercase; font-weight: 700; margin-top: 2px; }
+    .metric-sub { font-size: 9px; color: #94A3B8; margin-top: 1px; }
+
+    .clinical-box {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 7px;
+      padding: 9px 12px;
+      margin-bottom: 10px;
+      font-size: 10.5px;
+      line-height: 1.45;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .clinical-box.ia-box {
+      background: #F5F7FF;
+      border: 1px solid #D5DDFF;
+      border-left: 3.5px solid #4F46E5;
+    }
+    .clinical-box-title { font-weight: 800; color: #0B1929; margin-bottom: 3px; font-size: 11px; }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
+      font-size: 10.5px;
       page-break-inside: auto;
     }
-    thead {
-      display: table-header-group;
-    }
-    tr {
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
     th {
       background: ${light};
-      padding: 8px;
-      text-align: center;
-      font-size: 11px;
       color: ${dark};
-      border: 1px solid #e2e8f0;
-      font-weight: 700;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 9.5px;
+      letter-spacing: 0.5px;
+      padding: 6px 8px;
+      border: 1px solid #E2E8F0;
+      text-align: center;
     }
     td {
-      padding: 7px 8px;
-      border: 1px solid #e2e8f0;
-      font-size: 11px;
+      padding: 5.5px 8px;
+      border: 1px solid #E2E8F0;
       text-align: center;
       vertical-align: middle;
+      color: #0B1929;
     }
-    .date-col { font-weight: 700; text-align: left; }
+    .td-left { text-align: left; }
+    .td-bold { font-weight: 700; }
+
+    .delta-pos { color: #16A34A; font-weight: 700; font-size: 9.5px; }
+    .delta-neg { color: #DC2626; font-weight: 700; font-size: 9.5px; }
+
     .photo-group {
       page-break-inside: avoid;
       break-inside: avoid;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .footer {
       text-align: center;
-      margin-top: 24px;
-      font-size: 11px;
-      color: #64748b;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 12px;
+      margin-top: 22px;
+      font-size: 9.5px;
+      color: #94A3B8;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 10px;
       page-break-inside: avoid;
       break-inside: avoid;
+      line-height: 1.4;
     }
   </style></head><body>
-  
+
+  <!-- HEADER -->
   <div class="header">
-    ${logoUrl ? `<img src="${logoUrl}" class="brand-logo" alt="${nombre}"/>` : `<div class="brand-name">${nombre}</div>`}
-    <div class="brand-sub">Reporte de Progreso y Evaluaciones</div>
+    <div>
+      ${logoUrl ? `<img src="${logoUrl}" class="brand-logo" alt="${nombre}"/>` : `<div class="brand-name">${nombre}</div>`}
+      <div class="brand-sub">Expediente Clínico & Reporte de Evaluación Antropométrica</div>
+    </div>
+    <div class="header-right">
+      <div class="doc-folio">EXP-${cliente?.id ? String(cliente.id).slice(0, 8).toUpperCase() : "FLUX"}</div>
+      <div class="doc-date">Emisión: <strong>${fechaHoy}</strong></div>
+    </div>
   </div>
-  
-  <div class="client-info">
-    <strong style="font-size:16px">${clienteNombre}</strong><br>
-    <span style="color:#666;font-size:13px">Objetivo: ${clienteObjetivo}</span>
-    <span style="float:right;color:#999;font-size:12px">Generado: ${fechaHoy}</span>
+
+  <!-- FICHA CLÍNICA DEL PACIENTE -->
+  <div class="client-card">
+    <div class="client-col">
+      <div class="client-name">${clienteNombre}</div>
+      <div class="client-detail">
+        <strong>Sexo:</strong> ${clienteSexo === "F" ? "Femenino" : "Masculino"} &nbsp;•&nbsp;
+        <strong>Edad:</strong> ${clienteEdad ? `${clienteEdad} años` : "—"} &nbsp;•&nbsp;
+        <strong>Estatura:</strong> ${latest?.estatura ? `${latest.estatura} cm` : "—"}
+      </div>
+    </div>
+    <div class="client-col" style="text-align:right;">
+      <div class="client-detail"><strong>Objetivo General:</strong> ${clienteObjetivo}</div>
+      <div class="client-detail">
+        <strong>Protocolo:</strong> ${metodoLabel} &nbsp;•&nbsp;
+        <strong>Última Evaluación:</strong> ${fmtDate(latest?.fecha)}
+      </div>
+    </div>
   </div>
 
   ${
     latest
       ? `
-    <div class="title-sec">Última Evaluación (${fmtDate(latest.fecha)} · ${escapeHtml(getMetodoLabel(latest.metodo))})</div>
-    <div class="macros">
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.peso || "--")}</div><div class="macro-lbl">Peso (kg)</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.imc || "--")}</div><div class="macro-lbl">IMC</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.grasa_pct || "--")}</div><div class="macro-lbl">Grasa (%)</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.masa_libre_grasa || latest.musculo_pct || "--")}</div><div class="macro-lbl">${latest.masa_libre_grasa ? "Masa Magra MLG (kg)" : "Músculo (%)"}</div></div>
+    <!-- 1. PRESCRIPCIÓN ENERGÉTICA Y MACRONUTRIENTES -->
+    <div class="title-sec">
+      <span>Prescripción Energética y Macronutrientes</span>
+      <span>
+        <span class="badge ${prescMode === "ia" ? "badge-ia" : prescMode === "manual" ? "badge-manual" : "badge-math"}">
+          ${prescMode === "ia" ? "✨ Auditado por IA Clínica" : prescMode === "manual" ? "✏️ Prescripción Manual" : "🔢 Fórmula Matemática"}
+        </span>
+        ${goalPreset ? `<span class="badge badge-goal">${goalPreset.title} (${goalPreset.pct > 0 ? `+${goalPreset.pct}%` : `${goalPreset.pct}%`})</span>` : ""}
+        ${fafInfo ? `<span class="badge badge-faf">FAF ${fafInfo.value} (${fafInfo.label})</span>` : ""}
+      </span>
     </div>
-    <div class="macros" style="grid-template-columns:repeat(4,1fr);margin-bottom:30px">
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.icc || latest.agua_pct || "--")}</div><div class="macro-lbl">${latest.icc ? "ICC" : "Agua (%)"}</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.cintura || "--")}</div><div class="macro-lbl">Cintura (cm)</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.glucosa || "--")}</div><div class="macro-lbl">Glucosa (mg/dL)</div></div>
-      <div class="macro-box"><div class="macro-val">${escapeHtml(latest.presion_arterial || "--")}</div><div class="macro-lbl">Presión</div></div>
+
+    <!-- BALANCE ENERGÉTICO -->
+    <div class="grid-4">
+      <div class="metric-card">
+        <div class="metric-val">${targetTmb ? `${targetTmb}` : "—"} <span style="font-size:10px;font-weight:normal">kcal</span></div>
+        <div class="metric-lbl">TMB (Tasa Basal)</div>
+        <div class="metric-sub">Metabolismo en reposo</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${targetGet ? `${targetGet}` : "—"} <span style="font-size:10px;font-weight:normal">kcal</span></div>
+        <div class="metric-lbl">GET (Gasto Total)</div>
+        <div class="metric-sub">TMB × Factor actividad</div>
+      </div>
+      <div class="metric-card accent-bg">
+        <div class="metric-val">${targetKcal ? `${targetKcal}` : "—"} <span style="font-size:10px;font-weight:normal">kcal</span></div>
+        <div class="metric-lbl">Calorías Meta / Día</div>
+        <div class="metric-sub">${goalPreset ? goalPreset.desc : "Pauta prescrita"}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${aguaL ? `${aguaL} L` : "—"}</div>
+        <div class="metric-lbl">Hidratación Sugerida</div>
+        <div class="metric-sub">Líquidos base diarios</div>
+      </div>
     </div>
+
+    <!-- MACRONUTRIENTES -->
+    <div class="grid-3">
+      <div class="metric-card" style="border-top:3px solid #3B82F6">
+        <div class="metric-val" style="color:#1D4ED8">${protG ? `${protG} g` : "—"}</div>
+        <div class="metric-lbl">Proteínas ${protPct ? `(${protPct}%)` : ""}</div>
+        <div class="metric-sub">${protGKg ? `${protGKg} g/kg peso corporal` : "Aporte estructural"}</div>
+      </div>
+      <div class="metric-card" style="border-top:3px solid #10B981">
+        <div class="metric-val" style="color:#047857">${carbG ? `${carbG} g` : "—"}</div>
+        <div class="metric-lbl">Carbohidratos ${carbPct ? `(${carbPct}%)` : ""}</div>
+        <div class="metric-sub">${carbGKg ? `${carbGKg} g/kg peso corporal` : "Energía glucolítica"}</div>
+      </div>
+      <div class="metric-card" style="border-top:3px solid #F59E0B">
+        <div class="metric-val" style="color:#B45309">${fatG ? `${fatG} g` : "—"}</div>
+        <div class="metric-lbl">Grasas Saludables ${fatPct ? `(${fatPct}%)` : ""}</div>
+        <div class="metric-sub">${fatGKg ? `${fatGKg} g/kg peso corporal` : "Soporte hormonal"}</div>
+      </div>
+    </div>
+
+    <!-- DICTAMEN DE AUDITORÍA IA / CRITERIO CLÍNICO -->
+    ${
+      aiAudit?.criterioClinico || aiAudit?.justificacionFisiologica
+        ? `
+      <div class="clinical-box ia-box">
+        <div class="clinical-box-title" style="color:#4338CA">
+          ✨ Dictamen Clínico de la Prescripción Auditada por Inteligencia Artificial
+        </div>
+        <div style="color:#1E1B4B;margin-bottom:4px;">
+          ${escapeHtml(aiAudit.criterioClinico || aiAudit.justificacionFisiologica)}
+        </div>
+        ${
+          aiAudit.ajusteKcal
+            ? `<div style="font-size:10px;color:#4338CA;font-weight:700;">Ajuste calórico aplicado: ${escapeHtml(aiAudit.ajusteKcal)}</div>`
+            : ""
+        }
+        ${
+          aiAudit.enfoqueEntrenamiento
+            ? `<div style="font-size:10px;color:#0B1929;margin-top:2px;"><strong>Directriz de entrenamiento:</strong> ${escapeHtml(aiAudit.enfoqueEntrenamiento)}</div>`
+            : ""
+        }
+      </div>
+    `
+        : ""
+    }
+
+    <!-- 2. CHECK-IN DE SEGUIMIENTO CLÍNICO -->
+    ${
+      hasCheckin
+        ? `
+      <div class="title-sec">
+        <span>Check-in de Seguimiento Clínico y Biofeedback</span>
+        <span style="font-size:9.5px;color:#64748B;font-weight:normal">Escala 1 a 5</span>
+      </div>
+      <div class="grid-5">
+        <div class="metric-card">
+          <div class="metric-val" style="font-size:15px">
+            ${latest.checkin_energia || "—"}/5
+            ${latest.checkin_energia ? renderDots(latest.checkin_energia, 5, "#EAB308") : ""}
+          </div>
+          <div class="metric-lbl">⚡ Energía</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="font-size:15px">
+            ${latest.checkin_saciedad || "—"}/5
+            ${latest.checkin_saciedad ? renderDots(latest.checkin_saciedad, 5, "#10B981") : ""}
+          </div>
+          <div class="metric-lbl">🍽️ Saciedad</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="font-size:15px">
+            ${latest.checkin_digestion || "—"}/5
+            ${latest.checkin_digestion ? renderDots(latest.checkin_digestion, 5, "#8B5CF6") : ""}
+          </div>
+          <div class="metric-lbl">🩺 Digestión</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="font-size:15px">
+            ${latest.checkin_descanso || "—"}/5
+            ${latest.checkin_descanso ? renderDots(latest.checkin_descanso, 5, "#6366F1") : ""}
+          </div>
+          <div class="metric-lbl">🌙 Sueño</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="font-size:15px;color:${Number(latest.nivel_estres) >= 4 ? "#DC2626" : Number(latest.nivel_estres) === 3 ? "#D97706" : "#2563EB"}">
+            ${latest.nivel_estres || "—"}/5
+            ${latest.nivel_estres ? renderDots(latest.nivel_estres, 5, Number(latest.nivel_estres) >= 4 ? "#DC2626" : Number(latest.nivel_estres) === 3 ? "#D97706" : "#2563EB") : ""}
+          </div>
+          <div class="metric-lbl">⚠️ Estrés</div>
+        </div>
+      </div>
+      ${
+        latest.checkin_observaciones
+          ? `
+        <div class="clinical-box" style="margin-top:-2px">
+          <strong>Sensaciones y Estado Físico:</strong> ${escapeHtml(latest.checkin_observaciones)}
+        </div>
+      `
+          : ""
+      }
+      ${
+        latest.checkin_ajustes
+          ? `
+        <div class="clinical-box" style="border-left:3.5px solid ${accent};margin-top:-2px">
+          <strong style="color:${dark}">Ajustes de Menú Solicitados:</strong> ${escapeHtml(latest.checkin_ajustes)}
+        </div>
+      `
+          : ""
+      }
+    `
+        : ""
+    }
+
+    <!-- 3. HÁBITOS, PREFERENCIAS Y RECORDATORIO 24H -->
+    ${
+      hasHabits
+        ? `
+      <div class="title-sec">
+        <span>Estilo de Vida, Preferencias y Hábitos</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        ${latest.horas_sueno ? `<div class="badge" style="background:#F1F5F9;color:#0B1929;border:1px solid #CBD5E1">🕒 <strong>Sueño diario:</strong> ${latest.horas_sueno} hrs/noche</div>` : ""}
+        ${latest.consumo_agua_estimado ? `<div class="badge" style="background:#F1F5F9;color:#0B1929;border:1px solid #CBD5E1">💧 <strong>Consumo de agua:</strong> ${latest.consumo_agua_estimado}</div>` : ""}
+        ${latest.dias_ejercicio_actual ? `<div class="badge" style="background:#F1F5F9;color:#0B1929;border:1px solid #CBD5E1">🏋️ <strong>Días de entrenamiento previos:</strong> ${latest.dias_ejercicio_actual} d/sem</div>` : ""}
+      </div>
+      <div class="grid-2">
+        ${
+          latest.preferencias_alimentos
+            ? `
+          <div class="clinical-box" style="background:#F0FDF4;border-color:#BBF7D0;color:#166534">
+            <strong>Alimentos Favoritos / Preferencias:</strong><br>${escapeHtml(latest.preferencias_alimentos)}
+          </div>
+        `
+            : "<div></div>"
+        }
+        ${
+          latest.aversiones_alimentos
+            ? `
+          <div class="clinical-box" style="background:#FFF1F2;border-color:#FECDD3;color:#9F1239">
+            <strong>Alimentos que Rechaza / Alergias:</strong><br>${escapeHtml(latest.aversiones_alimentos)}
+          </div>
+        `
+            : "<div></div>"
+        }
+      </div>
+      ${
+        Boolean(latest.r24h_desayuno || latest.r24h_comida || latest.r24h_cena || latest.r24h_colacion_m || latest.r24h_colacion_v || latest.r24h_picoteos)
+          ? `
+        <div class="clinical-box" style="background:#FFFFFF;border:1px solid #E2E8F0;">
+          <strong style="color:${dark};display:block;margin-bottom:4px;">Recordatorio de 24 Horas Previo (R24H):</strong>
+          <div style="font-size:10px;line-height:1.6;color:#334155;">
+            ${latest.r24h_desayuno ? `• <strong>Desayuno:</strong> ${escapeHtml(latest.r24h_desayuno)}<br>` : ""}
+            ${latest.r24h_colacion_m ? `• <strong>Colación Matutina:</strong> ${escapeHtml(latest.r24h_colacion_m)}<br>` : ""}
+            ${latest.r24h_comida ? `• <strong>Comida:</strong> ${escapeHtml(latest.r24h_comida)}<br>` : ""}
+            ${latest.r24h_colacion_v ? `• <strong>Colación Vespertina:</strong> ${escapeHtml(latest.r24h_colacion_v)}<br>` : ""}
+            ${latest.r24h_cena ? `• <strong>Cena:</strong> ${escapeHtml(latest.r24h_cena)}<br>` : ""}
+            ${latest.r24h_picoteos ? `• <strong>Picoteos / Extras:</strong> ${escapeHtml(latest.r24h_picoteos)}<br>` : ""}
+          </div>
+        </div>
+      `
+          : ""
+      }
+    `
+        : ""
+    }
+
+    <!-- 4. COMPOSICIÓN CORPORAL Y ANTROPOMETRÍA -->
+    <div class="title-sec">
+      <span>Composición Corporal · ${metodoLabel}</span>
+      <span style="font-size:9.5px;color:#64748B;font-weight:normal">${fmtDate(latest.fecha)}</span>
+    </div>
+
+    <!-- TARJETAS PRINCIPALES -->
+    <div class="grid-5">
+      <div class="metric-card">
+        <div class="metric-val">${latest.peso || "—"} <span style="font-size:10px;font-weight:normal">kg</span></div>
+        <div class="metric-lbl">Peso Corporal</div>
+        <div class="metric-sub">${prev && delta(latest.peso, prev.peso) !== null ? `<span class="${delta(latest.peso, prev.peso) > 0 ? "delta-neg" : "delta-pos"}">${delta(latest.peso, prev.peso) > 0 ? "+" : ""}${delta(latest.peso, prev.peso).toFixed(1)} kg</span>` : "Registro actual"}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${latest.imc || "—"}</div>
+        <div class="metric-lbl">IMC (kg/m²)</div>
+        <div class="metric-sub">${imcInfo ? imcInfo.label : "Índice Quetelet"}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${latest.grasa_pct ? `${latest.grasa_pct}%` : "—"}</div>
+        <div class="metric-lbl">Grasa Corporal</div>
+        <div class="metric-sub">${latest.calc_masa_grasa ? `${latest.calc_masa_grasa} kg grasa` : "Porcentaje"}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${latest.masa_libre_grasa ? `${latest.masa_libre_grasa} kg` : "—"}</div>
+        <div class="metric-lbl">Masa Magra (MLG)</div>
+        <div class="metric-sub">Peso libre de grasa</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">${latest.calc_masa_muscular ? `${latest.calc_masa_muscular} kg` : latest.musculo_pct ? `${latest.musculo_pct}%` : "—"}</div>
+        <div class="metric-lbl">Masa Muscular</div>
+        <div class="metric-sub">${latest.musculo_pct ? `${latest.musculo_pct}% del peso` : "Tejido contráctil"}</div>
+      </div>
+    </div>
+
+    <!-- ISAK 4 COMPONENTES & SOMATOTIPO (SI CORRESPONDE) -->
+    ${
+      has4Masas || hasSomatotipo
+        ? `
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;padding:9px 12px;margin-bottom:10px;">
+        <div style="font-weight:800;color:${dark};font-size:10.5px;margin-bottom:6px;text-transform:uppercase;">
+          Fraccionamiento en 4 Masas (ISAK / Matiegka) y Somatotipo Heath-Carter
+        </div>
+        <div class="grid-4" style="margin-bottom:6px;">
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:6px;text-align:center;">
+            <div style="font-weight:800;font-size:13px;color:#DC2626">${latest.calc_masa_grasa || "—"} kg</div>
+            <div style="font-size:9px;color:#64748B;font-weight:700">Masa Grasa</div>
+          </div>
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:6px;text-align:center;">
+            <div style="font-weight:800;font-size:13px;color:#2563EB">${latest.calc_masa_muscular || "—"} kg</div>
+            <div style="font-size:9px;color:#64748B;font-weight:700">Masa Muscular (Matiegka)</div>
+          </div>
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:6px;text-align:center;">
+            <div style="font-weight:800;font-size:13px;color:#475569">${latest.calc_masa_osea || "—"} kg</div>
+            <div style="font-size:9px;color:#64748B;font-weight:700">Masa Ósea (Rocha)</div>
+          </div>
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:6px;text-align:center;">
+            <div style="font-weight:800;font-size:13px;color:#D97706">${latest.calc_masa_residual || "—"} kg</div>
+            <div style="font-size:9px;color:#64748B;font-weight:700">Masa Residual (Wurch)</div>
+          </div>
+        </div>
+        ${
+          hasSomatotipo
+            ? `
+          <div style="display:flex;gap:12px;font-size:10px;justify-content:center;background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:5px;">
+            <span><strong>Endomorfia (Adiposidad):</strong> ${latest.somatotipo_endo}</span>
+            <span>•</span>
+            <span><strong>Mesomorfia (Muscularidad):</strong> ${latest.somatotipo_meso}</span>
+            <span>•</span>
+            <span><strong>Ectomorfia (Linealidad):</strong> ${latest.somatotipo_ecto}</span>
+          </div>
+        `
+            : ""
+        }
+      </div>
+    `
+        : ""
+    }
+
+    <!-- TABLA DE CIRCUNFERENCIAS Y PLIEGUES -->
+    ${
+      hasCircunferencias || hasPliegues || hasDiametros
+        ? `
+      <table>
+        <thead>
+          <tr>
+            <th colspan="4" style="background:#F1F5F9;text-align:left;color:#0B1929">Circunferencias Corporales (cm) & Riesgo</th>
+            <th colspan="4" style="background:#F1F5F9;text-align:left;color:#0B1929">Pliegues Cutáneos (mm) & Diámetros</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-left"><strong>Cintura:</strong> ${latest.cintura ? `${latest.cintura} cm` : "—"}</td>
+            <td class="td-left"><strong>Cadera:</strong> ${latest.cadera ? `${latest.cadera} cm` : "—"}</td>
+            <td class="td-left"><strong>ICC:</strong> ${latest.icc || "—"} ${iccInfo ? `(${iccInfo.label})` : ""}</td>
+            <td class="td-left"><strong>ICE:</strong> ${latest.ice || "—"}</td>
+            <td class="td-left"><strong>Tríceps:</strong> ${latest.pliegue_triceps ? `${latest.pliegue_triceps} mm` : "—"}</td>
+            <td class="td-left"><strong>Subescapular:</strong> ${latest.pliegue_subescapular ? `${latest.pliegue_subescapular} mm` : "—"}</td>
+            <td class="td-left"><strong>Bíceps:</strong> ${latest.pliegue_biceps ? `${latest.pliegue_biceps} mm` : "—"}</td>
+            <td class="td-left"><strong>Cresta Ilíaca:</strong> ${latest.pliegue_cresta_iliaca ? `${latest.pliegue_cresta_iliaca} mm` : "—"}</td>
+          </tr>
+          <tr>
+            <td class="td-left"><strong>Cuello:</strong> ${latest.cuello ? `${latest.cuello} cm` : "—"}</td>
+            <td class="td-left"><strong>Pecho:</strong> ${latest.pecho ? `${latest.pecho} cm` : "—"}</td>
+            <td class="td-left"><strong>Brazo Relajado:</strong> ${latest.brazo_relajado ? `${latest.brazo_relajado} cm` : "—"}</td>
+            <td class="td-left"><strong>Brazo Flex:</strong> ${latest.brazo_contraido ? `${latest.brazo_contraido} cm` : "—"}</td>
+            <td class="td-left"><strong>Supraespinal:</strong> ${latest.pliegue_supraespinal ? `${latest.pliegue_supraespinal} mm` : "—"}</td>
+            <td class="td-left"><strong>Abdominal:</strong> ${latest.pliegue_abdominal ? `${latest.pliegue_abdominal} mm` : "—"}</td>
+            <td class="td-left"><strong>Muslo Ant.:</strong> ${latest.pliegue_muslo ? `${latest.pliegue_muslo} mm` : "—"}</td>
+            <td class="td-left"><strong>Pantorrilla:</strong> ${latest.pliegue_pantorrilla ? `${latest.pliegue_pantorrilla} mm` : "—"}</td>
+          </tr>
+          <tr>
+            <td class="td-left"><strong>Muslo:</strong> ${latest.muslo ? `${latest.muslo} cm` : "—"}</td>
+            <td class="td-left"><strong>Pantorrilla:</strong> ${latest.pantorrilla ? `${latest.pantorrilla} cm` : "—"}</td>
+            <td class="td-left" colspan="2"></td>
+            <td class="td-left" colspan="2"><strong>Sumatoria Σ Pliegues:</strong> ${latest.sum_pliegues ? `${latest.sum_pliegues} mm` : "—"}</td>
+            <td class="td-left" colspan="2"><strong>Diám. Muñeca/Codo/Rod.:</strong> ${[latest.diametro_muneca, latest.diametro_codo, latest.diametro_rodilla].filter(Boolean).join(" / ") || "—"} cm</td>
+          </tr>
+        </tbody>
+      </table>
+    `
+        : ""
+    }
+
+    <!-- CLÍNICOS Y NOTAS -->
+    ${
+      hasClinicos || latest.notas
+        ? `
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        ${latest.glucosa ? `<div class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A">Glucosa: ${latest.glucosa} mg/dL</div>` : ""}
+        ${latest.colesterol ? `<div class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A">Colesterol: ${latest.colesterol} mg/dL</div>` : ""}
+        ${latest.trigliceridos ? `<div class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A">Triglicéridos: ${latest.trigliceridos} mg/dL</div>` : ""}
+        ${latest.presion_arterial ? `<div class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A">Presión Arterial: ${latest.presion_arterial} mmHg</div>` : ""}
+      </div>
+      ${
+        latest.notas
+          ? `
+        <div class="clinical-box" style="margin-top:-4px">
+          <strong>Notas del Especialista:</strong> ${escapeHtml(latest.notas)}
+        </div>
+      `
+          : ""
+      }
+    `
+        : ""
+    }
   `
       : `<div style="text-align:center;padding:40px;color:#999">No hay evaluaciones registradas aún.</div>`
   }
 
+  <!-- 5. HISTORIAL DE PROGRESO Y EVOLUCIÓN TEMPORAL -->
   ${
     metricas.length > 0
       ? `
-    <div class="title-sec">Composición Corporal</div>
+    <div class="title-sec">
+      <span>Historial Comparativo y Evolución Temporal</span>
+      <span style="font-size:9.5px;color:#64748B;font-weight:normal">${metricas.length} registro(s)</span>
+    </div>
     <table>
-      <thead><tr>
-        <th style="text-align:left">Fecha</th>
-        <th>Protocolo</th><th>Peso (kg)</th><th>IMC</th><th>Grasa (%)</th><th>MLG (kg)</th><th>Músculo (%)</th>
-      </tr></thead>
+      <thead>
+        <tr>
+          <th style="text-align:left">Fecha</th>
+          <th>Protocolo</th>
+          <th>Peso (kg)</th>
+          <th>IMC</th>
+          <th>Grasa (%)</th>
+          <th>Masa Magra (kg)</th>
+          <th>Cintura (cm)</th>
+          <th>Prescripción</th>
+        </tr>
+      </thead>
       <tbody>
         ${metricas
-          .map(
-            (m) => `<tr>
-          <td class="date-col">${fmtDate(m.fecha)}</td>
-          <td>${escapeHtml(getMetodoLabel(m.metodo))}</td>
-          <td>${escapeHtml(m.peso || "--")}</td><td>${escapeHtml(m.imc || "--")}</td>
-          <td>${escapeHtml(m.grasa_pct || "--")}</td><td>${escapeHtml(m.masa_libre_grasa || "--")}</td><td>${escapeHtml(m.musculo_pct || "--")}</td>
-        </tr>`
-          )
+          .map((m, i) => {
+            const nextM = metricas[i + 1] || null;
+            const dPeso = nextM ? delta(m.peso, nextM.peso) : null;
+            const dGrasa = nextM ? delta(m.grasa_pct, nextM.grasa_pct) : null;
+            const pKcal = m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal || m.manual_macros?.targetKcal || m.targetKcal || null;
+            const pMode = m.prescription_mode || (m.ai_audit_result ? "IA" : "Mat.");
+            return `<tr>
+            <td class="td-left td-bold">${fmtDate(m.fecha)}</td>
+            <td>${escapeHtml(getMetodoLabel(m.metodo_evaluacion || m.metodo))}</td>
+            <td>
+              ${m.peso || "—"}
+              ${dPeso !== null ? `<br><span class="${dPeso > 0 ? "delta-neg" : "delta-pos"}">${dPeso > 0 ? "+" : ""}${dPeso.toFixed(1)}</span>` : ""}
+            </td>
+            <td>${m.imc || "—"}</td>
+            <td>
+              ${m.grasa_pct ? `${m.grasa_pct}%` : "—"}
+              ${dGrasa !== null ? `<br><span class="${dGrasa > 0 ? "delta-neg" : "delta-pos"}">${dGrasa > 0 ? "+" : ""}${dGrasa.toFixed(1)}%</span>` : ""}
+            </td>
+            <td>${m.masa_libre_grasa ? `${m.masa_libre_grasa}` : "—"}</td>
+            <td>${m.cintura ? `${m.cintura}` : "—"}</td>
+            <td>${pKcal ? `${pKcal} kcal (${pMode})` : "—"}</td>
+          </tr>`;
+          })
           .join("")}
       </tbody>
     </table>
 
-    <div class="title-sec">Medidas y Clínicos</div>
-    <table>
-      <thead><tr>
-        <th style="text-align:left">Fecha</th>
-        <th>Cintura (cm)</th><th>Cadera (cm)</th><th>ICC / ICE</th><th>Glucosa</th><th>Colesterol</th><th>Presión</th>
-      </tr></thead>
-      <tbody>
-        ${metricas
-          .map(
-            (m) => `<tr>
-          <td class="date-col">${fmtDate(m.fecha)}</td>
-          <td>${escapeHtml(m.cintura || "--")}</td><td>${escapeHtml(m.cadera || "--")}</td>
-          <td>${escapeHtml(m.icc || "--")} / ${escapeHtml(m.ice || "--")}</td>
-          <td>${escapeHtml(m.glucosa || "--")}</td><td>${escapeHtml(m.colesterol || "--")}</td><td>${escapeHtml(m.presion_arterial || "--")}</td>
-        </tr>`
-          )
-          .join("")}
-      </tbody>
-    </table>
-
+    <!-- 6. GALERÍA DE PROGRESO FOTOGRÁFICO -->
     ${
       metricas.some((m) => parseFotos(m.fotos).length > 0)
         ? `
-      <div class="title-sec" style="margin-top:40px; border-top:1px solid #ddd; padding-top:30px;">Galería de Progreso</div>
+      <div class="title-sec">Registro Fotográfico de Control</div>
       ${metricas
         .filter((m) => parseFotos(m.fotos).length > 0)
         .map(
           (m) => `
-        <div class="photo-group" style="margin-bottom:20px;">
-          <div style="font-weight:700; font-size:14px; margin-bottom:10px; color:${dark};">📅 ${fmtDate(m.fecha)}</div>
-          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div class="photo-group">
+          <div style="font-weight:800; font-size:11px; margin-bottom:8px; color:${dark};">📅 ${fmtDate(m.fecha)}</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
             ${parseFotos(m.fotos)
               .map(
                 (url) => `
-              <div class="photo-item" style="break-inside: avoid; page-break-inside: avoid;">
-                <img src="${safeUrl(url)}" style="max-width:280px; max-height:350px; width:auto; height:auto; display:block; border-radius:8px; border:1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" alt="Foto progreso"/>
+              <div style="break-inside:avoid;page-break-inside:avoid;">
+                <img src="${safeUrl(url)}" style="max-width:240px; max-height:300px; width:auto; height:auto; display:block; border-radius:6px; border:1px solid #CBD5E1; box-shadow: 0 1px 3px rgba(0,0,0,0.06);" alt="Foto progreso"/>
               </div>
             `
               )
@@ -1066,15 +1616,20 @@ export const generateProgresoPDF = (cliente, rawMetricas = [], brand = {}) => {
       : ""
   }
 
-  <div class="footer">Reporte generado por ${nombre} · Keep Going 💪</div>
+  <!-- FOOTER -->
+  <div class="footer">
+    Documento generado electrónicamente por la plataforma FLUX para <strong>${clienteNombre}</strong>.<br>
+    Información estrictamente confidencial para fines de asesoría nutricional y seguimiento deportivo · ${nombre}
+  </div>
+
   ${FLUX_PAGINATION_SCRIPT}
   </body></html>`;
 
   const cleanClient = String(cliente.nombre || "Paciente").replace(/[^a-zA-Z0-9_\-]/g, "_");
   openPdfPreviewModal({
     html,
-    title: `Reporte de Progreso — ${cliente.nombre || "Paciente"}`,
-    fileName: `Reporte_Progreso_${cleanClient}`,
+    title: `Expediente de Evaluación — ${cliente.nombre || "Paciente"}`,
+    fileName: `Expediente_Evaluacion_${cleanClient}`,
     accent,
   });
 };
