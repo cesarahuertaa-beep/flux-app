@@ -223,10 +223,12 @@ const emptyForm = () => ({
   eval_faf: "",
   ciclo_id: "",
 
-  // Hábitos del ciclo
+  // Hábitos del ciclo y actividad física actual
   horas_sueno: "",
   consumo_agua_estimado: "",
   nivel_estres: "3",
+  dias_ejercicio_actual: "",
+  horario_ejercicio: "",
 
   // Preferencias y gustos alimentarios del ciclo (migrados del expediente)
   preferencias_alimentos: "",
@@ -505,13 +507,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       base.metodo_evaluacion = "plicometria_jp3";
     }
 
-    // Precargar objetivo de la etapa y factor de actividad física del ciclo (o inferir desde expediente)
+    // Precargar objetivo de la etapa y factor de actividad física del ciclo (o inferir desde rutinas / expediente)
     const fallbackGoal = inferGoalFromText(
       clinicalRec?.anamnesis?.objetivo_principal || selected?.objetivo || targetCiclo?.nombre || ""
     );
+    let trainingDays = 0;
+    if (Array.isArray(rutinas) && rutinas.length > 0) {
+      const uDays = new Set();
+      rutinas.forEach(r => {
+        const parts = (r.nombre || "").split("|");
+        const dayTag = parts.length > 1 ? parts[0] : "";
+        if (dayTag && dayTag !== "S/D") uDays.add(dayTag.toLowerCase());
+      });
+      trainingDays = uDays.size > 0 ? uDays.size : rutinas.length;
+    }
+    let calculatedFaf = null;
+    if (trainingDays > 0) {
+      if (trainingDays <= 1) calculatedFaf = 1.2;
+      else if (trainingDays <= 3) calculatedFaf = 1.375;
+      else if (trainingDays <= 5) calculatedFaf = 1.55;
+      else calculatedFaf = 1.725;
+    }
     const fallbackFaf = inferFafFromAnamnesis(clinicalRec?.anamnesis);
     base.eval_objetivo = prev?.eval_objetivo || fallbackGoal;
-    base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(fallbackFaf);
+    base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(calculatedFaf || fallbackFaf || 1.375);
 
     // Precargar preferencias y R24H (de la evaluación previa o fallback de anamnesis)
     base.preferencias_alimentos = prev?.preferencias_alimentos || clinicalRec?.anamnesis?.preferencias_alimentos || "";
@@ -525,6 +544,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     base.horas_sueno = prev?.horas_sueno || clinicalRec?.anamnesis?.horas_sueno || "";
     base.consumo_agua_estimado = prev?.consumo_agua_estimado || clinicalRec?.anamnesis?.consumo_agua_estimado || "";
     base.nivel_estres = prev?.nivel_estres || clinicalRec?.anamnesis?.nivel_estres || "3";
+    base.dias_ejercicio_actual = prev?.dias_ejercicio_actual || (trainingDays > 0 ? String(trainingDays) : "");
+    base.horario_ejercicio = prev?.horario_ejercicio || "";
 
     // Precargar respuesta reciente del paciente o del expediente si existe
     const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
@@ -546,7 +567,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
-  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, selected?.objetivo, cicloActivo, cicloSel]);
+  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, selected?.objetivo, cicloActivo, cicloSel, rutinas]);
 
   useEffect(() => {
     const handleOpen = (ev) => {
@@ -668,6 +689,64 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     });
   }, [form, liveCalculations, activeMetricas, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
 
+  const routineDaysCount = useMemo(() => {
+    if (!Array.isArray(rutinas) || rutinas.length === 0) return 0;
+    const uniqueDays = new Set();
+    rutinas.forEach(r => {
+      const parts = (r.nombre || "").split("|");
+      const dayTag = parts.length > 1 ? parts[0] : "";
+      if (dayTag && dayTag !== "S/D") uniqueDays.add(dayTag.toLowerCase());
+    });
+    return uniqueDays.size > 0 ? uniqueDays.size : rutinas.length;
+  }, [rutinas]);
+
+  const suggestedFafFromTraining = useMemo(() => {
+    const days = routineDaysCount > 0
+      ? routineDaysCount
+      : (parseInt(form.dias_ejercicio_actual, 10) || 0);
+
+    if (days <= 1) return { value: 1.2, days, label: days === 0 ? "0–1 día (Sedentario)" : "1 día programado (Sedentario)" };
+    if (days <= 3) return { value: 1.375, days, label: `${days} días programados (Ligero)` };
+    if (days <= 5) return { value: 1.55, days, label: `${days} días programados (Moderado)` };
+    return { value: 1.725, days, label: `${days} días programados (Activo/Intenso)` };
+  }, [routineDaysCount, form.dias_ejercicio_actual]);
+
+  const adherenceSummary = useMemo(() => {
+    if (!nutriDias.length || !Object.keys(nutriProgreso).length) return null;
+    let totalComidas = 0;
+    let comidasRealizadas = 0;
+    let totalAguaMl = 0;
+    let totalMetaAguaMl = 0;
+    let diasRegistrados = 0;
+
+    Object.values(nutriProgreso).forEach(r => {
+      if (!r) return;
+      const cTotal = Number(r.comidas_total) || 0;
+      const cDone = Number(r.comidas_realizadas) || 0;
+      const agua = Number(r.agua_ml) || 0;
+      const metaAgua = Number(r.meta_agua_ml) || 2000;
+      if (cTotal > 0 || agua > 0) diasRegistrados++;
+      totalComidas += cTotal;
+      comidasRealizadas += cDone;
+      totalAguaMl += agua;
+      totalMetaAguaMl += metaAgua;
+    });
+
+    if (diasRegistrados === 0) return null;
+    const pctComidas = totalComidas > 0 ? Math.round((comidasRealizadas / totalComidas) * 100) : 0;
+    const pctAgua = totalMetaAguaMl > 0 ? Math.round((totalAguaMl / totalMetaAguaMl) * 100) : 0;
+    const promedioAguaL = (totalAguaMl / (diasRegistrados * 1000)).toFixed(1);
+    return {
+      pctComidas,
+      pctAgua,
+      promedioAguaL,
+      diasRegistrados,
+      summaryText: `Cumplimiento de comidas: ${pctComidas}% • Apego al agua: ${pctAgua}% (~${promedioAguaL} L/día en ${diasRegistrados} días registrados)`
+    };
+  }, [nutriDias, nutriProgreso]);
+
+  const isFirstEvaluationEver = !editingId && allLinkedMetricas.length === 0;
+
   const saveMetrica = async () => {
     setSaving(true);
     try {
@@ -683,7 +762,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf",
         "preferencias_alimentos", "aversiones_alimentos",
         "r24h_desayuno", "r24h_colacion_m", "r24h_comida", "r24h_colacion_v", "r24h_cena", "r24h_picoteos",
-        "horas_sueno", "consumo_agua_estimado", "nivel_estres"
+        "horas_sueno", "consumo_agua_estimado", "nivel_estres",
+        "dias_ejercicio_actual", "horario_ejercicio"
       ]);
       Object.entries(form).forEach(([k, v]) => {
         if (IGNORED_KEYS.has(k)) return;
@@ -1996,112 +2076,122 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: Protocol & Anthropometric Fields */}
               <div className="lg:col-span-8 flex flex-col gap-5">
-                {/* Card 0: Check-in de Seguimiento y Sensaciones */}
-                <div className="bg-white rounded-2xl border border-blue-100 p-4 sm:p-6 shadow-sm relative overflow-hidden">
+                {/* Paso 1: Check-in de Seguimiento */}
+                <div className="bg-white rounded-2xl border border-blue-100 p-4 sm:p-6 shadow-sm relative overflow-hidden space-y-4">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] to-blue-400" />
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                         <Activity className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
-                            Check-in de Seguimiento y Sensaciones
-                          </h3>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[var(--brand-primary)] uppercase tracking-wider">
                             Paso 1
                           </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Check-in de Seguimiento
+                          </h3>
                         </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5">
-                          Registra las sensaciones y adherencia del paciente durante la consulta (energía, saciedad, digestión y descanso).
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Registra las sensaciones del paciente basado en lo que ha experimentado a partir de la última sesión (o si es su primera sesión, cómo suele sentirse en el día a día). Pondera del 1 (lo menor o más desfavorable) al 5 (lo mayor u óptimo).
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 4 Escalas 1 a 5 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                  {/* 5 Escalas 1 a 5 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                     {[
-                      { key: "checkin_energia", label: "Energía diaria", icon: <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> },
-                      { key: "checkin_saciedad", label: "Control saciedad", icon: <Utensils className="w-3.5 h-3.5 text-emerald-600" /> },
-                      { key: "checkin_digestion", label: "Digestión", icon: <Stethoscope className="w-3.5 h-3.5 text-purple-600" /> },
-                      { key: "checkin_descanso", label: "Calidad de sueño", icon: <Moon className="w-3.5 h-3.5 text-indigo-500" /> },
-                    ].map((sc) => (
-                      <div key={sc.key} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                            {sc.icon}
-                            <span>{sc.label}</span>
-                          </span>
-                          <span className="text-xs font-extrabold text-[var(--brand-primary)]">
-                            {form[sc.key] || 4}/5
-                          </span>
+                      {
+                        key: "checkin_energia",
+                        label: "Energía diaria",
+                        icon: <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />,
+                        minHelp: "1: Mínima",
+                        maxHelp: "5: Óptima"
+                      },
+                      {
+                        key: "checkin_saciedad",
+                        label: "Control saciedad",
+                        icon: <Utensils className="w-3.5 h-3.5 text-emerald-600" />,
+                        minHelp: "1: Mucha hambre",
+                        maxHelp: "5: Saciado"
+                      },
+                      {
+                        key: "checkin_digestion",
+                        label: "Digestión",
+                        icon: <Stethoscope className="w-3.5 h-3.5 text-purple-600" />,
+                        minHelp: "1: Malestares",
+                        maxHelp: "5: Excelente"
+                      },
+                      {
+                        key: "checkin_descanso",
+                        label: "Calidad de sueño",
+                        icon: <Moon className="w-3.5 h-3.5 text-indigo-500" />,
+                        minHelp: "1: Deficiente",
+                        maxHelp: "5: Reparador"
+                      },
+                      {
+                        key: "nivel_estres",
+                        label: "Nivel de estrés",
+                        icon: <Activity className="w-3.5 h-3.5 text-rose-500" />,
+                        minHelp: "1: Mínimo / Relajado",
+                        maxHelp: "5: Severo / Máximo"
+                      },
+                    ].map((sc) => {
+                      const currentVal = Number(form[sc.key] || (sc.key === "nivel_estres" ? 3 : 4));
+                      return (
+                        <div key={sc.key} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5 truncate">
+                                {sc.icon}
+                                <span className="truncate">{sc.label}</span>
+                              </span>
+                              <span className="text-xs font-extrabold text-[var(--brand-primary)] shrink-0 ml-1">
+                                {currentVal}/5
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] text-[#6B7A8D] mb-2 font-medium">
+                              <span className="truncate">{sc.minHelp}</span>
+                              <span className="truncate text-right">{sc.maxHelp}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                disabled={isReadOnly}
+                                onClick={() => !isReadOnly && updForm(sc.key, String(n))}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                  isReadOnly ? "cursor-default" : "cursor-pointer"
+                                } ${
+                                  currentVal === n
+                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && updForm(sc.key, String(n))}
-                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
-                                isReadOnly ? "cursor-default" : "cursor-pointer"
-                              } ${
-                                Number(form[sc.key] || 4) === n
-                                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                  : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
-                              }`}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  {/* Observaciones y Ajustes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                        Sensaciones y adherencia de la semana
-                      </label>
-                      <input
-                        type="text"
-                        readOnly={isReadOnly}
-                        value={form.checkin_observaciones || ""}
-                        onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
-                        placeholder="Ej. Buena energía, sin hambre, completó entrenamientos..."
-                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                        Ajustes solicitados o notas para el nuevo plan
-                      </label>
-                      <input
-                        type="text"
-                        readOnly={isReadOnly}
-                        value={form.checkin_ajustes || ""}
-                        onChange={(e) => !isReadOnly && updForm("checkin_ajustes", e.target.value)}
-                        placeholder="Ej. Variar fuentes de proteína, opciones más prácticas..."
-                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Estilo de Vida y Hábitos del Ciclo */}
-                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
+                  {/* Hábitos de Sueño, Agua y Actividad Física */}
+                  <div className="pt-3 border-t border-blue-100/80 space-y-2.5">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-[var(--brand-primary)]" />
                       <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                        Estilo de Vida y Hábitos del Ciclo
+                        Estilo de Vida y Hábitos del Paciente
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {/* Horas de Sueño */}
                       <div>
                         <label className="block text-xs font-bold text-[#0B1929] mb-1">
@@ -2113,7 +2203,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           readOnly={isReadOnly}
                           value={form.horas_sueno || ""}
                           onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
-                          placeholder="Ej. 7.5"
+                          placeholder="Ej. 7.5 hrs"
                           className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
@@ -2133,228 +2223,343 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         />
                       </div>
 
-                      {/* Nivel de Estrés */}
+                      {/* Días de Ejercicio Actuales */}
                       <div>
                         <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                          Nivel de estrés ({form.nivel_estres || "3"}/5)
+                          Días de ejercicio actuales
                         </label>
-                        <div className="flex gap-1">
-                          {["1", "2", "3", "4", "5"].map((lvl) => (
-                            <button
-                              key={lvl}
-                              type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && updForm("nivel_estres", lvl)}
-                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
-                                isReadOnly ? "cursor-default" : "cursor-pointer"
-                              } ${
-                                String(form.nivel_estres || "3") === lvl
-                                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
-                                  : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-100"
-                              }`}
-                            >
-                              {lvl}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Preferencias y Aversiones de la Etapa */}
-                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Utensils className="w-4 h-4 text-emerald-600" />
-                      <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                        Preferencias Alimentarias de la Etapa
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* Favoritos */}
-                      <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
-                          <span>Alimentos predilectos para este ciclo</span>
-                        </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Comidas que más se le antojan o facilitan su adherencia en este periodo.
-                        </p>
-                        <textarea
-                          rows={2}
+                        <input
+                          type="number"
+                          min="0"
+                          max="7"
                           readOnly={isReadOnly}
-                          value={form.preferencias_alimentos || ""}
-                          onChange={(e) => !isReadOnly && updForm("preferencias_alimentos", e.target.value)}
-                          placeholder="Ej. Pollo, claras de huevo, arroz basmati, aguacate, plátano..."
-                          className={`w-full bg-white border border-emerald-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-emerald-500"}`}
+                          value={form.dias_ejercicio_actual || ""}
+                          onChange={(e) => !isReadOnly && updForm("dias_ejercicio_actual", e.target.value)}
+                          placeholder="Ej. 3 o 4 días/sem"
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
-                      {/* Aversiones */}
-                      <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <Ban className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Alimentos que rechaza o no desea para este ciclo</span>
+                      {/* Horario Disponible para Entrenar */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                          Horario habitual de entreno
                         </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Comidas que no quiere comer en esta etapa. Se excluirán al armar el menú.
-                        </p>
-                        <textarea
-                          rows={2}
+                        <input
+                          type="text"
                           readOnly={isReadOnly}
-                          value={form.aversiones_alimentos || ""}
-                          onChange={(e) => !isReadOnly && updForm("aversiones_alimentos", e.target.value)}
-                          placeholder="Ej. Pescado/mariscos, hígado, brócoli, mayonesa..."
-                          className={`w-full bg-white border border-rose-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-rose-500"}`}
+                          value={form.horario_ejercicio || ""}
+                          onChange={(e) => !isReadOnly && updForm("horario_ejercicio", e.target.value)}
+                          placeholder="Ej. Mañanas 7 AM, Tardes..."
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Recordatorio de 24 Horas (R24H) del Momento de la Consulta */}
-                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-purple-600" />
-                        <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                          Recordatorio de 24 Horas (R24H del día previo)
-                        </span>
+                  {/* Sensaciones y Adherencia del Ciclo (Solo para segundas evaluaciones en adelante) */}
+                  {!isFirstEvaluationEver && (
+                    <div className="pt-3 border-t border-blue-100/80 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <label className="block text-xs font-bold text-[#0B1929]">
+                          Sensaciones y adherencia del ciclo previo
+                        </label>
+                        {adherenceSummary?.summaryText && (
+                          <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => {
+                              if (!isReadOnly) {
+                                const current = (form.checkin_observaciones || "").trim();
+                                const summary = adherenceSummary.summaryText;
+                                updForm(
+                                  "checkin_observaciones",
+                                  current && !current.includes(summary) ? `${current} | ${summary}` : summary
+                                );
+                              }
+                            }}
+                            className="text-[11px] font-bold text-[var(--brand-primary)] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Auto-completar desde app</span>
+                          </button>
+                        )}
                       </div>
-                      <span className="text-[11px] text-[#6B7A8D]">
-                        Ingesta habitual real antes de este nuevo ciclo
-                      </span>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {[
-                        { key: "r24h_desayuno", label: "Desayuno", ph: "Ej. 2 huevos, frijoles y café con azúcar" },
-                        { key: "r24h_colacion_m", label: "Colación matutina", ph: "Ej. Manzana con galletas" },
-                        { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pollo, arroz, ensalada y agua de sabor" },
-                        { key: "r24h_colacion_v", label: "Colación vespertina", ph: "Ej. Yogur o barrita de avena" },
-                        { key: "r24h_cena", label: "Cena", ph: "Ej. 2 quesadillas o cereal con leche" },
-                        { key: "r24h_picoteos", label: "Bebidas / Picoteos", ph: "Ej. Refresco diario, botanas, dulces" },
-                      ].map((item) => (
-                        <div key={item.key}>
-                          <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
-                            {item.label}
-                          </label>
-                          <input
-                            type="text"
-                            readOnly={isReadOnly}
-                            value={form[item.key] || ""}
-                            onChange={(e) => !isReadOnly && updForm(item.key, e.target.value)}
-                            placeholder={item.ph}
-                            className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                          />
+                      {adherenceSummary && (
+                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 flex items-center justify-between gap-2 flex-wrap">
+                          <span>
+                            <strong>Registro en app:</strong> {adherenceSummary.summaryText}
+                          </span>
                         </div>
-                      ))}
+                      )}
+
+                      <input
+                        type="text"
+                        readOnly={isReadOnly}
+                        value={form.checkin_observaciones || ""}
+                        onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
+                        placeholder="Ej. Buena energía, apego al 90%, sin hambre excesiva..."
+                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Paso 2: Preferencias Alimentarias */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Utensils className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">
+                            Paso 2
+                          </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Preferencias Alimentarias
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Anota las preferencias alimentarias del paciente para esta etapa (lo que más le gusta comer y lo que no le gusta o prefiere evitar). Esto corresponde exclusivamente a gustos personales para estructurar el mejor menú posible; las alergias o patologías clínicas ya están resguardadas en su expediente.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Enfoque Energético de la Etapa (Alimenta Cálculo Automático de Macros IA) */}
-                  <div className="mt-4 pt-4 border-t border-blue-100/80 space-y-3.5">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
-                        <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                          Enfoque Energético de esta Etapa (Alimenta Cálculo de Macros IA)
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-[#6B7A8D]">
-                        Parámetros dinámicos exclusivos de este ciclo
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    {/* Favoritos */}
+                    <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 space-y-1.5">
+                      <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
+                        <span>Alimentos predilectos / Favoritos</span>
+                      </label>
+                      <p className="text-[11px] text-[#6B7A8D]">
+                        Ingredientes, comidas o preparaciones que más se le antojan o facilitan su apego.
+                      </p>
+                      <textarea
+                        rows={3}
+                        readOnly={isReadOnly}
+                        value={form.preferencias_alimentos || ""}
+                        onChange={(e) => !isReadOnly && updForm("preferencias_alimentos", e.target.value)}
+                        placeholder="Ej. Pollo, claras de huevo, arroz basmati, aguacate, plátano, avena..."
+                        className={`w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-emerald-500"}`}
+                      />
                     </div>
 
-                    {/* Objetivo de la Etapa */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
-                        Objetivo Nutricional de este Ciclo
+                    {/* Aversiones */}
+                    <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3.5 space-y-1.5">
+                      <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Ban className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Alimentos que rechaza o prefiere evitar</span>
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {GOAL_PRESETS.map((g) => {
-                          const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
-                          return (
-                            <button
-                              key={g.id}
-                              type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && updForm("eval_objetivo", g.id)}
-                              className={`text-left p-2.5 rounded-xl border transition-all ${
-                                isReadOnly ? "cursor-default" : "cursor-pointer"
-                              } ${
-                                isSelected
-                                  ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
-                                  : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                                  {g.title}
-                                </span>
-                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                                  isSelected
-                                    ? "bg-[var(--brand-primary)] text-white"
-                                    : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
-                                }`}>
-                                  {g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
-                                {g.desc}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Nivel de Actividad Física del Ciclo (FAF) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
-                        Factor de Actividad Física (FAF) en este Ciclo
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        {ACTIVITY_FACTORS.map((f) => {
-                          const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
-                          const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
-                          return (
-                            <button
-                              key={f.value}
-                              type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && updForm("eval_faf", String(f.value))}
-                              className={`text-left p-2.5 rounded-xl border transition-all ${
-                                isReadOnly ? "cursor-default" : "cursor-pointer"
-                              } ${
-                                isSelected
-                                  ? "bg-amber-50/90 border-amber-400 text-[#0B1929] shadow-2xs"
-                                  : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className={`text-xs font-bold ${isSelected ? "text-amber-700" : "text-[#0B1929]"}`}>
-                                  {f.label}
-                                </span>
-                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                                  isSelected ? "bg-amber-500 text-white" : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
-                                }`}>
-                                  {f.value}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
-                                {f.desc}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <p className="text-[11px] text-[#6B7A8D]">
+                        Comidas o ingredientes que no le agradan y no desea en sus menús por gusto personal (no por alergia).
+                      </p>
+                      <textarea
+                        rows={3}
+                        readOnly={isReadOnly}
+                        value={form.aversiones_alimentos || ""}
+                        onChange={(e) => !isReadOnly && updForm("aversiones_alimentos", e.target.value)}
+                        placeholder="Ej. Pescado/mariscos, hígado, brócoli, mayonesa, cebolla cruda..."
+                        className={`w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-rose-500"}`}
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* Card 1: Protocolo, Sexo, Edad y Fecha */}
-                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
-                  <div className="flex flex-col gap-3.5">
+                {/* Paso 3: Alimentación Diaria Habitual (R24H) */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 uppercase tracking-wider">
+                            Paso 3
+                          </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Alimentación Diaria Habitual (R24H)
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Comprende qué suele desayunar, comer y cenar el paciente habitualmente a lo largo del día para adaptar el nuevo plan a sus horarios y rutinas reales.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                    {[
+                      { key: "r24h_desayuno", label: "Desayuno", ph: "Ej. 2 huevos con jamón, 2 tortillas y café" },
+                      { key: "r24h_colacion_m", label: "Colación matutina", ph: "Ej. Manzana con almendras o galletas" },
+                      { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pechuga de pollo, 1 taza de arroz, ensalada y agua" },
+                      { key: "r24h_colacion_v", label: "Colación vespertina", ph: "Ej. Yogur griego con fruta o barrita" },
+                      { key: "r24h_cena", label: "Cena", ph: "Ej. 2 quesadillas de panela o cereal con leche" },
+                      { key: "r24h_picoteos", label: "Bebidas habituales y picoteos", ph: "Ej. Refresco regular, 2L de agua natural, café, botanas" },
+                    ].map((item) => (
+                      <div key={item.key}>
+                        <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                          {item.label}
+                        </label>
+                        <input
+                          type="text"
+                          readOnly={isReadOnly}
+                          value={form[item.key] || ""}
+                          onChange={(e) => !isReadOnly && updForm(item.key, e.target.value)}
+                          placeholder={item.ph}
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Paso 4: Enfoque u Objetivos del Paciente */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Target className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[var(--brand-primary)] uppercase tracking-wider">
+                            Paso 4
+                          </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Enfoque u Objetivos del Paciente
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Parámetros dinámicos exclusivos del plan actual para fijar el programa calórico y de macronutrientes de acuerdo a los objetivos generales del paciente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Objetivo de la Etapa */}
+                  <div className="pt-1">
+                    <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
+                      Objetivo Nutricional de este Ciclo
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {GOAL_PRESETS.map((g) => {
+                        const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("eval_objetivo", g.id)}
+                            className={`text-left p-2.5 rounded-xl border transition-all ${
+                              isReadOnly ? "cursor-default" : "cursor-pointer"
+                            } ${
+                              isSelected
+                                ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
+                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                                {g.title}
+                              </span>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                isSelected
+                                  ? "bg-[var(--brand-primary)] text-white"
+                                  : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                              }`}>
+                                {g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                              {g.desc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Factor de Actividad Física (FAF) Proyectado conectado a Entrenamiento */}
+                  <div className="pt-2 border-t border-[#F0F4FA]">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                      <label className="block text-xs font-bold text-[#6B7A8D]">
+                        Factor de Actividad Física (FAF) Proyectado
+                      </label>
+                      {suggestedFafFromTraining.days > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
+                          <Dumbbell className="w-3 h-3" />
+                          <span>Calculado de entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {ACTIVITY_FACTORS.map((f) => {
+                        const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
+                        const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
+                        return (
+                          <button
+                            key={f.value}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("eval_faf", String(f.value))}
+                            className={`text-left p-2.5 rounded-xl border transition-all ${
+                              isReadOnly ? "cursor-default" : "cursor-pointer"
+                            } ${
+                              isSelected
+                                ? "bg-amber-50/90 border-amber-400 text-[#0B1929] shadow-2xs"
+                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-xs font-bold ${isSelected ? "text-amber-700" : "text-[#0B1929]"}`}>
+                                {f.label}
+                              </span>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                                isSelected ? "bg-amber-500 text-white" : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                              }`}>
+                                {f.value}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                              {f.desc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paso 5: Mediciones Corporales y Antropometría */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider">
+                            Paso 5
+                          </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Mediciones Corporales y Antropometría
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Selecciona el protocolo de medición (Básico, Plicometría o Bioimpedancia) e ingresa las medidas corporales del paciente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3.5 pt-1 border-t border-[#F0F4FA]">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       {!isCivil && (
                         <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-auto">

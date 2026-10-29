@@ -249,6 +249,8 @@ export function enrichMetrica(m) {
     horas_sueno: meta.horas_sueno ?? m.horas_sueno ?? "",
     consumo_agua_estimado: meta.consumo_agua_estimado ?? m.consumo_agua_estimado ?? "",
     nivel_estres: meta.nivel_estres ?? m.nivel_estres ?? "3",
+    dias_ejercicio_actual: meta.dias_ejercicio_actual ?? m.dias_ejercicio_actual ?? "",
+    horario_ejercicio: meta.horario_ejercicio ?? m.horario_ejercicio ?? "",
   };
 }
 
