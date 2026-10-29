@@ -4170,16 +4170,189 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             )}
                                           </button>
                                         </div>
+
+                                        {/* Botón Lupa de Catálogo FLUX a la derecha de Ingredientes */}
+                                        <button
+                                          type="button"
+                                          onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: !prev[i] }))}
+                                          className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                                            dishCatalogOpenMap[i]
+                                              ? "bg-purple-100 text-purple-700 border-purple-300 shadow-2xs ring-1 ring-purple-300"
+                                              : "bg-white hover:bg-gray-50 text-[#6B7A8D] hover:text-[#0B1929] border-[#E2E8F0]"
+                                          }`}
+                                          title={dishCatalogOpenMap[i] ? "Cerrar catálogo de platillos" : "Explorar catálogo de platillos FLUX"}
+                                        >
+                                          <Search className="w-3.5 h-3.5" />
+                                        </button>
                                       </div>
                                     </div>
 
+                                    {/* Panel Desplegable de Catálogo FLUX (al pulsar la lupa) */}
+                                    {dishCatalogOpenMap[i] && (
+                                      <div className="mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                                            <Utensils className="w-3.5 h-3.5 text-purple-600" />
+                                            Catálogo de Platillos FLUX
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: false }))}
+                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                                            title="Cerrar catálogo"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+
+                                        {/* Barra de búsqueda */}
+                                        <div className="relative mb-2">
+                                          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                          <input
+                                            type="text"
+                                            value={dishCatalogSearchMap[i] || ""}
+                                            onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
+                                            placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón, Chilaquiles)..."
+                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
+                                          />
+                                          {dishCatalogSearchMap[i] && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setDishCatalogSearchMap(prev => ({ ...prev, [i]: "" }))}
+                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {/* Filtros de Categorías */}
+                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
+                                          {CATEGORIAS_PLATILLOS.map(cat => {
+                                            const activeCat = dishCatalogCatMap[i] || "todos";
+                                            const isSelected = activeCat === cat.id;
+                                            return (
+                                              <button
+                                                key={cat.id}
+                                                type="button"
+                                                onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [i]: cat.id }))}
+                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
+                                                  isSelected
+                                                    ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
+                                                }`}
+                                              >
+                                                <span>{cat.icono}</span>
+                                                <span>{cat.nombre}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {/* Grid de Platillos en formato visual similar a ingredientes */}
+                                        <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
+                                          {(() => {
+                                            const platillos = buscarPlatillosCatalogo(
+                                              dishCatalogSearchMap[i] || "",
+                                              dishCatalogCatMap[i] || "todos"
+                                            );
+                                            if (platillos.length === 0) {
+                                              return (
+                                                <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                                                  No se encontraron platillos para esa búsqueda.
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                {platillos.map(item => (
+                                                  <div
+                                                    key={item.id}
+                                                    onClick={() => handleSelectDishFromCatalog(i, item)}
+                                                    className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
+                                                  >
+                                                    <img
+                                                      src={item.foto_url}
+                                                      alt={item.nombre}
+                                                      className="w-12 h-12 object-cover rounded-lg shrink-0 border border-gray-100 group-hover:scale-105 transition-transform"
+                                                      loading="lazy"
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                      <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
+                                                        {item.nombre}
+                                                      </p>
+                                                      <div className="flex items-center gap-2 mt-1">
+                                                        {item.calorias && (
+                                                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                            {item.calorias} kcal
+                                                          </span>
+                                                        )}
+                                                        <span className="text-[10px] text-[#6B7A8D] capitalize">
+                                                          {item.categoria}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
                                     {(c.modoEdicion || "platillo") === "platillo" ? (
-                                      <textarea 
-                                        className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[72px]" 
-                                        value={opcionesList[0] || ""} 
-                                        onChange={e => updMealOption(i, 0, e.target.value)} 
-                                        placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
-                                      />
+                                      <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                                        {/* Foto con controles incorporados a la izquierda del cuadro gris */}
+                                        {c.foto_url ? (
+                                          <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-2xs bg-white group self-center sm:self-start">
+                                            <CachedImage 
+                                              src={c.foto_url} 
+                                              alt="Platillo" 
+                                              className="w-full h-full object-cover" 
+                                            />
+                                            {/* Botón Cambiar Foto */}
+                                            <label 
+                                              className="absolute inset-x-0 bottom-0 py-1 bg-black/65 hover:bg-black/85 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors backdrop-blur-xs"
+                                              title="Cambiar foto ilustrativa"
+                                            >
+                                              <Camera className="w-3 h-3" />
+                                              <span>Cambiar</span>
+                                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                            </label>
+                                            {/* Botón Quitar Foto */}
+                                            <button 
+                                              type="button" 
+                                              onClick={() => updComida(i, "foto_url", "")} 
+                                              className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 hover:bg-rose-600 text-white transition-colors cursor-pointer shadow-sm"
+                                              title="Quitar foto"
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          /* Cuadro para subir foto incorporado a la izquierda */
+                                          <label 
+                                            className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 rounded-2xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[var(--brand-primary)] hover:bg-blue-50/30 flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all group self-center sm:self-start"
+                                            title="Subir foto ilustrativa del platillo"
+                                          >
+                                            <div className="w-8 h-8 rounded-full bg-white border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] group-hover:text-[var(--brand-primary)] group-hover:border-blue-200 shadow-2xs transition-colors">
+                                              <Camera className="w-4 h-4" />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-[#6B7A8D] group-hover:text-[var(--brand-primary)] transition-colors">
+                                              Subir foto
+                                            </span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                          </label>
+                                        )}
+
+                                        {/* Cuadro gris donde se describe el alimento */}
+                                        <textarea 
+                                          className="flex-1 w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[112px] sm:min-h-[128px] resize-y" 
+                                          value={opcionesList[0] || ""} 
+                                          onChange={e => updMealOption(i, 0, e.target.value)} 
+                                          placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
+                                        />
+                                      </div>
                                     ) : (
                                       /* Constructor por Ingredientes con Checkboxes */
                                       <div className="space-y-2.5">
@@ -4399,167 +4572,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                          </div>
                                        </div>
                                      ) : null}
-                                    {/* Menú Desplegable de Platillos FLUX (al pulsar la lupa) */}
-                                    {dishCatalogOpenMap[i] && (
-                                      <div className="mt-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
-                                        <div className="flex items-center justify-between gap-2 mb-2">
-                                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                                            <Utensils className="w-3.5 h-3.5 text-purple-600" />
-                                            Catálogo de Platillos FLUX
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: false }))}
-                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
-                                            title="Cerrar catálogo"
-                                          >
-                                            <X className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
 
-                                        {/* Barra de búsqueda */}
-                                        <div className="relative mb-2">
-                                          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                          <input
-                                            type="text"
-                                            value={dishCatalogSearchMap[i] || ""}
-                                            onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
-                                            placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón, Chilaquiles)..."
-                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
-                                          />
-                                          {dishCatalogSearchMap[i] && (
-                                            <button
-                                              type="button"
-                                              onClick={() => setDishCatalogSearchMap(prev => ({ ...prev, [i]: "" }))}
-                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
-                                            >
-                                              <X className="w-3.5 h-3.5" />
-                                            </button>
-                                          )}
-                                        </div>
-
-                                        {/* Filtros de Categorías */}
-                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
-                                          {CATEGORIAS_PLATILLOS.map(cat => {
-                                            const activeCat = dishCatalogCatMap[i] || "todos";
-                                            const isSelected = activeCat === cat.id;
-                                            return (
-                                              <button
-                                                key={cat.id}
-                                                type="button"
-                                                onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [i]: cat.id }))}
-                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
-                                                  isSelected
-                                                    ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
-                                                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
-                                                }`}
-                                              >
-                                                <span>{cat.icono}</span>
-                                                <span>{cat.nombre}</span>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-
-                                        {/* Grid de Platillos en formato visual similar a ingredientes */}
-                                        <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
-                                          {(() => {
-                                            const platillos = buscarPlatillosCatalogo(
-                                              dishCatalogSearchMap[i] || "",
-                                              dishCatalogCatMap[i] || "todos"
-                                            );
-                                            if (platillos.length === 0) {
-                                              return (
-                                                <div className="text-center py-6 text-xs text-[#6B7A8D]">
-                                                  No se encontraron platillos para esa búsqueda.
-                                                </div>
-                                              );
-                                            }
-                                            return (
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                                {platillos.map(item => (
-                                                  <div
-                                                    key={item.id}
-                                                    onClick={() => handleSelectDishFromCatalog(i, item)}
-                                                    className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
-                                                  >
-                                                    <img
-                                                      src={item.foto_url}
-                                                      alt={item.nombre}
-                                                      className="w-12 h-12 object-cover rounded-lg shrink-0 border border-gray-100 group-hover:scale-105 transition-transform"
-                                                      loading="lazy"
-                                                    />
-                                                    <div className="min-w-0 flex-1">
-                                                      <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
-                                                        {item.nombre}
-                                                      </p>
-                                                      <div className="flex items-center gap-2 mt-1">
-                                                        {item.calorias && (
-                                                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                                                            {item.calorias} kcal
-                                                          </span>
-                                                        )}
-                                                        <span className="text-[10px] text-[#6B7A8D] capitalize">
-                                                          {item.categoria}
-                                                        </span>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            );
-                                          })()}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Foto de Referencia Visual integrada en Opción Principal */}
-                                    <div className="mt-3 pt-3 border-t border-[#E2E8F0]/80">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
-                                          <Camera className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                                          Foto de Referencia Visual (Opción Principal)
-                                        </label>
-                                        {c.foto_url && (
-                                          <button 
-                                            type="button" 
-                                            onClick={() => updComida(i, "foto_url", "")} 
-                                            className="text-red-400 hover:text-red-600 text-xs font-semibold flex items-center gap-1"
-                                          >
-                                            <Trash2 className="w-3 h-3" /> Quitar foto
-                                          </button>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-3 flex-wrap">
-                                        {c.foto_url && (
-                                          <CachedImage 
-                                            src={c.foto_url} 
-                                            alt="referencia" 
-                                            className="w-14 h-14 object-cover rounded-xl border border-[#E2E8F0] shadow-2xs" 
-                                          />
-                                        )}
-                                        <label className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
-                                          <Camera className="w-3.5 h-3.5" />
-                                          <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
-                                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                                        </label>
-
-                                        {/* Botón Lupa de Catálogo FLUX */}
-                                        <button
-                                          type="button"
-                                          onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [i]: !prev[i] }))}
-                                          className={`flex items-center justify-center p-2 border rounded-xl transition-all cursor-pointer ${
-                                            dishCatalogOpenMap[i]
-                                              ? "bg-purple-100 text-purple-700 border-purple-300 shadow-2xs ring-1 ring-purple-300"
-                                              : "bg-gray-50 hover:bg-gray-100 text-[#0B1929] border-[#E2E8F0]"
-                                          }`}
-                                          title={dishCatalogOpenMap[i] ? "Cerrar catálogo de platillos" : "Explorar catálogo de platillos FLUX"}
-                                        >
-                                          <Search className="w-4 h-4 text-[#0B1929]" />
-                                        </button>
-                                      </div>
                                     </div>
-                                  </div>
 
                                   {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) */}
                                   {opcionesList.length > 1 && (
