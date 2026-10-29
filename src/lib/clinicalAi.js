@@ -675,7 +675,7 @@ export function evaluateMealClinicalCompatibility(mealText, clinicalRec) {
       estado: "conflicto",
       tipo: "peligro",
       titulo: "Alerta de Alergia / Intolerancia",
-      mensaje: `¡Cuidado! El platillo contiene '${joinSpanishList(alergiasDetectadas)}', registrado como alérgeno o intolerancia en el expediente.`,
+      mensaje: `Contiene '${joinSpanishList(alergiasDetectadas)}': ingrediente contraindicado por alergia o intolerancia en el expediente.`,
       coincidencias: alergiasDetectadas,
     };
   }
@@ -685,7 +685,7 @@ export function evaluateMealClinicalCompatibility(mealText, clinicalRec) {
       estado: "conflicto",
       tipo: "advertencia",
       titulo: "Aviso de Aversión Alimentaria",
-      mensaje: `Atención: El platillo contiene '${joinSpanishList(aversionesDetectadas)}', ingrediente que el paciente prefiere evitar o rechaza.`,
+      mensaje: `Contiene '${joinSpanishList(aversionesDetectadas)}': alimento rechazado por el paciente que pidió no incluir en su menú.`,
       coincidencias: aversionesDetectadas,
     };
   }
@@ -1722,7 +1722,10 @@ ${comidasText}
 INSTRUCCIONES:
 1. Si una comida tiene 0 kcal o macros vacíos porque fue escrita manualmente, calcula sus macros por tablas USDA/SMAE a partir de la Opción A y marca "macrosCalculadosPorIa": true.
 2. Si la comida ya tenía macros válidos, consérvalos y pon "macrosCalculadosPorIa": false.
-3. Evalúa si hay conflicto con alergias, aversiones o patologías en "alertaClinica" (o null).
+3. DETECCIÓN EXPLÍCITA DE CONFLICTOS Y AVERSIÓN (REGLA DE CLARIDAD):
+   - Si la comida contiene un alimento con aversión del paciente (${aversiones}), en "alertaClinica" DEBES NOMBRAR EXPLÍCITAMENTE QUÉ INGREDIENTE ES y qué falla de forma clara y directa (ej. "Contiene tomate: alimento que el paciente rechaza y pidió no incluir"). PROHIBIDO ser vago o no nombrar el alimento.
+   - Si contiene un alérgeno o exclusión clínica, especifícalo con claridad (ej. "Contiene leche entera: contraindicada por intolerancia a la lactosa").
+   - Si la toma es 100% segura y libre de conflictos o aversiones, devuelve null en "alertaClinica".
 4. Emite un dictamen general del día comparando calorías totales con la meta prescrita.
 
 Responde ÚNICAMENTE con JSON:
@@ -1735,8 +1738,8 @@ Responde ÚNICAMENTE con JSON:
       "carbohidratos": number,
       "grasas": number,
       "macrosCalculadosPorIa": boolean,
-      "alertaClinica": "string o null",
-      "evaluacion": "string corto"
+      "alertaClinica": "Nombre explícito del ingrediente en conflicto y motivo breve (ej. 'Contiene tomate: alimento rechazado en las aversiones del paciente'), o null si es 100% segura",
+      "evaluacion": "string corto (ej. 'Alineada con directriz DASH, sin lactosa')"
     }
   ],
   "resumenGlobal": {

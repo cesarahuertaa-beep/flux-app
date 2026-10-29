@@ -683,11 +683,11 @@ MISIÓN Y REGLAS DE LA AUDITORÍA:
    - Si la comida ya tenía macros válidos (> 0), consérvalos tal como están (a menos que detectes una discrepancia extrema de más del 50%, en cuyo caso indícalo en su alerta).
 
 2. VERIFICACIÓN DE SEGURIDAD Y COMPATIBILIDAD CLÍNICA (Por Comida):
-   - Revisa cada ingrediente de cada opción contra:
-     a) Alergias / Intolerancias / Exclusiones (ej. lácteos enteros en intolerancia a la lactosa, gluten en celiaquía).
-     b) Aversiones declaradas (ej. tomate, atún, mayonesa).
-     c) Patologías y Medicación (ej. exceso de sodio para hipertensión, azúcares simples en prediabetes).
-     d) Si detectas conflicto o desvío, genera una advertencia concisa y amigable en "alertaClinica". Si todo está en regla, devuelve null.
+   - Coteja CADA ingrediente de cada opción contra las aversiones, alergias y patologías del expediente:
+     a) AVERSIÓN DEL PACIENTE (REGLA OBLIGATORIA DE CLARIDAD): Si la comida contiene un alimento declarado en sus aversiones (ej. ${aversiones}), la "alertaClinica" DEBE NOMBRAR EXPLÍCITAMENTE QUÉ INGREDIENTE ES y qué falla con total precisión y brevedad (ej. "Contiene jitomate / tomate: alimento que el paciente rechaza y pidió no incluir", "Contiene atún: aversión declarada en expediente"). PROHIBIDO usar frases vagas como "se detectó una aversión" o "revisar ingredientes".
+     b) ALERGIAS / EXCLUSIONES: Nombra el alérgeno exacto (ej. "Contiene leche de vaca entera: contraindicada por intolerancia a la lactosa").
+     c) PATOLOGÍAS Y MEDICACIÓN: Nombra el desvío exacto (ej. "Exceso de embutidos altos en sodio: contraindicado para hipertensión arterial").
+     d) Si la toma es completamente segura y no viola ninguna aversión ni directriz, devuelve null en "alertaClinica".
 
 3. EVALUACIÓN Y COHERENCIA GLOBAL DEL DÍA:
    - Suma las calorías y macros de todas las comidas (incluyendo las recién calculadas) y compara contra la Meta Diaria Prescrita (Pilar 2).
@@ -703,7 +703,7 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
       "carbohidratos": number,
       "grasas": number,
       "macrosCalculadosPorIa": boolean,
-      "alertaClinica": "string con advertencia amigable si hay conflicto con aversión/alergia/patología, o null si es segura",
+      "alertaClinica": "Nombre explícito del ingrediente en conflicto y por qué falla (ej. 'Contiene tomate: alimento rechazado en las aversiones del paciente'), o null si es 100% segura",
       "evaluacion": "string corto (ej. 'Alineada con directriz DASH, sin lactosa')"
     }
   ],
@@ -783,6 +783,16 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
         sumC += car;
         sumF += f;
 
+        const mealText = ((c.opciones?.[0] || c.opcion1 || "") + " " + (c.opciones?.slice(1).join(" ") || "")).toLowerCase();
+        let alertaClinica: string | null = null;
+        if (aversiones && aversiones !== "No especificadas" && aversiones !== "Ninguna") {
+          const aversionsList = parseTags(aversiones);
+          const found = aversionsList.filter(av => av.length > 2 && mealText.includes(av.toLowerCase()));
+          if (found.length > 0) {
+            alertaClinica = `Contiene '${joinSpanishList(found)}': ingrediente rechazado en las aversiones declaradas del paciente.`;
+          }
+        }
+
         return {
           index: idx,
           calorias: cal,
@@ -790,8 +800,8 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
           carbohidratos: car,
           grasas: f,
           macrosCalculadosPorIa: calculated,
-          alertaClinica: null,
-          evaluacion: "Platillo verificado con tablas bromatológicas de referencia",
+          alertaClinica,
+          evaluacion: alertaClinica || "Platillo verificado con tablas bromatológicas de referencia",
         };
       });
 

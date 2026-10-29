@@ -2081,16 +2081,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               totalAutofilled++;
             }
 
-            // Inyectar alertas y evaluación clínica
+            // Inyectar alertas y evaluación clínica con máxima claridad
             updated.alertaClinica = audited.alertaClinica || null;
             if (audited.alertaClinica) {
               totalAlerts++;
-            }
-            if (audited.evaluacion) {
+              const isDanger = /al[eé]rg|intoleran|prohibid|peligr|contraindic/i.test(audited.alertaClinica);
               updated.evaluacionClinica = {
-                tipo: audited.alertaClinica ? "advertencia" : "exito",
+                tipo: isDanger ? "peligro" : "advertencia",
+                titulo: isDanger ? "Alérgeno / Exclusión Crítica" : "Aviso de Aversión Alimentaria",
+                mensaje: audited.alertaClinica,
+              };
+            } else if (audited.evaluacion) {
+              updated.evaluacionClinica = {
+                tipo: "exito",
+                titulo: "Compatibilidad Clínica",
                 mensaje: audited.evaluacion,
               };
+            } else {
+              updated.evaluacionClinica = null;
             }
             return updated;
           });
