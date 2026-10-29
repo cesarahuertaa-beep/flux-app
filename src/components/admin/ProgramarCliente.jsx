@@ -212,58 +212,110 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [dishCatalogSearchMap, setDishCatalogSearchMap] = useState({});
   const [dishCatalogCatMap, setDishCatalogCatMap] = useState({});
 
-  const handleSelectDishFromCatalog = (mealIdx, dish) => {
+  const [aiGeneratingDishMap, setAiGeneratingDishMap] = useState({});
+
+  const handleSelectDishFromCatalog = (mealIdx, dish, optIdx = 0) => {
+    const optKey = `${mealIdx}_${optIdx}`;
     setDiaForm(p => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
       const recipeText = dish.texto || dish.nombre;
       const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
-      opts[0] = recipeText;
+      while (opts.length <= optIdx) opts.push("");
+      opts[optIdx] = recipeText;
       c.opciones = opts;
-      c.opcion1 = recipeText;
-      if (dish.foto_url) {
-        c.foto_url = dish.foto_url;
+      if (optIdx === 0) {
+        c.opcion1 = recipeText;
+        if (dish.foto_url) c.foto_url = dish.foto_url;
+        if (dish.calorias) c.calorias = dish.calorias;
+        if (dish.proteina) c.proteina = dish.proteina;
+        if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
+        if (dish.grasas) c.grasas = dish.grasas;
+        c.modoEdicion = "platillo";
       }
-      if (dish.calorias) c.calorias = dish.calorias;
-      if (dish.proteina) c.proteina = dish.proteina;
-      if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
-      if (dish.grasas) c.grasas = dish.grasas;
-      c.modoEdicion = "platillo";
+      c.opcionesModoEdicion = {
+        ...(c.opcionesModoEdicion || {}),
+        [optIdx]: "platillo",
+      };
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
     });
-    setDishCatalogOpenMap(prev => ({ ...prev, [mealIdx]: false }));
+    setDishCatalogOpenMap(prev => ({ ...prev, [optKey]: false, [mealIdx]: false }));
+    const optLetter = String.fromCharCode(65 + optIdx);
     setMsg(
       <div className="flex items-center gap-1.5 text-purple-700">
         <Sparkles className="w-4 h-4 text-purple-600" />
-        <span>Platillo "{dish.nombre}" cargado exitosamente.</span>
+        <span>Platillo "{dish.nombre}" cargado en Opción {optLetter}.</span>
       </div>
     );
   };
 
-  const toggleIngrediente = (mealIdx, ingredienteNombre) => {
+  const toggleIngrediente = (mealIdx, ingredienteNombre, optIdx = 0) => {
     setDiaForm(p => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
-      const list = [...(c.ingredientesSeleccionados || [])];
+      const currentList = optIdx === 0
+        ? (c.ingredientesSeleccionados || [])
+        : (c.opcionesIngredientes?.[optIdx] || []);
+      const list = [...currentList];
       const exists = list.includes(ingredienteNombre);
       if (exists) {
-        c.ingredientesSeleccionados = list.filter(x => x !== ingredienteNombre);
+        const filtered = list.filter(x => x !== ingredienteNombre);
+        if (optIdx === 0) c.ingredientesSeleccionados = filtered;
+        c.opcionesIngredientes = { ...(c.opcionesIngredientes || {}), [optIdx]: filtered };
       } else {
-        c.ingredientesSeleccionados = [...list, ingredienteNombre];
+        const appended = [...list, ingredienteNombre];
+        if (optIdx === 0) c.ingredientesSeleccionados = appended;
+        c.opcionesIngredientes = { ...(c.opcionesIngredientes || {}), [optIdx]: appended };
       }
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
     });
   };
 
-  const handleGenerateDishFromIngredients = async (mealIdx) => {
+  const clearIngredientes = (mealIdx, optIdx = 0) => {
+    setDiaForm(p => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      if (optIdx === 0) {
+        c.ingredientesSeleccionados = [];
+      }
+      c.opcionesIngredientes = {
+        ...(c.opcionesIngredientes || {}),
+        [optIdx]: [],
+      };
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+  };
+
+  const setMealOptionMode = (mealIdx, optIdx, mode) => {
+    setDiaForm(p => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      if (optIdx === 0) {
+        c.modoEdicion = mode;
+      }
+      c.opcionesModoEdicion = {
+        ...(c.opcionesModoEdicion || {}),
+        [optIdx]: mode,
+      };
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+  };
+
+  const handleGenerateDishFromIngredients = async (mealIdx, optIdx = 0) => {
     const meal = diaForm.comidas[mealIdx];
-    const items = meal?.ingredientesSeleccionados || [];
+    const items = optIdx === 0
+      ? (meal?.ingredientesSeleccionados || [])
+      : (meal?.opcionesIngredientes?.[optIdx] || []);
     if (items.length === 0) {
       alert("Selecciona al menos 2 ingredientes marcando sus casillas para generar un platillo.");
       return;
     }
+    const optKey = `${mealIdx}_${optIdx}`;
+    setAiGeneratingDishMap(prev => ({ ...prev, [optKey]: true }));
     setAiGeneratingDishIndex(mealIdx);
     try {
       const metaKcal = Number(macros.calorias) || smartPrescription?.targetKcal || 0;
@@ -306,7 +358,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       });
 
       let autoPhoto = meal.foto_url;
-      if (!autoPhoto && res?.titulo) {
+      if (optIdx === 0 && !autoPhoto && res?.titulo) {
         try {
           const match = await searchDishPhotoInCatalog(res.titulo, [res.titulo, ...items]);
           if (match?.foto_url) {
@@ -315,27 +367,34 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         } catch {}
       }
 
+      const optLetter = String.fromCharCode(65 + optIdx);
+      const dishText = res.titulo && res.texto && !res.texto.startsWith(res.titulo)
+        ? `${res.titulo}\n\n${res.texto}`
+        : (res.texto || res.titulo || "");
+
       setDiaForm(p => {
         const cs = [...p.comidas];
         const c = { ...cs[mealIdx] };
-        // No sobreescribir c.nombre: el campo Nombre de la toma es opcional y 100% manual
-        const dishText = res.titulo && res.texto && !res.texto.startsWith(res.titulo)
-          ? `${res.titulo}\n\n${res.texto}`
-          : (res.texto || res.titulo || "");
         const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
-        opts[0] = dishText;
+        while (opts.length <= optIdx) opts.push("");
+        opts[optIdx] = dishText;
         c.opciones = opts;
-        c.opcion1 = dishText;
-        if (autoPhoto) c.foto_url = autoPhoto;
+        if (optIdx === 0) {
+          c.opcion1 = dishText;
+          if (autoPhoto) c.foto_url = autoPhoto;
 
-        // Inyectar calorías y macronutrientes calculados en los campos inferiores
-        if (res.calorias != null) c.calorias = Math.round(Number(res.calorias));
-        if (res.proteina != null) c.proteina = Math.round(Number(res.proteina));
-        if (res.carbohidratos != null) c.carbohidratos = Math.round(Number(res.carbohidratos));
-        if (res.grasas != null) c.grasas = Math.round(Number(res.grasas));
+          // Inyectar calorías y macronutrientes calculados en los campos inferiores
+          if (res.calorias != null) c.calorias = Math.round(Number(res.calorias));
+          if (res.proteina != null) c.proteina = Math.round(Number(res.proteina));
+          if (res.carbohidratos != null) c.carbohidratos = Math.round(Number(res.carbohidratos));
+          if (res.grasas != null) c.grasas = Math.round(Number(res.grasas));
 
-        // Conmutar automáticamente a modo platillo para revisar la receta generada
-        c.modoEdicion = "platillo";
+          c.modoEdicion = "platillo";
+        }
+        c.opcionesModoEdicion = {
+          ...(c.opcionesModoEdicion || {}),
+          [optIdx]: "platillo",
+        };
         cs[mealIdx] = c;
         return { ...p, comidas: cs };
       });
@@ -343,12 +402,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setMsg(
         <div className="flex items-center gap-1.5 text-purple-700">
           <Sparkles className="w-4 h-4 text-purple-600" />
-          <span>¡Platillo generado con IA! Se inyectaron su receta, calorías y macronutrientes.</span>
+          <span>¡Platillo generado con IA para la Opción ${optLetter}!</span>
         </div>
       );
     } catch (err) {
       alert("No se pudo generar el platillo con IA: " + (err?.message || "Error"));
     } finally {
+      setAiGeneratingDishMap(prev => ({ ...prev, [optKey]: false }));
       setAiGeneratingDishIndex(null);
     }
   };
@@ -4645,33 +4705,368 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                                     </div>
 
-                                  {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) */}
+                                  {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) con Platillos, Ingredientes y Catálogo FLUX */}
                                   {opcionesList.length > 1 && (
-                                    <div className="space-y-3 mb-3.5">
+                                    <div className="space-y-3.5 mb-3.5">
                                       {opcionesList.slice(1).map((altText, altIdx) => {
                                         const actualIdx = altIdx + 1;
                                         const optionLetter = String.fromCharCode(65 + actualIdx); // B, C, D...
+                                        const optKey = `${i}_${actualIdx}`;
+                                        const modo = c.opcionesModoEdicion?.[actualIdx] || "platillo";
+                                        const selectedIngs = c.opcionesIngredientes?.[actualIdx] || [];
+                                        const isCatOpen = Boolean(dishCatalogOpenMap[optKey]);
+                                        const catSearch = dishCatalogSearchMap[optKey] || "";
+                                        const catActive = dishCatalogCatMap[optKey] || "todos";
+                                        const ingSearch = ingredientSearchMap[optKey] || "";
+                                        const ingActive = ingredientCatMap[optKey] || "todos";
+                                        const isGen = Boolean(aiGeneratingDishMap[optKey]);
+
                                         return (
-                                          <div key={actualIdx} className="p-3.5 rounded-xl bg-white border border-[#E2E8F0]">
-                                            <div className="flex items-center justify-between gap-2 mb-2">
-                                              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                                                Opción Alternativa ({optionLetter})
-                                              </span>
+                                          <div key={actualIdx} className="p-3.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs">
+                                            {/* Header de la Opción Alternativa */}
+                                            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                                              <div className="flex items-center gap-2.5 flex-wrap">
+                                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                                                  Opción Alternativa ({optionLetter})
+                                                </span>
+
+                                                {/* Switch Platillo vs Ingredientes */}
+                                                <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
+                                                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                      modo === "platillo"
+                                                        ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
+                                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                                    }`}
+                                                  >
+                                                    <span>🍲</span>
+                                                    <span>Platillo</span>
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
+                                                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                      modo === "ingredientes"
+                                                        ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                                    }`}
+                                                  >
+                                                    <span>🥑</span>
+                                                    <span>Ingredientes</span>
+                                                    {selectedIngs.length > 0 && (
+                                                      <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                                                        {selectedIngs.length}
+                                                      </span>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* Botón Lupa de Catálogo FLUX */}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [optKey]: !prev[optKey] }))}
+                                                  className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                                                    isCatOpen
+                                                      ? "bg-purple-100 text-purple-700 border-purple-300 shadow-2xs ring-1 ring-purple-300"
+                                                      : "bg-white hover:bg-gray-50 text-[#6B7A8D] hover:text-[#0B1929] border-[#E2E8F0]"
+                                                  }`}
+                                                  title={isCatOpen ? "Cerrar catálogo de platillos" : `Explorar catálogo de platillos FLUX para Opción ${optionLetter}`}
+                                                >
+                                                  <Search className="w-3.5 h-3.5" />
+                                                </button>
+                                              </div>
+
+                                              {/* Botón Quitar Opción */}
                                               <button
                                                 type="button"
                                                 onClick={() => removeMealOption(i, actualIdx)}
-                                                className="text-red-400 hover:text-red-600 p-1 text-xs font-semibold flex items-center gap-1 rounded hover:bg-red-50"
+                                                className="text-red-400 hover:text-red-600 p-1 text-xs font-semibold flex items-center gap-1 rounded hover:bg-red-50 cursor-pointer transition-colors"
                                                 title="Eliminar esta opción"
                                               >
                                                 <Trash2 className="w-3.5 h-3.5" /> Quitar opción
                                               </button>
                                             </div>
-                                            <textarea 
-                                              className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[64px]" 
-                                              value={altText || ""} 
-                                              onChange={e => updMealOption(i, actualIdx, e.target.value)} 
-                                              placeholder={`Alternativa equivalente ${optionLetter} con mismos macronutrientes...`} 
-                                            />
+
+                                            {/* Panel Desplegable de Catálogo FLUX para esta opción alternativa */}
+                                            {isCatOpen && (
+                                              <div className="mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
+                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                  <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                                                    <Utensils className="w-3.5 h-3.5 text-purple-600" />
+                                                    Catálogo de Platillos FLUX (Opción {optionLetter})
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setDishCatalogOpenMap(prev => ({ ...prev, [optKey]: false }))}
+                                                    className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                                                    title="Cerrar catálogo"
+                                                  >
+                                                    <X className="w-3.5 h-3.5" />
+                                                  </button>
+                                                </div>
+
+                                                {/* Barra de búsqueda */}
+                                                <div className="relative mb-2">
+                                                  <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                  <input
+                                                    type="text"
+                                                    value={catSearch}
+                                                    onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [optKey]: e.target.value }))}
+                                                    placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón)..."
+                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
+                                                  />
+                                                  {catSearch && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setDishCatalogSearchMap(prev => ({ ...prev, [optKey]: "" }))}
+                                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                                    >
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  )}
+                                                </div>
+
+                                                {/* Filtros de Categorías */}
+                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
+                                                  {CATEGORIAS_PLATILLOS.map(cat => {
+                                                    const isSelected = catActive === cat.id;
+                                                    return (
+                                                      <button
+                                                        key={cat.id}
+                                                        type="button"
+                                                        onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [optKey]: cat.id }))}
+                                                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
+                                                          isSelected
+                                                            ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                                                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
+                                                        }`}
+                                                      >
+                                                        <span>{cat.icono}</span>
+                                                        <span>{cat.nombre}</span>
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+
+                                                {/* Grid de Platillos */}
+                                                <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
+                                                  {(() => {
+                                                    const platillos = buscarPlatillosCatalogo(catSearch, catActive);
+                                                    if (platillos.length === 0) {
+                                                      return (
+                                                        <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                                                          No se encontraron platillos para esa búsqueda.
+                                                        </div>
+                                                      );
+                                                    }
+                                                    return (
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                        {platillos.map(item => (
+                                                          <div
+                                                            key={item.id}
+                                                            onClick={() => handleSelectDishFromCatalog(i, item, actualIdx)}
+                                                            className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
+                                                          >
+                                                            <img
+                                                             src={item.foto_url}
+                                                             alt={item.nombre}
+                                                             className="w-12 h-12 object-cover rounded-lg shrink-0 border border-gray-100 group-hover:scale-105 transition-transform"
+                                                             loading="lazy"
+                                                            />
+                                                            <div className="min-w-0 flex-1">
+                                                              <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
+                                                                {item.nombre}
+                                                              </p>
+                                                              <div className="flex items-center gap-2 mt-1">
+                                                                {item.calorias && (
+                                                                  <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                                    {item.calorias} kcal
+                                                                  </span>
+                                                                )}
+                                                                <span className="text-[10px] text-[#6B7A8D] capitalize">
+                                                                  {item.categoria}
+                                                                </span>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    );
+                                                  })()}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Modo Platillo vs Modo Ingredientes */}
+                                            {modo === "platillo" ? (
+                                              /* Modo Platillo: Sin foto, área de texto completa */
+                                              <textarea 
+                                                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[96px] resize-y transition-colors" 
+                                                value={altText || ""} 
+                                                onChange={e => updMealOption(i, actualIdx, e.target.value)} 
+                                                placeholder={`Ingredientes, porciones y preparación de la alternativa ${optionLetter}...`} 
+                                              />
+                                            ) : (
+                                              /* Constructor por Ingredientes */
+                                              <div className="space-y-2.5">
+                                                {/* Barra de búsqueda de ingredientes */}
+                                                <div className="relative">
+                                                  <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                  <input
+                                                    type="text"
+                                                    value={ingSearch}
+                                                    onChange={e => setIngredientSearchMap(prev => ({ ...prev, [optKey]: e.target.value }))}
+                                                    placeholder="Buscar ingrediente (ej. Pollo, Arroz, Brócoli, Avena, Huevo)..."
+                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                                                  />
+                                                  {ingSearch && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setIngredientSearchMap(prev => ({ ...prev, [optKey]: "" }))}
+                                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                                    >
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  )}
+                                                </div>
+
+                                                {/* Filtros de Categorías de Ingredientes */}
+                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                                                  {CATEGORIAS_INGREDIENTES.map(cat => {
+                                                    const isSelected = ingActive === cat.id;
+                                                    return (
+                                                      <button
+                                                        key={cat.id}
+                                                        type="button"
+                                                        onClick={() => setIngredientCatMap(prev => ({ ...prev, [optKey]: cat.id }))}
+                                                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
+                                                          isSelected
+                                                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
+                                                            : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
+                                                        }`}
+                                                      >
+                                                        <span>{cat.icono}</span>
+                                                        <span>{cat.nombre}</span>
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+
+                                                {/* Bandeja de seleccionados */}
+                                                {selectedIngs.length > 0 && (
+                                                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
+                                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                      <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
+                                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                        {selectedIngs.length} ingredientes seleccionados:
+                                                      </span>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => clearIngredientes(i, actualIdx)}
+                                                        className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
+                                                      >
+                                                        Limpiar selección
+                                                      </button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                      {selectedIngs.map(ing => (
+                                                        <span
+                                                          key={ing}
+                                                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white border border-emerald-300 text-xs font-semibold text-emerald-900 shadow-2xs"
+                                                        >
+                                                          {ing}
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => toggleIngrediente(i, ing, actualIdx)}
+                                                            className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                          >
+                                                            <X className="w-3 h-3" />
+                                                          </button>
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {/* Grid de Ingredientes con Checkboxes */}
+                                                <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-56 overflow-y-auto">
+                                                  {(() => {
+                                                    const items = buscarIngredientes(ingSearch, ingActive);
+                                                    if (items.length === 0) {
+                                                      return (
+                                                        <div className="text-center py-6 text-xs text-[#6B7A8D]">
+                                                          No se encontraron ingredientes con ese término.
+                                                        </div>
+                                                      );
+                                                    }
+                                                    return (
+                                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                                        {items.map(item => {
+                                                          const isChecked = selectedIngs.includes(item.nombre);
+                                                          return (
+                                                            <div
+                                                              key={item.id}
+                                                              onClick={() => toggleIngrediente(i, item.nombre, actualIdx)}
+                                                              className={`flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                                                                isChecked
+                                                                  ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                                  : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
+                                                              }`}
+                                                            >
+                                                              <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => {}}
+                                                                className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer shrink-0"
+                                                              />
+                                                              <img
+                                                                src={item.foto}
+                                                                alt={item.nombre}
+                                                                className="w-6 h-6 object-contain rounded shrink-0 bg-white"
+                                                                loading="lazy"
+                                                                onError={e => { e.currentTarget.style.display = 'none'; }}
+                                                              />
+                                                              <span className="text-xs font-medium text-[#0B1929] truncate flex-1" title={item.nombre}>
+                                                                {item.nombre}
+                                                              </span>
+                                                            </div>
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    );
+                                                  })()}
+                                                </div>
+
+                                                {/* Pie del Constructor: Botón Generar con IA */}
+                                                <div className="pt-1 flex items-center justify-between gap-3 flex-wrap">
+                                                  <span className="text-[11px] text-[#6B7A8D]">
+                                                    {selectedIngs.length >= 2 
+                                                      ? `Combina tus ingredientes para la Opción ${optionLetter}.`
+                                                      : "Selecciona al menos 2 ingredientes para generar el platillo."}
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
+                                                    disabled={isGen || selectedIngs.length === 0}
+                                                    className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                                                  >
+                                                    {isGen ? (
+                                                      <>
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        <span>Creando platillo...</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                        <span>Generar Platillo con IA {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )}
                                           </div>
                                         );
                                       })}
