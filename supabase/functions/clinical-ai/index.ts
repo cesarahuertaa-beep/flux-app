@@ -243,7 +243,11 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
         JSON.stringify({
           error: "GEMINI_UNAVAILABLE",
           message: "No se pudo obtener respuesta de Google Gemini en este momento. Inténtalo nuevamente.",
-        }
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // =========================================================================
     // ACCIÓN: OPTIMIZACIÓN Y CÁLCULO DE MACROS DE COMIDA CON GEMINI
     // =========================================================================
@@ -479,14 +483,11 @@ Debes responder ÚNICAMENTE con un JSON:
         }
       }
     }
-),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // =========================================================================
     // ACCIÓN 2: SÍNTESIS Y AUDITORÍA DE EXPEDIENTE CLÍNICO INTEGRAL
     // =========================================================================
+    if (action === "clinical-synopsis") {
     const anamnesis = body.anamnesis || {};
     const cliente = body.cliente || {};
 
@@ -699,6 +700,12 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
         directrices_nutricionales: [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+    }
+
+    return new Response(
+      JSON.stringify({ error: "UNKNOWN_ACTION", message: `Acción no reconocida: ${action}` }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     return new Response(

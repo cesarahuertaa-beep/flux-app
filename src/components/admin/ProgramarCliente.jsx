@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -1849,16 +1849,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           c.nombre = res.nombreNormalizado;
         }
         c.alertaClinica = res.alertaClinica || null;
+        c.evaluacionClinica = res.evaluacionClinica || null;
         cs[mealIdx] = c;
         return { ...p, comidas: cs };
       });
-      const isLocal = res?.origen === "analitico_local";
-      setMsg(
-        <div className="flex items-center gap-1.5">
-          <Sparkles className={`w-4 h-4 ${isLocal ? "text-emerald-600" : "text-purple-600"}`} />
-          <span>{isLocal ? "Macros calculados (Motor Bromatológico FLUX)" : "Macros calculados con IA"}</span>
-        </div>
-      );
+      if (res?.evaluacionClinica?.tipo === "exito") {
+        setMsg(
+          <div className="flex items-center gap-1.5 text-emerald-700">
+            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <span>Macros calculados • ¡Alineado con comida favorita del paciente!</span>
+          </div>
+        );
+      } else if (res?.evaluacionClinica?.tipo === "advertencia" || res?.evaluacionClinica?.tipo === "peligro") {
+        setMsg(
+          <div className="flex items-center gap-1.5 text-amber-700">
+            <AlertCircle className="w-4 h-4 text-amber-600" />
+            <span>Macros calculados • ⚠️ Revisa el aviso clínico del platillo</span>
+          </div>
+        );
+      } else {
+        const isLocal = res?.origen === "analitico_local";
+        setMsg(
+          <div className="flex items-center gap-1.5">
+            <Sparkles className={`w-4 h-4 ${isLocal ? "text-emerald-600" : "text-purple-600"}`} />
+            <span>{isLocal ? "Macros calculados (Motor Bromatológico FLUX)" : "Macros calculados con IA"}</span>
+          </div>
+        );
+      }
     } catch (err) {
       console.error(err);
       setMsg(<div className="text-amber-600 text-xs">⚠️ {err.message || "No se pudo optimizar la comida"}</div>);
@@ -1893,7 +1910,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           const cs = [...p.comidas];
           const c = { ...cs[mealIdx] };
           const opts = [...(c.opciones || [""])];
-          opts.push(res.texto);
+          if (opts.length > 1 && !opts[opts.length - 1].trim()) {
+            opts[opts.length - 1] = res.texto;
+          } else {
+            opts.push(res.texto);
+          }
           c.opciones = opts;
           cs[mealIdx] = c;
           return { ...p, comidas: cs };
@@ -4026,17 +4047,60 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     />
 
                                     {/* Alerta clínica de alergias o aversiones */}
-                                    {c.alertaClinica && (
-                                      <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
-                                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                        <div className="min-w-0">
-                                          <div className="font-bold text-amber-950">Aviso clínico del expediente del paciente:</div>
-                                          <div className="text-[11px] leading-relaxed mt-0.5">
-                                            {typeof c.alertaClinica === 'string' ? c.alertaClinica : c.alertaClinica.mensaje}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
+                                    {c.evaluacionClinica ? (
+                                       <div className={`mt-2.5 p-2.5 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in transition-all ${
+                                         c.evaluacionClinica.tipo === "peligro"
+                                           ? "bg-rose-50/90 border-rose-200 text-rose-950"
+                                           : c.evaluacionClinica.tipo === "advertencia"
+                                           ? "bg-amber-50/90 border-amber-200 text-amber-950"
+                                           : c.evaluacionClinica.tipo === "exito"
+                                           ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+                                           : "bg-blue-50/90 border-blue-200 text-blue-950"
+                                       }`}>
+                                         {c.evaluacionClinica.tipo === "peligro" ? (
+                                           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                         ) : c.evaluacionClinica.tipo === "advertencia" ? (
+                                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                         ) : c.evaluacionClinica.tipo === "exito" ? (
+                                           <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                         ) : (
+                                           <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                                         )}
+                                         <div className="min-w-0 flex-1">
+                                           <div className="flex items-center gap-2 flex-wrap">
+                                             <span className="font-bold text-xs">{c.evaluacionClinica.titulo}</span>
+                                             {c.evaluacionClinica.tipo === "exito" && (
+                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
+                                                 Alimento Favorito
+                                               </span>
+                                             )}
+                                             {c.evaluacionClinica.tipo === "advertencia" && (
+                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold uppercase tracking-wider">
+                                                 Aversión
+                                               </span>
+                                             )}
+                                             {c.evaluacionClinica.tipo === "peligro" && (
+                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase tracking-wider">
+                                                 Alérgeno Crítico
+                                               </span>
+                                             )}
+                                           </div>
+                                           <div className="text-[11.5px] leading-relaxed mt-1">
+                                             {c.evaluacionClinica.mensaje}
+                                           </div>
+                                         </div>
+                                       </div>
+                                     ) : c.alertaClinica ? (
+                                       <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
+                                         <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                         <div className="min-w-0">
+                                           <div className="font-bold text-amber-950">Aviso clínico del expediente del paciente:</div>
+                                           <div className="text-[11px] leading-relaxed mt-0.5">
+                                             {typeof c.alertaClinica === 'string' ? c.alertaClinica : c.alertaClinica.mensaje}
+                                           </div>
+                                         </div>
+                                       </div>
+                                     ) : null}
                                   </div>
 
                                   {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) */}

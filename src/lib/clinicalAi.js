@@ -630,6 +630,86 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
  */
 
 /**
+ * Evalúa la compatibilidad clínica de un platillo o receta contra el expediente del paciente:
+ * - Alergias e intolerancias (riesgo clínico alto)
+ * - Aversiones (lo que el paciente no le gusta o prefiere evitar)
+ * - Alimentos favoritos (preferencias que aumentan el apego)
+ */
+export function evaluateMealClinicalCompatibility(mealText, clinicalRec) {
+  const textNorm = String(mealText || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const alergiasList = parseTags(anamnesis.alergias_intolerancias || "");
+  const aversionesList = parseTags(anamnesis.aversiones_alimentos || "");
+  const preferenciasList = parseTags(anamnesis.preferencias_alimentos || "");
+
+  const alergiasDetectadas = [];
+  for (const item of alergiasList) {
+    const cleaned = item.toLowerCase().trim();
+    if (cleaned.length > 2 && textNorm.includes(cleaned)) {
+      alergiasDetectadas.push(item);
+    }
+  }
+
+  const aversionesDetectadas = [];
+  for (const item of aversionesList) {
+    const cleaned = item.toLowerCase().trim();
+    if (cleaned.length > 2 && textNorm.includes(cleaned)) {
+      aversionesDetectadas.push(item);
+    }
+  }
+
+  const favoritosDetectados = [];
+  for (const item of preferenciasList) {
+    const cleaned = item.toLowerCase().trim();
+    if (cleaned.length > 2 && textNorm.includes(cleaned)) {
+      favoritosDetectados.push(item);
+    }
+  }
+
+  if (alergiasDetectadas.length > 0) {
+    return {
+      estado: "conflicto",
+      tipo: "peligro",
+      titulo: "Alerta de Alergia / Intolerancia",
+      mensaje: `¡Cuidado! El platillo contiene '${joinSpanishList(alergiasDetectadas)}', registrado como alérgeno o intolerancia en el expediente.`,
+      coincidencias: alergiasDetectadas,
+    };
+  }
+
+  if (aversionesDetectadas.length > 0) {
+    return {
+      estado: "conflicto",
+      tipo: "advertencia",
+      titulo: "Aviso de Aversión Alimentaria",
+      mensaje: `Atención: El platillo contiene '${joinSpanishList(aversionesDetectadas)}', ingrediente que el paciente prefiere evitar o rechaza.`,
+      coincidencias: aversionesDetectadas,
+    };
+  }
+
+  if (favoritosDetectados.length > 0) {
+    return {
+      estado: "favorito",
+      tipo: "exito",
+      titulo: "Alineado con sus alimentos favoritos",
+      mensaje: `¡Excelente apego! Contiene '${joinSpanishList(favoritosDetectados)}', reportado entre las comidas preferidas del paciente.`,
+      coincidencias: favoritosDetectados,
+    };
+  }
+
+  return {
+    estado: "seguro",
+    tipo: "seguro",
+    titulo: "Compatibilidad clínica verificada",
+    mensaje: "Platillo seguro. Libre de alérgenos y aversiones reportadas en el expediente del paciente.",
+    coincidencias: [],
+  };
+}
+
+/**
  * ═════════════════════════════════════════════════════════════════════
  * MOTOR ANALÍTICO LOCAL DE NUTRICIÓN (SMAE / USDA)
  * ═════════════════════════════════════════════════════════════════════
@@ -935,23 +1015,9 @@ export function estimateMealMacrosAnalytically(mealText, targetMacros = {}, clin
     calorias = calcSumKcal;
   }
 
-  // Auditoría clínica contra alergias y aversiones
-  const anamnesis = clinicalRec?.anamnesis || {};
-  const alergiasList = parseTags(anamnesis.alergias_intolerancias || "");
-  const aversionesList = parseTags(anamnesis.aversiones_alimentos || "");
-  const conflictos = [];
-
-  for (const item of [...alergiasList, ...aversionesList]) {
-    const cleaned = item.toLowerCase().trim();
-    if (cleaned.length > 2 && textNorm.includes(cleaned)) {
-      conflictos.push(item);
-    }
-  }
-
-  let alertaClinica = null;
-  if (conflictos.length > 0) {
-    alertaClinica = `⚠️ Precaución clínica: Este platillo contiene '${joinSpanishList(conflictos)}', reportado en las alergias/aversiones del paciente.`;
-  }
+  // Auditoría clínica contra alergias, aversiones y preferencias
+  const evaluacionClinica = evaluateMealClinicalCompatibility(textNorm, clinicalRec);
+  const alertaClinica = evaluacionClinica.estado === "conflicto" ? evaluacionClinica.mensaje : null;
 
   let nombreNormalizado = raw.split(/[,;\n\.\+]/)[0].trim();
   if (nombreNormalizado.length > 45) {
@@ -970,6 +1036,7 @@ export function estimateMealMacrosAnalytically(mealText, targetMacros = {}, clin
     palabrasClave: keywords,
     palabrasClaveFoto: keywords,
     alertaClinica,
+    evaluacionClinica,
     resumenNutricional: alertaClinica ? "Revisar ingredientes por posible conflicto clínico." : "Aporte nutricional equilibrado calculado por motor analítico FLUX.",
     origen: "analitico_local",
   };
@@ -1008,7 +1075,13 @@ export async function optimizeMealWithAi({ textoComida, mealText, targetKcal = 0
       if (!edgeRes.palabrasClaveFoto && edgeRes.palabrasClave) {
         edgeRes.palabrasClaveFoto = edgeRes.palabrasClave;
       }
-      return { ...edgeRes, origen: edgeRes.origen || "edge_function" };
+      const evaluacionClinica = edgeRes.evaluacionClinica || evaluateMealClinicalCompatibility(text, clinicalRec);
+      return { 
+        ...edgeRes, 
+        evaluacionClinica,
+        alertaClinica: edgeRes.alertaClinica || (evaluacionClinica.estado === "conflicto" ? evaluacionClinica.mensaje : null),
+        origen: edgeRes.origen || "edge_function" 
+      };
     }
   } catch {}
 
@@ -1118,7 +1191,12 @@ export async function generateAlternativeMealWithAi({ mainMealText, targetMacros
       geminiKey: apiKey,
     });
     clearTimeout(timeoutId);
-    if (edgeRes?.texto) {
+    if (
+      edgeRes?.texto &&
+      !edgeRes.diagnostico &&
+      !edgeRes.alertas?.patologias_normalizadas &&
+      !/^(paciente|diagn[oó]stico)/i.test(edgeRes.texto.trim())
+    ) {
       return { ...edgeRes, origen: edgeRes.origen || "edge_function" };
     }
   } catch {}
@@ -1256,7 +1334,12 @@ export async function generateMealFromPantryWithAi({ ingredientesDisponibles, ta
       geminiKey: apiKey,
     });
     clearTimeout(timeoutId);
-    if (edgeRes?.texto) {
+    if (
+      edgeRes?.texto &&
+      !edgeRes.diagnostico &&
+      !edgeRes.alertas?.patologias_normalizadas &&
+      !/^(paciente|diagn[oó]stico)/i.test(edgeRes.texto.trim())
+    ) {
       return { ...edgeRes, origen: edgeRes.origen || "edge_function" };
     }
   } catch {}
