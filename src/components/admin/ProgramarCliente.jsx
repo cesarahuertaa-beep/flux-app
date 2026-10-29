@@ -301,6 +301,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         c.opciones = opts;
         c.opcion1 = dishText;
         if (autoPhoto) c.foto_url = autoPhoto;
+
+        // Inyectar calorías y macronutrientes calculados en los campos inferiores
+        if (res.calorias != null) c.calorias = Math.round(Number(res.calorias));
+        if (res.proteina != null) c.proteina = Math.round(Number(res.proteina));
+        if (res.carbohidratos != null) c.carbohidratos = Math.round(Number(res.carbohidratos));
+        if (res.grasas != null) c.grasas = Math.round(Number(res.grasas));
+
         // Conmutar automáticamente a modo platillo para revisar la receta generada
         c.modoEdicion = "platillo";
         cs[mealIdx] = c;
@@ -310,7 +317,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setMsg(
         <div className="flex items-center gap-1.5 text-purple-700">
           <Sparkles className="w-4 h-4 text-purple-600" />
-          <span>¡Platillo generado con IA! Puedes revisarlo o calcular sus macros.</span>
+          <span>¡Platillo generado con IA! Se inyectaron su receta, calorías y macronutrientes.</span>
         </div>
       );
     } catch (err) {

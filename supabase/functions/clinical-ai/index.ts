@@ -427,7 +427,7 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
 
       if (geminiKey && geminiKey.trim().length >= 20 && ingredientes) {
         const promptDish = `Eres un chef profesional y nutriólogo clínico de FLUX.
-A partir de la siguiente lista de ingredientes seleccionados por el nutriólogo, propón un solo platillo real y conocido del mundo culinario que los combine con armonía gastronómica, especificando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento.${targetHint}
+A partir de la siguiente lista de ingredientes seleccionados por el nutriólogo, propón un solo platillo real y conocido del mundo culinario que los combine con armonía gastronómica, especificando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento y calculando su aporte de calorías y macronutrientes.${targetHint}
 
 ═══════════════════════════════════════════════════════════
 EJEMPLO MAESTRO DE TONO, GRAMAJES Y ESTRUCTURA (Imita este estilo exacto):
@@ -436,7 +436,11 @@ Ingredientes proporcionados: Tortilla de maíz, Carne de res molida, Chile chipo
 Respuesta esperada:
 {
   "titulo": "Tacos de picadillo de res al chipotle con aguacate",
-  "texto": "Tus ingredientes forman unos clásicos tacos de picadillo de res al chipotle; cocinando 150g de carne de res molida con 1 chile chipotle picado y servida sobre 3 tortillas de maíz calientes (90g) acompañadas de 50g de aguacate en rebanadas. Todos los ingredientes combinan a la perfección y ninguno sobra, aunque para que la carne quede jugosa conviene licuar el chipotle con 1 jitomate mediano, 1/4 de cebolla y 1 diente de ajo para la salsa, rematando con 1/2 limón fresco y una pizca de sal al servir."
+  "texto": "Tus ingredientes forman unos clásicos tacos de picadillo de res al chipotle; cocinando 150g de carne de res molida con 1 chile chipotle picado y servida sobre 3 tortillas de maíz calientes (90g) acompañadas de 50g de aguacate en rebanadas. Todos los ingredientes combinan a la perfección y ninguno sobra, aunque para que la carne quede jugosa conviene licuar el chipotle con 1 jitomate mediano, 1/4 de cebolla y 1 diente de ajo para la salsa, rematando con 1/2 limón fresco y una pizca de sal al servir.",
+  "calorias": 485,
+  "proteina": 38,
+  "carbohidratos": 42,
+  "grasas": 19
 }
 
 ═══════════════════════════════════════════════════════════
@@ -450,6 +454,7 @@ REGLAS ESTRICTAS DE REDACCIÓN:
    d) Indica con amabilidad y naturalidad si sobra algún ingrediente que desentone con la armonía del platillo (ej. "el pepino sobra en esta preparación caliente y es mejor reservarlo fresco (1/2 pieza en rodajas) para una ensalada aparte...").
    e) Sugiere los ingredientes básicos de cocina faltantes para completarlo con éxito con cantidades precisas (ej. 1/4 de cebolla, 1 diente de ajo, 1 cdita de aceite, una pizca de sal).
    f) PROHIBIDO hablar de beneficios nutricionales, vitaminas ni propiedades medicinales. Enfócate 100% en gramajes, técnica culinaria y sabor.
+3. "calorias", "proteina", "carbohidratos", "grasas": Calcula con rigor bromatológico y químico (Kcal ≈ P*4 + C*4 + G*9) el contenido nutricional total del platillo sumando los gramajes indicados en la receta. Devuelve números enteros redondeados.
 
 ═══════════════════════════════════════════════════════════
 INGREDIENTES SELECCIONADOS:
@@ -459,7 +464,11 @@ ${ingredientes}
 Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
 {
   "titulo": "Nombre del platillo",
-  "texto": "Texto corrido en un solo párrafo con gramajes exactos y técnica culinaria fluida..."
+  "texto": "Texto corrido en un solo párrafo con gramajes exactos y técnica culinaria fluida...",
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number
 }`;
 
         for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
@@ -486,10 +495,22 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
               const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
               if (textRes) {
                 const parsed = JSON.parse(textRes);
+                const p = Math.round(Number(parsed.proteina) || 0);
+                const c = Math.round(Number(parsed.carbohidratos) || 0);
+                const f = Math.round(Number(parsed.grasas) || 0);
+                let kcal = Math.round(Number(parsed.calorias) || 0);
+                const sumKcal = Math.round(p * 4 + c * 4 + f * 9);
+                if (Math.abs(kcal - sumKcal) > 30 && sumKcal > 0) {
+                  kcal = sumKcal;
+                }
                 return new Response(
                   JSON.stringify({
                     titulo: parsed.titulo || "Platillo sugerido",
                     texto: parsed.texto || "",
+                    calorias: kcal || sumKcal || undefined,
+                    proteina: p || undefined,
+                    carbohidratos: c || undefined,
+                    grasas: f || undefined,
                     origen: "gemini_edge",
                     model,
                   }),
