@@ -1473,7 +1473,13 @@ export async function generateDishFromIngredientsWithAi({ ingredientes = [], cli
   // Tier 2: Gemini Direct
   if (apiKey) {
     const targetHint = targetMacros?.calorias
-      ? `\nMeta aproximada de la toma: ~${targetMacros.calorias} kcal (Proteína: ~${targetMacros.proteina || 35}g, Carbos: ~${targetMacros.carbohidratos || 50}g, Grasas: ~${targetMacros.grasas || 15}g). Calibra las porciones y gramajes para acercarse a este balance nutricional.`
+      ? `\n═══════════════════════════════════════════════════════════
+META NUTRICIONAL ESTRICTA PARA ESTA SOLA TOMA (1 PERSONA):
+- Calorías meta: ~${targetMacros.calorias} kcal
+- Proteína sugerida: ~${targetMacros.proteina || 35}g
+- Carbohidratos sugeridos: ~${targetMacros.carbohidratos || 50}g
+- Grasas sugeridas: ~${targetMacros.grasas || 15}g
+REGLA DE ORO DE PORCIONES: Calibra las porciones y gramajes individuales de los alimentos para que el platillo alcance APROXIMADAMENTE ~${targetMacros.calorias} kcal. NUNCA generes porciones descomunales ni abarques las calorías de todo el día en una sola comida.`
       : "";
 
     const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
