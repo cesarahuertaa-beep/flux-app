@@ -243,7 +243,243 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
         JSON.stringify({
           error: "GEMINI_UNAVAILABLE",
           message: "No se pudo obtener respuesta de Google Gemini en este momento. Inténtalo nuevamente.",
-        }),
+        }
+    // =========================================================================
+    // ACCIÓN: OPTIMIZACIÓN Y CÁLCULO DE MACROS DE COMIDA CON GEMINI
+    // =========================================================================
+    if (action === "optimize-meal") {
+      const textoComida = (body.textoComida || body.mealText || "").trim();
+      const targetKcal = Number(body.targetKcal) || 0;
+      const anamnesis = body.anamnesis || {};
+      const cliente = body.cliente || {};
+
+      if (geminiKey && geminiKey.trim().length >= 20 && textoComida) {
+        const promptMeal = `Eres un nutriólogo clínico y bromatólogo experto de FLUX.
+Analiza la siguiente comida/receta diseñada para un paciente y calcula con máxima precisión sus calorías y macronutrientes basados en tablas de composición de alimentos (USDA/SMAE).
+Adicionalmente, coteja los ingredientes contra el expediente del paciente para detectar si hay algún conflicto con alergias o aversiones personales.
+
+EXPEDIENTE DEL PACIENTE:
+- Nombre: ${cliente?.nombre || "Paciente"} (${cliente?.genero === "F" ? "Mujer" : "Hombre"})
+- Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
+- Aversiones alimentarias (no le gusta comer): ${anamnesis.aversiones_alimentos || "Ninguna"}
+- Preferencias / favoritos: ${anamnesis.preferencias_alimentos || "Ninguna"}
+- Patologías: ${anamnesis.patologias || "Ninguna"}
+
+COMIDA A ANALIZAR:
+"${textoComida}"
+${targetKcal > 0 ? `(Meta de referencia para esta toma: ~${targetKcal} kcal)` : ""}
+
+INSTRUCCIONES:
+1. Calcula calorías totales, gramos de proteína, carbohidratos y grasas con coherencia química (Kcal = P*4 + C*4 + G*9).
+2. Si detectas algún ingrediente que coincida o sea derivado de las aversiones o alergias del paciente, genera una advertencia clínica amigable en "alertaClinica". Si todo está bien, devuelve null.
+3. Extrae un nombre normalizado corto (máx 5 palabras) y una lista de 4-6 palabras clave de ingredientes para búsqueda en catálogo visual.
+
+Debes responder ÚNICAMENTE con un JSON con esta estructura:
+{
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number,
+  "nombreNormalizado": "string corto",
+  "palabrasClave": ["ingrediente1", "ingrediente2", "ingrediente3"],
+  "alertaClinica": "string con aviso si choca con aversión/alergia, o null si es seguro",
+  "resumenNutricional": "string breve de 1 oración sobre la calidad de la toma"
+}`;
+
+        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptMeal }] }],
+                  generationConfig: {
+                    temperature: 0.2,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                return new Response(
+                  JSON.stringify({
+                    ...parsed,
+                    palabrasClaveFoto: parsed.palabrasClaveFoto || parsed.palabrasClave || [],
+                    origen: "gemini_edge",
+                    model,
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    // =========================================================================
+    // ACCIÓN: GENERAR ALTERNATIVA EQUIVALENTE (ISO-MACROS) CON GEMINI
+    // =========================================================================
+    if (action === "alternative-meal") {
+      const mainMealText = (body.mainMealText || "").trim();
+      const targetMacros = body.targetMacros || {};
+      const anamnesis = body.anamnesis || {};
+      const kcal = Number(targetMacros.calorias) || 0;
+      const p = Number(targetMacros.proteina) || 0;
+      const c = Number(targetMacros.carbohidratos) || 0;
+      const f = Number(targetMacros.grasas) || 0;
+
+      if (geminiKey && geminiKey.trim().length >= 20 && mainMealText) {
+        const promptAlt = `Eres un chef y nutriólogo deportivo de élite de FLUX.
+Genera una OPCIÓN ALTERNATIVA EQUIVALENTE (ISO-MACRONUTRIENTE) a la opción principal que te proporcionamos.
+La alternativa debe ser atractiva, con ingredientes comunes y fáciles de preparar, y debe IGUALAR con precisión los mismos macros de la opción principal.
+
+OPCIÓN PRINCIPAL:
+"${mainMealText}"
+${kcal > 0 ? `METAS ISO-MACROS A IGUALAR: ${kcal} kcal | ${p}g Proteína | ${c}g Carbos | ${f}g Grasas` : ""}
+
+PREFERENCIAS DEL PACIENTE:
+- Alimentos favoritos: ${anamnesis.preferencias_alimentos || "Variado"}
+- Aversiones (NO usar): ${anamnesis.aversiones_alimentos || "Ninguna"}
+- Alergias (NO usar): ${anamnesis.alergias_intolerancias || "Ninguna"}
+
+INSTRUCCIONES:
+1. Redacta la opción alternativa con porciones exactas en gramos, tazas o piezas.
+2. Si la opción principal fue salada, la alternativa puede ser otra opción salada distinta o dulce si encaja con la toma.
+3. No uses ningún ingrediente que esté en las aversiones o alergias del paciente.
+
+Debes responder ÚNICAMENTE con un JSON con esta estructura:
+{
+  "texto": "string con la preparación, ingredientes y porciones exactas de la opción alternativa",
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number,
+  "nombreNormalizado": "string breve del platillo alternativo"
+}`;
+
+        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptAlt }] }],
+                  generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                return new Response(
+                  JSON.stringify({
+                    ...parsed,
+                    origen: "gemini_edge",
+                    model,
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    // =========================================================================
+    // ACCIÓN: GENERAR RECETA DESDE DESPENSA CON GEMINI
+    // =========================================================================
+    if (action === "pantry-meal") {
+      const ingredientesDisponibles = (body.ingredientesDisponibles || "").trim();
+      const targetMacros = body.targetMacros || {};
+      const anamnesis = body.anamnesis || {};
+      const kcal = Number(targetMacros.calorias) || 500;
+      const p = Number(targetMacros.proteina) || 35;
+      const c = Number(targetMacros.carbohidratos) || 50;
+      const f = Number(targetMacros.grasas) || 15;
+
+      if (geminiKey && geminiKey.trim().length >= 20 && ingredientesDisponibles) {
+        const promptPantry = `Eres un chef y nutriólogo clínico deportivo de FLUX.
+El nutriólogo o paciente cuenta con estos ingredientes en su despensa o refri:
+"${ingredientesDisponibles}"
+
+Tu tarea es crear un platillo delicioso, balanceado y práctico utilizando prioritariamente esos ingredientes (puedes agregar básicos como sal, pimienta, limón o aceite con moderación) para alcanzar esta meta nutricional:
+- Calorías meta: ~${kcal} kcal
+- Proteína: ~${p}g
+- Carbohidratos: ~${c}g
+- Grasas: ~${f}g
+
+Evita estrictamente: ${anamnesis.alergias_intolerancias || ""} ${anamnesis.aversiones_alimentos || ""}.
+
+Debes responder ÚNICAMENTE con un JSON:
+{
+  "texto": "string con el nombre del platillo, ingredientes con porciones exactas (g, tazas, piezas) y breve modo de preparación",
+  "nombreNormalizado": "string breve del platillo",
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number
+}`;
+
+        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptPantry }] }],
+                  generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                return new Response(
+                  JSON.stringify({
+                    ...parsed,
+                    origen: "gemini_edge",
+                    model,
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

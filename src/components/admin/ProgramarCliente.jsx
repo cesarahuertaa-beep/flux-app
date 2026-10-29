@@ -1852,10 +1852,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         cs[mealIdx] = c;
         return { ...p, comidas: cs };
       });
-      setMsg(<div className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-600" /> Macros calculados con IA</div>);
+      const isLocal = res?.origen === "analitico_local";
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <Sparkles className={`w-4 h-4 ${isLocal ? "text-emerald-600" : "text-purple-600"}`} />
+          <span>{isLocal ? "Macros calculados (Motor Bromatológico FLUX)" : "Macros calculados con IA"}</span>
+        </div>
+      );
     } catch (err) {
       console.error(err);
-      alert(err.message || "Error al optimizar con IA.");
+      setMsg(<div className="text-amber-600 text-xs">⚠️ {err.message || "No se pudo optimizar la comida"}</div>);
     } finally {
       setAiOptimizingIndex(null);
     }
@@ -1892,11 +1898,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           cs[mealIdx] = c;
           return { ...p, comidas: cs };
         });
-        setMsg(<div className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-600" /> Alternativa equivalente generada</div>);
+        const isLocal = res?.origen === "analitico_local";
+        setMsg(
+          <div className="flex items-center gap-1.5">
+            <Sparkles className={`w-4 h-4 ${isLocal ? "text-emerald-600" : "text-purple-600"}`} />
+            <span>{isLocal ? "Alternativa equivalente generada (Motor Bromatológico)" : "Alternativa equivalente generada con IA"}</span>
+          </div>
+        );
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || "No se pudo generar la alternativa con IA.");
+      setMsg(<div className="text-amber-600 text-xs">⚠️ {err.message || "No se pudo generar la alternativa"}</div>);
     } finally {
       setAiAltIndex(null);
     }
