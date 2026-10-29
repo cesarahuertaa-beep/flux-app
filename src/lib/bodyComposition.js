@@ -998,7 +998,12 @@ export function generateSmartMacroPrescription({
   let finalProtPct = calcMatematico.protPct;
   let finalCarbPct = calcMatematico.carbPct;
   let finalFatPct = calcMatematico.fatPct;
-  let finalRationale = rationale;
+  const mathRationale =
+    peso > 0
+      ? `Prescripción calculada mediante ${formulaLabel} (TMB ${calcMatematico.tmb} kcal × FAF ${fafInfo.short} = ${calcMatematico.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalInfo.pct > 0 ? `+${goalInfo.pct}` : goalInfo.pct}%), la fórmula matemática establece ${calcMatematico.targetKcal} kcal con ${calcMatematico.protGKg} g/kg de proteína (${calcMatematico.proteinasG}g) y ${calcMatematico.fatGKg} g/kg de grasas (${calcMatematico.grasasG}g).`
+      : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
+
+  let finalRationale = mathRationale;
 
   if (activeMode === "ia" && (pm || ai)) {
     finalTargetKcal = Number(pm?.targetKcal || ai?.targetKcal) || calcMatematico.targetKcal;
