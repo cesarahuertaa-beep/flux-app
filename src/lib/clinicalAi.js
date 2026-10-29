@@ -260,57 +260,102 @@ export function getGeminiApiKey() {
  */
 export async function generateClinicalAiSynopsis(anamnesis, cliente) {
   const highlights = extractClinicalHighlights(anamnesis, cliente);
+  const apiKey = getGeminiApiKey();
 
   // 1. Intentar llamar a la Edge Function de Supabase (Backend seguro y centralizado)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    const edgeRes = await invokeEdgeFunction("clinical-ai", { anamnesis, cliente });
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "clinical-synopsis",
+      anamnesis,
+      cliente,
+      geminiKey: apiKey,
+    });
     clearTimeout(timeoutId);
 
-    if (edgeRes?.texto && edgeRes.texto.length > 30) {
+    if (edgeRes?.diagnostico || edgeRes?.texto) {
       return {
-        texto: edgeRes.texto,
+        texto: edgeRes.diagnostico || edgeRes.texto,
+        diagnostico: edgeRes.diagnostico || edgeRes.texto,
+        alertas: edgeRes.alertas || null,
+        medicacion_normalizada: edgeRes.medicacion_normalizada || null,
+        heredo_normalizado: edgeRes.heredo_normalizado || null,
+        contexto_normalizado: edgeRes.contexto_normalizado || null,
+        directrices_nutricionales: edgeRes.directrices_nutricionales || [],
         origen: edgeRes.origen || "edge_function",
-        model: edgeRes.model || "gemini-2.0-flash",
+        model: edgeRes.model || "gemini-3.5-flash-lite",
         generadoEn: edgeRes.generadoEn || new Date().toISOString(),
         highlights,
       };
     }
   } catch {
-    // Si la función de Supabase aún no está desplegada en el proyecto remoto o hay error de red, continuar
+    // Continuar a llamada directa o fallback
   }
 
-  const prompt = `Eres una IA médica y de nutrición clínica de FLUX.
-Analiza la siguiente información de expediente atemporal y redacta un DIAGNÓSTICO CLÍNICO-NUTRICIONAL EJECUTIVO (exactamente 1 párrafo de 3 a 4 oraciones) para el especialista.
+  const patologiasRaw = (anamnesis?.patologias || "").trim();
+  const alergiasRaw = (anamnesis?.alergias_intolerancias || "").trim();
+  const medicacionRaw = (anamnesis?.medicacion_suplementos || "").trim();
+  const heredoRaw = (anamnesis?.antecedentes_heredofamiliares || "").trim();
+  const lesionesRaw = (anamnesis?.cirugias_lesiones || "").trim();
+  const digestivoRaw = (anamnesis?.sintomas_gi || "").trim();
+  const ocupacionRaw = (anamnesis?.ocupacion_actividad || "").trim();
+  const alcoholTabacoRaw = (anamnesis?.consumo_alcohol_tabaco || "").trim();
+  const notasRaw = (anamnesis?.notas_consulta || "").trim();
+  const objetivo = (anamnesis?.objetivo_principal || cliente?.objetivo || "").trim();
 
-NO concatenes ni enumeres los datos tal cual. Proporciona un criterio clínico inteligente de especialista:
-1. Evalúa el impacto metabólico de sus patologías (ej. si dice 'Dabetes tipo 1', corrígelo a Diabetes Mellitus Tipo 1, explicando consideraciones clínicas relevantes).
-2. Considera sus alergias e intolerancias alimentarias crónicas (${highlights.alergias.raw || "Ninguna"}) como exclusiones de seguridad médica obligatorias. Si los síntomas GI son 'Normal' o 'Saludable', reconoce que su función gastrointestinal es óptima (¡NUNCA digas que se debe excluir la digestión normal!).
-3. Considera su medicación crónica actual (${highlights.medicacion.raw || "Ninguna"}) y antecedentes heredofamiliares (${highlights.heredo.raw || "Ninguno"}) para vigilancia preventiva.
-4. Integra su contexto ocupacional (${highlights.habitos.ocupacion || "No especificada"}) y cirugías/lesiones (${highlights.lesiones.raw || "Ninguna"}) como base para el diseño del plan.
+  const prompt = `Eres un médico especialista en medicina interna y nutrición clínica de élite en FLUX.
+Tu tarea es REALIZAR UNA AUDITORÍA Y SÍNTESIS INTEGRAL DEL EXPEDIENTE CLÍNICO DE UN PACIENTE REAL.
+Debes interpretar datos médicos, corregir errores ortográficos o descripciones coloquiales del paciente y generar una síntesis profesional y estructurada.
 
+═══════════════════════════════════════════════════════════
 DATOS DEL PACIENTE:
+═══════════════════════════════════════════════════════════
+- Nombre: ${cliente?.nombre || "Paciente"}
 - Sexo: ${cliente?.genero === "F" || cliente?.sexo === "F" ? "Femenino" : "Masculino"}
-- Diagnósticos y Patologías Crónicas: ${highlights.patologias.raw || "Ninguno"}
-- Alergias e Intolerancias Alimentarias: ${highlights.alergias.raw || "Ninguna"}
-- Antecedentes Heredofamiliares: ${highlights.heredo.raw || "Ninguno"}
-- Medicación y Suplementos Actuales: ${highlights.medicacion.raw || "Ninguno"}
-- Cirugías y Lesiones Previas: ${highlights.lesiones.raw || "Ninguno"}
-- Digestión / Síntomas GI: ${highlights.digestivo.isNormal ? "Normal / Saludable" : highlights.digestivo.raw || "Normal"}
-- Ocupación / Actividad diaria: ${highlights.habitos.ocupacion || "No especificada"}
-- Toxicomanías (Alcohol/Tabaco): ${highlights.habitos.alcoholTabaco || "No reportado"}
+- Objetivo: ${objetivo || "Mejorar salud y composición corporal"}
 
-Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado con lenguaje médico profesional y directo. Sin listas ni viñetas.`;
+INFORMACIÓN REPORTADA EN EL EXPEDIENTE:
+1. Patologías / Diagnósticos: ${patologiasRaw || "Ninguna"}
+2. Alergias e Intolerancias: ${alergiasRaw || "Ninguna"}
+3. Medicación y Suplementos: ${medicacionRaw || "Ninguna"}
+4. Antecedentes Heredofamiliares: ${heredoRaw || "Ninguno"}
+5. Cirugías y Lesiones: ${lesionesRaw || "Ninguna"}
+6. Digestión / Síntomas GI: ${digestivoRaw || "Normal"}
+7. Ocupación y Actividad: ${ocupacionRaw || "No especificada"}
+8. Alcohol / Tabaco: ${alcoholTabacoRaw || "No reportado"}
+${notasRaw ? `9. Notas de consulta: ${notasRaw}` : ""}
 
-  const apiKey = getGeminiApiKey();
+INSTRUCCIONES CLÍNICAS:
+1. Normaliza los textos coloquiales o con faltas de ortografía a terminología médica limpia (ej. 'solo para contralar a hipertension' -> 'Terapia antihipertensiva oral', 'ambuelos tubieron diabetes' -> 'Diabetes Mellitus tipo 2 en abuelos').
+2. Si hay 'intolerancia a la lactosa', el alimento real a excluir son 'Lácteos y derivados con lactosa' (¡NUNCA digas 'excluir la intolerancia'!).
+3. Redacta un diagnóstico integral cruzando patologías, herencia y medicación.
+4. Proporciona entre 3 y 4 directrices dietoterapéuticas precisas para el nutriólogo.
+
+Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
+{
+  "diagnostico": "string con diagnóstico clínico integral (3-4 oraciones profesionales)",
+  "alertas": {
+    "patologias_normalizadas": ["patología corregida"],
+    "exclusiones_alimentarias": ["alimento real 1 a evitar"],
+    "observacion_alergias": "string breve"
+  },
+  "medicacion_normalizada": "string profesional sin faltas de ortografía",
+  "heredo_normalizado": "string profesional de antecedentes familiares",
+  "contexto_normalizado": {
+    "ocupacion": "string profesional",
+    "digestion": "string profesional",
+    "alcohol_tabaco": "string profesional"
+  },
+  "directrices_nutricionales": ["directriz 1", "directriz 2", "directriz 3"]
+}`;
   
   if (apiKey) {
     const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
     for (const model of candidateModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -324,8 +369,8 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 350,
+                temperature: 0.2,
+                responseMimeType: "application/json",
               },
             }),
           }
@@ -335,10 +380,18 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
         if (res.ok) {
           const data = await res.json();
           const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (geminiText && geminiText.length > 30) {
+          if (geminiText) {
+            const parsed = JSON.parse(geminiText);
             return {
-              texto: geminiText,
-              origen: "gemini",
+              texto: parsed.diagnostico || geminiText,
+              diagnostico: parsed.diagnostico || geminiText,
+              alertas: parsed.alertas || null,
+              medicacion_normalizada: parsed.medicacion_normalizada || medicacionRaw,
+              heredo_normalizado: parsed.heredo_normalizado || heredoRaw,
+              contexto_normalizado: parsed.contexto_normalizado || null,
+              directrices_nutricionales: parsed.directrices_nutricionales || [],
+              origen: "gemini_direct",
+              model,
               generadoEn: new Date().toISOString(),
               highlights,
             };
@@ -353,6 +406,20 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
   // Fallback analítico médico
   return {
     texto: highlights.sintesisTexto,
+    diagnostico: highlights.sintesisTexto,
+    alertas: {
+      patologias_normalizadas: highlights.patologias.tags,
+      exclusiones_alimentarias: highlights.alergias.tags,
+      observacion_alergias: "Exclusión de alérgenos reportados",
+    },
+    medicacion_normalizada: highlights.medicacion.raw || "Sin medicación reportada",
+    heredo_normalizado: highlights.heredo.raw || "Sin antecedentes reportados",
+    contexto_normalizado: {
+      ocupacion: highlights.habitos.ocupacion || "No especificada",
+      digestion: highlights.digestivo.isNormal ? "Función digestiva conservada" : highlights.digestivo.raw,
+      alcohol_tabaco: highlights.habitos.alcoholTabaco || "No reportado",
+    },
+    directrices_nutricionales: [],
     origen: "analitico",
     generadoEn: new Date().toISOString(),
     highlights,

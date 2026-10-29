@@ -249,7 +249,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
     }
 
     // =========================================================================
-    // ACCIÓN 2: SÍNTESIS DE EXPEDIENTE CLÍNICO
+    // ACCIÓN 2: SÍNTESIS Y AUDITORÍA DE EXPEDIENTE CLÍNICO INTEGRAL
     // =========================================================================
     const anamnesis = body.anamnesis || {};
     const cliente = body.cliente || {};
@@ -262,11 +262,15 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
     const alergiasRaw = (anamnesis.alergias_intolerancias || "").trim();
     const alergias = parseTags(alergiasRaw);
 
-    const aversionesRaw = (anamnesis.aversiones_alimentos || "").trim();
-    const aversiones = parseTags(aversionesRaw);
+    const medicacionRaw = (anamnesis.medicacion_suplementos || "").trim();
+    const heredoRaw = (anamnesis.antecedentes_heredofamiliares || "").trim();
+    const lesionesRaw = (anamnesis.cirugias_lesiones || "").trim();
+    const ocupacionRaw = (anamnesis.ocupacion_actividad || "").trim();
+    const alcoholTabacoRaw = (anamnesis.consumo_alcohol_tabaco || "").trim();
+    const notasRaw = (anamnesis.notas_consulta || "").trim();
 
+    const aversionesRaw = (anamnesis.aversiones_alimentos || "").trim();
     const preferenciasRaw = (anamnesis.preferencias_alimentos || "").trim();
-    const preferencias = parseTags(preferenciasRaw);
 
     const digestivoRaw = (anamnesis.sintomas_gi || "").trim();
     const isNormalGI =
@@ -283,7 +287,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
     ).trim();
 
     const exclusionesMap = new Map<string, string>();
-    [...alergias, ...aversiones].forEach((item) => {
+    [...alergias, ...parseTags(aversionesRaw)].forEach((item) => {
       const k = item.toLowerCase();
       if (!exclusionesMap.has(k)) exclusionesMap.set(k, item.toLowerCase());
     });
@@ -291,28 +295,68 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
     const exclusionesStr = itemsExcluir.length > 0 ? itemsExcluir.join(", ") : "Ninguna";
 
     if (geminiKey && geminiKey.trim().length >= 20) {
-      const prompt = `Eres una IA médica y de nutrición clínica de FLUX.
-Analiza la siguiente información de expediente y redacta un DIAGNÓSTICO CLÍNICO-NUTRICIONAL EJECUTIVO (exactamente 1 párrafo fluido de 3 a 4 oraciones) para el especialista.
+      const prompt = `Eres un médico especialista en medicina interna y nutrición clínica de élite en FLUX.
+Tu tarea es REALIZAR UNA AUDITORÍA Y SÍNTESIS INTEGRAL DEL EXPEDIENTE CLÍNICO DE UN PACIENTE REAL.
+Debes interpretar datos médicos, corregir errores ortográficos o descripciones coloquiales del paciente y generar una síntesis profesional y estructurada.
 
-Criterios clínicos de especialista:
-1. Evalúa el impacto metabólico de sus patologías (ej. si dice 'Dabetes tipo 1', corrígelo a Diabetes Mellitus Tipo 1, explicando consideraciones clínicas relevantes).
-2. Considera sus alergias y aversiones (${exclusionesStr}) como exclusiones obligatorias consolidadas sin repetir alimentos. Si la digestión o síntomas GI es 'Normal', reconoce que su función gastrointestinal es óptima (¡NUNCA digas que se debe excluir la digestión normal!).
-3. Explica cómo capitalizar sus alimentos favoritos (${preferenciasRaw || "ninguno"}) estratégicamente (ej. cortes magros de carne roja para hierro y proteína de alto valor biológico).
-4. Integra su estilo de vida (${sueno || "8h"} de sueño, estrés nivel ${estresNivel}/5, agua ${agua || "2L"}) como base favorable para la formulación del plan.
-
+═══════════════════════════════════════════════════════════
 DATOS DEL PACIENTE:
-- Sexo: ${cliente?.genero === "F" || cliente?.sexo === "F" ? "Femenino" : "Masculino"}
-- Objetivo: ${objetivo || "Mejorar salud y composición corporal"}
-- Diagnósticos: ${patologiasRaw || "Ninguno"}
-- Alergias: ${alergiasRaw || "Ninguna"}
-- Digestión / Síntomas GI: ${isNormalGI ? "Normal / Saludable" : digestivoRaw || "Normal"}
-- Alimentos que evita o rechaza: ${aversionesRaw || "Ninguno"}
-- Alimentos favoritos: ${preferenciasRaw || "Ninguno"}
-- Sueño: ${sueno || "No especificado"}
-- Estrés: ${estresNivel}/5
-- Agua: ${agua || "No especificado"}
+═══════════════════════════════════════════════════════════
+- Nombre: ${cliente.nombre || "Paciente"}
+- Sexo: ${cliente.genero === "F" || cliente.sexo === "F" ? "Femenino" : "Masculino"}
+- Edad: ${cliente.edad || "Adulto"} años
+- Objetivo declarado: ${objetivo || "Mejorar salud y composición corporal"}
 
-Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado con lenguaje médico profesional y directo. Sin listas ni viñetas.`;
+═══════════════════════════════════════════════════════════
+INFORMACIÓN REPORTADA EN EL EXPEDIENTE (PUEDE CONTENER TYPOS O COLOQUIALISMOS):
+═══════════════════════════════════════════════════════════
+1. Patologías / Diagnósticos: ${patologiasRaw || "Ninguna"}
+2. Alergias e Intolerancias: ${alergiasRaw || "Ninguna"}
+3. Medicación y Suplementos actuales: ${medicacionRaw || "Ninguna"}
+4. Antecedentes Heredofamiliares: ${heredoRaw || "Ninguno"}
+5. Cirugías y Lesiones previas: ${lesionesRaw || "Ninguna"}
+6. Función Digestiva / Síntomas GI: ${digestivoRaw || "Normal"}
+7. Ocupación y Actividad diaria: ${ocupacionRaw || "No especificada"}
+8. Toxicomanías (Alcohol / Tabaco): ${alcoholTabacoRaw || "No reportado"}
+9. Hábitos de descanso y estrés: Sueño ${sueno || "7"}h, Estrés ${estresNivel}/5, Agua ${agua || "No especificada"}
+10. Preferencias y aversiones: Favoritos (${preferenciasRaw || "No especificados"}), Evita (${aversionesRaw || "No especificados"})
+${notasRaw ? `11. Notas de consulta previa: ${notasRaw}` : ""}
+
+═══════════════════════════════════════════════════════════
+INSTRUCCIONES CLÍNICAS CRÍTICAS:
+═══════════════════════════════════════════════════════════
+1. CORRECCIÓN Y NORMALIZACIÓN MÉDICA (LIMPIA LOS TYPOS DEL PACIENTE):
+   - Traduce cualquier texto coloquial o mal escrito a terminología médica profesional (ej. si dice 'solo para contralar a hipertension' normalízalo a 'Terapia antihipertensiva oral no especificada'; si dice 'Mis ambuelos tubieron diabetes' normalízalo a 'Diabetes Mellitus tipo 2 en abuelos'; si dice 'poco, solo socal' normalízalo a 'Consumo ocasional de alcohol (social), no fumador'; si dice 'bastante seden...' normalízalo a 'Jornada laboral con alto grado de sedentarismo').
+2. EXCLUSIONES ALIMENTARIAS REALES (NO CONFUNDAS CONDICIÓN CON ALIMENTO):
+   - Si el paciente reporta "intolerancia a la lactosa", el alimento a excluir son "Lácteos enteros y derivados convencionales con lactosa", ¡NUNCA digas "excluir la intolerancia"!
+   - Diferencia alergias reales de intolerancias o aversiones personales.
+3. DIAGNÓSTICO INTEGRAL Y VIGILANCIA FARMACO-NUTRIENTE:
+   - Redacta un diagnóstico clínico-nutricional ejecutivo de 3 a 4 oraciones fluidas.
+   - Cruza las variables: si hay hipertensión + herencia de diabetes, enfatiza la prevención cardiovascular y el control glucémico; si toma medicación, evalúa interacciones con minerales (ej. sodio, potasio).
+4. DIRECTRICES CONCRETAS PARA EL NUTRIÓLOGO:
+   - Proporciona entre 3 y 4 directrices dietoterapéuticas precisas y prácticas para la elaboración del plan de alimentación.
+
+Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
+{
+  "diagnostico": "string con el diagnóstico clínico integral (3-4 oraciones profesionales fluidas)",
+  "alertas": {
+    "patologias_normalizadas": ["string con patología corregida"],
+    "exclusiones_alimentarias": ["alimento real 1 a evitar", "alimento real 2 a evitar"],
+    "observacion_alergias": "string breve con la indicación clínica de seguridad"
+  },
+  "medicacion_normalizada": "string con la interpretación clínica profesional del tratamiento actual",
+  "heredo_normalizado": "string con los antecedentes familiares traducidos a riesgo preventivo",
+  "contexto_normalizado": {
+    "ocupacion": "string breve profesional sobre el sedentarismo o actividad laboral",
+    "digestion": "string breve sobre el estado GI (ej: Función digestiva conservada sin sintomatología de alarma)",
+    "alcohol_tabaco": "string breve profesional sobre hábitos tóxicos"
+  },
+  "directrices_nutricionales": [
+    "directriz 1 para el nutriólogo (ej. Control estricto de sodio < 2,000 mg/día)",
+    "directriz 2 (ej. Sustituir lácteos tradicionales por alternativas deslactosadas o vegetales)",
+    "directriz 3 (ej. Priorizar carbohidratos de bajo índice glucémico y fibra soluble)"
+  ]
+}`;
 
       for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
         try {
@@ -326,21 +370,40 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
               },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.25, maxOutputTokens: 350 },
+                generationConfig: {
+                  temperature: 0.2,
+                  responseMimeType: "application/json",
+                },
               }),
             }
           );
 
           if (res.ok) {
             const data = await res.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (text && text.length > 30) {
+            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (textResponse) {
+              const parsed = JSON.parse(textResponse);
               return new Response(
                 JSON.stringify({
-                  texto: text,
+                  success: true,
                   origen: "gemini",
                   model,
                   generadoEn: new Date().toISOString(),
+                  texto: parsed.diagnostico || textResponse,
+                  diagnostico: parsed.diagnostico || textResponse,
+                  alertas: parsed.alertas || {
+                    patologias_normalizadas: patologias,
+                    exclusiones_alimentarias: itemsExcluir,
+                    observacion_alergias: "Exclusión de alérgenos reportados",
+                  },
+                  medicacion_normalizada: parsed.medicacion_normalizada || medicacionRaw,
+                  heredo_normalizado: parsed.heredo_normalizado || heredoRaw,
+                  contexto_normalizado: parsed.contexto_normalizado || {
+                    ocupacion: ocupacionRaw || "Actividad habitual",
+                    digestion: isNormalGI ? "Función digestiva conservada" : digestivoRaw,
+                    alcohol_tabaco: alcoholTabacoRaw || "No reportado",
+                  },
+                  directrices_nutricionales: parsed.directrices_nutricionales || [],
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
@@ -373,17 +436,31 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
 
     if (itemsExcluir.length > 0) {
       sintesisParts.push(
-        `Se establece la exclusión estricta de ${joinSpanishList(
+        `Se establece la exclusión de ${joinSpanishList(
           itemsExcluir
-        )} para garantizar la seguridad clínica frente a alergias y asegurar apego total al plan.`
+        )} para garantizar la seguridad clínica y asegurar apego total al plan.`
       );
     }
 
     return new Response(
       JSON.stringify({
         texto: sintesisParts.join(" "),
+        diagnostico: sintesisParts.join(" "),
         origen: "analitico_base",
         generadoEn: new Date().toISOString(),
+        alertas: {
+          patologias_normalizadas: patologias,
+          exclusiones_alimentarias: itemsExcluir,
+          observacion_alergias: "Exclusión de alérgenos reportados",
+        },
+        medicacion_normalizada: medicacionRaw || "Sin medicación reportada",
+        heredo_normalizado: heredoRaw || "Sin antecedentes reportados",
+        contexto_normalizado: {
+          ocupacion: ocupacionRaw || "No especificada",
+          digestion: isNormalGI ? "Función digestiva conservada" : digestivoRaw,
+          alcohol_tabaco: alcoholTabacoRaw || "No reportado",
+        },
+        directrices_nutricionales: [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -9,10 +9,13 @@ import {
   HeartPulse,
   Briefcase,
   Activity,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import {
   extractClinicalHighlights,
-  generateClinicalAiSynopsis
+  generateClinicalAiSynopsis,
 } from "../../lib/clinicalAi";
 import { saveClinicalRecord } from "../../lib/clinicalRecord";
 
@@ -25,66 +28,99 @@ export default function ClinicalAiSummaryCard({
   // Por defecto colapsado según requerimiento del usuario
   const [collapsed, setCollapsed] = useState(true);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [aiSynopsis, setAiSynopsis] = useState(() => {
-    return anamnesis?.resumen_ia?.texto || null;
+  const [aiError, setAiError] = useState(null);
+
+  const [aiData, setAiData] = useState(() => {
+    const raw = anamnesis?.resumen_ia;
+    if (!raw) return null;
+    if (typeof raw === "object") return raw;
+    return { texto: raw, diagnostico: raw };
   });
 
   const highlights = useMemo(() => {
     return extractClinicalHighlights(anamnesis, cliente);
   }, [anamnesis, cliente]);
 
-  // Si no hay diagnóstico guardado o era la versión con campos antiguos, enriquecer automáticamente con IA
   useEffect(() => {
-    const existing = anamnesis?.resumen_ia?.texto;
-    const esTextoAntiguoConFallas =
-      existing &&
-      (existing.includes("(Norml)") ||
-        existing.includes("Desde la perspectiva de prescripción") ||
-        existing.includes("Dabetes") ||
-        existing.includes("sintomatología GI") ||
-        existing.includes("y hidratación") ||
-        existing.includes("8 de descanso") ||
-        existing.includes("alergia confirmada") ||
-        existing.includes("comidas predilectas") ||
-        existing.includes("alimentos que le desagraden"));
-
-    if (existing && !esTextoAntiguoConFallas) {
-      setAiSynopsis(existing);
-    } else {
-      // Mostrar primero la síntesis limpia local y luego actualizar con IA
-      setAiSynopsis(highlights.sintesisTexto);
-      if (cliente?.id && !loadingAi) {
-        setLoadingAi(true);
-        generateClinicalAiSynopsis(anamnesis, cliente)
-          .then((res) => {
-            if (res?.texto) {
-              setAiSynopsis(res.texto);
-              const updatedAnamnesis = {
-                ...anamnesis,
-                resumen_ia: {
-                  texto: res.texto,
-                  origen: res.origen,
-                  generado_en: res.generadoEn,
-                },
-              };
-              const nextRec = {
-                ...clinicalRec,
-                anamnesis: updatedAnamnesis,
-              };
-              saveClinicalRecord(cliente.id, nextRec).then((saved) => {
-                if (onRecordUpdated) onRecordUpdated(saved);
-              });
-            }
-          })
-          .catch(() => {})
-          .finally(() => setLoadingAi(false));
+    const raw = anamnesis?.resumen_ia;
+    if (raw) {
+      if (typeof raw === "object") {
+        setAiData(raw);
+      } else {
+        setAiData({ texto: raw, diagnostico: raw });
       }
     }
-  }, [cliente?.id, anamnesis?.resumen_ia?.texto]);
+  }, [anamnesis?.resumen_ia]);
+
+  const handleRunAiAudit = async (e) => {
+    if (e) e.stopPropagation();
+    if (!cliente?.id || loadingAi) return;
+    setLoadingAi(true);
+    setAiError(null);
+    try {
+      const res = await generateClinicalAiSynopsis(anamnesis, cliente);
+      if (res?.diagnostico || res?.texto) {
+        const newAiData = {
+          texto: res.diagnostico || res.texto,
+          diagnostico: res.diagnostico || res.texto,
+          alertas: res.alertas,
+          medicacion_normalizada: res.medicacion_normalizada,
+          heredo_normalizado: res.heredo_normalizado,
+          contexto_normalizado: res.contexto_normalizado,
+          directrices_nutricionales: res.directrices_nutricionales || [],
+          origen: res.origen,
+          model: res.model,
+          generado_en: res.generadoEn || new Date().toISOString(),
+        };
+        setAiData(newAiData);
+        const updatedAnamnesis = {
+          ...anamnesis,
+          resumen_ia: newAiData,
+        };
+        const nextRec = {
+          ...clinicalRec,
+          anamnesis: updatedAnamnesis,
+        };
+        const saved = await saveClinicalRecord(cliente.id, nextRec);
+        if (onRecordUpdated) onRecordUpdated(saved);
+        setCollapsed(false); // auto-expand to show new results
+      }
+    } catch (err) {
+      console.error("Error auditando expediente con IA:", err);
+      setAiError(err.message || "Error al conectar con Google Gemini");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
 
   const hayAlertasMedicas =
     highlights.patologias.presente ||
-    highlights.alergias.presente;
+    highlights.alergias.presente ||
+    (aiData?.alertas?.patologias_normalizadas && aiData.alertas.patologias_normalizadas.length > 0) ||
+    (aiData?.alertas?.exclusiones_alimentarias && aiData.alertas.exclusiones_alimentarias.length > 0);
+
+  const isGeminiOrigin =
+    aiData?.origen === "gemini" ||
+    aiData?.origen === "gemini_direct" ||
+    aiData?.origen === "edge_function";
+
+  const exclusionesList =
+    aiData?.alertas?.exclusiones_alimentarias && aiData.alertas.exclusiones_alimentarias.length > 0
+      ? aiData.alertas.exclusiones_alimentarias
+      : highlights.alergias.tags.length > 0
+      ? highlights.alergias.tags
+      : highlights.alergias.raw
+      ? [highlights.alergias.raw]
+      : [];
+
+  const patologiasList =
+    aiData?.alertas?.patologias_normalizadas && aiData.alertas.patologias_normalizadas.length > 0
+      ? aiData.alertas.patologias_normalizadas
+      : highlights.patologias.tags.length > 0
+      ? highlights.patologias.tags
+      : highlights.patologias.raw
+      ? [highlights.patologias.raw]
+      : [];
 
   return (
     <div className="mb-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white rounded-2xl border border-blue-200/80 shadow-sm overflow-hidden transition-all duration-200">
@@ -106,12 +142,29 @@ export default function ClinicalAiSummaryCard({
             <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100/80 text-[var(--brand-primary)] border border-blue-200">
               IA FLUX
             </span>
+            {isGeminiOrigin && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>Auditado con IA</span>
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: Flecha para extender / colapsar */}
+        {/* Right: Botón Auditar con IA + Flecha colapsar */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-semibold text-[#6B7A8D] hidden sm:inline">
+          <button
+            type="button"
+            onClick={handleRunAiAudit}
+            disabled={loadingAi}
+            className="py-1 px-3 rounded-lg bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-2xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Auditar y normalizar el expediente clínico con Google Gemini"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${loadingAi ? "animate-spin" : ""}`} />
+            <span>{loadingAi ? "Auditando..." : isGeminiOrigin ? "Reauditar con IA" : "Auditar con IA"}</span>
+          </button>
+
+          <span className="text-xs font-semibold text-[#6B7A8D] hidden md:inline ml-1">
             {collapsed ? "Ver diagnóstico y antecedentes" : "Ocultar"}
           </span>
           <button
@@ -127,6 +180,13 @@ export default function ClinicalAiSummaryCard({
           </button>
         </div>
       </div>
+
+      {aiError && (
+        <div className="px-5 py-2 bg-red-50 border-t border-red-200 flex items-center gap-2 text-xs text-red-700">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{aiError}</span>
+        </div>
+      )}
 
       {/* ── Contenido Expandido ── */}
       {!collapsed && (
@@ -158,43 +218,35 @@ export default function ClinicalAiSummaryCard({
 
                 {hayAlertasMedicas ? (
                   <div className="space-y-2">
-                    {/* Alergias / Intolerancias */}
-                    {highlights.alergias.presente && (
+                    {/* Alergias / Intolerancias / Exclusiones de Alimentos */}
+                    {exclusionesList.length > 0 && (
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-0.5">
-                          Alergias / Intolerancias:
+                          Exclusiones Alimentarias:
                         </span>
                         <div className="flex flex-wrap gap-1">
-                          {highlights.alergias.tags.length > 0 ? (
-                            highlights.alergias.tags.map((t, i) => (
-                              <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
-                                <span>{t}</span>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-[#0B1929]">{highlights.alergias.raw}</span>
-                          )}
+                          {exclusionesList.map((t, i) => (
+                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
+                              <span>{t}</span>
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Patologías */}
-                    {highlights.patologias.presente && (
+                    {/* Patologías / Condiciones */}
+                    {patologiasList.length > 0 && (
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-red-800 block mb-0.5">
                           Patologías / Condiciones:
                         </span>
                         <div className="flex flex-wrap gap-1">
-                          {highlights.patologias.tags.length > 0 ? (
-                            highlights.patologias.tags.map((t, i) => (
-                              <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-900 border border-red-200">
-                                {t}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-[#0B1929]">{highlights.patologias.raw}</span>
-                          )}
+                          {patologiasList.map((t, i) => (
+                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-900 border border-red-200">
+                              {t}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -206,7 +258,7 @@ export default function ClinicalAiSummaryCard({
                 )}
               </div>
               <span className="text-[10px] text-red-700/80 mt-2 block font-medium">
-                Condición clínica basal
+                {aiData?.alertas?.observacion_alergias || "Condición clínica basal"}
               </span>
             </div>
 
@@ -218,20 +270,16 @@ export default function ClinicalAiSummaryCard({
                   <span>Medicación & Suplementos</span>
                 </div>
 
-                {highlights.medicacion.presente ? (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 block">
-                      Tratamiento actual:
-                    </span>
-                    <p className="text-xs text-[#0B1929] font-medium leading-snug">
-                      {highlights.medicacion.raw}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#6B7A8D] italic">
-                    No reporta medicación ni suplementación actual.
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 block">
+                    Tratamiento actual:
+                  </span>
+                  <p className="text-xs text-[#0B1929] font-medium leading-snug">
+                    {aiData?.medicacion_normalizada || highlights.medicacion.raw || (
+                      <span className="text-[#6B7A8D] italic font-normal">No reporta medicación ni suplementación actual.</span>
+                    )}
                   </p>
-                )}
+                </div>
               </div>
               <span className="text-[10px] text-indigo-700/80 mt-2 block font-medium">
                 Vigilancia fármaco-nutriente
@@ -246,20 +294,16 @@ export default function ClinicalAiSummaryCard({
                   <span>Riesgo Heredofamiliar</span>
                 </div>
 
-                {highlights.heredo?.presente ? (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block">
-                      Antecedentes en la familia:
-                    </span>
-                    <p className="text-xs text-[#0B1929] font-medium leading-snug">
-                      {highlights.heredo.raw}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#6B7A8D] italic">
-                    Sin antecedentes familiares de riesgo reportados.
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block">
+                    Antecedentes en la familia:
+                  </span>
+                  <p className="text-xs text-[#0B1929] font-medium leading-snug">
+                    {aiData?.heredo_normalizado || highlights.heredo?.raw || (
+                      <span className="text-[#6B7A8D] italic font-normal">Sin antecedentes familiares de riesgo reportados.</span>
+                    )}
                   </p>
-                )}
+                </div>
               </div>
               <span className="text-[10px] text-purple-700/80 mt-2 block font-medium">
                 Prevención metabólica y cardiovascular
@@ -281,23 +325,24 @@ export default function ClinicalAiSummaryCard({
                       <span className="text-[#6B7A8D]">{highlights.lesiones.raw}</span>
                     </div>
                   )}
-                  {highlights.habitos.ocupacion && (
-                    <div className="truncate">
-                      <strong className="text-[#0B1929]">Ocupación:</strong>{" "}
-                      <span className="text-[#6B7A8D]">{highlights.habitos.ocupacion}</span>
-                    </div>
-                  )}
+                  <div>
+                    <strong className="text-[#0B1929]">Ocupación:</strong>{" "}
+                    <span className="text-[#6B7A8D]">
+                      {aiData?.contexto_normalizado?.ocupacion || highlights.habitos.ocupacion || "No especificada"}
+                    </span>
+                  </div>
                   <div>
                     <strong className="text-[#0B1929]">Función digestiva:</strong>{" "}
                     <span className="text-[#6B7A8D]">
-                      {highlights.digestivo.isNormal ? "Digestión conservada" : highlights.digestivo.raw}
+                      {aiData?.contexto_normalizado?.digestion || (highlights.digestivo.isNormal ? "Digestión conservada" : highlights.digestivo.raw)}
                     </span>
                   </div>
-                  {highlights.habitos.alcoholTabaco && (
-                    <div className="truncate text-amber-800">
-                      <strong>Alcohol/Tabaco:</strong> {highlights.habitos.alcoholTabaco}
-                    </div>
-                  )}
+                  <div>
+                    <strong className="text-[#0B1929]">Alcohol/Tabaco:</strong>{" "}
+                    <span className="text-[#6B7A8D]">
+                      {aiData?.contexto_normalizado?.alcohol_tabaco || highlights.habitos.alcoholTabaco || "No reportado"}
+                    </span>
+                  </div>
                 </div>
               </div>
               <span className="text-[10px] text-blue-700/80 mt-2 block font-medium">
@@ -314,17 +359,44 @@ export default function ClinicalAiSummaryCard({
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                   <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
                     Diagnóstico Basado en el Expediente
                   </span>
                   <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                    {loadingAi ? "Analizando con IA..." : "Análisis IA"}
+                    {loadingAi
+                      ? "Analizando con IA..."
+                      : isGeminiOrigin
+                      ? `Auditado IA · ${aiData?.model || "Gemini"}`
+                      : "Análisis IA"}
                   </span>
                 </div>
+                
                 <p className="text-xs text-[#0B1929] leading-relaxed font-normal">
-                  {aiSynopsis || highlights.sintesisTexto || "Sin antecedentes registrados en el expediente."}
+                  {aiData?.diagnostico || aiData?.texto || highlights.sintesisTexto || "Sin antecedentes registrados en el expediente."}
                 </p>
+
+                {/* Directrices Nutricionales para la Programación */}
+                {Array.isArray(aiData?.directrices_nutricionales) && aiData.directrices_nutricionales.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-indigo-100/70">
+                    <span className="text-[11px] font-bold text-indigo-950 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Directrices Nutricionales para la Programación:</span>
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {aiData.directrices_nutricionales.map((dir, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 p-2 rounded-lg bg-indigo-50/50 border border-indigo-100 text-xs text-[#0B1929]"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                          <span className="leading-snug">{dir}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {highlights.notasConsulta && (
                   <div className="mt-2 pt-2 border-t border-[#F0F4FA] text-xs text-[#6B7A8D]">
                     <strong className="text-[#0B1929]">Notas de consulta:</strong> {highlights.notasConsulta}
