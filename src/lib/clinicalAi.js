@@ -306,17 +306,20 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
   const apiKey = getGeminiApiKey();
   
   if (apiKey) {
-    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
     for (const model of candidateModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
             signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
@@ -465,13 +468,16 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
   "estrategiaMenu": "string con sugerencias directas y prácticas de menú basadas en lo que come"
 }`;
 
-    for (const model of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
       try {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiKey,
+            },
             body: JSON.stringify({
               contents: [{ parts: [{ text: promptAudit }] }],
               generationConfig: {
