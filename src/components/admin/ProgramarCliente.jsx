@@ -228,9 +228,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       cliente: selected,
       metrica: cycleMetrica || latestMetrica,
       clinicalRec,
+      ciclo: cicloSel,
       cicloNombre: cicloSel?.nombre || "",
     });
-  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel?.nombre]);
+  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel]);
 
   useEffect(() => {
     let active = true;
