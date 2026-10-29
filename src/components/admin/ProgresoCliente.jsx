@@ -949,6 +949,39 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       rawData.evalSexo = evalSexo;
       rawData.evalEdad = evalEdad;
 
+      // Preservar modo de prescripción y resultados de auditoría clínica con IA
+      rawData.prescription_mode = prescriptionMode;
+      if (aiAuditResult) {
+        rawData.ai_audit_result = aiAuditResult;
+      }
+      if (manualMacros && (manualMacros.targetKcal || manualMacros.proteinG || manualMacros.carbsG || manualMacros.fatsG)) {
+        rawData.manual_macros = manualMacros;
+      }
+      if (activePrescription && activePrescription.targetKcal > 0) {
+        rawData.prescribed_macros = {
+          targetKcal: activePrescription.targetKcal,
+          tmb: activePrescription.tmb,
+          get: activePrescription.get,
+          proteinG: activePrescription.proteinG,
+          carbsG: activePrescription.carbsG,
+          fatsG: activePrescription.fatsG,
+          protGKg: activePrescription.protGKg,
+          carbGKg: activePrescription.carbGKg,
+          fatGKg: activePrescription.fatGKg,
+          proteinPct: activePrescription.proteinPct,
+          carbsPct: activePrescription.carbsPct,
+          fatsPct: activePrescription.fatsPct,
+          goalPct: activePrescription.goalPct,
+          mode: activePrescription.mode,
+          modeLabel: activePrescription.modeLabel,
+          badgeMotivo: activePrescription.badgeMotivo || null,
+          analisisClinico: activePrescription.analisisClinico || null,
+          ajustesSugeridos: activePrescription.ajustesSugeridos || [],
+          estrategiaMenu: activePrescription.estrategiaMenu || null,
+          model: activePrescription.model || null,
+        };
+      }
+
       const calc = calculateBodyComposition(form, evalSexo, evalEdad);
       const data = prepareMetricaPayload(rawData, calc);
 
@@ -1032,7 +1065,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       if (editingId) deletedIdsRef.current.delete(String(editingId));
 
       // 1. Actualización optimista instantánea (0ms) en el estado de React:
-      const rowWithCiclo = { ...savedRow, ciclo_id: targetCicloId };
+      const rowWithCiclo = {
+        ...savedRow,
+        ciclo_id: targetCicloId,
+        prescription_mode: prescriptionMode,
+        ai_audit_result: aiAuditResult,
+        manual_macros: manualMacros,
+        prescribed_macros: rawData.prescribed_macros || activePrescription,
+      };
       const enrichedItem = enrichMetrica(rowWithCiclo);
       setMetricas(prev => {
         const filtered = prev.filter(m => String(m.id) !== String(enrichedItem.id) && String(m.id) !== String(editingId));
@@ -1047,6 +1087,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         const next = [rowWithCiclo, ...filtered];
         return next.sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"));
       });
+
+      // 3. Sincronizar automáticamente la prescripción seleccionada al Plan Nutricional activo
+      if (autoSyncMacros && !isReadOnly && activePrescription?.targetKcal > 0 && selected?.id) {
+        try {
+          const nutriPayload = {
+            calorias: Math.round(Number(activePrescription.targetKcal) || 0),
+            proteina: Math.round(Number(activePrescription.proteinG) || 0),
+            carbohidratos: Math.round(Number(activePrescription.carbsG) || 0),
+            grasas: Math.round(Number(activePrescription.fatsG) || 0),
+          };
+          const cycleQuery = targetCicloId ? `ciclo_id=eq.${targetCicloId}` : `ciclo_id=is.null`;
+          const currentNutri = await dbGetFresh(`nutricion?cliente_id=eq.${selected.id}&${cycleQuery}&limit=1`);
+          if (currentNutri && currentNutri.length > 0) {
+            await dbPatch(`nutricion?id=eq.${currentNutri[0].id}`, nutriPayload);
+          } else {
+            await dbPost("nutricion", {
+              cliente_id: selected.id,
+              ...nutriPayload,
+              ...(targetCicloId ? { ciclo_id: targetCicloId } : {})
+            });
+          }
+        } catch (syncErr) {
+          console.warn("Error sincronizando plan de nutrición desde evaluación:", syncErr);
+        }
+      }
 
       const macrosToSync = (autoSyncMacros && !isReadOnly && activePrescription?.targetKcal > 0)
         ? {
@@ -1163,9 +1228,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEvalEdad(detectedEdad);
     setForm(filled);
     setAutoSyncMacros(true);
-    setPrescriptionMode("matematico");
-    setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
-    setAiAuditResult(null);
+
+    // Restaurar modo de prescripción previamente seleccionado por el doctor
+    const savedMode = m.prescription_mode || m.prescriptionMode || (m.ai_audit_result || m.aiAuditResult ? "ia" : "matematico");
+    setPrescriptionMode(savedMode);
+
+    // Restaurar macros manuales si existían
+    if (m.manual_macros || m.manualMacros) {
+      setManualMacros(m.manual_macros || m.manualMacros);
+    } else {
+      setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
+    }
+
+    // Restaurar resultado de auditoría clínica con IA de Gemini
+    if (m.ai_audit_result || m.aiAuditResult) {
+      setAiAuditResult(m.ai_audit_result || m.aiAuditResult);
+    } else {
+      setAiAuditResult(null);
+    }
+
     setIsAuditingAi(false);
     setAiAuditError(null);
     setEditingId(m.id);
@@ -1444,6 +1525,29 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </span>
                       ) : null;
                     })()}
+                    {(m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal) && (() => {
+                      const mode = m.prescription_mode || (m.ai_audit_result ? "ia" : "matematico");
+                      const kcal = m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal;
+                      const label = m.prescribed_macros?.modeLabel || (mode === "ia" ? "Auditado IA" : mode === "manual" ? "Manual" : "Matemático");
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border ${
+                          mode === "ia"
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            : mode === "manual"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}>
+                          {mode === "ia" ? (
+                            <Sparkles className="w-3 h-3 text-indigo-600" />
+                          ) : mode === "manual" ? (
+                            <Edit2 className="w-3 h-3 text-amber-600" />
+                          ) : (
+                            <Calculator className="w-3 h-3 text-blue-600" />
+                          )}
+                          <span>{kcal} kcal ({label})</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex gap-1.5 self-start sm:self-auto">
                     <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1 cursor-pointer">
@@ -1576,6 +1680,34 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           m.r24h_picoteos && `Picoteos: ${m.r24h_picoteos}`,
                         ].filter(Boolean).join(" • ")}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Criterio y Auditoría de IA registrada */}
+                {Boolean(m.prescription_mode === "ia" && m.ai_audit_result) && (
+                  <div className="mt-3 bg-gradient-to-r from-indigo-50/70 to-blue-50/40 border border-indigo-100 rounded-xl p-3 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-bold text-indigo-950 flex items-center gap-1.5 text-xs">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Prescripción Auditada por IA ({m.ai_audit_result.targetKcal} kcal)
+                      </span>
+                      {m.ai_audit_result.badgeMotivo && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                          {m.ai_audit_result.badgeMotivo}
+                        </span>
+                      )}
+                    </div>
+                    {m.ai_audit_result.analisisClinico && (
+                      <p className="text-[#334155] text-[11px] leading-relaxed">
+                        <span className="font-bold text-[#0B1929]">Criterio clínico: </span>
+                        {m.ai_audit_result.analisisClinico}
+                      </p>
+                    )}
+                    {m.ai_audit_result.estrategiaMenu && (
+                      <p className="text-indigo-900 text-[11px] font-medium">
+                        <span className="font-bold text-[#0B1929]">Estrategia: </span>
+                        {m.ai_audit_result.estrategiaMenu}
+                      </p>
                     )}
                   </div>
                 )}

@@ -251,6 +251,10 @@ export function enrichMetrica(m) {
     nivel_estres: meta.nivel_estres ?? m.nivel_estres ?? "3",
     dias_ejercicio_actual: meta.dias_ejercicio_actual ?? m.dias_ejercicio_actual ?? "",
     horario_ejercicio: meta.horario_ejercicio ?? m.horario_ejercicio ?? "",
+    prescription_mode: meta.prescription_mode ?? m.prescription_mode ?? null,
+    ai_audit_result: meta.ai_audit_result ?? m.ai_audit_result ?? null,
+    manual_macros: meta.manual_macros ?? m.manual_macros ?? null,
+    prescribed_macros: meta.prescribed_macros ?? m.prescribed_macros ?? null,
   };
 }
 
@@ -336,6 +340,10 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.horas_sueno !== undefined && rawData.horas_sueno !== "") extraMeta.horas_sueno = rawData.horas_sueno;
   if (rawData.consumo_agua_estimado !== undefined && rawData.consumo_agua_estimado !== "") extraMeta.consumo_agua_estimado = rawData.consumo_agua_estimado;
   if (rawData.nivel_estres !== undefined && rawData.nivel_estres !== "") extraMeta.nivel_estres = rawData.nivel_estres;
+  if (rawData.prescription_mode) extraMeta.prescription_mode = rawData.prescription_mode;
+  if (rawData.ai_audit_result) extraMeta.ai_audit_result = rawData.ai_audit_result;
+  if (rawData.manual_macros) extraMeta.manual_macros = rawData.manual_macros;
+  if (rawData.prescribed_macros) extraMeta.prescribed_macros = rawData.prescribed_macros;
 
   Object.entries(calcResult || {}).forEach(([k, v]) => {
     if (k === "imc_info" || k === "icc_info") return;
