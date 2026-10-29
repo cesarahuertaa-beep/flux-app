@@ -1027,6 +1027,8 @@ export function generateSmartMacroPrescription({
         checkin_digestion: enriched?.checkin_digestion || 4,
         horas_sueno: enriched?.horas_sueno || 7.5,
         consumo_agua: enriched?.consumo_agua_estimado || "",
+        dias_ejercicio_actuales: enriched?.dias_ejercicio_actual || anamnesis?.dias_entrenamiento || anamnesis?.frecuencia_ejercicio || "0",
+        faf_proyectado_etapa: fafInfo?.label || "Moderado (3 a 5 días/semana)",
       },
     },
 

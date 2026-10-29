@@ -707,17 +707,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   const activePrescription = useMemo(() => {
     if (!liveSmartMacros) return null;
+    const getNum = Number(liveSmartMacros.matematico?.get || liveSmartMacros.get) || 0;
+    const p = parseFloat(form.peso) || parseFloat(liveSmartMacros.peso) || 0;
+
     if (prescriptionMode === "ia" && aiAuditResult) {
-      const p = parseFloat(form.peso) || parseFloat(liveSmartMacros.peso) || 0;
       const kcal = Number(aiAuditResult.targetKcal) || liveSmartMacros.targetKcal || 0;
       const prot = Number(aiAuditResult.proteinG) || 0;
       const carbs = Number(aiAuditResult.carbsG) || 0;
       const fats = Number(aiAuditResult.fatsG) || 0;
       const totalCalc = prot * 4 + carbs * 4 + fats * 9 || kcal;
+      const dynamicGoalPct = getNum > 0 ? Math.round(((kcal - getNum) / getNum) * 100) : (liveSmartMacros.goalPct || 0);
+
       return {
         targetKcal: kcal,
         tmb: liveSmartMacros.tmb,
-        get: liveSmartMacros.get,
+        get: getNum,
         proteinG: prot,
         carbsG: carbs,
         fatsG: fats,
@@ -727,7 +731,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         proteinPct: totalCalc > 0 ? Math.round(((prot * 4) / totalCalc) * 100) : 0,
         carbsPct: totalCalc > 0 ? Math.round(((carbs * 4) / totalCalc) * 100) : 0,
         fatsPct: totalCalc > 0 ? Math.round(((fats * 9) / totalCalc) * 100) : 0,
-        goalPct: liveSmartMacros.goalPct,
+        goalPct: dynamicGoalPct,
         mode: "ia",
         modeLabel: "Auditado IA",
         hasEnoughData: true,
@@ -739,16 +743,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       };
     }
     if (prescriptionMode === "manual") {
-      const p = parseFloat(form.peso) || parseFloat(liveSmartMacros.peso) || 0;
       const kcal = Number(manualMacros.targetKcal) || liveSmartMacros.targetKcal || 0;
       const prot = Number(manualMacros.proteinG) || 0;
       const carbs = Number(manualMacros.carbsG) || 0;
       const fats = Number(manualMacros.fatsG) || 0;
       const totalCalc = prot * 4 + carbs * 4 + fats * 9 || kcal;
+      const dynamicGoalPct = getNum > 0 ? Math.round(((kcal - getNum) / getNum) * 100) : (liveSmartMacros.goalPct || 0);
+
       return {
         targetKcal: kcal,
         tmb: liveSmartMacros.tmb,
-        get: liveSmartMacros.get,
+        get: getNum,
         proteinG: prot,
         carbsG: carbs,
         fatsG: fats,
@@ -758,7 +763,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         proteinPct: totalCalc > 0 ? Math.round(((prot * 4) / totalCalc) * 100) : 0,
         carbsPct: totalCalc > 0 ? Math.round(((carbs * 4) / totalCalc) * 100) : 0,
         fatsPct: totalCalc > 0 ? Math.round(((fats * 9) / totalCalc) * 100) : 0,
-        goalPct: liveSmartMacros.goalPct,
+        goalPct: dynamicGoalPct,
         mode: "manual",
         modeLabel: "Manual",
         hasEnoughData: kcal > 0,
@@ -780,6 +785,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setIsAuditingAi(true);
     setAiAuditError(null);
     try {
+      // Pliegues cutáneos (mm)
+      const plieguesArr = [];
+      if (form.pliegue_triceps) plieguesArr.push(`Tríceps: ${form.pliegue_triceps} mm`);
+      if (form.pliegue_subescapular) plieguesArr.push(`Subescapular: ${form.pliegue_subescapular} mm`);
+      if (form.pliegue_suprailiaco) plieguesArr.push(`Suprailíaco: ${form.pliegue_suprailiaco} mm`);
+      if (form.pliegue_abdominal) plieguesArr.push(`Abdominal: ${form.pliegue_abdominal} mm`);
+      if (form.pliegue_muslo) plieguesArr.push(`Muslo: ${form.pliegue_muslo} mm`);
+      if (form.pliegue_pantorrilla) plieguesArr.push(`Pantorrilla: ${form.pliegue_pantorrilla} mm`);
+      if (form.pliegue_biceps) plieguesArr.push(`Bíceps: ${form.pliegue_biceps} mm`);
+      if (form.pliegue_pectoral) plieguesArr.push(`Pectoral: ${form.pliegue_pectoral} mm`);
+      const plieguesStr = plieguesArr.join(", ");
+
+      // Circunferencias corporales (cm)
+      const circArr = [];
+      if (form.cintura) circArr.push(`Cintura: ${form.cintura} cm`);
+      if (form.cadera) circArr.push(`Cadera: ${form.cadera} cm`);
+      if (form.cuello) circArr.push(`Cuello: ${form.cuello} cm`);
+      if (form.pecho) circArr.push(`Pecho: ${form.pecho} cm`);
+      if (form.brazo_relajado) circArr.push(`Brazo relajado: ${form.brazo_relajado} cm`);
+      if (form.brazo_contraido) circArr.push(`Brazo contraído: ${form.brazo_contraido} cm`);
+      if (form.muslo) circArr.push(`Muslo: ${form.muslo} cm`);
+      if (form.pantorrilla) circArr.push(`Pantorrilla: ${form.pantorrilla} cm`);
+      const circStr = circArr.join(", ");
+
       const res = await auditMacroPrescriptionWithAi({
         cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
         anamnesis: clinicalRec?.anamnesis || {},
@@ -790,26 +819,37 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           estatura: form.estatura || activeMetricas[0]?.estatura || selected?.estatura || "",
           grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
           masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
+          masa_muscular_kg: liveCalculations.masa_muscular_kg || form.calc_masa_muscular || "",
+          pliegues_str: plieguesStr,
+          circunferencias_str: circStr,
+          inbody_bmr: form.inbody_bmr || "",
+          metodo_label: form.metodo_evaluacion === "durnin" ? "Durnin-Womersley (4 Pliegues)" : form.metodo_evaluacion === "inbody" ? "Bioimpedancia Eléctrica (InBody)" : "Plicometría ISAK (6 Pliegues)",
           sexo: evalSexo,
           edad: evalEdad,
         },
         r24h: liveSmartMacros.r24h || {},
-        habitos: liveSmartMacros.contextoClinico?.habitos || {},
+        habitos: {
+          ...(liveSmartMacros.contextoClinico?.habitos || {}),
+          dias_ejercicio_actuales: form.dias_ejercicio_actual || liveSmartMacros.contextoClinico?.habitos?.dias_ejercicio_actuales || "0",
+          faf_proyectado_etapa: liveSmartMacros.fafInfo?.label || "Moderado (3 a 5 días/semana)",
+        },
         calcMatematico: {
           formulaLabel: liveSmartMacros.formulaLabel,
           tmb: liveSmartMacros.matematico?.tmb || liveSmartMacros.tmb,
           get: liveSmartMacros.matematico?.get || liveSmartMacros.get,
-          goalTitle: liveSmartMacros.goalInfo?.title,
+          faf: liveSmartMacros.faf || liveSmartMacros.matematico?.faf || 1.55,
+          goalTitle: liveSmartMacros.goalInfo?.title || "Recomposición Corporal",
           goalPct: liveSmartMacros.goalPct,
           targetKcal: liveSmartMacros.matematico?.targetKcal || liveSmartMacros.targetKcal,
           proteinG: liveSmartMacros.matematico?.proteinG || liveSmartMacros.proteinG,
           protGKg: liveSmartMacros.matematico?.protGKg || liveSmartMacros.protGKg,
           carbsG: liveSmartMacros.matematico?.carbsG || liveSmartMacros.carbsG,
+          carbGKg: liveSmartMacros.matematico?.carbGKg || liveSmartMacros.carbGKg,
           fatsG: liveSmartMacros.matematico?.fatsG || liveSmartMacros.fatsG,
           fatGKg: liveSmartMacros.matematico?.fatGKg || liveSmartMacros.fatGKg,
         },
-        preferencias: liveSmartMacros.preferencias || "",
-        aversiones: liveSmartMacros.aversiones || "",
+        preferencias: form.preferencias_alimentos || liveSmartMacros.preferencias || "",
+        aversiones: form.aversiones_alimentos || liveSmartMacros.aversiones || "",
       });
 
       setAiAuditResult(res);
