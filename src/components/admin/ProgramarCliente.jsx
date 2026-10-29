@@ -136,6 +136,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   // ── Ciclos ──
   const [ciclos, setCiclos] = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
   const [cicloSel, setCicloSel] = useState(() => _peekActiveCiclo);
+  const isReadOnly = Boolean(cicloSel && !cicloSel.activo);
   const [showPastCycles, setShowPastCycles] = useState(false);
   useEffect(() => { 
     if (cicloSel && !cicloSel.activo) setShowPastCycles(true); 
@@ -356,7 +357,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const ORDINALES = ["Primer","Segundo","Tercer","Cuarto","Quinto","Sexto","Séptimo","Octavo","Noveno","Décimo"];
 
-  const isReadOnly = cicloSel && !cicloSel.activo;
   const isEstandar = localStorage.getItem("flux_role") === "civil" && selected && !selected.nutriologo_id && selected.plan_tipo !== 'premium' && selected.objetivo !== 'Mi entrenamiento personal';
 
   // ── Historial para Plantillas ──
