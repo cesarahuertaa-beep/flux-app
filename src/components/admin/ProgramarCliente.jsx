@@ -211,28 +211,46 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   });
 
   const cycleMetrica = useMemo(() => {
-    if (!Array.isArray(allMetricas) || allMetricas.length === 0) return latestMetrica;
+    if (!Array.isArray(allMetricas) || allMetricas.length === 0) return null;
     const linked = linkMetricasToCiclos(allMetricas, ciclos);
+    const getEvalTime = (m) => {
+      if (!m) return 0;
+      const f = m.fecha ? (String(m.fecha).split("T")[0] + "T12:00:00") : m.created_at;
+      return new Date(f || 0).getTime();
+    };
     if (cicloSel?.id) {
       const forCycle = linked.filter((m) => String(m.ciclo_id) === String(cicloSel.id));
       if (forCycle.length > 0) {
-        return [...forCycle].sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"))[0];
+        return [...forCycle].sort((a, b) => {
+          const diff = getEvalTime(b) - getEvalTime(a);
+          if (diff !== 0) return diff;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        })[0];
       }
+      // El plan seleccionado no tiene evaluación registrada aún
+      return null;
     }
-    return linked.length > 0
-      ? [...linked].sort((a, b) => new Date((b.fecha || "") + "T12:00:00") - new Date((a.fecha || "") + "T12:00:00"))[0]
-      : latestMetrica;
-  }, [allMetricas, ciclos, cicloSel?.id, latestMetrica]);
+    // Fallback únicamente si el cliente no tiene ningún plan/ciclo creado todavía
+    if (!ciclos || ciclos.length === 0) {
+      return [...linked].sort((a, b) => {
+        const diff = getEvalTime(b) - getEvalTime(a);
+        if (diff !== 0) return diff;
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      })[0];
+    }
+    return null;
+  }, [allMetricas, ciclos, cicloSel?.id]);
 
   const smartPrescription = useMemo(() => {
+    if (!cycleMetrica) return null;
     return generateSmartMacroPrescription({
       cliente: selected,
-      metrica: cycleMetrica || latestMetrica,
+      metrica: cycleMetrica,
       clinicalRec,
       ciclo: cicloSel,
       cicloNombre: cicloSel?.nombre || "",
     });
-  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel]);
+  }, [selected, cycleMetrica, clinicalRec, cicloSel]);
 
   useEffect(() => {
     let active = true;
@@ -306,7 +324,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   // Sincronización automática transparente de macros con la evaluación más actual del plan
   useEffect(() => {
-    if (!selected?.id || isReadOnly || !smartPrescription?.targetKcal) return;
+    if (!selected?.id || isReadOnly || !smartPrescription?.targetKcal || !cycleMetrica) return;
     const sKcal = Number(smartPrescription.targetKcal) || 0;
     const sP = Number(smartPrescription.proteinG) || 0;
     const sC = Number(smartPrescription.carbsG) || 0;
@@ -340,7 +358,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }).catch(() => {});
     }
-  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly]);
+  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly, cycleMetrica]);
 
   const parsedActiveCycle = useMemo(() => {
     return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
@@ -2526,11 +2544,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <>
                 {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
                 {(() => {
-                  const hasEvaluation = Boolean(smartPrescription.hasEvaluation && smartPrescription.targetKcal > 0);
-                  const targetKcal = hasEvaluation ? smartPrescription.targetKcal : (Number(macros.calorias) || smartPrescription.targetKcal);
-                  const activeP = hasEvaluation ? smartPrescription.proteinG : (Number(macros.proteina) || smartPrescription.proteinG);
-                  const activeC = hasEvaluation ? smartPrescription.carbsG : (Number(macros.carbohidratos) || smartPrescription.carbsG);
-                  const activeF = hasEvaluation ? smartPrescription.fatsG : (Number(macros.grasas) || smartPrescription.fatsG);
+                  if (!smartPrescription || !smartPrescription.hasEvaluation || !cycleMetrica || !smartPrescription.targetKcal || smartPrescription.targetKcal <= 0) {
+                    return null;
+                  }
+                  const targetKcal = smartPrescription.targetKcal;
+                  const activeP = smartPrescription.proteinG;
+                  const activeC = smartPrescription.carbsG;
+                  const activeF = smartPrescription.fatsG;
                   const pPct = targetKcal > 0 ? Math.round((activeP * 4 / targetKcal) * 100) : 0;
                   const cPct = targetKcal > 0 ? Math.round((activeC * 4 / targetKcal) * 100) : 0;
                   const fPct = targetKcal > 0 ? Math.round((activeF * 9 / targetKcal) * 100) : 0;
