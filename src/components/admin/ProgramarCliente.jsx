@@ -234,10 +234,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
     setAiGeneratingDishIndex(mealIdx);
     try {
+      const numComidas = Math.max(1, diaForm.comidas.length || 1);
+      const kcalMeta = (macros.calorias || smartPrescription?.targetKcal) ? Math.round((macros.calorias || smartPrescription?.targetKcal) / numComidas) : null;
+      const pMeta = (macros.proteina || smartPrescription?.proteinG) ? Math.round((macros.proteina || smartPrescription?.proteinG) / numComidas) : null;
+      const cMeta = (macros.carbohidratos || smartPrescription?.carbsG) ? Math.round((macros.carbohidratos || smartPrescription?.carbsG) / numComidas) : null;
+      const fMeta = (macros.grasas || smartPrescription?.fatsG) ? Math.round((macros.grasas || smartPrescription?.fatsG) / numComidas) : null;
+
       const res = await generateDishFromIngredientsWithAi({
         ingredientes: items,
         cliente: selected,
         clinicalRec,
+        targetMacros: kcalMeta ? { calorias: kcalMeta, proteina: pMeta, carbohidratos: cMeta, grasas: fMeta } : null,
       });
 
       let autoPhoto = meal.foto_url;
