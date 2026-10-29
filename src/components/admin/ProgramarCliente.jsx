@@ -4153,17 +4153,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                                     {/* 2. Calorías de la toma (Definidas por el nutriólogo con indicador de % restante) */}
                                     <div>
-                                      <div className="flex items-center justify-between mb-1.5">
-                                        <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1">
-                                          <Flame className="w-3.5 h-3.5 text-amber-500" />
-                                          Calorías de la toma
-                                        </label>
-                                        {metaKcal > 0 && mealKcal > 0 && (
-                                          <span className="text-[10px] font-extrabold text-[var(--brand-primary)] bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
-                                            {mealPct}% del día
-                                          </span>
-                                        )}
-                                      </div>
+                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <Flame className="w-3.5 h-3.5 text-amber-500" />
+                                        Calorías de la toma
+                                      </label>
                                       <div className="relative">
                                         <input 
                                           type="number"
@@ -4693,7 +4686,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#CBD5E1] text-[#6B7A8D] hover:text-[#0B1929] hover:border-[#94A3B8] transition-colors font-semibold"
                                     >
                                       <Plus className="w-3.5 h-3.5" />
-                                      <span>+ Agregar Opción Alternativa</span>
+                                      <span>Agregar Opción Alternativa</span>
                                     </button>
 
                                     <button
@@ -4711,7 +4704,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       ) : (
                                         <>
                                           <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                                          <span>✨ Generar Alternativa con IA</span>
+                                          <span>Generar Alternativa con IA</span>
                                         </>
                                       )}
                                     </button>
