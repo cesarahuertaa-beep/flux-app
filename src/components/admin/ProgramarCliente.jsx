@@ -2610,20 +2610,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             </p>
                           </div>
                         </div>
-
-                        {/* Botones de acción rápida */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          {!isReadOnly && (
-                            <button
-                              type="button"
-                              onClick={() => setShowMacroCalc(true)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-                            >
-                              <Calculator className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                              <span>Simulador</span>
-                            </button>
-                          )}
-                        </div>
                       </div>
 
                       {/* Cuadrícula de Macronutrientes */}

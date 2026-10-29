@@ -24,7 +24,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban, Loader2
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -284,6 +284,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     carbsG: "",
     fatsG: ""
   });
+  const [manualSimMode, setManualSimMode] = useState("g_kg"); // "g_kg" | "pct"
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [isAuditingAi, setIsAuditingAi] = useState(false);
   const [aiAuditError, setAiAuditError] = useState(null);
@@ -860,6 +861,94 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     } finally {
       setIsAuditingAi(false);
     }
+  };
+
+  const handleCopyFromAi = () => {
+    if (!aiAuditResult) return;
+    setManualMacros({
+      targetKcal: String(aiAuditResult.targetKcal || ""),
+      proteinG: String(aiAuditResult.proteinG || ""),
+      carbsG: String(aiAuditResult.carbsG || ""),
+      fatsG: String(aiAuditResult.fatsG || ""),
+    });
+  };
+
+  const handleCopyFromMath = () => {
+    const math = liveSmartMacros?.matematico || liveSmartMacros;
+    if (!math) return;
+    setManualMacros({
+      targetKcal: String(math.targetKcal || ""),
+      proteinG: String(math.proteinG || ""),
+      carbsG: String(math.carbsG || ""),
+      fatsG: String(math.fatsG || ""),
+    });
+  };
+
+  const handleSetGoalPreset = (pct) => {
+    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    const getNum = Number(liveSmartMacros?.matematico?.get || liveSmartMacros?.get) || 0;
+    if (getNum <= 0) return;
+    const newKcal = Math.round(getNum * (1 + pct / 100));
+    const curP = Number(manualMacros.proteinG) || Number(liveSmartMacros.proteinG) || (p > 0 ? Math.round(p * 2.0) : 0);
+    const curF = Number(manualMacros.fatsG) || Number(liveSmartMacros.fatsG) || (p > 0 ? Math.round(p * 0.9) : 0);
+    const newC = Math.max(0, Math.round((newKcal - curP * 4 - curF * 9) / 4));
+    setManualMacros({
+      targetKcal: String(newKcal),
+      proteinG: String(curP),
+      carbsG: String(newC),
+      fatsG: String(curF),
+    });
+  };
+
+  const handleAdjustProtGKg = (newGKg) => {
+    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    if (p <= 0) return;
+    const newProtG = Math.round(p * newGKg);
+    const kcal = Number(manualMacros.targetKcal) || Number(liveSmartMacros.targetKcal) || 0;
+    const curF = Number(manualMacros.fatsG) || Number(liveSmartMacros.fatsG) || 0;
+    const newCarbs = Math.max(0, Math.round((kcal - newProtG * 4 - curF * 9) / 4));
+    setManualMacros(prev => ({
+      ...prev,
+      targetKcal: String(kcal),
+      proteinG: String(newProtG),
+      carbsG: String(newCarbs),
+    }));
+  };
+
+  const handleAdjustFatGKg = (newGKg) => {
+    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    if (p <= 0) return;
+    const newFatG = Math.round(p * newGKg);
+    const kcal = Number(manualMacros.targetKcal) || Number(liveSmartMacros.targetKcal) || 0;
+    const curP = Number(manualMacros.proteinG) || Number(liveSmartMacros.proteinG) || 0;
+    const newCarbs = Math.max(0, Math.round((kcal - curP * 4 - newFatG * 9) / 4));
+    setManualMacros(prev => ({
+      ...prev,
+      targetKcal: String(kcal),
+      fatsG: String(newFatG),
+      carbsG: String(newCarbs),
+    }));
+  };
+
+  const handleAdjustPct = (type, val) => {
+    const kcal = Number(manualMacros.targetKcal) || Number(liveSmartMacros.targetKcal) || 0;
+    if (kcal <= 0) return;
+    const curP = Number(activePrescription?.proteinPct) || 30;
+    const curC = Number(activePrescription?.carbsPct) || 45;
+    const curF = Number(activePrescription?.fatsPct) || 25;
+    let nextP = type === 'p' ? val : curP;
+    let nextF = type === 'f' ? val : curF;
+    let nextC = type === 'c' ? val : (100 - nextP - nextF);
+    if (nextC < 0) nextC = 0;
+    const pG = Math.round(((nextP / 100) * kcal) / 4);
+    const fG = Math.round(((nextF / 100) * kcal) / 9);
+    const cG = Math.max(0, Math.round((kcal - pG * 4 - fG * 9) / 4));
+    setManualMacros({
+      targetKcal: String(kcal),
+      proteinG: String(pG),
+      carbsG: String(cG),
+      fatsG: String(fG),
+    });
   };
 
   const routineDaysCount = useMemo(() => {
@@ -3216,14 +3305,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     <button
                       type="button"
                       onClick={() => {
+                        const prevMode = prescriptionMode;
                         setPrescriptionMode("manual");
-                        if (!manualMacros.targetKcal && activePrescription) {
+                        if (prevMode === "ia" && aiAuditResult) {
                           setManualMacros({
-                            targetKcal: String(activePrescription.targetKcal || ""),
-                            proteinG: String(activePrescription.proteinG || ""),
-                            carbsG: String(activePrescription.carbsG || ""),
-                            fatsG: String(activePrescription.fatsG || ""),
+                            targetKcal: String(aiAuditResult.targetKcal || ""),
+                            proteinG: String(aiAuditResult.proteinG || ""),
+                            carbsG: String(aiAuditResult.carbsG || ""),
+                            fatsG: String(aiAuditResult.fatsG || ""),
                           });
+                        } else {
+                          const hasManualData = Boolean(
+                            manualMacros.targetKcal &&
+                            (manualMacros.proteinG || manualMacros.carbsG || manualMacros.fatsG)
+                          );
+                          if (!hasManualData) {
+                            const base = liveSmartMacros?.matematico || liveSmartMacros || activePrescription;
+                            if (base) {
+                              setManualMacros({
+                                targetKcal: String(base.targetKcal || ""),
+                                proteinG: String(base.proteinG || ""),
+                                carbsG: String(base.carbsG || ""),
+                                fatsG: String(base.fatsG || ""),
+                              });
+                            }
+                          }
                         }
                       }}
                       className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -3356,150 +3462,451 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </div>
 
                       {/* Bloque de Auditoría Clínica con Google Gemini IA (Genuina, bajo demanda) */}
-                      <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                            <span className="text-xs font-bold text-[#0B1929]">
-                              Auditoría Clínica con IA (Gemini)
-                            </span>
-                          </div>
-                          {aiAuditResult?.badgeMotivo ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200/60">
-                              {aiAuditResult.badgeMotivo}
-                            </span>
-                          ) : !isAuditingAi ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                              Bajo Demanda
-                            </span>
-                          ) : null}
-                        </div>
-
-                        {/* Estado de Carga */}
-                        {isAuditingAi && (
-                          <div className="p-3 rounded-lg bg-white/90 border border-indigo-100 flex items-center gap-2.5 text-xs text-indigo-900 shadow-xs">
-                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
-                            <span className="font-medium">
-                              Google Gemini está analizando el expediente médico, R24H y antropometría...
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Mensaje de Error (API Key o Red) */}
-                        {aiAuditError && !isAuditingAi && (
-                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5">
-                              <strong className="block font-bold">No se pudo auditar con IA:</strong>
-                              <p className="text-[11px] leading-relaxed">{aiAuditError}</p>
+                      {prescriptionMode !== "manual" && (
+                        <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 text-indigo-600" />
+                              <span className="text-xs font-bold text-[#0B1929]">
+                                Auditoría Clínica con IA (Gemini)
+                              </span>
                             </div>
+                            {aiAuditResult?.badgeMotivo ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200/60">
+                                {aiAuditResult.badgeMotivo}
+                              </span>
+                            ) : !isAuditingAi ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                Bajo Demanda
+                              </span>
+                            ) : null}
                           </div>
-                        )}
 
-                        {/* Estado Inicial: Botón para detonar la auditoría */}
-                        {!aiAuditResult && !isAuditingAi && (
-                          <div className="space-y-2">
-                            <p className="text-[11px] text-[#475569] leading-relaxed">
-                              Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante Google Gemini para obtener una recomendación adaptada a la realidad del paciente.
-                            </p>
-                            <button
-                              type="button"
-                              disabled={isReadOnly || !liveSmartMacros?.hasEnoughData}
-                              onClick={handleAuditMacrosWithAi}
-                              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                            >
-                              <Sparkles className="w-3.5 h-3.5" />
-                              <span>Auditar Prescripción con Gemini IA</span>
-                            </button>
-                          </div>
-                        )}
+                          {/* Estado de Carga */}
+                          {isAuditingAi && (
+                            <div className="p-3 rounded-lg bg-white/90 border border-indigo-100 flex items-center gap-2.5 text-xs text-indigo-900 shadow-xs">
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
+                              <span className="font-medium">
+                                Google Gemini está analizando el expediente médico, R24H y antropometría...
+                              </span>
+                            </div>
+                          )}
 
-                        {/* Resultado Genuino de Gemini */}
-                        {aiAuditResult && !isAuditingAi && (
-                          <div className="space-y-2.5">
-                            {aiAuditResult.analisisClinico && (
-                              <p className="text-[11px] text-[#334155] leading-relaxed bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
-                                <strong className="text-[#0B1929] block mb-0.5 font-bold">
-                                  Criterio clínico emitido por Gemini:
-                                </strong>
-                                {aiAuditResult.analisisClinico}
+                          {/* Mensaje de Error (API Key o Red) */}
+                          {aiAuditError && !isAuditingAi && (
+                            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <strong className="block font-bold">No se pudo auditar con IA:</strong>
+                                <p className="text-[11px] leading-relaxed">{aiAuditError}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Estado Inicial: Botón para detonar la auditoría */}
+                          {!aiAuditResult && !isAuditingAi && (
+                            <div className="space-y-2">
+                              <p className="text-[11px] text-[#475569] leading-relaxed">
+                                Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante Google Gemini para obtener una recomendación adaptada a la realidad del paciente.
                               </p>
-                            )}
+                              <button
+                                type="button"
+                                disabled={isReadOnly || !liveSmartMacros?.hasEnoughData}
+                                onClick={handleAuditMacrosWithAi}
+                                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Auditar Prescripción con Gemini IA</span>
+                              </button>
+                            </div>
+                          )}
 
-                            {/* Ajustes Sugeridos */}
-                            {aiAuditResult.ajustesSugeridos?.length > 0 && (
-                              <div className="space-y-1 pt-1 border-t border-indigo-100/70">
-                                <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
-                                  Ajustes sugeridos por la IA:
-                                </span>
-                                <ul className="text-[11px] text-[#475569] space-y-1 list-disc pl-3.5">
-                                  {aiAuditResult.ajustesSugeridos.map((ajuste, idx) => (
-                                    <li key={idx} className="leading-tight">{ajuste}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
+                          {/* Resultado Genuino de Gemini */}
+                          {aiAuditResult && !isAuditingAi && (
+                            <div className="space-y-2.5">
+                              {aiAuditResult.analisisClinico && (
+                                <p className="text-[11px] text-[#334155] leading-relaxed bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                                  <strong className="text-[#0B1929] block mb-0.5 font-bold">
+                                    Criterio clínico emitido por Gemini:
+                                  </strong>
+                                  {aiAuditResult.analisisClinico}
+                                </p>
+                              )}
 
-                            {/* Estrategia de Menú */}
-                            {aiAuditResult.estrategiaMenu && (
-                              <div className="p-2 rounded-lg bg-white/90 border border-indigo-100/80 text-[11px] text-[#334155] flex items-start gap-1.5">
-                                <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                                <div className="leading-snug">
-                                  <strong className="text-[#0B1929]">Estrategia recomendada: </strong>
-                                  {aiAuditResult.estrategiaMenu}
+                              {/* Ajustes Sugeridos */}
+                              {aiAuditResult.ajustesSugeridos?.length > 0 && (
+                                <div className="space-y-1 pt-1 border-t border-indigo-100/70">
+                                  <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                                    Ajustes sugeridos por la IA:
+                                  </span>
+                                  <ul className="text-[11px] text-[#475569] space-y-1 list-disc pl-3.5">
+                                    {aiAuditResult.ajustesSugeridos.map((ajuste, idx) => (
+                                      <li key={idx} className="leading-tight">{ajuste}</li>
+                                    ))}
+                                  </ul>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {/* Controles de Acción */}
-                            <div className="pt-1.5 border-t border-indigo-100/70 flex items-center justify-between gap-2 flex-wrap">
-                              {prescriptionMode === "ia" ? (
-                                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                  Prescripción de la IA activa ({aiAuditResult.targetKcal} kcal)
-                                </span>
-                              ) : (
+                              {/* Estrategia de Menú */}
+                              {aiAuditResult.estrategiaMenu && (
+                                <div className="p-2 rounded-lg bg-white/90 border border-indigo-100/80 text-[11px] text-[#334155] flex items-start gap-1.5">
+                                  <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                  <div className="leading-snug">
+                                    <strong className="text-[#0B1929]">Estrategia recomendada: </strong>
+                                    {aiAuditResult.estrategiaMenu}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Controles de Acción */}
+                              <div className="pt-1.5 border-t border-indigo-100/70 flex items-center justify-between gap-2 flex-wrap">
+                                {prescriptionMode === "ia" ? (
+                                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    Prescripción de la IA activa ({aiAuditResult.targetKcal} kcal)
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => !isReadOnly && setPrescriptionMode("ia")}
+                                    className="py-1.5 px-3 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>Aplicar prescripción de la IA ({aiAuditResult.targetKcal} kcal)</span>
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   disabled={isReadOnly}
-                                  onClick={() => !isReadOnly && setPrescriptionMode("ia")}
-                                  className="py-1.5 px-3 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                  onClick={handleAuditMacrosWithAi}
+                                  className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
                                 >
-                                  <Sparkles className="w-3 h-3" />
-                                  <span>Aplicar prescripción de la IA ({aiAuditResult.targetKcal} kcal)</span>
+                                  Volver a auditar con IA
                                 </button>
-                              )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
+                      {/* Bloque de Prescripción Dinámica / Simulador (Modo Manual) */}
+                      {prescriptionMode === "manual" && (
+                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl p-4 space-y-3.5 shadow-xs">
+                          {/* Cabecera del Simulador Inline */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                              <span className="text-xs font-bold text-[#0B1929]">
+                                Simulador & Ajustes Manuales
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200/60">
+                                Ajuste Fino
+                              </span>
+                            </div>
+
+                            {/* Switcher: g/kg vs % */}
+                            <div className="flex bg-amber-100/60 p-0.5 rounded-lg border border-amber-200/70">
                               <button
                                 type="button"
-                                disabled={isReadOnly}
-                                onClick={handleAuditMacrosWithAi}
-                                className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                                onClick={() => setManualSimMode("g_kg")}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  manualSimMode === "g_kg"
+                                    ? "bg-white text-amber-900 shadow-2xs"
+                                    : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                }`}
                               >
-                                Volver a auditar con IA
+                                g / kg
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setManualSimMode("pct")}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  manualSimMode === "pct"
+                                    ? "bg-white text-amber-900 shadow-2xs"
+                                    : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                }`}
+                              >
+                                % Calorías
                               </button>
                             </div>
                           </div>
-                        )}
 
-                        {/* Acciones de Regreso para Modo Manual */}
-                        {prescriptionMode === "manual" && (
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
-                            <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                              <Edit2 className="w-3.5 h-3.5 text-amber-600" />
-                              Valores manuales activos
-                            </span>
-                            <button
-                              type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
-                              className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] underline cursor-pointer"
-                            >
-                              Restablecer a matemático
-                            </button>
+                          {/* Presets Rápidos de Objetivo Calórico */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-[#475569]">
+                                Ajuste rápido de Kcal (sobre GET {activePrescription.get} kcal):
+                              </span>
+                              <span className="font-bold text-amber-700 font-['Rajdhani'] text-xs">
+                                {activePrescription.goalPct > 0 ? `+${activePrescription.goalPct}%` : `${activePrescription.goalPct}%`}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                              {[
+                                { label: "-20% Déficit", pct: -20 },
+                                { label: "-15% Déficit", pct: -15 },
+                                { label: "-10% Déficit", pct: -10 },
+                                { label: "0% Mant.", pct: 0 },
+                                { label: "+10% Superávit", pct: 10 },
+                                { label: "+15% Superávit", pct: 15 },
+                              ].map((preset) => {
+                                const isCurrent = Number(activePrescription.goalPct) === preset.pct;
+                                return (
+                                  <button
+                                    key={preset.pct}
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => handleSetGoalPreset(preset.pct)}
+                                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all border text-center cursor-pointer disabled:opacity-50 ${
+                                      isCurrent
+                                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                                        : "bg-white/80 border-amber-200/80 text-[#334155] hover:bg-amber-100/60"
+                                    }`}
+                                  >
+                                    {preset.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        )}
-                      </div>
+
+                          {/* Controles Dinámicos según modo g_kg vs pct */}
+                          {manualSimMode === "g_kg" ? (
+                            <div className="space-y-3 pt-1">
+                              {/* Slider Proteína g/kg */}
+                              <div className="bg-white/90 border border-blue-200/80 rounded-xl p-3 space-y-1.5 shadow-2xs">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-bold text-blue-900">
+                                    Proteína (g / kg peso)
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black text-blue-700 font-['Rajdhani']">
+                                      {activePrescription.protGKg} g/kg
+                                    </span>
+                                    <span className="text-[10px] text-[#6B7A8D]">
+                                      ({activePrescription.proteinG}g · {activePrescription.proteinPct}%)
+                                    </span>
+                                    <div className="flex items-center gap-0.5 ml-1">
+                                      <button
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => handleAdjustProtGKg(Math.max(1.0, Number((activePrescription.protGKg - 0.1).toFixed(1))))}
+                                        className="w-5 h-5 rounded bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
+                                      >
+                                        -
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => handleAdjustProtGKg(Math.min(3.5, Number((activePrescription.protGKg + 0.1).toFixed(1))))}
+                                        className="w-5 h-5 rounded bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="1.0"
+                                  max="3.5"
+                                  step="0.1"
+                                  disabled={isReadOnly}
+                                  value={activePrescription.protGKg || 2.0}
+                                  onChange={(e) => handleAdjustProtGKg(Number(e.target.value))}
+                                  className="w-full accent-blue-600 cursor-pointer"
+                                />
+                              </div>
+
+                              {/* Slider Grasas g/kg */}
+                              <div className="bg-white/90 border border-amber-200/80 rounded-xl p-3 space-y-1.5 shadow-2xs">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-bold text-amber-900">
+                                    Grasas (g / kg peso)
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black text-amber-700 font-['Rajdhani']">
+                                      {activePrescription.fatGKg} g/kg
+                                    </span>
+                                    <span className="text-[10px] text-[#6B7A8D]">
+                                      ({activePrescription.fatsG}g · {activePrescription.fatsPct}%)
+                                    </span>
+                                    <div className="flex items-center gap-0.5 ml-1">
+                                      <button
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => handleAdjustFatGKg(Math.max(0.5, Number((activePrescription.fatGKg - 0.05).toFixed(2))))}
+                                        className="w-5 h-5 rounded bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
+                                      >
+                                        -
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => handleAdjustFatGKg(Math.min(2.0, Number((activePrescription.fatGKg + 0.05).toFixed(2))))}
+                                        className="w-5 h-5 rounded bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0.5"
+                                  max="2.0"
+                                  step="0.05"
+                                  disabled={isReadOnly}
+                                  value={activePrescription.fatGKg || 0.9}
+                                  onChange={(e) => handleAdjustFatGKg(Number(e.target.value))}
+                                  className="w-full accent-amber-500 cursor-pointer"
+                                />
+                              </div>
+
+                              {/* Carbohidratos: Balance Residual */}
+                              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                                <div className="text-[11px] text-emerald-950">
+                                  <strong className="block font-bold">Carbohidratos de balance:</strong>
+                                  <span className="text-[#475569]">Cuadran las calorías restantes de la meta</span>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-xs font-black text-emerald-800 font-['Rajdhani']">
+                                    {activePrescription.carbsG}g ({activePrescription.carbGKg} g/kg)
+                                  </div>
+                                  <div className="text-[10px] font-semibold text-emerald-700">
+                                    {activePrescription.carbsPct}% de las kcal
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Modo Porcentual (%) */
+                            <div className="space-y-2.5 pt-1">
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-white/90 border border-blue-200 rounded-xl p-2.5 text-center">
+                                  <div className="text-[10px] font-bold text-blue-700 uppercase mb-1">
+                                    % Proteína
+                                  </div>
+                                  <div className="text-sm font-black text-blue-900 font-['Rajdhani']">
+                                    {activePrescription.proteinPct}%
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="15"
+                                    max="50"
+                                    step="1"
+                                    disabled={isReadOnly}
+                                    value={activePrescription.proteinPct || 30}
+                                    onChange={(e) => handleAdjustPct("p", Number(e.target.value))}
+                                    className="w-full accent-blue-600 mt-1 cursor-pointer"
+                                  />
+                                </div>
+                                <div className="bg-white/90 border border-emerald-200 rounded-xl p-2.5 text-center">
+                                  <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1">
+                                    % Carbos
+                                  </div>
+                                  <div className="text-sm font-black text-emerald-900 font-['Rajdhani']">
+                                    {activePrescription.carbsPct}%
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="10"
+                                    max="70"
+                                    step="1"
+                                    disabled={isReadOnly}
+                                    value={activePrescription.carbsPct || 45}
+                                    onChange={(e) => handleAdjustPct("c", Number(e.target.value))}
+                                    className="w-full accent-emerald-600 mt-1 cursor-pointer"
+                                  />
+                                </div>
+                                <div className="bg-white/90 border border-amber-200 rounded-xl p-2.5 text-center">
+                                  <div className="text-[10px] font-bold text-amber-700 uppercase mb-1">
+                                    % Grasas
+                                  </div>
+                                  <div className="text-sm font-black text-amber-900 font-['Rajdhani']">
+                                    {activePrescription.fatsPct}%
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="15"
+                                    max="50"
+                                    step="1"
+                                    disabled={isReadOnly}
+                                    value={activePrescription.fatsPct || 25}
+                                    onChange={(e) => handleAdjustPct("f", Number(e.target.value))}
+                                    className="w-full accent-amber-500 mt-1 cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] px-1">
+                                <span className="text-[#6B7A8D]">Suma de porcentajes:</span>
+                                <span
+                                  className={`font-bold px-2 py-0.5 rounded-full ${
+                                    activePrescription.proteinPct + activePrescription.carbsPct + activePrescription.fatsPct === 100
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {activePrescription.proteinPct + activePrescription.carbsPct + activePrescription.fatsPct}%
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Base de Sustento: Copiar de IA o Restaurar Matemático */}
+                          <div className="space-y-2 pt-2 border-t border-amber-200/70">
+                            {aiAuditResult && (
+                              <div className="bg-white/90 border border-indigo-200 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
+                                <div className="text-[11px] text-[#334155] leading-tight min-w-0">
+                                  <div className="flex items-center gap-1 font-bold text-indigo-900">
+                                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <span>Prescripción IA disponible:</span>
+                                    {aiAuditResult.badgeMotivo && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800">
+                                        {aiAuditResult.badgeMotivo}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[#64748B] text-[10px] mt-0.5">
+                                    {aiAuditResult.targetKcal} kcal · {aiAuditResult.proteinG}g P · {aiAuditResult.carbsG}g C · {aiAuditResult.fatsG}g G
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={handleCopyFromAi}
+                                  className="py-1 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>Copiar de IA</span>
+                                </button>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                onClick={handleCopyFromMath}
+                                className="font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Restablecer cálculo matemático ({liveSmartMacros?.targetKcal} kcal)</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
+                                className="font-semibold text-[#6B7A8D] hover:text-[#0B1929] hover:underline cursor-pointer"
+                              >
+                                Salir de manual
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Sincronización Automática con el Plan Nutricional */}
                       {!isReadOnly && (
