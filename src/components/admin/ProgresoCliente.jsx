@@ -24,7 +24,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban, Loader2
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -32,6 +32,7 @@ import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
+import { auditMacroPrescriptionWithAi } from "../../lib/clinicalAi";
 
 const FIELDS_BASICAS = [
   { key: "peso", label: "Peso (kg)", type: "number", step: "0.1" },
@@ -283,6 +284,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     carbsG: "",
     fatsG: ""
   });
+  const [aiAuditResult, setAiAuditResult] = useState(null);
+  const [isAuditingAi, setIsAuditingAi] = useState(false);
+  const [aiAuditError, setAiAuditError] = useState(null);
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
@@ -571,6 +575,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
     setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
+    setAiAuditResult(null);
+    setIsAuditingAi(false);
+    setAiAuditError(null);
     setEditingId(null);
     setExistingFotos([]);
     setPendingFotos([]);
@@ -700,12 +707,35 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   const activePrescription = useMemo(() => {
     if (!liveSmartMacros) return null;
-    if (prescriptionMode === "ia" && liveSmartMacros.ia) {
+    if (prescriptionMode === "ia" && aiAuditResult) {
+      const p = parseFloat(form.peso) || parseFloat(liveSmartMacros.peso) || 0;
+      const kcal = Number(aiAuditResult.targetKcal) || liveSmartMacros.targetKcal || 0;
+      const prot = Number(aiAuditResult.proteinG) || 0;
+      const carbs = Number(aiAuditResult.carbsG) || 0;
+      const fats = Number(aiAuditResult.fatsG) || 0;
+      const totalCalc = prot * 4 + carbs * 4 + fats * 9 || kcal;
       return {
-        ...liveSmartMacros.ia,
+        targetKcal: kcal,
+        tmb: liveSmartMacros.tmb,
+        get: liveSmartMacros.get,
+        proteinG: prot,
+        carbsG: carbs,
+        fatsG: fats,
+        protGKg: aiAuditResult.protGKg || (p > 0 ? Number((prot / p).toFixed(2)) : 0),
+        carbGKg: aiAuditResult.carbGKg || (p > 0 ? Number((carbs / p).toFixed(2)) : 0),
+        fatGKg: aiAuditResult.fatGKg || (p > 0 ? Number((fats / p).toFixed(2)) : 0),
+        proteinPct: totalCalc > 0 ? Math.round(((prot * 4) / totalCalc) * 100) : 0,
+        carbsPct: totalCalc > 0 ? Math.round(((carbs * 4) / totalCalc) * 100) : 0,
+        fatsPct: totalCalc > 0 ? Math.round(((fats * 9) / totalCalc) * 100) : 0,
+        goalPct: liveSmartMacros.goalPct,
         mode: "ia",
-        modeLabel: "Sugerido IA",
-        hasEnoughData: liveSmartMacros.hasEnoughData,
+        modeLabel: "Auditado IA",
+        hasEnoughData: true,
+        badgeMotivo: aiAuditResult.badgeMotivo || "Prescripción IA",
+        analisisClinico: aiAuditResult.analisisClinico,
+        ajustesSugeridos: aiAuditResult.ajustesSugeridos || [],
+        estrategiaMenu: aiAuditResult.estrategiaMenu,
+        model: aiAuditResult.model,
       };
     }
     if (prescriptionMode === "manual") {
@@ -740,7 +770,57 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       modeLabel: "Matemático (Fórmula)",
       hasEnoughData: liveSmartMacros.hasEnoughData,
     };
-  }, [prescriptionMode, liveSmartMacros, manualMacros, form.peso]);
+  }, [prescriptionMode, liveSmartMacros, manualMacros, aiAuditResult, form.peso]);
+
+  const handleAuditMacrosWithAi = async () => {
+    if (!liveSmartMacros || !liveSmartMacros.hasEnoughData) {
+      setAiAuditError("Ingresa al menos el peso del paciente en la evaluación para auditar con IA.");
+      return;
+    }
+    setIsAuditingAi(true);
+    setAiAuditError(null);
+    try {
+      const res = await auditMacroPrescriptionWithAi({
+        cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
+        anamnesis: clinicalRec?.anamnesis || {},
+        metrica: {
+          ...form,
+          ...liveCalculations,
+          peso: form.peso || activeMetricas[0]?.peso || selected?.peso || "",
+          estatura: form.estatura || activeMetricas[0]?.estatura || selected?.estatura || "",
+          grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
+          masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
+          sexo: evalSexo,
+          edad: evalEdad,
+        },
+        r24h: liveSmartMacros.r24h || {},
+        habitos: liveSmartMacros.contextoClinico?.habitos || {},
+        calcMatematico: {
+          formulaLabel: liveSmartMacros.formulaLabel,
+          tmb: liveSmartMacros.matematico?.tmb || liveSmartMacros.tmb,
+          get: liveSmartMacros.matematico?.get || liveSmartMacros.get,
+          goalTitle: liveSmartMacros.goalInfo?.title,
+          goalPct: liveSmartMacros.goalPct,
+          targetKcal: liveSmartMacros.matematico?.targetKcal || liveSmartMacros.targetKcal,
+          proteinG: liveSmartMacros.matematico?.proteinG || liveSmartMacros.proteinG,
+          protGKg: liveSmartMacros.matematico?.protGKg || liveSmartMacros.protGKg,
+          carbsG: liveSmartMacros.matematico?.carbsG || liveSmartMacros.carbsG,
+          fatsG: liveSmartMacros.matematico?.fatsG || liveSmartMacros.fatsG,
+          fatGKg: liveSmartMacros.matematico?.fatGKg || liveSmartMacros.fatGKg,
+        },
+        preferencias: liveSmartMacros.preferencias || "",
+        aversiones: liveSmartMacros.aversiones || "",
+      });
+
+      setAiAuditResult(res);
+      setPrescriptionMode("ia");
+    } catch (err) {
+      console.error("Error auditando con IA:", err);
+      setAiAuditError(err.message || "Error al conectar con Google Gemini");
+    } finally {
+      setIsAuditingAi(false);
+    }
+  };
 
   const routineDaysCount = useMemo(() => {
     if (!Array.isArray(rutinas) || rutinas.length === 0) return 0;
@@ -1045,6 +1125,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
     setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
+    setAiAuditResult(null);
+    setIsAuditingAi(false);
+    setAiAuditError(null);
     setEditingId(m.id);
     setExistingFotos(parseFotos(m.fotos));
     setPendingFotos([]);
@@ -2920,7 +3003,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     )}
                   </div>
 
-                  {/* Selector de 3 Modos: Matemático, Sugerido IA, Manual */}
+                  {/* Selector de 3 Modos: Matemático, Auditado IA, Manual */}
                   <div className="flex bg-[#F0F4FA] rounded-xl p-1 gap-1">
                     <button
                       type="button"
@@ -2936,15 +3019,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPrescriptionMode("ia")}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      disabled={isReadOnly || isAuditingAi}
+                      onClick={() => {
+                        if (aiAuditResult) {
+                          setPrescriptionMode("ia");
+                        } else {
+                          handleAuditMacrosWithAi();
+                        }
+                      }}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
                         prescriptionMode === "ia"
                           ? "bg-indigo-600 shadow-xs text-white"
                           : "text-indigo-600 hover:text-indigo-800"
                       }`}
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Sugerido IA</span>
+                      {isAuditingAi ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      <span>{aiAuditResult ? "Auditado IA" : "Auditar IA"}</span>
                     </button>
                     <button
                       type="button"
@@ -3088,81 +3182,134 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       </div>
 
-                      {/* Bloque de Análisis Clínico Contextual IA */}
-                      <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3 space-y-2.5">
+                      {/* Bloque de Auditoría Clínica con Google Gemini IA (Genuina, bajo demanda) */}
+                      <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1.5">
                             <Sparkles className="w-4 h-4 text-indigo-600" />
                             <span className="text-xs font-bold text-[#0B1929]">
-                              Auditoría y Recomendación de la IA
+                              Auditoría Clínica con IA (Gemini)
                             </span>
                           </div>
-                          {liveSmartMacros.ia?.badgeMotivo && (
+                          {aiAuditResult?.badgeMotivo ? (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200/60">
-                              {liveSmartMacros.ia.badgeMotivo}
+                              {aiAuditResult.badgeMotivo}
                             </span>
-                          )}
+                          ) : !isAuditingAi ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                              Bajo Demanda
+                            </span>
+                          ) : null}
                         </div>
 
-                        <p className="text-[11px] text-[#475569] leading-relaxed">
-                          {liveSmartMacros.aiRationale?.resumenTexto}
-                        </p>
-
-                        {/* Variables detectadas en R24H, Check-in o Expediente */}
-                        {liveSmartMacros.aiRationale?.findings?.length > 0 && (
-                          <div className="space-y-1 pt-1 border-t border-indigo-100/70">
-                            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
-                              Variables del paciente detectadas:
+                        {/* Estado de Carga */}
+                        {isAuditingAi && (
+                          <div className="p-3 rounded-lg bg-white/90 border border-indigo-100 flex items-center gap-2.5 text-xs text-indigo-900 shadow-xs">
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
+                            <span className="font-medium">
+                              Google Gemini está analizando el expediente médico, R24H y antropometría...
                             </span>
-                            <ul className="text-[11px] text-[#475569] space-y-1 list-disc pl-3.5">
-                              {liveSmartMacros.aiRationale.findings.map((finding, idx) => (
-                                <li key={idx} className="leading-tight">{finding}</li>
-                              ))}
-                            </ul>
                           </div>
                         )}
 
-                        {/* Estrategia recomendada para el menú */}
-                        {liveSmartMacros.aiRationale?.estrategiaMenu && (
-                          <div className="p-2 rounded-lg bg-white/90 border border-indigo-100/80 text-[11px] text-[#334155] flex items-start gap-1.5">
-                            <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                            <div className="leading-snug">
-                              <strong className="text-[#0B1929]">Estrategia recomendada: </strong>
-                              {liveSmartMacros.aiRationale.estrategiaMenu}
+                        {/* Mensaje de Error (API Key o Red) */}
+                        {aiAuditError && !isAuditingAi && (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                              <strong className="block font-bold">No se pudo auditar con IA:</strong>
+                              <p className="text-[11px] leading-relaxed">{aiAuditError}</p>
                             </div>
                           </div>
                         )}
 
-                        {/* Botón de Acción según el Modo */}
-                        {prescriptionMode === "matematico" && (
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && setPrescriptionMode("ia")}
-                            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Aplicar sugerencias de la IA ({liveSmartMacros.ia.targetKcal} kcal)</span>
-                          </button>
-                        )}
-
-                        {prescriptionMode === "ia" && (
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
-                            <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              Sugerencias de la IA activas
-                            </span>
+                        {/* Estado Inicial: Botón para detonar la auditoría */}
+                        {!aiAuditResult && !isAuditingAi && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-[#475569] leading-relaxed">
+                              Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante Google Gemini para obtener una recomendación adaptada a la realidad del paciente.
+                            </p>
                             <button
                               type="button"
-                              disabled={isReadOnly}
-                              onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
-                              className="text-[11px] font-bold text-[#6B7A8D] hover:text-[#0B1929] underline cursor-pointer"
+                              disabled={isReadOnly || !liveSmartMacros?.hasEnoughData}
+                              onClick={handleAuditMacrosWithAi}
+                              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                             >
-                              Volver a cálculo matemático
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Auditar Prescripción con Gemini IA</span>
                             </button>
                           </div>
                         )}
 
+                        {/* Resultado Genuino de Gemini */}
+                        {aiAuditResult && !isAuditingAi && (
+                          <div className="space-y-2.5">
+                            {aiAuditResult.analisisClinico && (
+                              <p className="text-[11px] text-[#334155] leading-relaxed bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                                <strong className="text-[#0B1929] block mb-0.5 font-bold">
+                                  Criterio clínico emitido por Gemini:
+                                </strong>
+                                {aiAuditResult.analisisClinico}
+                              </p>
+                            )}
+
+                            {/* Ajustes Sugeridos */}
+                            {aiAuditResult.ajustesSugeridos?.length > 0 && (
+                              <div className="space-y-1 pt-1 border-t border-indigo-100/70">
+                                <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                                  Ajustes sugeridos por la IA:
+                                </span>
+                                <ul className="text-[11px] text-[#475569] space-y-1 list-disc pl-3.5">
+                                  {aiAuditResult.ajustesSugeridos.map((ajuste, idx) => (
+                                    <li key={idx} className="leading-tight">{ajuste}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Estrategia de Menú */}
+                            {aiAuditResult.estrategiaMenu && (
+                              <div className="p-2 rounded-lg bg-white/90 border border-indigo-100/80 text-[11px] text-[#334155] flex items-start gap-1.5">
+                                <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                <div className="leading-snug">
+                                  <strong className="text-[#0B1929]">Estrategia recomendada: </strong>
+                                  {aiAuditResult.estrategiaMenu}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Controles de Acción */}
+                            <div className="pt-1.5 border-t border-indigo-100/70 flex items-center justify-between gap-2 flex-wrap">
+                              {prescriptionMode === "ia" ? (
+                                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  Prescripción de la IA activa ({aiAuditResult.targetKcal} kcal)
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => !isReadOnly && setPrescriptionMode("ia")}
+                                  className="py-1.5 px-3 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>Aplicar prescripción de la IA ({aiAuditResult.targetKcal} kcal)</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                onClick={handleAuditMacrosWithAi}
+                                className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                              >
+                                Volver a auditar con IA
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Acciones de Regreso para Modo Manual */}
                         {prescriptionMode === "manual" && (
                           <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
                             <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">

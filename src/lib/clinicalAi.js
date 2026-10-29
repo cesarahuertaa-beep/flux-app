@@ -243,13 +243,13 @@ export function getGeminiApiKey() {
   try {
     if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
       const k = import.meta.env.VITE_GEMINI_API_KEY.trim();
-      if (k && k.startsWith("AIzaSy")) return k;
+      if (k && (k.startsWith("AIzaSy") || k.length >= 20)) return k;
     }
   } catch {}
   try {
     if (typeof process !== "undefined" && process.env && process.env.VITE_GEMINI_API_KEY) {
       const k = process.env.VITE_GEMINI_API_KEY.trim();
-      if (k && k.startsWith("AIzaSy")) return k;
+      if (k && (k.startsWith("AIzaSy") || k.length >= 20)) return k;
     }
   } catch {}
   return "";
@@ -306,7 +306,7 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
   const apiKey = getGeminiApiKey();
   
   if (apiKey) {
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash"];
+    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
     for (const model of candidateModels) {
       try {
         const controller = new AbortController();
@@ -322,7 +322,7 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
                 temperature: 0.3,
-                thinkingConfig: { thinkingBudget: 0 },
+                maxOutputTokens: 350,
               },
             }),
           }
@@ -347,11 +347,167 @@ Responde ÚNICAMENTE con el párrafo de diagnóstico clínico, fluido, redactado
     }
   }
 
-  // Fallback analítico médico perfeccionado
+  // Fallback analítico médico
   return {
     texto: highlights.sintesisTexto,
     origen: "analitico",
     generadoEn: new Date().toISOString(),
     highlights,
   };
+}
+
+/**
+ * Real AI Macro Prescription Auditor using Google Gemini via Supabase Edge Function or Direct API
+ */
+export async function auditMacroPrescriptionWithAi({
+  cliente = {},
+  anamnesis = {},
+  metrica = {},
+  r24h = {},
+  habitos = {},
+  calcMatematico = {},
+  preferencias = "",
+  aversiones = "",
+}) {
+  const geminiKey = getGeminiApiKey();
+
+  // 1. Intentar llamar a la Edge Function de Supabase (Backend seguro)
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "audit-macros",
+      cliente,
+      anamnesis,
+      metrica,
+      r24h,
+      habitos,
+      calcMatematico,
+      preferencias,
+      aversiones,
+      geminiKey,
+    });
+
+    if (edgeRes?.prescription) {
+      return {
+        ...edgeRes.prescription,
+        origen: edgeRes.origen || "edge_function",
+        model: edgeRes.model || "gemini-2.0-flash",
+        generadoEn: edgeRes.generadoEn || new Date().toISOString(),
+      };
+    }
+  } catch (edgeErr) {
+    if (edgeErr?.message?.includes("rechazada") || edgeErr?.message?.includes("API Key")) {
+      throw edgeErr;
+    }
+  }
+
+  // 2. Intentar llamada directa a Google Gemini si hay API key en el cliente
+  if (geminiKey) {
+    const promptAudit = `Eres un médico y nutriólogo clínico deportivo de élite en FLUX.
+Tu tarea es AUDITAR Y RECOMENDAR LA PRESCRIPCIÓN ENERGÉTICA Y DE MACRONUTRIENTES para un paciente real.
+
+DATOS DEL PACIENTE:
+- Sexo: ${cliente.genero || metrica.sexo || "No especificado"}
+- Edad: ${cliente.edad || metrica.edad || "No especificada"} años
+- Peso actual: ${metrica.peso || "0"} kg
+- Estatura: ${metrica.estatura || "0"} cm
+- Porcentaje de grasa: ${metrica.grasa_pct ? `${metrica.grasa_pct}%` : "No medido"}
+- Masa libre de grasa: ${metrica.masa_libre_grasa ? `${metrica.masa_libre_grasa} kg` : "No medida"}
+- Patologías y antecedentes médicos: ${anamnesis.patologias || "Ninguna"}
+- Medicación y suplementos: ${anamnesis.medicacion_suplementos || "Ninguna"}
+- Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
+
+CHECK-IN Y HÁBITOS DE VIDA:
+- Nivel de estrés: ${habitos.nivel_estres || 3}/5
+- Control de saciedad: ${habitos.checkin_saciedad || 3}/5 (1 = mucha hambre/antojos, 5 = muy saciado)
+- Nivel de energía: ${habitos.checkin_energia || 3}/5
+- Digestión: ${habitos.checkin_digestion || 3}/5 (1 = malestares frecuentes, 5 = óptima)
+- Horas de sueño diarias: ${habitos.horas_sueno || 7} horas
+- Consumo de agua estimado: ${habitos.consumo_agua || "No especificado"}
+
+RECORDATORIO DE 24 HORAS (R24H) REPORTADO POR EL PACIENTE:
+- Desayuno: ${r24h.desayuno || "No reportado"}
+- Colación matutina: ${r24h.colacion_m || "No reportada"}
+- Comida principal: ${r24h.comida || "No reportada"}
+- Colación vespertina: ${r24h.colacion_v || "No reportada"}
+- Cena: ${r24h.cena || "No reportada"}
+- Picoteos / Bebidas extras: ${r24h.picoteos || "No reportados"}
+
+PREFERENCIAS DEL PACIENTE:
+- Alimentos favoritos: ${preferencias || "No especificados"}
+- Alimentos que evita o rechaza: ${aversiones || "No especificados"}
+
+CÁLCULO MATEMÁTICO BASE (FÓRMULA ${calcMatematico.formulaLabel || "Estándar"}):
+- Tasa Metabólica Basal (TMB): ${calcMatematico.tmb || 0} kcal
+- Gasto Energético Total (GET con FAF): ${calcMatematico.get || 0} kcal
+- Objetivo fijado: ${calcMatematico.goalTitle || "Mantenimiento"} (${calcMatematico.goalPct || 0}%)
+- Calorías objetivo según fórmula: ${calcMatematico.targetKcal || 0} kcal
+- Macros según fórmula: Proteína ${calcMatematico.proteinG || 0}g (${calcMatematico.protGKg || 2.0} g/kg), Grasas ${calcMatematico.fatsG || 0}g (${calcMatematico.fatGKg || 0.9} g/kg), Carbohidratos ${calcMatematico.carbsG || 0}g.
+
+INSTRUCCIONES CLÍNICAS PARA TU RESPUESTA:
+1. Evalúa si el cálculo puramente matemático es realista para el estilo de vida, R24H y antecedentes del paciente.
+2. Si el R24H muestra un consumo calórico muy diferente o picoteos frecuentes, ajusta las calorías a un déficit/superávit de transición que garantice apego sin choque calórico brusco.
+3. Ajusta los gramos de proteína (g/kg) y grasas (g/kg) según el perfil metabólico (ej. si hay sobrepeso/obesidad dosifica sobre peso magro o 1.8-2.0 g/kg; si hay malestar digestivo reduce grasas; si hay resistencia a insulina controla carbohidratos netos).
+4. Redacta un análisis clínico honesto y razonado, indicando variables encontradas y la justificación del ajuste.
+5. Brinda una estrategia práctica de menú para coordinar las comidas según los horarios y hábitos del R24H.
+
+Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exacta:
+{
+  "targetKcal": number,
+  "proteinG": number,
+  "protGKg": number,
+  "carbsG": number,
+  "carbGKg": number,
+  "fatsG": number,
+  "fatGKg": number,
+  "badgeMotivo": "string breve (máx 30 caracteres, ej: Déficit Progresivo o Ajuste Metabólico)",
+  "analisisClinico": "string con el criterio clínico razonado de especialista (2 a 3 oraciones)",
+  "ajustesSugeridos": ["ajuste 1", "ajuste 2"],
+  "estrategiaMenu": "string con sugerencias directas y prácticas de menú basadas en lo que come"
+}`;
+
+    for (const model of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptAudit }] }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            const parsed = JSON.parse(text);
+            return {
+              ...parsed,
+              origen: "gemini_direct",
+              model,
+              generadoEn: new Date().toISOString(),
+            };
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData?.error?.message || `HTTP ${res.status}`;
+          if (res.status === 401 || res.status === 403) {
+            throw new Error(`La API Key de Gemini fue rechazada (${msg}). Verifica que sea una clave válida de Google AI Studio.`);
+          }
+        }
+      } catch (err) {
+        if (err.message?.includes("rechazada")) throw err;
+      }
+    }
+  }
+
+  throw new Error(
+    "No se pudo conectar con Google Gemini. Asegúrate de configurar una API Key válida (GEMINI_API_KEY) en Supabase Secrets o en el archivo .env."
+  );
 }
