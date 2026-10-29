@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -43,6 +43,15 @@ const sanitizeWhatsAppPhone = (phone) => {
   if (clean.length === 10) clean = "52" + clean;
   return clean;
 };
+
+
+const TIME_PRESETS = [
+  { time: "08:00 AM", name: "Desayuno", short: "08:00 AM Desayuno" },
+  { time: "11:30 AM", name: "Colación Matutina", short: "11:30 AM Colación" },
+  { time: "02:30 PM", name: "Comida Principal", short: "02:30 PM Comida" },
+  { time: "05:30 PM", name: "Pre-entreno / Snack", short: "05:30 PM Snack" },
+  { time: "08:30 PM", name: "Cena", short: "08:30 PM Cena" },
+];
 
 const isOfflineError = (e) => {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -188,7 +197,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [entrenoView, setEntrenoView] = useState("programar"); // "programar" | "tracking"
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
-  const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[] });
+  const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"" });
+  const [aiOptimizingIndex, setAiOptimizingIndex] = useState(null);
+  const [aiAltIndex, setAiAltIndex] = useState(null);
+  const [photoCatalogModal, setPhotoCatalogModal] = useState(null);
+  const [catalogCategory, setCatalogCategory] = useState("Todos");
+  const [catalogSearch, setCatalogSearch] = useState("");
   const [showRutinaModal, setShowRutinaModal] = useState(false);
   const [editRutina, setEditRutina] = useState(null);
   const [rutinaForm, setRutinaForm] = useState({ nombre:"", ejercicios:[] });
@@ -401,7 +415,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   useBackButton(showHistorico, () => setShowHistorico(false), 30);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
   useBackButton(!!templateModal, () => setTemplateModal(null), 40);
-  useBackButton(!!showDiaModal, () => setShowDiaModal(false), 20);
+  useBackButton(!!showDiaModal, () => {
+    if (photoCatalogModal) setPhotoCatalogModal(null);
+    else setShowDiaModal(false);
+  }, 20);
   useBackButton(!!showRutinaModal, () => setShowRutinaModal(false), 20);
   useBackButton(!!showPlanModal, () => setShowPlanModal(false), 20);
   
@@ -510,16 +527,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (!d) return;
     try {
       const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
-      const parts = (d.dia || "").split("|");
-      const dayTab = parts.length > 1 ? parts[0].trim() : "";
-      const title = parts.length > 1 ? parts.slice(1).join("|").trim() : (d.dia || "").trim();
+      const meta = parseDiaMetadata(d.dia || "");
       setDiaForm(p => ({
         ...p,
         dia: (d.dia || "") + " (Copia)",
-        diasSeleccionados: p.diasSeleccionados?.length > 0 ? p.diasSeleccionados : (dayTab && dayTab !== "S/D" ? [dayTab] : []),
-        tituloPersonalizado: title ? `${title} (Copia)` : "Día importado",
+        diasSeleccionados: p.diasSeleccionados?.length > 0 ? p.diasSeleccionados : (meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : []),
+        tituloPersonalizado: meta.titulo ? `${meta.titulo} (Copia)` : "Día importado",
+        aguaLitros: meta.agua || p.aguaLitros || "",
+        suplementos: meta.suplementos || p.suplementos || "",
         comidas: (coms || []).map(x => {
-          const copy = { ...x, _dndId: Math.random().toString(36).slice(2, 9) };
+          const parsedOpts = parseMealOptions(x);
+          const copy = { 
+            ...x, 
+            _dndId: Math.random().toString(36).slice(2, 9),
+            opciones: parsedOpts.length > 0 ? parsedOpts : [x.opcion1 || ""],
+            alertaClinica: null
+          };
           delete copy.id;
           delete copy.dia_id;
           return copy;
@@ -1376,21 +1399,52 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (isEstandarLimit(dias.length)) return;
     loadHistorial();
     setEditDia(null); 
-    setDiaForm({ dia:"", diasSeleccionados:[], tituloPersonalizado:"", orden:dias.length, comidas:[{ _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }); 
+    const pesoActual = cycleMetrica?.peso || latestMetrica?.peso || selected?.peso || null;
+    const suggestedWater = pesoActual ? (Math.round(pesoActual * 0.035 * 10) / 10).toFixed(1) : "2.5";
+    setDiaForm({ 
+      dia:"", 
+      diasSeleccionados:[], 
+      tituloPersonalizado:"", 
+      aguaLitros: suggestedWater,
+      suplementos: "",
+      orden:dias.length, 
+      comidas:[{ 
+        _dndId: Math.random().toString(36).slice(2,9), 
+        hora:"08:00 AM", 
+        nombre:"Comida 1: Desayuno", 
+        opciones: [""],
+        opcion1:"", 
+        opcion2:"", 
+        calorias:"", 
+        proteina:"", 
+        carbohidratos:"", 
+        grasas:"", 
+        foto_url:"",
+        alertaClinica: null
+      }] 
+    }); 
     setShowDiaModal(true); 
   };
   const openEditDia = (d) => { 
-    const parts = (d.dia ||"").split('|');
-    const dayTab = parts.length > 1 ? parts[0] : '';
-    const title = parts.length > 1 ? parts[1] : parts[0];
+    const meta = parseDiaMetadata(d.dia || "");
 
     setEditDia(d); 
     setDiaForm({ 
       dia:d.dia, 
-      diasSeleccionados: dayTab ? [dayTab] : [],
-      tituloPersonalizado: title,
+      diasSeleccionados: meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : [],
+      tituloPersonalizado: meta.titulo || "",
+      aguaLitros: meta.agua || "",
+      suplementos: meta.suplementos || "",
       orden:d.orden, 
-      comidas:d.comidas.map(c=>({...c, _dndId: String(c.id || Math.random().toString(36).slice(2,9))})) 
+      comidas:(d.comidas || []).map(c => {
+        const parsedOpts = parseMealOptions(c);
+        return {
+          ...c,
+          _dndId: String(c.id || Math.random().toString(36).slice(2,9)),
+          opciones: parsedOpts.length > 0 ? parsedOpts : [c.opcion1 || ""],
+          alertaClinica: null
+        };
+      })
     }); 
     setShowDiaModal(true); 
   };
@@ -1399,15 +1453,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const formSnap = {
       ...diaForm,
       diasSeleccionados: [...(diaForm.diasSeleccionados || [])],
-      comidas: (diaForm.comidas || []).map(c => ({ ...c })),
+      comidas: (diaForm.comidas || []).map(c => {
+        const { opcion1, opcion2 } = formatMealOptions(c.opciones || [c.opcion1 || ""]);
+        return {
+          ...c,
+          opcion1,
+          opcion2,
+        };
+      }),
     };
     const editDiaSnap = editDia;
     const prevDias = dias;
 
+    const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
+    const finalName = formatDiaMetadata({
+      dayCode,
+      titulo: formSnap.tituloPersonalizado,
+      agua: formSnap.aguaLitros,
+      suplementos: formSnap.suplementos
+    });
+
     // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
     if (editDiaSnap) {
-      const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
-      const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
       const optimisticComidas = formSnap.comidas.map((c, i) => ({
         ...c,
         id: c.id || `temp_${Date.now()}_${i}`,
@@ -1416,6 +1483,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         nombre: c.nombre || "",
         opcion1: c.opcion1 || "",
         opcion2: c.opcion2 || "",
+        opciones: c.opciones || [c.opcion1 || ""],
         calorias: +c.calorias || null,
         proteina: +c.proteina || null,
         carbohidratos: +c.carbohidratos || null,
@@ -1437,13 +1505,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const dSeleccionados = formSnap.diasSeleccionados || [];
       const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
       let orderCounter = formSnap.orden;
-      const optimisticNewDias = creationDays.map((dayCode, idx) => {
-        const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
+      const optimisticNewDias = creationDays.map((dCode, idx) => {
+        const optimisticDayName = formatDiaMetadata({
+          dayCode: dCode,
+          titulo: formSnap.tituloPersonalizado,
+          agua: formSnap.aguaLitros,
+          suplementos: formSnap.suplementos
+        });
         const tempDiaId = `temp_dia_${Date.now()}_${idx}`;
         const dObj = {
           id: tempDiaId,
           nutricion_id: nutri?.id || "temp_nutri",
-          dia: finalName,
+          dia: optimisticDayName,
           orden: orderCounter++,
           comidas: formSnap.comidas.map((c, i) => ({
             ...c,
@@ -1453,6 +1526,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             nombre: c.nombre || `Comida ${i + 1}`,
             opcion1: c.opcion1 || "",
             opcion2: c.opcion2 || "",
+            opciones: c.opciones || [c.opcion1 || ""],
             calorias: +c.calorias || 0,
             proteina: +c.proteina || 0,
             carbohidratos: +c.carbohidratos || 0,
@@ -1495,8 +1569,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
 
       if (editDiaSnap && !String(editDiaSnap.id).startsWith("temp_")) {
-        const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
-        const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
         const diaId = editDiaSnap.id;
 
         const oldIds = (editDiaSnap.comidas || []).map(c => c.id).filter(id => id && !String(id).startsWith("temp_"));
@@ -1554,9 +1626,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
         let orderCounter = formSnap.orden;
 
-        const diasData = creationDays.map(dayCode => {
-          const finalName = formSnap.tituloPersonalizado ? `${dayCode}|${formSnap.tituloPersonalizado}` : `${dayCode}|`;
-          const d = { nutricion_id: currentNutri.id, dia: finalName, orden: orderCounter };
+        const diasData = creationDays.map(dCode => {
+          const optimisticDayName = formatDiaMetadata({
+            dayCode: dCode,
+            titulo: formSnap.tituloPersonalizado,
+            agua: formSnap.aguaLitros,
+            suplementos: formSnap.suplementos
+          });
+          const d = { nutricion_id: currentNutri.id, dia: optimisticDayName, orden: orderCounter };
           orderCounter++;
           return d;
         });
@@ -1595,16 +1672,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (!isMiPlan && selected?.auth_id) {
         const throttleKey = `flux_notif_nutri_${selected.id}`;
         const lastSent = Number(sessionStorage.getItem(throttleKey) || 0);
-        if (Date.now() - lastSent > 120000) {
+        if (Date.now() - lastSent > 3600000) {
           sessionStorage.setItem(throttleKey, String(Date.now()));
           dbPost("notificaciones", {
-            profile_id: selected.auth_id,
-            titulo: "Plan de Nutrición actualizado",
-            mensaje: "Tu nutriólogo ha actualizado tu plan de alimentación.",
-            tipo: "plan",
-            link_url: "nutricion",
-            entidad_id: currentNutri?.id || selected.id
-          }, { headers: { Prefer: "return=minimal" } }).catch(() => {});
+            usuario_id: selected.auth_id,
+            tipo: "plan_nutri",
+            titulo: "Tu plan de nutrición ha sido actualizado",
+            mensaje: `Tu nutriólogo actualizó tu plan nutricional para ${cicloSel?.nombre || "este ciclo"}. Revisa tus nuevas metas y opciones de comida.`,
+            leido: false,
+          }).catch(() => {});
         }
       }
     } catch (e) {
@@ -1645,9 +1721,183 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     });
   };
-  const addComida  = () => setDiaForm(p => ({ ...p, comidas:[...p.comidas, { _dndId: Math.random().toString(36).slice(2,9), hora:"", nombre:"", opcion1:"", opcion2:"", calorias:"", proteina:"", carbohidratos:"", grasas:"", foto_url:"" }] }));
-  const updComida  = (i,f,v) => setDiaForm(p => { const cs=[...p.comidas]; if (cs[i]) cs[i]={...cs[i],[f]:v}; return { ...p, comidas:cs }; });
-  const remComida  = (i) => setDiaForm(p => ({ ...p, comidas:p.comidas.filter((_,x)=>x!==i) }));
+  const addComida = () => setDiaForm(p => ({
+    ...p,
+    comidas: [
+      ...p.comidas,
+      {
+        _dndId: Math.random().toString(36).slice(2, 9),
+        hora: "08:00 AM",
+        nombre: `Comida ${p.comidas.length + 1}`,
+        opciones: [""],
+        opcion1: "",
+        opcion2: "",
+        calorias: "",
+        proteina: "",
+        carbohidratos: "",
+        grasas: "",
+        foto_url: "",
+        alertaClinica: null
+      }
+    ]
+  }));
+
+  const duplicateComida = (i) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    const target = cs[i];
+    if (!target) return p;
+    const duplicated = {
+      ...target,
+      _dndId: Math.random().toString(36).slice(2, 9),
+      id: undefined,
+      nombre: target.nombre ? `${target.nombre} (Copia)` : `Comida ${i + 1} (Copia)`,
+      opciones: [...(target.opciones && target.opciones.length > 0 ? target.opciones : [target.opcion1 || ""])],
+      alertaClinica: null
+    };
+    cs.splice(i + 1, 0, duplicated);
+    return { ...p, comidas: cs };
+  });
+
+  const updComida = (i, f, v) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    if (cs[i]) cs[i] = { ...cs[i], [f]: v };
+    return { ...p, comidas: cs };
+  });
+
+  const remComida = (i) => setDiaForm(p => ({
+    ...p,
+    comidas: p.comidas.filter((_, x) => x !== i)
+  }));
+
+  const updMealOption = (mealIdx, optIdx, text) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    const c = { ...cs[mealIdx] };
+    const opts = [...(c.opciones || [""])];
+    opts[optIdx] = text;
+    c.opciones = opts;
+    if (optIdx === 0) {
+      c.opcion1 = text;
+      c.alertaClinica = null;
+    }
+    cs[mealIdx] = c;
+    return { ...p, comidas: cs };
+  });
+
+  const addMealOption = (mealIdx) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    const c = { ...cs[mealIdx] };
+    const opts = [...(c.opciones || [""])];
+    opts.push("");
+    c.opciones = opts;
+    cs[mealIdx] = c;
+    return { ...p, comidas: cs };
+  });
+
+  const removeMealOption = (mealIdx, optIdx) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    const c = { ...cs[mealIdx] };
+    const opts = (c.opciones || [""]).filter((_, idx) => idx !== optIdx);
+    c.opciones = opts.length > 0 ? opts : [""];
+    c.opcion1 = c.opciones[0] || "";
+    cs[mealIdx] = c;
+    return { ...p, comidas: cs };
+  });
+
+  const handleOptimizeComidaWithAi = async (mealIdx) => {
+    const meal = diaForm.comidas[mealIdx];
+    const mainText = meal?.opciones?.[0] || meal?.opcion1 || "";
+    if (!mainText.trim()) {
+      alert("Escribe primero los ingredientes o preparación de la Opción Principal para optimizar con IA.");
+      return;
+    }
+    setAiOptimizingIndex(mealIdx);
+    try {
+      const res = await optimizeMealWithAi({
+        mealText: mainText,
+        clinicalRec,
+        cliente: selected,
+        targetMacros: {
+          calorias: macros.calorias || smartPrescription?.targetKcal,
+          proteina: macros.proteina || smartPrescription?.proteinG,
+          carbohidratos: macros.carbohidratos || smartPrescription?.carbsG,
+          grasas: macros.grasas || smartPrescription?.fatsG,
+        }
+      });
+
+      let autoPhoto = meal.foto_url;
+      if (!autoPhoto && res?.palabrasClaveFoto) {
+        try {
+          const match = await searchDishPhotoInCatalog(mainText, res.palabrasClaveFoto);
+          if (match?.foto_url) {
+            autoPhoto = match.foto_url;
+          }
+        } catch {}
+      }
+
+      setDiaForm(p => {
+        const cs = [...p.comidas];
+        const c = { ...cs[mealIdx] };
+        if (res.calorias != null) c.calorias = res.calorias;
+        if (res.proteina != null) c.proteina = res.proteina;
+        if (res.carbohidratos != null) c.carbohidratos = res.carbohidratos;
+        if (res.grasas != null) c.grasas = res.grasas;
+        if (autoPhoto) c.foto_url = autoPhoto;
+        if (res.nombreNormalizado && (!c.nombre || c.nombre.startsWith("Comida "))) {
+          c.nombre = res.nombreNormalizado;
+        }
+        c.alertaClinica = res.alertaClinica || null;
+        cs[mealIdx] = c;
+        return { ...p, comidas: cs };
+      });
+      setMsg(<div className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-600" /> Macros calculados con IA</div>);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Error al optimizar con IA.");
+    } finally {
+      setAiOptimizingIndex(null);
+    }
+  };
+
+  const handleGenerateAltWithAi = async (mealIdx) => {
+    const meal = diaForm.comidas[mealIdx];
+    const mainText = meal?.opciones?.[0] || meal?.opcion1 || "";
+    if (!mainText.trim()) {
+      alert("La Opción Principal debe contener la receta base para que la IA diseñe un equivalente iso-macronutrimental.");
+      return;
+    }
+    setAiAltIndex(mealIdx);
+    try {
+      const res = await generateAlternativeMealWithAi({
+        mainMealText: mainText,
+        targetMacros: {
+          calorias: meal.calorias,
+          proteina: meal.proteina,
+          carbohidratos: meal.carbohidratos,
+          grasas: meal.grasas,
+        },
+        clinicalRec,
+        cliente: selected
+      });
+
+      if (res?.texto) {
+        setDiaForm(p => {
+          const cs = [...p.comidas];
+          const c = { ...cs[mealIdx] };
+          const opts = [...(c.opciones || [""])];
+          opts.push(res.texto);
+          c.opciones = opts;
+          cs[mealIdx] = c;
+          return { ...p, comidas: cs };
+        });
+        setMsg(<div className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-600" /> Alternativa equivalente generada</div>);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "No se pudo generar la alternativa con IA.");
+    } finally {
+      setAiAltIndex(null);
+    }
+  };
   
   // Abre el modal de recorte en lugar de subir directo
   const handleFileSelect = (i, e) => {
@@ -3314,6 +3564,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const metaCarbs = Number(macros.carbohidratos) || smartPrescription?.carbsG || 0;
         const metaFat = Number(macros.grasas) || smartPrescription?.fatsG || 0;
 
+        const diffKcal = metaKcal > 0 ? metaKcal - totKcal : 0;
+        const diffProt = metaProt > 0 ? metaProt - totProt : 0;
+        const diffCarbs = metaCarbs > 0 ? metaCarbs - totCarbs : 0;
+        const diffFat = metaFat > 0 ? metaFat - totFat : 0;
+
+        const pesoActual = cycleMetrica?.peso || latestMetrica?.peso || selected?.peso || null;
+        const recWater = pesoActual ? (Math.round(pesoActual * 0.035 * 10) / 10).toFixed(1) : "2.5";
+
         return (
           <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
             {/* Top Sticky Bar */}
@@ -3348,6 +3606,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 <span>{totProt}g P</span>
                 <span>{totCarbs}g C</span>
                 <span>{totFat}g G</span>
+                {metaKcal > 0 && (
+                  <span className={`ml-1 text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+                    diffKcal === 0 ? 'bg-emerald-100 text-emerald-800' : diffKcal > 0 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {diffKcal === 0 ? '🎯 Meta exacta' : diffKcal > 0 ? `Faltan ${diffKcal} kcal` : `Excedido +${Math.abs(diffKcal)} kcal`}
+                  </span>
+                )}
               </div>
 
               {/* Actions */}
@@ -3386,8 +3651,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             {/* Main Content Area: 2-Column Split on Desktop */}
             <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* Left Column (Sticky on Desktop): Configuración del Día + Balance de Macros */}
+              {/* Left Column (Sticky on Desktop): Programación + Balance + Hidratación & Suplementos */}
               <div className="lg:col-span-4 lg:sticky lg:top-20 flex flex-col gap-5">
+                
                 {/* Card 1: Configuración del Día */}
                 <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -3453,7 +3719,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </div>
                 </div>
 
-                {/* Desktop Live Macro Balance Card */}
+                {/* Card 2: Desktop Live Macro Balance Card */}
                 <div className="hidden lg:block bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
@@ -3488,10 +3754,103 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       );
                     })}
                   </div>
+
+                  {/* Macro Gap Tracking Box */}
+                  {metaKcal > 0 && (
+                    <div className="mt-4 pt-3.5 border-t border-[#F0F4FA]">
+                      {diffKcal === 0 ? (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>¡Meta calórica diaria alcanzada con precisión!</span>
+                        </div>
+                      ) : diffKcal > 0 ? (
+                        <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/70 text-xs text-blue-900">
+                          <div className="font-bold flex items-center justify-between text-blue-950 mb-1">
+                            <span>Faltan por asignar:</span>
+                            <span className="font-extrabold text-blue-700">{diffKcal} kcal</span>
+                          </div>
+                          <div className="text-[11px] text-blue-800 flex items-center gap-2">
+                            <span>P: {diffProt > 0 ? `${diffProt}g` : '0g'}</span>
+                            <span>•</span>
+                            <span>C: {diffCarbs > 0 ? `${diffCarbs}g` : '0g'}</span>
+                            <span>•</span>
+                            <span>G: {diffFat > 0 ? `${diffFat}g` : '0g'}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span className="font-bold">Excedido por +{Math.abs(diffKcal)} kcal sobre la meta diaria</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Card 3: Hidratación y Suplementación */}
+                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm space-y-4">
+                  <h4 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
+                    <Droplets className="w-3.5 h-3.5 text-blue-500" />
+                    Hidratación y Suplementación
+                  </h4>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Meta de Agua (Litros/día)</label>
+                      {pesoActual && (
+                        <button
+                          type="button"
+                          onClick={() => setDiaForm(p => ({ ...p, aguaLitros: recWater }))}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          💧 Sugerir ({recWater} L)
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-blue-500 transition-colors"
+                        value={diaForm.aguaLitros || ""}
+                        onChange={e => setDiaForm(p => ({ ...p, aguaLitros: e.target.value }))}
+                        placeholder="Ej. 2.5"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#94A3B8]">L / día</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
+                      Suplementación Diaria Prescrita
+                    </label>
+                    <textarea 
+                      className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500 transition-colors min-h-[64px]"
+                      value={diaForm.suplementos || ""}
+                      onChange={e => setDiaForm(p => ({ ...p, suplementos: e.target.value }))}
+                      placeholder="Ej. Creatina 5g con el desayuno, Multivitamínico 1 cápsula con almuerzo..."
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {["+ Creatina 5g", "+ Proteína Whey", "+ Multivitamínico", "+ Omega 3", "+ Magnesio"].map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            const cur = diaForm.suplementos ? diaForm.suplementos.trim() + ", " : "";
+                            setDiaForm(p => ({ ...p, suplementos: cur + tag.replace('+ ', '') }));
+                          }}
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 transition-colors"
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
-              {/* Right Column: Lista de Comidas */}
+              {/* Right Column: Lista de Comidas (Siempre Desplegadas y Visibles) */}
               <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-2 mb-5">
                   <div>
@@ -3527,110 +3886,281 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 ) : (
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndComidas}>
                     <SortableContext items={diaForm.comidas.map(c => String(c._dndId))} strategy={verticalListSortingStrategy}>
-                      <div className="space-y-4">
-                        {diaForm.comidas.map((c, i) => (
-                          <SortableItem key={c._dndId} id={c._dndId}>
-                            {({ dragHandle, isDragging }) => (
-                              <div className={`bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 transition-all ${isDragging ? 'shadow-lg ring-2 ring-[var(--brand-primary)]/20 bg-white' : ''}`}>
-                                <div className="flex justify-between items-center mb-3">
-                                  <div className="flex items-center gap-2.5">
-                                    {dragHandle}
-                                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929]">
-                                      Comida {i + 1}
-                                    </span>
-                                  </div>
-                                  <button 
-                                    type="button"
-                                    onClick={() => remComida(i)} 
-                                    className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                                    title="Eliminar comida"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
+                      <div className="space-y-5">
+                        {diaForm.comidas.map((c, i) => {
+                          const mealKcal = Number(c.calorias) || 0;
+                          const mealPct = metaKcal > 0 ? Math.round((mealKcal / metaKcal) * 100) : 0;
+                          const opcionesList = c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                  <div>
-                                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Hora sugerida</label>
-                                    <input 
-                                      className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
-                                      value={c.hora} 
-                                      onChange={e => updComida(i, "hora", e.target.value)} 
-                                      placeholder="Ej. 8:00 AM" 
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la toma</label>
-                                    <input 
-                                      className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
-                                      value={c.nombre} 
-                                      onChange={e => updComida(i, "nombre", e.target.value)} 
-                                      placeholder="Ej. Desayuno, Pre-entreno, Cena..." 
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                  <div>
-                                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción Principal</label>
-                                    <textarea 
-                                      className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[76px]" 
-                                      value={c.opcion1} 
-                                      onChange={e => updComida(i, "opcion1", e.target.value)} 
-                                      placeholder="Ingredientes, porciones, preparación..." 
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Opción Alternativa (Opcional)</label>
-                                    <textarea 
-                                      className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[76px]" 
-                                      value={c.opcion2} 
-                                      onChange={e => updComida(i, "opcion2", e.target.value)} 
-                                      placeholder="Alternativa equivalente..." 
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Photo upload */}
-                                <div className="mb-3.5 p-3 bg-white rounded-xl border border-[#E2E8F0]">
-                                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Foto de referencia visual</label>
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    {c.foto_url && (
-                                      <CachedImage src={c.foto_url} alt="referencia" className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0]" />
-                                    )}
-                                    <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
-                                      <ImageIcon className="w-4 h-4" />
-                                      <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
-                                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                                    </label>
-                                    {c.foto_url && (
-                                      <button type="button" onClick={() => updComida(i, "foto_url", "")} className="text-red-400 hover:text-red-600 p-2 text-xs font-semibold flex items-center gap-1">
-                                        <Trash2 className="w-3.5 h-3.5" /> Quitar
+                          return (
+                            <SortableItem key={c._dndId} id={c._dndId}>
+                              {({ dragHandle, isDragging }) => (
+                                <div className={`bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 transition-all ${isDragging ? 'shadow-lg ring-2 ring-[var(--brand-primary)]/20 bg-white' : ''}`}>
+                                  
+                                  {/* Meal Card Top Header */}
+                                  <div className="flex justify-between items-center mb-3.5 pb-2.5 border-b border-[#E2E8F0]/70">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      {dragHandle}
+                                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white border border-[#E2E8F0] text-[#0B1929]">
+                                        Comida {i + 1}
+                                      </span>
+                                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-100">
+                                        {mealKcal} kcal {mealPct > 0 ? `• ${mealPct}% del día` : ''}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button 
+                                        type="button"
+                                        onClick={() => duplicateComida(i)}
+                                        className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors p-1.5 rounded-lg hover:bg-gray-100 flex items-center gap-1 text-xs font-semibold"
+                                        title="Duplicar esta comida"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">Duplicar</span>
                                       </button>
-                                    )}
+                                      <button 
+                                        type="button"
+                                        onClick={() => remComida(i)} 
+                                        className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                                        title="Eliminar comida"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
 
-                                {/* Macros per meal */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                  {[["calorias","Calorías (Kcal)"], ["proteina","Proteína (g)"], ["carbohidratos","Carbos (g)"], ["grasas","Grasas (g)"]].map(([f, lb]) => (
-                                    <div key={f} className="bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
-                                      <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1 truncate">{lb}</label>
+                                  {/* Row 1: Hora sugerida y Nombre de la toma */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                    <div>
+                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                        Hora sugerida (AM/PM)
+                                      </label>
                                       <input 
-                                        type="number" 
-                                        className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#0B1929] text-center focus:outline-none focus:border-[var(--brand-primary)]" 
-                                        value={c[f]} 
-                                        onChange={e => updComida(i, f, e.target.value)} 
-                                        placeholder="0" 
+                                        className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
+                                        value={c.hora || ""} 
+                                        onChange={e => updComida(i, "hora", e.target.value)} 
+                                        placeholder="Ej. 08:00 AM" 
+                                      />
+                                      {/* Preset chips */}
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {TIME_PRESETS.map(preset => (
+                                          <button
+                                            key={preset.time}
+                                            type="button"
+                                            onClick={() => {
+                                              updComida(i, "hora", preset.time);
+                                              if (!c.nombre || c.nombre.startsWith("Comida ")) {
+                                                updComida(i, "nombre", preset.name);
+                                              }
+                                            }}
+                                            className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[#6B7A8D]"
+                                          >
+                                            {preset.time}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre de la toma</label>
+                                      <input 
+                                        className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]" 
+                                        value={c.nombre || ""} 
+                                        onChange={e => updComida(i, "nombre", e.target.value)} 
+                                        placeholder="Ej. Desayuno, Pre-entreno, Comida, Cena..." 
                                       />
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
 
-                              </div>
-                            )}
-                          </SortableItem>
-                        ))}
+                                  {/* Row 2: Opción Principal (A) con Botón Optimizar con IA */}
+                                  <div className="mb-3.5 p-3.5 rounded-xl bg-white border border-[#E2E8F0]">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          Opción Principal (A)
+                                        </span>
+                                        <span className="text-[11px] text-[#6B7A8D]">Receta base obligatoria</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOptimizeComidaWithAi(i)}
+                                        disabled={aiOptimizingIndex === i}
+                                        className="text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50"
+                                        title="Calcula macros con IA, audita aversiones/alergias del expediente y busca foto de referencia"
+                                      >
+                                        {aiOptimizingIndex === i ? (
+                                          <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Analizando...</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                            <span>Optimizar con IA</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+
+                                    <textarea 
+                                      className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[72px]" 
+                                      value={opcionesList[0] || ""} 
+                                      onChange={e => updMealOption(i, 0, e.target.value)} 
+                                      placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
+                                    />
+
+                                    {/* Alerta clínica de alergias o aversiones */}
+                                    {c.alertaClinica && (
+                                      <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
+                                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                        <div className="min-w-0">
+                                          <div className="font-bold text-amber-950">Aviso clínico del expediente del paciente:</div>
+                                          <div className="text-[11px] leading-relaxed mt-0.5">
+                                            {typeof c.alertaClinica === 'string' ? c.alertaClinica : c.alertaClinica.mensaje}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Row 3: Opciones Alternativas Dinámicas (B, C, D...) */}
+                                  {opcionesList.length > 1 && (
+                                    <div className="space-y-3 mb-3.5">
+                                      {opcionesList.slice(1).map((altText, altIdx) => {
+                                        const actualIdx = altIdx + 1;
+                                        const optionLetter = String.fromCharCode(65 + actualIdx); // B, C, D...
+                                        return (
+                                          <div key={actualIdx} className="p-3.5 rounded-xl bg-white border border-[#E2E8F0]">
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                                                Opción Alternativa ({optionLetter})
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => removeMealOption(i, actualIdx)}
+                                                className="text-red-400 hover:text-red-600 p-1 text-xs font-semibold flex items-center gap-1 rounded hover:bg-red-50"
+                                                title="Eliminar esta opción"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" /> Quitar opción
+                                              </button>
+                                            </div>
+                                            <textarea 
+                                              className="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[64px]" 
+                                              value={altText || ""} 
+                                              onChange={e => updMealOption(i, actualIdx, e.target.value)} 
+                                              placeholder={`Alternativa equivalente ${optionLetter} con mismos macronutrientes...`} 
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Botones de Opciones Alternativas */}
+                                  <div className="flex items-center gap-2 flex-wrap mb-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => addMealOption(i)}
+                                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#CBD5E1] text-[#6B7A8D] hover:text-[#0B1929] hover:border-[#94A3B8] transition-colors font-semibold"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>+ Agregar Opción Alternativa</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleGenerateAltWithAi(i)}
+                                      disabled={aiAltIndex === i}
+                                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-semibold border border-purple-200 disabled:opacity-50"
+                                      title="Genera automáticamente una alternativa que iguala con precisión los mismos macros de la Opción A"
+                                    >
+                                      {aiAltIndex === i ? (
+                                        <>
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          <span>Generando equivalente...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                          <span>✨ Generar Alternativa con IA</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {/* Row 4: Foto de referencia visual */}
+                                  <div className="mb-4 p-3 bg-white rounded-xl border border-[#E2E8F0]">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">
+                                        Foto de Referencia Visual (Opción Principal)
+                                      </label>
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                      {c.foto_url && (
+                                        <CachedImage 
+                                          src={c.foto_url} 
+                                          alt="referencia" 
+                                          className="w-16 h-16 object-cover rounded-xl border border-[#E2E8F0] shadow-2xs" 
+                                        />
+                                      )}
+                                      <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-[var(--brand-primary)] rounded-xl text-[var(--brand-primary)] text-xs font-bold cursor-pointer hover:bg-[var(--brand-primary)]/5 transition-colors">
+                                        <Camera className="w-4 h-4" />
+                                        <span>{c.foto_url ? "Cambiar foto" : "Subir foto ilustrativa"}</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                      </label>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCatalogCategory("Todos");
+                                          setCatalogSearch("");
+                                          setPhotoCatalogModal({ mealIndex: i });
+                                        }}
+                                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-[#E2E8F0] bg-gray-50 hover:bg-gray-100 rounded-xl text-[#0B1929] text-xs font-bold transition-colors"
+                                      >
+                                        <Search className="w-3.5 h-3.5 text-[#6B7A8D]" />
+                                        <span>🔍 Catálogo FLUX</span>
+                                      </button>
+
+                                      {c.foto_url && (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => updComida(i, "foto_url", "")} 
+                                          className="text-red-400 hover:text-red-600 p-2 text-xs font-semibold flex items-center gap-1"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" /> Quitar
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Row 5: Macronutrientes por comida */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                    {[
+                                      ["calorias", "Calorías (Kcal)"], 
+                                      ["proteina", "Proteína (g)"], 
+                                      ["carbohidratos", "Carbos (g)"], 
+                                      ["grasas", "Grasas (g)"]
+                                    ].map(([f, lb]) => (
+                                      <div key={f} className="bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
+                                        <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1 truncate">{lb}</label>
+                                        <input 
+                                          type="number" 
+                                          className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#0B1929] text-center focus:outline-none focus:border-[var(--brand-primary)]" 
+                                          value={c[f] || ""} 
+                                          onChange={e => updComida(i, f, e.target.value)} 
+                                          placeholder="0" 
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                </div>
+                              )}
+                            </SortableItem>
+                          );
+                        })}
                       </div>
                     </SortableContext>
                   </DndContext>
@@ -3654,6 +4184,118 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
         );
       })()}
+
+      {/* ── Modal de Catálogo de Platillos FLUX ── */}
+      {photoCatalogModal && (
+        <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-[#0B1929] flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
+                  Catálogo de Platillos y Recetas FLUX
+                </h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">Selecciona una imagen de alta resolución para la Comida {photoCatalogModal.mealIndex + 1}</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setPhotoCatalogModal(null)} 
+                className="p-2 text-[#6B7A8D] hover:text-[#0B1929] rounded-xl hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search & Category Filter */}
+            <div className="px-6 py-3 border-b border-[#E2E8F0] bg-[#F8FAFC] space-y-2.5">
+              <div className="relative">
+                <Search className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder="Buscar por platillo o ingrediente (ej. Huevo, Avena, Pollo, Salmón, Ensalada)..."
+                  value={catalogSearch}
+                  onChange={e => setCatalogSearch(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {["Todos", "Desayuno", "Pollo", "Carne", "Pescado", "Bowls", "Ensalada", "Snack"].map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCatalogCategory(cat)}
+                    className={`px-3 py-1 rounded-lg font-bold shrink-0 transition-colors ${
+                      catalogCategory === cat 
+                        ? 'bg-[var(--brand-primary)] text-white' 
+                        : 'bg-white border border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-100'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dish Cards Grid */}
+            <div className="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {CATALOGO_PLATILLOS_BASE.filter(item => {
+                const matchesCat = catalogCategory === "Todos" || item.categoria?.toLowerCase().includes(catalogCategory.toLowerCase());
+                const q = catalogSearch.toLowerCase().trim();
+                const matchesSearch = !q || item.titulo?.toLowerCase().includes(q) || (item.keywords || []).some(k => k.toLowerCase().includes(q));
+                return matchesCat && matchesSearch;
+              }).map(item => (
+                <div 
+                  key={item.id}
+                  onClick={() => {
+                    const idx = photoCatalogModal.mealIndex;
+                    updComida(idx, "foto_url", item.foto_url);
+                    // Si el nombre de la comida es genérico, sugerir el nombre del platillo
+                    const curComida = diaForm.comidas[idx];
+                    if (!curComida?.nombre || curComida.nombre.startsWith("Comida ")) {
+                      updComida(idx, "nombre", item.titulo);
+                    }
+                    setPhotoCatalogModal(null);
+                    setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto asignada del catálogo</div>);
+                  }}
+                  className="group cursor-pointer rounded-2xl border border-[#E2E8F0] overflow-hidden hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col bg-white"
+                >
+                  <div className="aspect-4/3 relative overflow-hidden bg-gray-100">
+                    <img 
+                      src={item.foto_url} 
+                      alt={item.titulo} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      loading="lazy"
+                    />
+                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs">
+                      ~{item.caloriasAprox} kcal
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <div className="text-xs font-bold text-[#0B1929] line-clamp-1 group-hover:text-[var(--brand-primary)] transition-colors">
+                      {item.titulo}
+                    </div>
+                    <div className="text-[10px] text-[#6B7A8D] mt-0.5 uppercase tracking-wider font-semibold">
+                      {item.categoria}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPhotoCatalogModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-gray-100 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Editor de Rutina a Pantalla Completa (Master-Detail) ── */}
       {showRutinaModal && (

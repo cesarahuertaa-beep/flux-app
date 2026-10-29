@@ -622,3 +622,255 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
     "No se pudo conectar con Google Gemini. Asegúrate de configurar una API Key válida (GEMINI_API_KEY) en Supabase Secrets o en el archivo .env."
   );
 }
+
+/**
+ * ═════════════════════════════════════════════════════════════════════
+ * NUEVAS HERRAMIENTAS DE OPTIMIZACIÓN CLÍNICA DE COMIDAS CON GEMINI
+ * ═════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Optimiza y calcula automáticamente los macros de una comida a partir de su texto e ingredientes,
+ * y realiza una auditoría clínica contra las aversiones, alergias y expediente del paciente.
+ */
+export async function optimizeMealWithAi({ textoComida, targetKcal = 0, clinicalRec = null, cliente = {} }) {
+  if (!textoComida || !textoComida.trim()) {
+    throw new Error("Escribe los ingredientes o descripción del platillo para optimizar con IA.");
+  }
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const apiKey = getGeminiApiKey();
+
+  // 1. Intentar llamar a Edge Function de Supabase
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "optimize-meal",
+      textoComida: textoComida.trim(),
+      targetKcal,
+      anamnesis,
+      cliente,
+      geminiKey: apiKey,
+    });
+    clearTimeout(timeoutId);
+    if (edgeRes?.calorias || edgeRes?.proteina) {
+      return edgeRes;
+    }
+  } catch {}
+
+  // 2. Fallback directo a Google Gemini API
+  if (apiKey) {
+    const prompt = `Eres un nutriólogo clínico y bromatólogo experto de FLUX.
+Analiza la siguiente comida/receta diseñada para un paciente y calcula con máxima precisión sus calorías y macronutrientes basados en tablas de composición de alimentos (USDA/SMAE).
+Adicionalmente, coteja los ingredientes contra el expediente del paciente para detectar si hay algún conflicto con alergias o aversiones personales.
+
+EXPEDIENTE DEL PACIENTE:
+- Nombre: ${cliente.nombre || "Paciente"} (${cliente.genero === "F" ? "Mujer" : "Hombre"})
+- Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
+- Aversiones alimentarias (no le gusta comer): ${anamnesis.aversiones_alimentos || "Ninguna"}
+- Preferencias / favoritos: ${anamnesis.preferencias_alimentos || "Ninguna"}
+- Patologías: ${anamnesis.patologias || "Ninguna"}
+
+COMIDA A ANALIZAR:
+"${textoComida.trim()}"
+${targetKcal > 0 ? `(Meta de referencia para esta toma: ~${targetKcal} kcal)` : ""}
+
+INSTRUCCIONES:
+1. Calcula calorías totales, gramos de proteína, carbohidratos y grasas con coherencia química (Kcal = P*4 + C*4 + G*9).
+2. Si detectas algún ingrediente que coincida o sea derivado de las aversiones o alergias del paciente, genera una advertencia clínica amigable en "alertaClinica". Si todo está bien, devuelve null.
+3. Extrae un nombre normalizado corto (máx 5 palabras) y una lista de 4-6 palabras clave de ingredientes para búsqueda en catálogo visual.
+
+Debes responder ÚNICAMENTE con un JSON con esta estructura:
+{
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number,
+  "nombreNormalizado": "string corto",
+  "palabrasClave": ["ingrediente1", "ingrediente2", "ingrediente3"],
+  "alertaClinica": "string con aviso si choca con aversión/alergia, o null si es seguro",
+  "resumenNutricional": "string breve de 1 oración sobre la calidad de la toma"
+}`;
+
+    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            return JSON.parse(text);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  throw new Error("No se pudo conectar con el motor de IA. Revisa tu conexión a internet o API Key.");
+}
+
+/**
+ * Genera una opción de comida alternativa iso-macronutriente (con los mismos macros y calorías),
+ * respetando gustos del paciente y evitando sus aversiones.
+ */
+export async function generateAlternativeMealWithAi({ mainMealText, targetMacros = {}, clinicalRec = null, cliente = {} }) {
+  if (!mainMealText || !mainMealText.trim()) {
+    throw new Error("Se requiere la opción principal para generar una alternativa equivalente.");
+  }
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const apiKey = getGeminiApiKey();
+  const kcal = Number(targetMacros.calorias) || 0;
+  const p = Number(targetMacros.proteina) || 0;
+  const c = Number(targetMacros.carbohidratos) || 0;
+  const f = Number(targetMacros.grasas) || 0;
+
+  if (apiKey) {
+    const prompt = `Eres un chef y nutriólogo deportivo de élite de FLUX.
+Genera una OPCIÓN ALTERNATIVA EQUIVALENTE (ISO-MACRONUTRIENTE) a la opción principal que te proporcionamos.
+La alternativa debe ser atractiva, con ingredientes comunes y fáciles de preparar, y debe IGUALAR con precisión los mismos macros de la opción principal.
+
+OPCIÓN PRINCIPAL:
+"${mainMealText.trim()}"
+${kcal > 0 ? `METAS ISO-MACROS A IGUALAR: ${kcal} kcal | ${p}g Proteína | ${c}g Carbos | ${f}g Grasas` : ""}
+
+PREFERENCIAS DEL PACIENTE:
+- Alimentos favoritos: ${anamnesis.preferencias_alimentos || "Variado"}
+- Aversiones (NO usar): ${anamnesis.aversiones_alimentos || "Ninguna"}
+- Alergias (NO usar): ${anamnesis.alergias_intolerancias || "Ninguna"}
+
+INSTRUCCIONES:
+1. Redacta la opción alternativa con porciones exactas en gramos, tazas o piezas.
+2. Si la opción principal fue salada, la alternativa puede ser otra opción salada distinta o dulce si encaja con la toma.
+3. No uses ningún ingrediente que esté en las aversiones o alergias del paciente.
+
+Debes responder ÚNICAMENTE con un JSON con esta estructura:
+{
+  "texto": "string con la preparación, ingredientes y porciones exactas de la opción alternativa",
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number,
+  "nombreNormalizado": "string breve del platillo alternativo"
+}`;
+
+    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            return JSON.parse(text);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  throw new Error("No se pudo conectar con el motor de IA para generar la alternativa.");
+}
+
+/**
+ * Diseña un platillo a partir de ingredientes disponibles / despensa para cuadrar con los macros de la toma.
+ */
+export async function generateMealFromPantryWithAi({ ingredientesDisponibles, targetMacros = {}, clinicalRec = null, cliente = {} }) {
+  if (!ingredientesDisponibles || !ingredientesDisponibles.trim()) {
+    throw new Error("Indica los ingredientes disponibles para sugerir el platillo.");
+  }
+
+  const anamnesis = clinicalRec?.anamnesis || {};
+  const apiKey = getGeminiApiKey();
+  const kcal = Number(targetMacros.calorias) || 500;
+  const p = Number(targetMacros.proteina) || 35;
+  const c = Number(targetMacros.carbohidratos) || 50;
+  const f = Number(targetMacros.grasas) || 15;
+
+  if (apiKey) {
+    const prompt = `Eres un chef y nutriólogo clínico deportivo de FLUX.
+El nutriólogo o paciente cuenta con estos ingredientes en su despensa o refri:
+"${ingredientesDisponibles.trim()}"
+
+Tu tarea es crear un platillo delicioso, balanceado y práctico utilizando prioritariamente esos ingredientes (puedes agregar básicos como sal, pimienta, limón o aceite con moderación) para alcanzar esta meta nutricional:
+- Calorías meta: ~${kcal} kcal
+- Proteína: ~${p}g
+- Carbohidratos: ~${c}g
+- Grasas: ~${f}g
+
+Evita estrictamente: ${anamnesis.alergias_intolerancias || ""} ${anamnesis.aversiones_alimentos || ""}.
+
+Debes responder ÚNICAMENTE con un JSON:
+{
+  "texto": "string con el nombre del platillo, ingredientes con porciones exactas (g, tazas, piezas) y breve modo de preparación",
+  "nombreNormalizado": "string breve del platillo",
+  "calorias": number,
+  "proteina": number,
+  "carbohidratos": number,
+  "grasas": number
+}`;
+
+    for (const model of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) {
+            return JSON.parse(text);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  throw new Error("No se pudo conectar con el motor de IA para generar la receta por despensa.");
+}

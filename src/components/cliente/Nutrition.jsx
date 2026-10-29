@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2 } from "lucide-react";
+import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2, Pill } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
 import { CachedImage } from "../../lib/mediaCache";
+import { parseMealOptions, parseDiaMetadata } from "../../lib/mealOptions";
 
 const GroceryListModal = lazy(() => import("../ui/GroceryListModal"));
 
@@ -30,6 +31,7 @@ export default function Nutrition({
   const [activeDay, setActiveDay]       = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
   const [showGrocery, setShowGrocery]   = useState(false);
+  const [activeMealOptions, setActiveMealOptions] = useState({});
   const autoSelectedForPlanRef          = useRef(null);
   const brand = useBrand();
 
@@ -424,6 +426,38 @@ export default function Nutrition({
           </p>
         </div>
 
+        {/* Metadatos del día: Hidratación recomendada y Suplementación asignada */}
+        {(() => {
+          const meta = parseDiaMetadata(diaActual?.dia || diaActual?.nombre);
+          if (!meta.agua && !meta.suplementos) return null;
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pb-1">
+              {meta.agua && (
+                <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 flex items-center gap-2.5 text-xs text-blue-950 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                    <Droplets className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Meta de Agua para hoy</div>
+                    <div className="text-sm font-extrabold text-blue-900">{meta.agua} Litros</div>
+                  </div>
+                </div>
+              )}
+              {meta.suplementos && (
+                <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200/60 flex items-center gap-2.5 text-xs text-purple-950 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                    <Pill className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Suplementación prescrita</div>
+                    <div className="text-xs font-bold text-purple-900 truncate" title={meta.suplementos}>{meta.suplementos}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {comidas.length === 0 && (
           <p className="text-sm text-[#6B7A8D] italic">No hay comidas registradas para este día.</p>
         )}
@@ -522,24 +556,51 @@ export default function Nutrition({
                         </div>
                       )}
   
-                      {/* Contenido: nombre, opciones, alternativa */}
+                      {/* Contenido: nombre, opciones dinámicas */}
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                      <p className="text-lg font-bold text-[#0B1929]">{label}</p>
+                        <p className="text-lg font-bold text-[#0B1929]">{label}</p>
 
-                      {/* Opción 1 (Descripción completa sin line-clamp) */}
-                      {meal.opcion1 && (
-                        <p className="text-sm text-[#6B7A8D] leading-relaxed">
-                          {meal.opcion1}
-                        </p>
-                      )}
-                      
-                      {/* Alternativa */}
-                      {meal.opcion2 && (
-                        <p className="text-sm text-[#9BA8B7] leading-relaxed mt-1">
-                          <span className="font-semibold">Alt:</span> {meal.opcion2}
-                        </p>
-                      )}
-                    </div>
+                        {(() => {
+                          const options = parseMealOptions(meal);
+                          if (options.length <= 1) {
+                            return meal.opcion1 ? (
+                              <p className="text-sm text-[#6B7A8D] leading-relaxed">
+                                {meal.opcion1}
+                              </p>
+                            ) : null;
+                          }
+
+                          const activeOptIdx = activeMealOptions[meal.id || idx] || 0;
+                          return (
+                            <div className="mt-1 space-y-2">
+                              {/* Píldoras de selección interactiva de opciones */}
+                              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                                {options.map((_, oIdx) => {
+                                  const letter = String.fromCharCode(65 + oIdx);
+                                  const isActive = activeOptIdx === oIdx;
+                                  return (
+                                    <button
+                                      key={oIdx}
+                                      type="button"
+                                      onClick={() => setActiveMealOptions(p => ({ ...p, [meal.id || idx]: oIdx }))}
+                                      className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 cursor-pointer ${
+                                        isActive
+                                          ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                                          : "bg-[#F0F4FA] text-[#6B7A8D] hover:bg-[#E2E8F0]"
+                                      }`}
+                                    >
+                                      {oIdx === 0 ? "Opción A (Principal)" : `Opción ${letter}`}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] text-sm text-[#334155] leading-relaxed">
+                                {options[activeOptIdx] || options[0]}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
                   </div>
 
                   {/* Macros (Proteína, Carbos, Grasas) — fila separada si existen */}
