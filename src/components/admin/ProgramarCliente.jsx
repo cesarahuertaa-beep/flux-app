@@ -216,7 +216,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const getEvalTime = (m) => {
       if (!m) return 0;
       const f = m.fecha ? (String(m.fecha).split("T")[0] + "T12:00:00") : m.created_at;
-      return new Date(f || 0).getTime();
+      const t = new Date(f || 0).getTime();
+      return isNaN(t) ? 0 : t;
     };
     if (cicloSel?.id) {
       const forCycle = linked.filter((m) => String(m.ciclo_id) === String(cicloSel.id));
@@ -242,7 +243,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [allMetricas, ciclos, cicloSel?.id]);
 
   const smartPrescription = useMemo(() => {
-    if (!cycleMetrica) return null;
     return generateSmartMacroPrescription({
       cliente: selected,
       metrica: cycleMetrica,
@@ -3309,10 +3309,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const totProt = diaForm.comidas.reduce((s, c) => s + (Number(c.proteina) || 0), 0);
         const totCarbs = diaForm.comidas.reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0);
         const totFat = diaForm.comidas.reduce((s, c) => s + (Number(c.grasas) || 0), 0);
-        const metaKcal = Number(macros.calorias) || smartPrescription.targetKcal || 0;
-        const metaProt = Number(macros.proteina) || smartPrescription.proteinG || 0;
-        const metaCarbs = Number(macros.carbohidratos) || smartPrescription.carbsG || 0;
-        const metaFat = Number(macros.grasas) || smartPrescription.fatsG || 0;
+        const metaKcal = Number(macros.calorias) || smartPrescription?.targetKcal || 0;
+        const metaProt = Number(macros.proteina) || smartPrescription?.proteinG || 0;
+        const metaCarbs = Number(macros.carbohidratos) || smartPrescription?.carbsG || 0;
+        const metaFat = Number(macros.grasas) || smartPrescription?.fatsG || 0;
 
         return (
           <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">

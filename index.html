@@ -17,6 +17,52 @@
   <body>
     <!-- Pantalla de arranque instantánea: evita el pantallazo blanco mientras carga el JS -->
     <div id="root"><div id="boot"><i></i></div></div>
+    <script>
+      // Watchdog de arranque: Si el bundle JS falla (despliegue reciente, chunk 404 o caché rota), auto-recuperar
+      window.addEventListener('error', function(e) {
+        if (e && e.target && e.target.tagName === 'SCRIPT') {
+          console.warn('[FLUX Watchdog] Falla cargando script principal:', e.target.src);
+          try {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+              });
+            }
+          } catch(err) {}
+          var last = sessionStorage.getItem('flux_boot_retry');
+          var now = Date.now();
+          if (!last || (now - Number(last)) > 8000) {
+            sessionStorage.setItem('flux_boot_retry', String(now));
+            window.location.reload();
+          }
+        }
+      }, true);
+
+      setTimeout(function() {
+        var bootEl = document.getElementById('boot');
+        if (bootEl && bootEl.parentNode) {
+          var rec = document.getElementById('boot-rec');
+          if (!rec) {
+            var btn = document.createElement('button');
+            btn.id = 'boot-rec';
+            btn.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#ffffff;border:1px solid #E2E8F0;box-shadow:0 8px 24px rgba(0,0,0,0.08);padding:10px 18px;border-radius:14px;font-family:sans-serif;font-size:13px;font-weight:700;color:#1A6FD4;cursor:pointer;z-index:99999;display:flex;align-items:center;gap:8px;';
+            btn.innerHTML = '<span>Actualizar versión</span> ↻';
+            btn.onclick = function() {
+              try {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    regs.forEach(function(r) { r.unregister(); });
+                  });
+                }
+                sessionStorage.clear();
+              } catch(e) {}
+              window.location.reload();
+            };
+            document.body.appendChild(btn);
+          }
+        }
+      }, 6500);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

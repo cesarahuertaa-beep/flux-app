@@ -179,6 +179,12 @@ export default function App() {
     };
     window.addEventListener("hashchange", handleHashChange);
 
+    // Temporizador de seguridad: Si la restauración se demora más de 3.5s, desbloquear la interfaz
+    const safetyTimer = setTimeout(() => {
+      console.warn("[Restore] Timeout de seguridad alcanzado: forzando fin de restoring.");
+      setRestoring(false);
+    }, 3500);
+
     const restore = async () => {
       try {
         // Si hay un flujo pendiente de invitación, recuperación o error de correo, NO restaurar sesión previa
@@ -233,6 +239,7 @@ export default function App() {
             } catch (e) { /* ignore */ }
             const sObj = { role: savedRole, data: optimisticData, token: token || "offline", profileId, multiRoles: savedMultiRoles };
             setSession(sObj);
+            clearTimeout(safetyTimer);
             setRestoring(false);
             syncNativeCredentials();
             setTimeout(() => {
@@ -296,6 +303,7 @@ export default function App() {
       } catch (err) {
         console.error("[Restore] Error inesperado restaurando sesión:", err);
       } finally {
+        clearTimeout(safetyTimer);
         setRestoring(false);
       }
     };
