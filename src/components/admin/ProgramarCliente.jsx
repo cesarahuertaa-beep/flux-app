@@ -253,9 +253,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setDiaForm(p => {
         const cs = [...p.comidas];
         const c = { ...cs[mealIdx] };
-        if (res.titulo) {
-          c.nombre = res.titulo;
-        }
+        // No sobreescribir c.nombre: el campo Nombre de la toma es opcional y 100% manual
         const dishText = res.titulo && res.texto && !res.texto.startsWith(res.titulo)
           ? `${res.titulo}\n\n${res.texto}`
           : (res.texto || res.titulo || "");
