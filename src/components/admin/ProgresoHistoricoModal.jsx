@@ -214,9 +214,9 @@ export default function ProgresoHistoricoModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
-      {/* ── Top Sticky Header (Estilo Nueva Rutina / Nueva Dieta) ── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] shadow-2xs">
+    <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-hidden animate-in fade-in duration-150">
+      {/* ── Top Header Fijo (Estilo Nueva Rutina / Nueva Dieta) ── */}
+      <div className="shrink-0 bg-white border-b border-[#E2E8F0] shadow-2xs z-30">
         <div className="px-4 md:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <button
@@ -264,7 +264,8 @@ export default function ProgresoHistoricoModal({
       </div>
 
       {/* ── Cuerpo a Pantalla Completa ── */}
-      <div className="max-w-7xl w-full mx-auto p-4 md:p-8 space-y-6 flex-1">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl w-full mx-auto p-4 md:p-8 space-y-6">
         {/* Banner de Resumen Global KPIs */}
         {kpiStats && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -742,14 +743,21 @@ export default function ProgresoHistoricoModal({
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Modal de Detalle de Evaluación Consultada ── */}
       {selectedEval && (
-        <div className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden">
+        <div
+          onClick={() => setSelectedEval(null)}
+          className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl w-full max-w-xl my-auto flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden max-h-[88vh]"
+          >
             {/* Header del detalle */}
-            <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
+            <div className="px-5 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
                   <Activity className="w-5 h-5" />
@@ -759,7 +767,9 @@ export default function ProgresoHistoricoModal({
                     Evaluación del {fmtDate(selectedEval.fecha)}
                   </h3>
                   <div className="flex items-center gap-1.5 flex-wrap text-xs text-[#6B7A8D] mt-0.5">
-                    <span>{getMetodoLabel(selectedEval.metodo_evaluacion)} • Modo solo lectura</span>
+                    <span className="text-[11px] font-medium text-[#6B7A8D]">
+                      {getMetodoLabel(selectedEval.metodo_evaluacion)}
+                    </span>
                     {selectedEval.eval_objetivo && (() => {
                       const g = getGoalPresetInfo(selectedEval.eval_objetivo);
                       return g ? (
@@ -782,14 +792,82 @@ export default function ProgresoHistoricoModal({
               <button
                 type="button"
                 onClick={() => setSelectedEval(null)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-[#6B7A8D] hover:text-[#0B1929] transition-colors cursor-pointer shrink-0"
+                title="Cerrar (Esc)"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body del detalle */}
-            <div className="p-5 overflow-y-auto space-y-4">
+            <div className="flex-1 p-5 overflow-y-auto space-y-4">
+              {/* Prescripción Nutricional / Dictamen IA si existe */}
+              {Boolean(
+                selectedEval.prescribed_macros?.targetKcal ||
+                  selectedEval.ai_audit_result?.targetKcal ||
+                  selectedEval.manual_macros?.targetKcal
+              ) && (() => {
+                const pm =
+                  selectedEval.prescribed_macros ||
+                  selectedEval.ai_audit_result ||
+                  selectedEval.manual_macros ||
+                  {};
+                const kcal = pm.targetKcal;
+                const p = pm.proteinG;
+                const c = pm.carbsG;
+                const g = pm.fatsG;
+                const mode =
+                  selectedEval.prescription_mode ||
+                  (selectedEval.ai_audit_result ? "ia" : "matematico");
+                const modeLabel =
+                  pm.modeLabel ||
+                  (mode === "ia"
+                    ? "Auditado con IA"
+                    : mode === "manual"
+                    ? "Manual"
+                    : "Matemático");
+                return (
+                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Meta Prescrita ({modeLabel})
+                      </span>
+                      <span className="text-xs font-black text-indigo-900 font-['Rajdhani']">
+                        {kcal} kcal
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-white rounded-xl p-2 border border-indigo-100/80">
+                        <span className="text-[10px] text-[#6B7A8D] block">Kcal</span>
+                        <span className="text-xs font-bold text-[#0B1929]">{kcal}</span>
+                      </div>
+                      <div className="bg-white rounded-xl p-2 border border-indigo-100/80">
+                        <span className="text-[10px] text-[#6B7A8D] block">Proteína</span>
+                        <span className="text-xs font-bold text-blue-600">{p ? `${p}g` : "—"}</span>
+                      </div>
+                      <div className="bg-white rounded-xl p-2 border border-indigo-100/80">
+                        <span className="text-[10px] text-[#6B7A8D] block">Carbos</span>
+                        <span className="text-xs font-bold text-emerald-600">{c ? `${c}g` : "—"}</span>
+                      </div>
+                      <div className="bg-white rounded-xl p-2 border border-indigo-100/80">
+                        <span className="text-[10px] text-[#6B7A8D] block">Grasas</span>
+                        <span className="text-xs font-bold text-amber-600">{g ? `${g}g` : "—"}</span>
+                      </div>
+                    </div>
+                    {pm.analisisClinico && (
+                      <p className="text-[11px] text-[#0B1929] bg-white rounded-xl p-2.5 border border-indigo-100/80 leading-relaxed">
+                        <strong className="text-indigo-700">Dictamen:</strong> {pm.analisisClinico}
+                      </p>
+                    )}
+                    {pm.estrategiaMenu && (
+                      <p className="text-[11px] text-[#0B1929] bg-white rounded-xl p-2.5 border border-indigo-100/80 leading-relaxed">
+                        <strong className="text-indigo-700">Estrategia sugerida:</strong> {pm.estrategiaMenu}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Check-in */}
               {Boolean(
                 selectedEval.checkin_energia ||
@@ -942,7 +1020,7 @@ export default function ProgresoHistoricoModal({
             </div>
 
             {/* Footer del detalle */}
-            <div className="px-5 py-3 border-t border-[#E2E8F0] flex items-center justify-between bg-gray-50">
+            <div className="px-5 py-3 border-t border-[#E2E8F0] flex items-center justify-between bg-gray-50 shrink-0">
               <button
                 type="button"
                 onClick={() => handleDeleteEval(selectedEval)}
@@ -954,7 +1032,7 @@ export default function ProgresoHistoricoModal({
               <button
                 type="button"
                 onClick={() => setSelectedEval(null)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#E2E8F0] text-xs font-bold text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-white border border-[#E2E8F0] text-xs font-bold text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer shadow-2xs"
               >
                 Cerrar consulta
               </button>
