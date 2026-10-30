@@ -99,6 +99,11 @@ export function registerBackAction(handler, priority = 10, pushBrowserHistory = 
   };
 }
 
+/** True si hay algún modal / overlay abierto (todos se registran con useBackButton). */
+export function hasOpenOverlay() {
+  return actionStack.length > 0;
+}
+
 /**
  * Executes the highest priority (or most recent) back handler.
  * Returns true if an action was handled, false if the stack was empty.

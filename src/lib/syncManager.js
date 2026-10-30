@@ -29,7 +29,12 @@ export const initSyncManager = () => {
   started = true;
 
   window.addEventListener("online", runSync);
-  document.addEventListener("visibilitychange", () => runSync());
+  document.addEventListener("visibilitychange", () => {
+    runSync();
+    // Al volver a la pestaña/app: pedir de nuevo todos los datos activos para mostrar siempre lo último
+    if (document.visibilityState === "visible") refreshStaleCache(0, 40).catch(() => {});
+  });
+  window.addEventListener("focus", () => refreshStaleCache(5000, 40).catch(() => {}));
 
   if (Capacitor.isNativePlatform()) {
     CapApp.addListener("appStateChange", () => runSync());

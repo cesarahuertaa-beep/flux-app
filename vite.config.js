@@ -10,7 +10,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: false, // el registro se hace en main.jsx solo para web (no en la app nativa)
+      // Se conserva el manifest (instalable como app) pero sin caché de código: el sw.js que se
+      // publica se autodestruye y limpia cachés viejas en los usuarios que aún lo tengan instalado.
+      selfDestroying: true,
+      injectRegister: false,
       includeAssets: ['flux_logo.jpeg', 'flux-favicon.ico'],
       manifest: {
         name: 'FLUX - Sport Supplements',
