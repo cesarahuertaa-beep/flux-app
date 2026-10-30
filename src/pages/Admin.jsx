@@ -31,6 +31,7 @@ import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { peekClinicalRecord } from "../lib/clinicalRecord";
 import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
 import { calcEdadFromBirthdate } from "../lib/bodyComposition";
+import { CachedImage } from "../lib/mediaCache";
 
 const getInitials = (name) => {
   if (!name) return "P";
@@ -1216,9 +1217,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                           <div className="flex items-start justify-between gap-2.5 mb-3">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="relative shrink-0">
-                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
-                                  {getInitials(c.nombre)}
-                                </div>
+                                {c.avatar_url || c.foto_url ? (
+                                  <CachedImage
+                                    src={c.avatar_url || c.foto_url}
+                                    alt={c.nombre}
+                                    className="w-11 h-11 rounded-2xl object-cover border border-slate-200/80 shadow-2xs bg-[#F7F9FC]"
+                                    fallback={
+                                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
+                                        {getInitials(c.nombre)}
+                                      </div>
+                                    }
+                                  />
+                                ) : (
+                                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
+                                    {getInitials(c.nombre)}
+                                  </div>
+                                )}
                                 <span 
                                   className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
                                     !c.activo 
