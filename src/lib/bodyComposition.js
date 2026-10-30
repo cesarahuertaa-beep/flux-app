@@ -1242,9 +1242,10 @@ export function generateSmartTrainingPrescription({
     lesionesRaw.length > 2 &&
     !/^(no|ningun[ao]s?|nada|n\/a|sin|ninguna\.)/i.test(lesionesRaw);
 
-  // 2. Nivel de Actividad Previo (Historial)
+  // 2. Nivel de Actividad Previo (Historial antes de la etapa)
   const ocupacion = (anamnesis.ocupacion_actividad || "").trim();
   const freqPreviaRaw = (
+    enriched?.dias_ejercicio_actual ||
     anamnesis.dias_entrenamiento ||
     anamnesis.frecuencia_ejercicio ||
     ""
@@ -1259,46 +1260,72 @@ export function generateSmartTrainingPrescription({
     nivelPrevio = "Avanzado / Atleta";
   } else if (/recreativ|regular|gym|pesas|3 d[ií]as/i.test(freqPreviaRaw + " " + tipoPrevioRaw)) {
     nivelPrevio = "Intermedio / Recreativo";
-  } else if (/sedentar|oficina|ningun|0 d[ií]as|poco/i.test(ocupacion + " " + freqPreviaRaw)) {
+  } else if (/sedentar|oficina|ningun|0 d[ií]as|poco/i.test(ocupacion + " " + freqPreviaRaw) || freqPreviaNum <= 1) {
     nivelPrevio = "Sedentario / Re-inicio";
   }
 
-  // 3. FAF y Frecuencia Proyectada en la Etapa Actual
+  // 3. FAF y Frecuencia Proyectada en la Etapa Actual (Paso 4 de Evaluación)
   const fafVal =
     parseFloat(enriched?.eval_faf) ||
     smartPrescription?.faf ||
-    inferFafFromAnamnesis(anamnesis);
+    inferFafFromAnamnesis(anamnesis) ||
+    1.55;
   const fafInfo = getActivityFactorInfo(fafVal) || ACTIVITY_FACTORS[2];
 
+  // La meta proyectada de días está regida por el FAF seleccionado en el Paso 4:
+  // 1.2: Sedentario (0-1 d/sem) -> prescripción base 2 días
+  // 1.375: Ligero (1-3 d/sem) -> prescripción 3 días
+  // 1.55: Moderado (3-5 d/sem) -> prescripción 4 días (rango 3 a 5 días)
+  // 1.725: Activo (6-7 d/sem) -> prescripción 5-6 días
+  // 1.9: Atleta (Doble sesión) -> prescripción 6 días
   let diasSugeridos = 4;
-  const diasActualRaw = enriched?.dias_ejercicio_actual;
-  if (diasActualRaw && !isNaN(parseInt(diasActualRaw, 10))) {
-    diasSugeridos = Math.min(7, Math.max(1, parseInt(diasActualRaw, 10)));
-  } else if (fafVal <= 1.2) {
+  let frecuenciaLabel = "4 días / semana (3–5 d/sem)";
+  if (fafVal <= 1.25) {
     diasSugeridos = 2;
-  } else if (fafVal <= 1.375) {
+    frecuenciaLabel = "2 días / semana (Acondicionamiento base)";
+  } else if (fafVal <= 1.45) {
     diasSugeridos = 3;
-  } else if (fafVal <= 1.55) {
+    frecuenciaLabel = "3 días / semana (1–3 d/sem)";
+  } else if (fafVal <= 1.65) {
     diasSugeridos = 4;
-  } else if (fafVal <= 1.725) {
+    frecuenciaLabel = "4 días / semana (3–5 d/sem)";
+  } else if (fafVal <= 1.8) {
     diasSugeridos = 5;
+    frecuenciaLabel = "5–6 días / semana (6–7 d/sem)";
   } else {
     diasSugeridos = 6;
+    frecuenciaLabel = "6 días / semana (Atleta)";
   }
 
-  // 4. Objetivo de Etapa
+  // Si en las notas del FAF se especificó un número explícito de días (ej. "entrena 4 días", "3 días por semana")
+  const fafNotas = (enriched?.eval_faf_notas || "").trim();
+  const matchDiasNotas = fafNotas.match(/(\d+)\s*(?:d[ií]as|sesiones)/i);
+  if (matchDiasNotas) {
+    const num = parseInt(matchDiasNotas[1], 10);
+    if (!isNaN(num) && num >= 1 && num <= 7) {
+      diasSugeridos = num;
+      frecuenciaLabel = `${num} días / semana (${fafInfo?.label || "Proyectado"})`;
+    }
+  }
+
+  // 4. Objetivo de Etapa (Paso 4 de Evaluación)
   const cycleParts = String(ciclo?.nombre || cicloNombre || "").split("|");
   const cycleEnfoque = cycleParts[4] || ciclo?.enfoque || "";
-  const goalTitle =
+  const rawGoalId =
     enriched?.eval_objetivo ||
     (cycleEnfoque ? inferGoalFromText(cycleEnfoque) : "") ||
-    smartPrescription?.goalInfo?.title ||
-    cliente?.objetivo ||
-    "Recomposición Corporal";
+    smartPrescription?.goalInfo?.id ||
+    "cut_10";
+
+  const goalPreset = getGoalPresetInfo(rawGoalId) || smartPrescription?.goalInfo || GOAL_PRESETS[2];
+  const goalTitle = goalPreset?.title
+    ? `${goalPreset.title} (${goalPreset.pct > 0 ? `+${goalPreset.pct}%` : `${goalPreset.pct}%`})`
+    : "Recomposición Corporal (-10%)";
+  const goalShortTitle = goalPreset?.title || "Recomposición Corporal";
 
   // 5. Inferencia de los 4 Bloques Prescriptivos de Entrenamiento
   // A. Frecuencia
-  const frecuenciaLabel = `${diasSugeridos} días / semana`;
+  // (diasSugeridos y frecuenciaLabel calculados arriba con el FAF de etapa)
 
   // B. Split / División Sugerida
   let splitSugerido = "Torso / Pierna (Upper / Lower)";
@@ -1349,7 +1376,6 @@ export function generateSmartTrainingPrescription({
   }
 
   // 6. Dictamen Biomecánico & Estrategia de Rutina
-  const fafNotas = (enriched?.eval_faf_notas || "").trim();
   const horario = (enriched?.horario_ejercicio || anamnesis?.horario_entrenamiento || "").trim();
   const deportePref = (anamnesis?.tipo_entrenamiento || anamnesis?.deporte_favorito || "Entrenamiento de fuerza en gimnasio").trim();
 
@@ -1357,9 +1383,9 @@ export function generateSmartTrainingPrescription({
   if (tieneLesiones) {
     rationaleBiomecanico = `El paciente presenta reporte de ${lesionesRaw}. Se establece un diseño con adaptaciones biomecánicas obligatorias: priorizar patrones con soporte guiado (máquinas o bancos) y trabajo unilateral para corregir asimetrías, evitando sobrecargas axiales compresivas en las articulaciones afectadas. Esquema de ${diasSugeridos} días estructurado en ${splitSugerido} con control estricto de tempo y rango de movimiento indoloro.`;
   } else if (nivelPrevio.includes("Sedentario")) {
-    rationaleBiomecanico = `Paciente en transición de un nivel ${nivelPrevio.toLowerCase()} (${ocupacion || "actividad laboral habitual"}) hacia una frecuencia de ${diasSugeridos} días semanales. Se prescribe una fase de acondicionamiento neuromuscular enfocada en dominar los patrones básicos de movimiento (bisagra de cadera, empuje, tracción y dominante de rodilla) a intensidad moderada (${volumenRpe}) para inducir adaptaciones en tejido conectivo sin generar fatiga excesiva.`;
+    rationaleBiomecanico = `Paciente en transición de un nivel ${nivelPrevio.toLowerCase()} (${ocupacion || "actividad laboral habitual"}) hacia una frecuencia proyectada de ${diasSugeridos} días semanales (${fafInfo?.label || "FAF " + fafVal}). Se prescribe una división de ${splitSugerido} con acondicionamiento neuromuscular enfocada en dominar los patrones básicos de movimiento a intensidad moderada (${volumenRpe}) para inducir adaptaciones en tejido conectivo sin generar fatiga excesiva.`;
   } else {
-    rationaleBiomecanico = `Perfil con experiencia previa favorable (${nivelPrevio.toLowerCase()}) orientado al objetivo de ${goalTitle}. Se recomienda implementar una división de ${splitSugerido} en ${diasSugeridos} sesiones semanales, priorizando sobrecarga progresiva en los ejercicios compuestos base y complementando con aislamiento metabólico en ${volumenRpe}.`;
+    rationaleBiomecanico = `Perfil con experiencia previa favorable (${nivelPrevio.toLowerCase()}) orientado al objetivo de ${goalShortTitle}. Se recomienda implementar una división de ${splitSugerido} en ${diasSugeridos} sesiones semanales (${fafInfo?.label || "FAF " + fafVal}), priorizando sobrecarga progresiva en los ejercicios compuestos base y complementando con aislamiento metabólico en ${volumenRpe}.`;
   }
 
   // 7. Adaptaciones específicas de lesiones

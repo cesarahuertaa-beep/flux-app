@@ -3641,7 +3641,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             {p.diasSugeridos} <span className="text-xs font-medium text-[#6B7A8D]">días / sem</span>
                           </span>
                           <span className="text-[10px] text-[#6B7A8D] block truncate mt-0.5">
-                            {p.fafInfo?.short || "Meta de microciclo"}
+                            {p.fafInfo?.label || "Meta de microciclo"}
                           </span>
                         </div>
 
