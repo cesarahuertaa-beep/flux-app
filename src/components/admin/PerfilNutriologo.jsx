@@ -157,6 +157,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     setSavingPersonal(true);
     try {
       await syncPersonalData(personalForm.email, formData);
+      window.dispatchEvent(new CustomEvent("flux:profile-updated", { detail: formData }));
       if (currentMultiRoles && currentMultiRoles.length > 0) {
         currentMultiRoles.forEach(r => {
           if (r.data) Object.assign(r.data, formData);

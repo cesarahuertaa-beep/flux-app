@@ -99,6 +99,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
     setIsSaving(true);
     try {
       await syncPersonalData(form.email, formData);
+      window.dispatchEvent(new CustomEvent("flux:profile-updated", { detail: formData }));
       if (user) {
         Object.assign(user, formData); // Actualizar cache local de sesión
       }

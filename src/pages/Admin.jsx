@@ -108,7 +108,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
   const _peekClientes = dbPeek(_initClientesFilter);
   const _peekBiblio = dbPeek("biblioteca_ejercicios?order=nombre.asc");
-  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
+  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,avatar_url`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
 
   const [clientes, setClientes] = useState(() =>
     Array.isArray(_peekClientes)
@@ -964,7 +964,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setClientes(prev => [...prev]);
     };
     window.addEventListener("flux:expediente-updated", onExpUpdated);
-    return () => window.removeEventListener("flux:expediente-updated", onExpUpdated);
+
+    const onProfileUpd = (e) => {
+      if (e.detail) {
+        setMyProfile(p => ({ ...(p || {}), ...e.detail }));
+      }
+    };
+    window.addEventListener("flux:profile-updated", onProfileUpd);
+    return () => {
+      window.removeEventListener("flux:expediente-updated", onExpUpdated);
+      window.removeEventListener("flux:profile-updated", onProfileUpd);
+    };
   }, []);
 
   const activeCount = clientes.filter(c => c.activo).length;
@@ -1045,6 +1055,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       brand={brand}
       onLogout={onLogout}
       session={session}
+      userAvatar={myProfile?.avatar_url || session?.data?.avatar_url || session?.avatar_url}
     >
       {diasGracia && !isCivil && (
         <div className="bg-red-500 text-white p-3 text-center text-sm font-bold animate-pulse z-50 relative shrink-0 flex items-center justify-center gap-2">

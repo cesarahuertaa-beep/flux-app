@@ -18,10 +18,28 @@ import { CachedImage } from "../../lib/mediaCache";
  * @param {Function} setActive - Función para cambiar tab
  * @param {Object}   session  - Objeto de sesión (para nombre/rol)
  */
-export function AppLayout({ children, nav, active, setActive, session }) {
+export function AppLayout({ children, nav, active, setActive, session, userAvatar: userAvatarProp }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const brand = useBrand();
+
+  const initialAvatar = userAvatarProp || session?.data?.avatar_url || session?.avatar_url || session?.data?.foto_url || null;
+  const [liveAvatar, setLiveAvatar] = useState(initialAvatar);
+
+  useEffect(() => {
+    const next = userAvatarProp || session?.data?.avatar_url || session?.avatar_url || session?.data?.foto_url || null;
+    if (next) setLiveAvatar(next);
+  }, [userAvatarProp, session?.data?.avatar_url, session?.avatar_url, session?.data?.foto_url]);
+
+  useEffect(() => {
+    const onProfileUpdated = (e) => {
+      if (e.detail?.avatar_url !== undefined) {
+        setLiveAvatar(e.detail.avatar_url || null);
+      }
+    };
+    window.addEventListener("flux:profile-updated", onProfileUpdated);
+    return () => window.removeEventListener("flux:profile-updated", onProfileUpdated);
+  }, []);
 
   const navRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -94,9 +112,22 @@ export function AppLayout({ children, nav, active, setActive, session }) {
         {!collapsed ? (
           <div className="mx-3 mt-4 mb-1 flex items-center justify-between">
             <button onClick={() => setActive("perfil")} className={`flex-1 min-w-0 px-3 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${active ==="perfil" ?"bg-white border-[var(--brand-primary)] shadow-sm" :"bg-white border-[#E2E5EA] shadow-sm hover:border-[var(--brand-primary)]"}`}>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
-                <User size={13} strokeWidth={2} className="text-white" />
-              </div>
+              {liveAvatar ? (
+                <CachedImage
+                  src={liveAvatar}
+                  alt={userName}
+                  className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-slate-200"
+                  fallback={
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
+                      <User size={13} strokeWidth={2} className="text-white" />
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
+                  <User size={13} strokeWidth={2} className="text-white" />
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-[#0B1929] truncate leading-tight">{userName}</p>
                 <p className="text-[10px] text-[#6B7A8D] leading-tight truncate">{subtitle}</p>
@@ -105,8 +136,17 @@ export function AppLayout({ children, nav, active, setActive, session }) {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 mt-4 mb-1">
-            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${active ==="perfil" ?"ring-2 ring-offset-2 ring-[var(--brand-primary)]" :"hover:scale-105"}`} style={{ background:"var(--brand-primary)" }}>
-              <User size={13} strokeWidth={2} className="text-white" />
+            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all overflow-hidden ${active ==="perfil" ?"ring-2 ring-offset-2 ring-[var(--brand-primary)]" :"hover:scale-105"}`} style={{ background:"var(--brand-primary)" }}>
+              {liveAvatar ? (
+                <CachedImage
+                  src={liveAvatar}
+                  alt={userName}
+                  className="w-full h-full object-cover"
+                  fallback={<User size={13} strokeWidth={2} className="text-white" />}
+                />
+              ) : (
+                <User size={13} strokeWidth={2} className="text-white" />
+              )}
             </button>
           </div>
         )}
