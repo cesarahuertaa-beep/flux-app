@@ -94,6 +94,117 @@ const DIAS_CONFIG = [
   { id: 0, label: "Domingo", short: "DOM" },
 ];
 const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+const formatSelectedDays = (dias) => {
+  if (!dias || dias.length === 0) return "Seleccionar días de atención...";
+  if (dias.length === 7) return "Todos los días (7 días)";
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const sorted = [...dias].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const names = sorted.map(d => DIAS_CONFIG.find(c => c.id === d)?.label || DIAS_FULL[d]);
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} (+${names.length - 2} más)`;
+};
+
+function MultiSelectDays({ selected = [], onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      document.addEventListener("touchstart", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [isOpen]);
+
+  const toggleDay = (id) => {
+    const next = selected.includes(id)
+      ? selected.filter(x => x !== id)
+      : [...selected, id];
+    onChange(next);
+  };
+
+  const displayText = formatSelectedDays(selected);
+  const hasSelection = selected && selected.length > 0;
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(prev => !prev)}
+        className={`w-full flex items-center justify-between gap-2 bg-white text-[#0B1929] border rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all cursor-pointer font-['Inter',sans-serif] ${
+          isOpen
+            ? "border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary)]/10"
+            : "border-[#E2E8F0] hover:border-[var(--brand-primary)]"
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Calendar className="w-4 h-4 text-[#94A3B8] shrink-0" />
+          <span className={`truncate text-left font-medium ${hasSelection ? "text-[#0B1929]" : "text-[#94A3B8]"}`}>
+            {displayText}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {hasSelection && (
+            <span className="text-[10px] font-bold bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] px-1.5 py-0.5 rounded-md">
+              {selected.length}
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 text-[#6B7A8D] transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-[250] left-0 right-0 top-full mt-1.5 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl py-1 max-h-60 overflow-y-auto scroll-hide overscroll-contain animate-in fade-in zoom-in-95 duration-100">
+          {DIAS_CONFIG.map(({ id, label }) => {
+            const isChecked = selected.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDay(id);
+                }}
+                className={`w-full px-3.5 py-2 text-left text-xs font-medium flex items-center justify-between transition-colors cursor-pointer select-none ${
+                  isChecked
+                    ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-bold"
+                    : "text-[#0B1929] hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
+                    isChecked
+                      ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white"
+                      : "border-[#CBD5E1] bg-white"
+                  }`}>
+                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                  <span className="text-xs font-medium">{label}</span>
+                </div>
+                {isChecked && (
+                  <Check className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 const HORAS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
   const m = (i % 2) * 30;
@@ -823,24 +934,16 @@ export function AgendaAdmin({ setMsg, profileId }) {
               />
             </Field>
           ) : (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">
-                  Días de atención con este horario
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-[#0B1929]">
+                  Días de atención
                 </label>
                 <div className="flex items-center gap-2 text-xs">
                   <button
                     type="button"
-                    onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [1, 2, 3, 4, 5] }))}
-                    className="text-[var(--brand-primary)] hover:underline font-bold text-[11px] cursor-pointer"
-                  >
-                    Lun - Vie
-                  </button>
-                  <span className="text-gray-300">•</span>
-                  <button
-                    type="button"
                     onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [1, 2, 3, 4, 5, 6, 0] }))}
-                    className="text-[var(--brand-primary)] hover:underline font-bold text-[11px] cursor-pointer"
+                    className="text-[var(--brand-primary)] hover:underline font-bold text-xs cursor-pointer"
                   >
                     Todos
                   </button>
@@ -848,54 +951,27 @@ export function AgendaAdmin({ setMsg, profileId }) {
                   <button
                     type="button"
                     onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [] }))}
-                    className="text-[#6B7A8D] hover:text-[#0B1929] text-[11px] cursor-pointer"
+                    className="text-[#6B7A8D] hover:text-[#0B1929] text-xs cursor-pointer"
                   >
                     Limpiar
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {DIAS_CONFIG.map(({ id, label }) => {
-                  const isChecked = (horarioForm.dias_semana || []).includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setHorarioForm(p => {
-                          const current = p.dias_semana || [];
-                          const next = current.includes(id)
-                            ? current.filter(x => x !== id)
-                            : [...current, id];
-                          return { ...p, dias_semana: next };
-                        });
-                      }}
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none text-left ${
-                        isChecked
-                          ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[var(--brand-primary)] font-bold shadow-2xs"
-                          : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:border-[#CBD5E1] hover:text-[#0B1929]"
-                      }`}
-                    >
-                      <div className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
-                        isChecked ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white" : "border-[#CBD5E1] bg-white"
-                      }`}>
-                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                      <span className="truncate">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <MultiSelectDays 
+                selected={horarioForm.dias_semana || []}
+                onChange={next => setHorarioForm(p => ({ ...p, dias_semana: next }))}
+              />
+
               {(!horarioForm.dias_semana || horarioForm.dias_semana.length === 0) && (
-                <p className="text-[11px] text-amber-600 mt-1.5 font-medium">
+                <p className="text-[11px] text-amber-600 font-medium">
                   * Selecciona al menos un día para aplicar este horario.
                 </p>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 mt-1">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Hora inicio">
               <CustomSelect 
                 value={horarioForm.hora_inicio} 
