@@ -1954,7 +1954,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const deleteDia = (d) => {
-    const diaTitulo = (d.dia || "").split('|').filter(Boolean).join(' - ') || "este día";
+    const meta = parseDiaMetadata(d.dia || "");
+    const diaTitulo = meta.titulo
+      ? `${meta.dayCode && meta.dayCode !== "S/D" ? `${meta.dayCode} - ` : ""}${meta.titulo}`
+      : (d.dia || "").split('|')[0] || "este día";
     setConfirmDelete({
       title: `¿Eliminar "${diaTitulo}"?`,
       description: "Esta acción eliminará el día y todas sus comidas asociadas permanentemente.",
@@ -3489,47 +3492,62 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndDias}>
               <SortableContext items={dias.map(d => String(d.id))} strategy={verticalListSortingStrategy}>
-                {dias.map(d => {
-                  const parts = (d.dia ||"").split('|');
-                  const tab = parts.length > 1 ? parts[0] : 'S/D';
-                  const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
+                {dias.map((d) => {
+                  const meta = parseDiaMetadata(d.dia || "");
+                  const dayCode = meta.dayCode || "S/D";
+                  const titulo = meta.titulo || "";
+                  const numComidas = (d.comidas || []).length;
+                  const totKcal = (d.comidas || []).reduce((s, c) => s + (Number(c.calorias) || 0), 0);
+                  const totProt = (d.comidas || []).reduce((s, c) => s + (Number(c.proteina) || 0), 0);
+                  const totCarb = (d.comidas || []).reduce((s, c) => s + (Number(c.carbohidratos) || 0), 0);
+                  const totGras = (d.comidas || []).reduce((s, c) => s + (Number(c.grasas) || 0), 0);
+
                   return (
-                      <SortableItem key={d.id} id={d.id}>
-                        {({ dragHandle, isDragging }) => (
-                          <div className="bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center gap-2">
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              {!isReadOnly && <div className="shrink-0">{dragHandle}</div>}
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center flex-wrap gap-1.5 leading-tight">
-                                  {tab !== 'S/D' && (
-                                    <span className="font-semibold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[10px] rounded shrink-0 uppercase">{tab}</span>
-                                  )}
-                                  <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title ||"Sin título"}</span>
-                                </div>
-                                <div className="text-xs text-[#6B7A8D] mt-0.5 shrink-0 flex items-center flex-wrap gap-2">
-                                  <span className="font-medium">{d.comidas.length} comidas</span>
-                                  <span className="opacity-70">&middot;</span>
-                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.calorias)||0), 0)} kcal</span>
-                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.proteina)||0), 0)}g P</span>
-                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.carbohidratos)||0), 0)}g C</span>
-                                  <span>{d.comidas.reduce((s,c) => s + (Number(c.grasas)||0), 0)}g G</span>
-                                </div>
+                    <SortableItem key={d.id} id={d.id}>
+                      {({ dragHandle, isDragging }) => (
+                        <div className="bg-white rounded-xl border border-[#E2E8F0] px-4 py-3 mb-2 flex justify-between items-center gap-3 shadow-2xs hover:border-gray-300 transition-all">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {!isReadOnly && <div className="shrink-0 text-slate-400 hover:text-slate-600">{dragHandle}</div>}
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center flex-wrap gap-2 leading-tight">
+                                {dayCode !== "S/D" && (
+                                  <span className="font-bold px-2 py-0.5 bg-[var(--brand-primary)] text-white text-[11px] rounded-md shrink-0 uppercase tracking-wide shadow-2xs">
+                                    {dayCode}
+                                  </span>
+                                )}
+                                <span className="font-bold text-[14px] text-[#0B1929] truncate">
+                                  {titulo || (dayCode !== "S/D" ? "Menú diario" : "Sin título")}
+                                </span>
+                              </div>
+                              <div className="text-xs text-[#6B7A8D] mt-1 flex items-center flex-wrap gap-1.5 font-medium">
+                                <span>{numComidas} {numComidas === 1 ? "comida" : "comidas"}</span>
+                                <span className="text-[#CBD5E1]">•</span>
+                                <span className="text-[#0B1929] font-bold">{totKcal} kcal</span>
+                                <span className="text-[#6B7A8D]">({totProt}g P · {totCarb}g C · {totGras}g G)</span>
                               </div>
                             </div>
-                            {!isReadOnly && (
-                              <div className="flex gap-1.5 shrink-0">
-                                <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors" onClick={() => openEditDia(d)}>
-                                  <Edit2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Editar</span>
-                                </button>
-                                <button className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" onClick={() => deleteDia(d)}>
-                                  <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline text-xs font-medium">Borrar</span>
-                                </button>
-                              </div>
-                            )}
                           </div>
-                        )}
-                      </SortableItem>
-                  )})}
+                          {!isReadOnly && (
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors cursor-pointer"
+                                onClick={() => openEditDia(d)}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" /> <span className="text-xs font-semibold">Editar</span>
+                              </button>
+                              <button
+                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                                onClick={() => deleteDia(d)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> <span className="text-xs font-semibold">Borrar</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </SortableItem>
+                  );
+                })}
               </SortableContext>
             </DndContext>
           </>

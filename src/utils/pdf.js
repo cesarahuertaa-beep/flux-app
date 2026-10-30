@@ -1,5 +1,6 @@
 import { escapeHtml, parseFotos } from "./helpers";
 import { registerBackAction } from "../lib/backButtonHandler";
+import { parseDiaMetadata } from "../lib/mealOptions";
 import {
   enrichMetrica,
   getMetodoLabel,
@@ -781,7 +782,17 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
       if (sumKcal || sumProt || sumCarbs || sumGrasas) {
         macrosHtml = `<span style="float:right; font-size:12px; color:#fff; opacity:0.92; font-weight:normal;">${sumKcal} kcal &middot; ${sumProt}g P &middot; ${sumCarbs}g C &middot; ${sumGrasas}g G</span>`;
       }
-      return `<div class="dia"><div class="dia-title">${escapeHtml(d.dia || d.nombre || "Día")} ${macrosHtml}</div>
+      const meta = parseDiaMetadata(d.dia || d.nombre || "");
+      const cleanTitle = meta.titulo
+        ? `${meta.dayCode && meta.dayCode !== "S/D" ? `${meta.dayCode} - ` : ""}${meta.titulo}`
+        : (d.dia || d.nombre || "Día").split("|")[0];
+      const extraDetails = [
+        meta.agua ? `Agua: ${meta.agua} L` : "",
+        meta.suplementos ? `Suplementación: ${meta.suplementos}` : ""
+      ].filter(Boolean).join(" &middot; ");
+
+      return `<div class="dia"><div class="dia-title">${escapeHtml(cleanTitle)} ${macrosHtml}</div>
+      ${extraDetails ? `<div style="font-size:11px; color:#6B7A8D; margin-top:3px; margin-bottom:8px; font-weight:500;">${escapeHtml(extraDetails)}</div>` : ""}
   <table><thead><tr><th>Hora</th><th>Comida</th><th>Opci&oacute;n 1</th><th>Opci&oacute;n 2</th><th>Kcal</th><th>P/C/G</th></tr></thead>
   <tbody>${comidas
     .map(
