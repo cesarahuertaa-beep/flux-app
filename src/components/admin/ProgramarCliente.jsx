@@ -946,11 +946,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const eliminarCiclo = async (ciclo, e) => {
     e.stopPropagation(); // no seleccionar el ciclo al dar clic en borrar
     try {
-      // Verificar si tiene datos en paralelo
-      const [nutris, ruts] = await Promise.all([
+      // Verificar si tiene datos en paralelo (nutrición, rutinas y evaluaciones de este ciclo)
+      const [nutris, ruts, directMetricas] = await Promise.all([
         dbGet(`nutricion?ciclo_id=eq.${ciclo.id}`).catch(() => []),
         dbGet(`rutinas?ciclo_id=eq.${ciclo.id}`).catch(() => []),
+        selected?.id
+          ? dbGet(`metricas_progreso?cliente_id=eq.${selected.id}&ciclo_id=eq.${ciclo.id}`).catch(() => [])
+          : Promise.resolve([]),
       ]);
+
+      // Incluir también cualquier métrica en memoria o caché vinculada a este ciclo
+      const localEvals = (allMetricas || []).filter((m) => String(m.ciclo_id) === String(ciclo.id));
+      const evalsMap = new Map();
+      (directMetricas || []).forEach((m) => evalsMap.set(String(m.id), m));
+      localEvals.forEach((m) => evalsMap.set(String(m.id), m));
+      const evals = Array.from(evalsMap.values());
 
       const doDelete = async () => {
         // Cierre y actualización optimista en 0ms
@@ -981,8 +991,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           if (ruts?.length > 0) {
             delPromises.push(dbDel(`rutinas?id=in.(${ruts.map(r => r.id).join(",")})`));
           }
+          if (evals.length > 0) {
+            delPromises.push(dbDel(`metricas_progreso?id=in.(${evals.map(m => m.id).join(",")})`));
+          }
           delPromises.push(dbDel(`ciclos?id=eq.${ciclo.id}`));
           await Promise.all(delPromises);
+
+          if (evals.length > 0) {
+            const evalIdsSet = new Set(evals.map((m) => String(m.id)));
+            updateQueryCache("metricas_progreso", (cachedList) => {
+              if (!Array.isArray(cachedList)) return [];
+              return cachedList.filter((m) => !evalIdsSet.has(String(m.id)) && String(m.ciclo_id) !== String(ciclo.id));
+            });
+            setAllMetricas((prev) => prev.filter((m) => !evalIdsSet.has(String(m.id))));
+            if (typeof window !== "undefined" && selected?.id) {
+              window.dispatchEvent(
+                new CustomEvent("flux:metricas-updated", {
+                  detail: { clienteId: selected.id, source: "ProgramarCliente" },
+                })
+              );
+            }
+          }
+
           invalidateCache("ciclos");
           loadCiclos(null, { forceFresh: true });
           loadData(undefined, { silent: true, forceFresh: true });
@@ -995,10 +1025,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       };
 
-      if ((nutris?.length || 0) > 0 || (ruts?.length || 0) > 0) {
+      const totalItems = (nutris?.length || 0) + (ruts?.length || 0) + evals.length;
+      if (totalItems > 0) {
+        const parts = [];
+        if (ruts?.length > 0) parts.push(`${ruts.length} rutina(s)`);
+        if (nutris?.length > 0) parts.push(`${nutris.length} plan(es) de nutrición`);
+        if (evals.length > 0) parts.push(`${evals.length} evaluación(es)`);
         setConfirmDelete({
           title: "¡Cuidado! Eliminar ciclo completo",
-          description: `Este ciclo contiene ${ruts?.length || 0} rutina(s) y ${nutris?.length || 0} plan(es) de nutrición. Si continúas, se destruirá todo su contenido permanentemente.`,
+          description: `Este ciclo contiene ${parts.join(", ")}. Si continúas, se destruirá todo su contenido permanentemente sin dejar datos huérfanos.`,
           confirmText: "Eliminar todo",
           danger: true,
           icon: "alert",

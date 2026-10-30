@@ -23,10 +23,13 @@ import {
   Moon,
   Stethoscope,
   Target,
-  Flame
+  Flame,
+  Trash2,
+  AlertCircle
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
+import { ConfirmModal } from "../ui/ConfirmModal";
 import { generateProgresoPDF } from "../../utils/pdf";
 import {
   enrichMetrica,
@@ -35,7 +38,7 @@ import {
   getGoalPresetInfo,
   getActivityFactorInfo,
 } from "../../lib/bodyComposition";
-import { dbPeek, dbGet } from "../../lib/supabase";
+import { dbPeek, dbGet, dbDel, updateQueryCache } from "../../lib/supabase";
 import { parseFotos } from "../../utils/helpers";
 import { useBackButton } from "../../lib/backButtonHandler";
 
@@ -67,10 +70,12 @@ export default function ProgresoHistoricoModal({
   const [loading, setLoading] = useState(false);
   const [selectedEval, setSelectedEval] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
+  useBackButton(Boolean(confirmDelete), () => setConfirmDelete(null), 115);
   useBackButton(Boolean(lightboxUrl), () => setLightboxUrl(null), 110);
   useBackButton(Boolean(selectedEval), () => setSelectedEval(null), 105);
-  useBackButton(isOpen && !selectedEval && !lightboxUrl, onClose, 100);
+  useBackButton(isOpen && !selectedEval && !lightboxUrl && !confirmDelete, onClose, 100);
 
   useEffect(() => {
     if (!isOpen || !cliente?.id) return;
@@ -102,6 +107,55 @@ export default function ProgresoHistoricoModal({
   const allLinkedMetricas = useMemo(() => {
     return linkMetricasToCiclos(metricas, ciclos);
   }, [metricas, ciclos]);
+
+  // Evaluaciones que no pertenecen a ningún ciclo actual
+  const unlinkedEvals = useMemo(() => {
+    return allLinkedMetricas.filter(
+      (m) => !ciclos.some((c) => String(c.id) === String(m.ciclo_id))
+    );
+  }, [allLinkedMetricas, ciclos]);
+
+  // Eliminar evaluación con confirmación y sincronización de caché
+  const handleDeleteEval = (ev) => {
+    if (!ev) return;
+    setConfirmDelete({
+      title: "¿Eliminar evaluación?",
+      description: `Se eliminará permanentemente la evaluación del ${fmtDate(ev.fecha)} (${ev.peso ? `${ev.peso} kg` : "sin peso"} • ${ev.grasa_pct ? `${ev.grasa_pct}%` : "sin %"} grasa). Esta acción destruirá permanentemente sus mediciones y no se puede deshacer.`,
+      confirmText: "Eliminar evaluación",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        const idStr = String(ev.id);
+        setConfirmDelete(null);
+        if (selectedEval?.id === ev.id) {
+          setSelectedEval(null);
+        }
+
+        // 1. Eliminación optimista en el modal
+        setMetricas((prev) => prev.filter((m) => String(m.id) !== idStr));
+
+        // 2. Actualizar caché de consultas de metricas_progreso
+        updateQueryCache("metricas_progreso", (cachedList) => {
+          if (!Array.isArray(cachedList)) return [];
+          return cachedList.filter((m) => String(m.id) !== idStr);
+        });
+
+        // 3. Ejecutar borrado en base de datos
+        try {
+          await dbDel(`metricas_progreso?id=eq.${idStr}`);
+          if (typeof window !== "undefined" && cliente?.id) {
+            window.dispatchEvent(
+              new CustomEvent("flux:metricas-updated", {
+                detail: { clienteId: cliente.id, source: "ProgresoHistoricoModal" },
+              })
+            );
+          }
+        } catch (err) {
+          console.error("Error al eliminar evaluación:", err);
+        }
+      },
+    });
+  };
 
   // Orden cronológico (de la más antigua a la más reciente)
   const chronologicalEvals = useMemo(() => {
@@ -569,14 +623,24 @@ export default function ProgresoHistoricoModal({
                               ) : (
                                 <span />
                               )}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedEval(ev)}
-                                className="text-[var(--brand-primary)] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer py-1"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>Consultar</span>
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEval(ev)}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                  title="Eliminar esta evaluación"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedEval(ev)}
+                                  className="text-[var(--brand-primary)] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer py-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Consultar</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -585,6 +649,96 @@ export default function ProgresoHistoricoModal({
                   </div>
                 );
               })}
+
+              {/* Evaluaciones Huérfanas / Sin Plan Asignado */}
+              {unlinkedEvals.length > 0 && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/20 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
+                        Sin Plan Asignado
+                      </span>
+                      <h4 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                        Evaluaciones Previas o Huérfanas
+                      </h4>
+                    </div>
+                    <span className="text-xs text-[#6B7A8D] font-medium">
+                      {unlinkedEvals.length} evaluación{unlinkedEvals.length !== 1 ? "es" : ""}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-amber-200/60">
+                    {unlinkedEvals.map((ev) => (
+                      <div
+                        key={ev.id}
+                        className="bg-white border border-amber-200/80 rounded-xl p-3.5 flex flex-col justify-between gap-2.5 hover:shadow-xs transition-shadow"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                            {fmtDate(ev.fecha)}
+                          </span>
+                          {ev.metodo_evaluacion && (
+                            <span className="text-[10px] font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-2 py-0.5 rounded-md">
+                              {getMetodoLabel(ev.metodo_evaluacion)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]/60">
+                          <div>
+                            <span className="text-[10px] text-[#6B7A8D] block">Peso</span>
+                            <span className="text-xs font-bold text-[#0B1929]">
+                              {ev.peso ? `${ev.peso} kg` : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#6B7A8D] block">Grasa</span>
+                            <span className="text-xs font-bold text-[#0B1929]">
+                              {ev.grasa_pct ? `${ev.grasa_pct}%` : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#6B7A8D] block">M. Magra</span>
+                            <span className="text-xs font-bold text-emerald-700">
+                              {ev.masa_libre_grasa ? `${ev.masa_libre_grasa} kg` : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-[#F0F4FA] text-xs">
+                          {parseFotos(ev.fotos).length > 0 ? (
+                            <span className="text-[11px] text-[#6B7A8D] flex items-center gap-1">
+                              <Camera className="w-3 h-3 text-amber-600" />
+                              {parseFotos(ev.fotos).length} fotos
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEval(ev)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Eliminar esta evaluación"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEval(ev)}
+                              className="text-[var(--brand-primary)] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer py-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Consultar</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -788,7 +942,15 @@ export default function ProgresoHistoricoModal({
             </div>
 
             {/* Footer del detalle */}
-            <div className="px-5 py-3 border-t border-[#E2E8F0] flex justify-end bg-gray-50">
+            <div className="px-5 py-3 border-t border-[#E2E8F0] flex items-center justify-between bg-gray-50">
+              <button
+                type="button"
+                onClick={() => handleDeleteEval(selectedEval)}
+                className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar evaluación</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedEval(null)}
@@ -814,6 +976,19 @@ export default function ProgresoHistoricoModal({
           />
         </div>
       )}
+
+      {/* Modal de confirmación para eliminar evaluación */}
+      <ConfirmModal
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDelete?.onConfirm}
+        title={confirmDelete?.title}
+        description={confirmDelete?.description}
+        confirmText={confirmDelete?.confirmText || "Eliminar"}
+        cancelText={confirmDelete?.cancelText || "Cancelar"}
+        danger={confirmDelete?.danger ?? true}
+        icon={confirmDelete?.icon || "trash"}
+      />
     </div>
   );
 }

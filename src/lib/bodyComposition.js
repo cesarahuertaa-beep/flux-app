@@ -276,7 +276,9 @@ export function linkMetricasToCiclos(metricasList, ciclosList) {
   });
 
   return metricasList.map(m => {
-    if (m.ciclo_id) return m;
+    // Si la métrica ya tiene un ciclo_id y ESE ciclo efectivamente existe en la lista de ciclos activos/históricos:
+    const cycleExists = m.ciclo_id && ciclosList.some(c => String(c.id) === String(m.ciclo_id));
+    if (cycleExists) return m;
 
     if (sortedCycles.length === 1) {
       return { ...m, ciclo_id: sortedCycles[0].id };
