@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, ChevronDown, Palette, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Palette } from "lucide-react";
 import { useBrand, getFluxOfficialColor } from "../BrandContext";
 import { extractPaletteFromImage } from "../../lib/colorExtractor";
 
@@ -145,14 +145,9 @@ export default function BrandColorPicker({
         <div className="absolute right-0 bottom-full mb-2 sm:bottom-auto sm:top-full sm:mt-2 z-[150] w-64 bg-white rounded-2xl shadow-2xl border border-[#E2E8F0] p-3.5 animate-in fade-in zoom-in-95 duration-150">
           {/* Cabecera del selector */}
           {hasLogoPalette ? (
-            <div className="flex items-center justify-between text-xs font-bold text-[#0B1929] mb-2 px-0.5">
-              <div className="flex items-center gap-1.5">
-                <Sparkles size={13} className="text-amber-500 fill-amber-500 shrink-0" />
-                <span className="truncate">Paleta de tu Logo & FLUX</span>
-              </div>
-              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full shrink-0">
-                Logo analizado
-              </span>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#6B7A8D] mb-2 px-0.5">
+              <Palette size={14} className="text-[#6B7A8D]" />
+              <span>Paleta de tu logo</span>
             </div>
           ) : extracting ? (
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#6B7A8D] mb-2 px-0.5">
@@ -161,7 +156,7 @@ export default function BrandColorPicker({
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#6B7A8D] mb-2 px-0.5">
-              <Palette size={14} />
+              <Palette size={14} className="text-[#6B7A8D]" />
               <span>Colores recomendados</span>
             </div>
           )}
