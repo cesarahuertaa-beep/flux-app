@@ -7,13 +7,23 @@ const BrandContext = createContext(null);
 export const useBrand = () => useContext(BrandContext);
 
 // Default FLUX brand - used as absolute fallback if database is offline/unreachable
-const FLUX_DEFAULT = { 
+export const FLUX_DEFAULT = { 
   nombre_marca: "FLUX Sport Supplements", 
   color_primario: "#1A6FD4", 
   logo_url: "/flux_logo.jpeg" 
 };
 
+export const getFluxOfficialColor = () => {
+  try {
+    return localStorage.getItem("flux_official_brand_color") || FLUX_DEFAULT.color_primario;
+  } catch {
+    return FLUX_DEFAULT.color_primario;
+  }
+};
+
 export function BrandProvider({ children, session }) {
+  const [fluxBrandColor, setFluxBrandColor] = useState(() => getFluxOfficialColor());
+
   const [brand, setBrand] = useState(() => {
     try {
       const cachedColor = localStorage.getItem("flux_cached_brand_color");
@@ -66,6 +76,14 @@ export function BrandProvider({ children, session }) {
         } catch (saErr) {
           console.warn("No se pudo cargar marca superadmin:", saErr);
         }
+
+        const officialColor = superadminBrand.color_primario || FLUX_DEFAULT.color_primario;
+        if (active) {
+          setFluxBrandColor(officialColor);
+        }
+        try {
+          localStorage.setItem("flux_official_brand_color", officialColor);
+        } catch (e) {}
 
         // 2. Determinar si hay un perfil específico según la sesión
         let profileIdToFetch = null;
@@ -130,8 +148,15 @@ export function BrandProvider({ children, session }) {
     "--brand-primary-light": `color-mix(in srgb, ${brand.color_primario} 20%, white)`,
   };
 
+  const contextValue = {
+    ...brand,
+    fluxBrandColor,
+    setBrand,
+    setBrandColor: (c) => setBrand((prev) => ({ ...prev, color_primario: c }))
+  };
+
   return (
-    <BrandContext.Provider value={brand}>
+    <BrandContext.Provider value={contextValue}>
       <div style={{ ...cssVars, minHeight: "100vh" }}>
         {children}
       </div>

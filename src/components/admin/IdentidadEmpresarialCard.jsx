@@ -8,25 +8,27 @@ import BrandColorPicker from "../ui/BrandColorPicker";
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [tempLogoFile, setTempLogoFile] = useState(null);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setTempLogoFile(file);
     setUploading(true);
-      try {
-        const ext = file.name.split('.').pop();
-        const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-        const url = await storageUpload("logos", path, file);
-        cacheMediaUrl(url).catch(() => {});
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+      const url = await storageUpload("logos", path, file);
+      cacheMediaUrl(url).catch(() => {});
 
-        if (form.logo_url && form.logo_url.includes("storage/v1/object/public/logos/")) {
-          const oldPath = form.logo_url.split("/public/logos/")[1];
-          if (oldPath) {
-            await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar logo anterior", err));
-          }
+      if (form.logo_url && form.logo_url.includes("storage/v1/object/public/logos/")) {
+        const oldPath = form.logo_url.split("/public/logos/")[1];
+        if (oldPath) {
+          await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar logo anterior", err));
         }
+      }
 
-        setForm((prev) => ({ ...prev, logo_url: url }));
+      setForm((prev) => ({ ...prev, logo_url: url }));
       onSave({ ...form, logo_url: url });
     } catch (error) {
       showFluxAlert("Error subiendo logo", error.message);
@@ -43,6 +45,8 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
     return <div className="p-6 bg-white rounded-2xl shadow-sm border border-[#E2E8F0] animate-pulse h-64"></div>;
   }
 
+  const currentLogo = tempLogoFile || form.logo_url;
+
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] mb-8">
       <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
@@ -56,6 +60,12 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div>
             </div>
+          ) : tempLogoFile ? (
+            <img 
+              src={URL.createObjectURL(tempLogoFile)} 
+              alt="Logo Preview" 
+              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
+            />
           ) : form.logo_url ? (
             <CachedImage 
               src={form.logo_url} 
@@ -78,7 +88,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
         </div>
         <div className="flex-1 min-w-0 w-full text-center md:text-left">
-          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca ||"Nombre de tu Consultorio"}</h2>
+          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
           <p className="text-[#6B7A8D] text-sm">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
         </div>
         <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
@@ -86,6 +96,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
           <BrandColorPicker
             value={form.color_primario || "#1A6FD4"}
             onChange={handleColorChange}
+            logoSource={currentLogo}
           />
         </div>
       </div>
@@ -148,7 +159,6 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
       </div>
       {isSaving && <div className="text-xs text-[#6B7A8D] flex items-center gap-1 mt-2 justify-end"><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#6B7A8D]"></div> Guardando...</div>}
-      {children}
     </div>
   );
 }

@@ -846,6 +846,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               <BrandColorPicker
                 value={formNutri.color_primario || "#1A6FD4"}
                 onChange={val => setFormNutri(p => ({ ...p, color_primario: val }))}
+                logoSource={formNutri.logo_url}
               />
             </div>
           </div>
@@ -913,6 +914,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               <BrandColorPicker
                 value={editFormNutri.color_primario || "#1A6FD4"}
                 onChange={val => setEditFormNutri(p => ({ ...p, color_primario: val }))}
+                logoSource={editFormNutri.logo_url}
               />
             </div>
           </div>
