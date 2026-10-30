@@ -162,14 +162,33 @@ export function CitasCliente({ cliente }) {
     setLoading(false);
   }, [clienteId, nutriologoId, nutriologoDuracion]);
 
-  useEffect(() => { if (clienteId && nutriologoId) loadData(); }, [loadData]);
+  useEffect(() => {
+    if (!clienteId || !nutriologoId) return;
+    loadData();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["citas", "disponibilidad", "citas_ratings", "profiles", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        loadData();
+      }, 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [clienteId, nutriologoId, loadData]);
 
-  // Actualizar slots cuando cambia la fecha
+  // Actualizar slots cuando cambia la fecha o la disponibilidad
   useEffect(() => {
     if (!selectedDate) { setSlots([]); setSelectedSlot(null); return; }
     const s = generarSlots(disponibilidad, citas, selectedDate, nutriologoDuracion);
     setSlots(s);
-    setSelectedSlot(null);
+    setSelectedSlot(prev => (prev && s.some(slot => slot.iso === prev.iso && !slot.ocupado)) ? prev : null);
   }, [selectedDate, disponibilidad, citas, nutriologoDuracion]);
 
   const submitRating = async () => {

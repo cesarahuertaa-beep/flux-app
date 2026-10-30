@@ -64,7 +64,23 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const isFirstRenderConfig = useRef(true);
   const [solicitudes, setSolicitudes] = useState([]);
 
-  useEffect(() => { loadProfile(); }, [profileId]);
+  useEffect(() => {
+    loadProfile();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["profiles", "solicitudes_profesionales", "configuracion_app", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadProfile(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [profileId]);
 
   const loadProfile = async () => {
     try {

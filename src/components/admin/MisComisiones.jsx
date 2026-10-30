@@ -50,7 +50,23 @@ export default function MisComisiones({ myId, setMsg }) {
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, [myId]);
+  useEffect(() => {
+    loadData();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["comisiones", "profiles", "clientes", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadData(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [myId]);
 
   // Meses únicos
   const mesesDisponibles = useMemo(() => {

@@ -37,7 +37,23 @@ export default function GestorTienda({ setMsg }) {
     setLoading(false);
   };
 
-  useEffect(() => { loadProductos(); }, []);
+  useEffect(() => {
+    loadProductos();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["productos", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadProductos(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, []);
 
   const uploadImg = async (file) => {
     setUploading(true);

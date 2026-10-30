@@ -156,7 +156,24 @@ export default function ControlPagos({ setMsg }) {
     setLoadingCivil(false);
   };
 
-  useEffect(() => { loadData(); loadDataCivil(); }, []);
+  useEffect(() => {
+    loadData();
+    loadDataCivil();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["recibos_pago", "recibos_pago_civil", "pagos_manuales", "profiles", "clientes", "configuracion_app", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { loadData(); loadDataCivil(); }, 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, []);
 
   // ── Filtros Nutriólogos ─────────────────────────────────────────────────
   const mesesDisponibles = useMemo(() => {

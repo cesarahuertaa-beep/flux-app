@@ -252,7 +252,23 @@ export default function Progreso({ cliente, isSelfManaged }) {
     }
   }, [cliente?.id]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["metricas_progreso", "progreso", "rutinas", "ciclos", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadData(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [loadData]);
   useEffect(() => { if (view === 'galeria') loadPersonalPhotos(); }, [view, loadPersonalPhotos]);
 
   const saveIndex = async (urls) => {

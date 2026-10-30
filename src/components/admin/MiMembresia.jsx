@@ -98,6 +98,20 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   useEffect(() => {
     loadData();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["profiles", "clientes", "pagos_manuales", "configuracion_app", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadData(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
   }, [profileId]);
 
   const isEstudiante = perfil?.role === "nutriologo_estudiante";

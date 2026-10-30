@@ -373,7 +373,33 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setLoading(false);
   }, [loadCitas, loadDisponibilidad, loadClientes, loadProfile]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["citas", "disponibilidad", "clientes", "profiles", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!table || table === "*") {
+          loadCitas();
+          loadDisponibilidad();
+          loadClientes();
+          loadProfile();
+        } else if (table === "citas") loadCitas();
+        else if (table === "disponibilidad") loadDisponibilidad();
+        else if (table === "clientes") loadClientes();
+        else if (table === "profiles") loadProfile();
+      }, 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [load, loadCitas, loadDisponibilidad, loadClientes, loadProfile]);
 
   // ── Acciones ──
   const confirmar = async (cita) => {
@@ -536,7 +562,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
       }
       setShowHorario(false);
       setEditingHorarioId(null);
-      loadDisponibilidad();
+      await loadDisponibilidad();
     } catch (e) {
       // Fallback si la columna duracion_minutos aún no está en Supabase
       try {
@@ -559,7 +585,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
         setMsg("Horario guardado");
         setShowHorario(false);
         setEditingHorarioId(null);
-        loadDisponibilidad();
+        await loadDisponibilidad();
       } catch (err2) {
         setMsg(err2.message || "Error al guardar horario");
       }

@@ -234,7 +234,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     let cacheTimer = null;
 
     const onFocus = () => {
-      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: false });
+      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: true });
     };
 
     const onCacheUpdated = () => {
@@ -244,9 +244,9 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           Object.keys(pendingSavesRef.current || {}).length === 0 &&
           Object.keys(pendingNutriSavesRef.current || {}).length === 0
         ) {
-          loadData({ silent: true, forceFresh: false });
+          loadData({ silent: true, forceFresh: true });
         }
-      }, 300);
+      }, 200);
     };
 
     const onPlanUpdated = (e) => {

@@ -1,4 +1,4 @@
-import { storageUpload } from "./supabase";
+import { storageUpload, broadcastTableChange, invalidateCache } from "./supabase";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -71,7 +71,7 @@ export async function fetchClinicalRecord(clienteId) {
   if (!clienteId || !SUPA_URL) return local;
   try {
     const url = `${SUPA_URL}/storage/v1/object/public/logos/expediente_clinico_${clienteId}.json?t=${Date.now()}`;
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: "no-store" });
     if (r.ok) {
       const parsed = await r.json();
       const merged = {
@@ -135,6 +135,8 @@ export async function saveClinicalRecord(clienteId, nextRecord) {
         detail: { clienteId, record: normalized },
       })
     );
+    invalidateCache("expediente_clinico", { clienteId });
+    broadcastTableChange("expediente_clinico", { clienteId });
   } catch {
     // ignore
   }

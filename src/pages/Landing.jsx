@@ -611,6 +611,18 @@ export default function Landing({ session, onLogout }) {
       } catch (e) { console.error('Error cargando nutris', e); }
     };
     loadData();
+    const onCacheUpdated = (ev) => {
+      const tbl = ev?.detail?.table;
+      if (!tbl || ["*", "profiles", "productos", "citas_ratings", "directorio_nutriologos_publicos"].includes(tbl)) {
+        loadData();
+      }
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("focus", loadData);
+    return () => {
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("focus", loadData);
+    };
   }, []);
 
   const activeSupplements = dbSupplements;

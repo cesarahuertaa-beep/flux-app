@@ -147,7 +147,23 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     setLoading(false);
   };
 
-  useEffect(() => { loadNutriologos(); }, []);
+  useEffect(() => {
+    loadNutriologos();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["profiles", "clientes", "recibos_pago", "solicitudes_profesionales", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadNutriologos(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, []);
 
   const handleLogoChange = async (e, setFnc) => {
     const file = e.target.files?.[0];

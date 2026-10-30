@@ -154,7 +154,25 @@ export default function App() {
             return false;
           }
           localStorage.setItem("flux_multi_roles", JSON.stringify(latestRoles));
-          setSession(prev => prev ? { ...prev, multiRoles: latestRoles } : prev);
+          setSession(prev => {
+            if (!prev) return prev;
+            const searchRole = prev.role === "civil" ? "cliente" : prev.role;
+            const match = latestRoles.find(r => {
+              if (r.role !== searchRole) return false;
+              if (searchRole === "cliente" && prev.data?.id) return String(r.data?.id) === String(prev.data?.id);
+              if (prev.profileId && r.data?.id) return String(r.data?.id) === String(prev.profileId);
+              return true;
+            });
+            const nextData = match?.data ? { ...prev.data, ...match.data } : prev.data;
+            const dataChanged = JSON.stringify(prev.data) !== JSON.stringify(nextData);
+            const rolesChanged = JSON.stringify(prev.multiRoles) !== JSON.stringify(latestRoles);
+            if (!dataChanged && !rolesChanged) return prev;
+            const nextSession = { ...prev, data: nextData, multiRoles: latestRoles };
+            try {
+              localStorage.setItem("flux_session_snapshot", JSON.stringify({ role: nextSession.role, data: nextSession.data, profileId: nextSession.profileId }));
+            } catch {}
+            return nextSession;
+          });
         }
       }
       return true;
@@ -357,8 +375,15 @@ export default function App() {
       validateSessionLiveness();
     };
 
+    const handleCacheSync = (ev) => {
+      const tbl = ev?.detail?.table;
+      if (!tbl || tbl === "*" || tbl === "profiles" || tbl === "clientes") {
+        validateSessionLiveness();
+      }
+    };
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("flux:cache-updated", handleCacheSync);
 
     let capListener = null;
     if (Capacitor.isNativePlatform()) {
@@ -377,6 +402,7 @@ export default function App() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("flux:cache-updated", handleCacheSync);
       clearInterval(heartbeatTimer);
       if (capListener && typeof capListener.remove === "function") {
         capListener.remove();

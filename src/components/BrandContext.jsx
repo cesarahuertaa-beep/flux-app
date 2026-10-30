@@ -132,11 +132,21 @@ export function BrandProvider({ children, session }) {
     fetchBrand();
 
     const onBrandUpdated = () => { fetchBrand(); };
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (!table || table === "*" || table === "profiles") {
+        fetchBrand();
+      }
+    };
     window.addEventListener("flux:brand-updated", onBrandUpdated);
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onBrandUpdated);
 
     return () => {
       active = false;
       window.removeEventListener("flux:brand-updated", onBrandUpdated);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onBrandUpdated);
     };
   }, [session]);
 

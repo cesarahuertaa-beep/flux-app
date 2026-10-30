@@ -370,10 +370,22 @@ const RELATED_TABLES = {
   nutricion_dias: ["nutricion_dias", "comidas", "nutricion", "ciclos"],
   nutricion: ["nutricion", "nutricion_dias", "ciclos"],
   ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias", "ejercicios"],
+  disponibilidad: ["disponibilidad", "citas", "profiles"],
+  citas: ["citas", "disponibilidad", "citas_ratings", "notificaciones"],
+  citas_ratings: ["citas_ratings", "citas", "directorio_nutriologos_publicos", "profiles"],
+  profiles: ["profiles", "directorio_nutriologos_publicos", "clientes", "disponibilidad"],
+  clientes: ["clientes", "profiles", "ciclos", "citas", "metricas_progreso"],
+  metricas_progreso: ["metricas_progreso", "clientes", "progreso"],
+  progreso: ["progreso", "rutinas", "ejercicios"],
+  nutricion_progreso: ["nutricion_progreso", "nutricion_dias", "nutricion"],
+  pagos_manuales: ["pagos_manuales", "profiles", "clientes", "comisiones"],
+  solicitudes_profesionales: ["solicitudes_profesionales", "profiles"],
+  productos: ["productos"],
+  notificaciones: ["notificaciones"],
 };
 
-/** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms pero se refresca en segundo plano. */
-export const invalidateCache = (table) => {
+/** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms para dbPeek pero se refresca de inmediato. */
+export const invalidateCache = (table, extraDetail = null) => {
   const targets = table ? (RELATED_TABLES[table] || [table]) : null;
   for (const [key, entry] of queryCache.entries()) {
     const keyTable = key.split("?")[0];
@@ -382,8 +394,170 @@ export const invalidateCache = (table) => {
       persistEntry(key);
     }
   }
-  emitCacheUpdate("*", table || "*", null);
+  emitCacheUpdate("*", table || "*", extraDetail);
 };
+
+// ── Canal en Tiempo Real Multi-Dispositivo (Supabase Realtime WebSocket + Broadcast) ──
+let _rtSocket = null;
+let _rtHeartbeatTimer = null;
+let _rtReconnectTimer = null;
+let _rtRef = 1;
+let _rtJoined = false;
+const _clientInstanceId = Math.random().toString(36).slice(2, 10);
+
+const handleRemoteTableChange = (table, payload = null) => {
+  if (!table) return;
+  if (payload?.sender === _clientInstanceId) return;
+  if (table === "expediente_clinico" && payload?.clienteId && typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(
+        new CustomEvent("flux:expediente-updated", {
+          detail: { clienteId: payload.clienteId, remote: true },
+        })
+      );
+    } catch { /* ignore */ }
+  }
+  invalidateCache(table, payload);
+};
+
+export const broadcastTableChange = (table, extra = {}) => {
+  if (!table || typeof window === "undefined" || !SUPA_URL || !SUPA_KEY) return;
+  const payload = { table, sender: _clientInstanceId, ts: Date.now(), ...extra };
+
+  // 1. Envío inmediato por WebSocket si está conectado
+  if (_rtSocket && _rtSocket.readyState === WebSocket.OPEN && _rtJoined) {
+    try {
+      _rtSocket.send(
+        JSON.stringify({
+          topic: "realtime:flux_live_sync",
+          event: "broadcast",
+          payload: {
+            type: "broadcast",
+            event: "table_changed",
+            payload,
+          },
+          ref: String(++_rtRef),
+        })
+      );
+    } catch { /* ignore */ }
+  }
+
+  // 2. Respaldo por REST Broadcast de Supabase para garantizar entrega aún si el WS se está reconectando
+  try {
+    fetch(`${SUPA_URL}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${_authToken || SUPA_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            topic: "flux_live_sync",
+            event: "table_changed",
+            payload,
+          },
+        ],
+      }),
+    }).catch(() => {});
+  } catch { /* ignore */ }
+};
+
+export const initRealtimeSync = () => {
+  if (typeof window === "undefined" || !SUPA_URL || !SUPA_KEY) return;
+  if (_rtSocket && (_rtSocket.readyState === WebSocket.OPEN || _rtSocket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  try {
+    const wsBase = SUPA_URL.replace(/^http/, "ws");
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPA_KEY)}&vsn=1.0.0`;
+    const ws = new WebSocket(wsUrl);
+    _rtSocket = ws;
+    _rtJoined = false;
+
+    ws.onopen = () => {
+      if (_rtSocket !== ws) return;
+      try {
+        ws.send(
+          JSON.stringify({
+            topic: "realtime:flux_live_sync",
+            event: "phx_join",
+            payload: {
+              config: {
+                broadcast: { ack: false, self: false },
+                presence: { key: "" },
+                postgres_changes: [{ event: "*", schema: "public" }],
+              },
+              access_token: _authToken || SUPA_KEY,
+            },
+            ref: String(++_rtRef),
+          })
+        );
+        _rtJoined = true;
+      } catch { /* ignore */ }
+
+      if (_rtHeartbeatTimer) clearInterval(_rtHeartbeatTimer);
+      _rtHeartbeatTimer = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(
+              JSON.stringify({
+                topic: "phoenix",
+                event: "heartbeat",
+                payload: {},
+                ref: String(++_rtRef),
+              })
+            );
+          } catch { /* ignore */ }
+        }
+      }, 25000);
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (!msg || !msg.event) return;
+        if (msg.event === "broadcast" && msg.payload?.event === "table_changed") {
+          handleRemoteTableChange(msg.payload?.payload?.table, msg.payload?.payload);
+        } else if (
+          msg.event === "postgres_changes" ||
+          msg.event === "INSERT" ||
+          msg.event === "UPDATE" ||
+          msg.event === "DELETE"
+        ) {
+          const tbl = msg.payload?.data?.table || msg.payload?.table;
+          if (tbl) handleRemoteTableChange(tbl, msg.payload);
+        }
+      } catch { /* ignore */ }
+    };
+
+    const scheduleReconnect = () => {
+      if (_rtHeartbeatTimer) {
+        clearInterval(_rtHeartbeatTimer);
+        _rtHeartbeatTimer = null;
+      }
+      _rtJoined = false;
+      if (_rtReconnectTimer) clearTimeout(_rtReconnectTimer);
+      _rtReconnectTimer = setTimeout(() => {
+        if (typeof navigator === "undefined" || navigator.onLine !== false) {
+          initRealtimeSync();
+        }
+      }, 3000);
+    };
+
+    ws.onclose = scheduleReconnect;
+    ws.onerror = () => {
+      try { ws.close(); } catch { /* ignore */ }
+    };
+  } catch { /* ignore */ }
+};
+
+if (typeof window !== "undefined") {
+  setTimeout(() => initRealtimeSync(), 200);
+  window.addEventListener("online", () => initRealtimeSync());
+}
 
 /** Actualiza de forma síncrona las entradas en caché de una tabla para mantener UI optimista en 0ms */
 export const updateQueryCache = (tablePrefix, updater) => {
@@ -441,7 +615,10 @@ const queueMutation = async (method, path, body, prefer) => {
   }
 };
 
-// ── Función base de petición (Arquitectura Local-First / Single Source of Truth) ──
+// Deduplicación de peticiones GET simultáneas para evitar peticiones duplicadas al mismo endpoint
+const _inflightGets = new Map();
+
+// ── Función base de petición (Network-First cuando hay internet + Fallback Offline instantáneo) ──
 const q = async (path, opts = {}, onBackgroundUpdate = null) => {
   if (!_isHydrated) {
     await hydrateOfflineCache();
@@ -466,7 +643,12 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
     const t = withTimeout(isGet ? (queryCache.has(path) ? 5000 : 12000) : 25000);
     try {
       if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("OFFLINE");
-      r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers, ...restOpts, signal: t.signal });
+      r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+        ...(isGet ? { cache: "no-store" } : {}),
+        headers,
+        ...restOpts,
+        signal: t.signal,
+      });
       t.done();
       _netDown = false;
     } catch {
@@ -517,7 +699,13 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
       return fetchNetwork();
     }
 
-    if ((opts.headers?.Prefer?.includes("return=minimal") || headers.Prefer?.includes("return=minimal")) && r.ok) return [];
+    if ((opts.headers?.Prefer?.includes("return=minimal") || headers.Prefer?.includes("return=minimal")) && r.ok) {
+      if (!isGet) {
+        invalidateCache(table);
+        broadcastTableChange(table);
+      }
+      return [];
+    }
     if (!r.ok) {
       if (returnedCache) return;
       // En lectura, cualquier fallo HTTP devuelve el último dato bueno de la base local si existe
@@ -560,36 +748,44 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
 
       if (isDifferent || prevCached?.invalidated) persistEntry(path);
 
-      if (returnedCache && isDifferent) {
-        if (onBackgroundUpdate) onBackgroundUpdate(finalData);
+      if (onBackgroundUpdate && isDifferent) {
+        onBackgroundUpdate(finalData);
+      }
+      if (prevCached && isDifferent) {
         emitCacheUpdate(path, table, finalData);
       }
       return finalData;
     }
+
+    // Mutación (POST / PATCH / DELETE) completada en servidor: invalidar caché y notificar a otros dispositivos al instante
+    invalidateCache(table);
+    broadcastTableChange(table);
     return data;
   };
 
   if (isGet) {
     const cached = opts.force ? null : queryCache.get(path);
-    if (cached) {
-      // PATRÓN LOCAL-FIRST (Estilo WhatsApp):
-      // Siempre respondemos en 0 ms desde la base de datos interna del teléfono.
-      // Si hay conexión y la caché tiene > 8 segundos o fue marcada obsoleta, actualizamos en segundo plano.
-      if (!isOfflineNow()) {
-        const age = Date.now() - (cached.timestamp || 0);
-        if (_netDown) {
-          if (Date.now() - _lastRetry > 5000) {
-            _lastRetry = Date.now();
-            returnedCache = true;
-            fetchNetwork().catch(() => {});
-          }
-        } else if (cached.invalidated || age > 8000) {
-          returnedCache = true;
-          fetchNetwork().catch(() => {});
-        }
-      }
+    // Si estamos sin internet, responder de inmediato desde la base de datos local
+    if (isOfflineNow() && cached) {
       return cached.data;
     }
+    // Con internet disponible: si hay callback de fondo y caché válida, entregar adelanto en 0ms
+    if (cached && !cached.invalidated && onBackgroundUpdate) {
+      try { onBackgroundUpdate(cached.data); } catch { /* ignore */ }
+    }
+    // Siempre esperar el dato real y fresco de Supabase (deduplicando lecturas concurrentes al mismo path)
+    if (_inflightGets.has(path)) {
+      const p = _inflightGets.get(path);
+      if (onBackgroundUpdate) {
+        p.then((res) => { try { onBackgroundUpdate(res); } catch { /* ignore */ } }).catch(() => {});
+      }
+      return p;
+    }
+    const netPromise = fetchNetwork().finally(() => {
+      _inflightGets.delete(path);
+    });
+    _inflightGets.set(path, netPromise);
+    return netPromise;
   } else {
     // En mutaciones (PATCH / DELETE), actualizar optimísticamente la caché local de inmediato (online y offline)
     if (method === "PATCH" || method === "DELETE") {
@@ -683,6 +879,8 @@ export const dbUpsert = async (p, b, opts = {}) => {
     const e = await r.text();
     throw new Error(e);
   }
+  invalidateCache(table);
+  broadcastTableChange(table);
   if (prefer.includes("return=minimal")) return [];
   const txt = await r.text();
   try {
@@ -748,7 +946,10 @@ export const flushMutations = async () => {
       _flushingPromise = null;
     }
     if (sent) {
-      touched.forEach((t) => invalidateCache(t));
+      touched.forEach((t) => {
+        invalidateCache(t);
+        broadcastTableChange(t);
+      });
       try {
         window.dispatchEvent(new CustomEvent("flux:synced", { detail: { tables: [...touched] } }));
       } catch { /* ignore */ }

@@ -931,20 +931,33 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
   applyPrescribedMacrosRef.current = handleApplyPrescribedMacros;
 
+  const pendingCacheReloadRef = useRef(false);
+
   useEffect(() => { loadCiclos(); }, [loadCiclos]);
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
 
   useEffect(() => {
+    if (!saving && !showDiaModal && !showRutinaModal && !showPlanModal && pendingCacheReloadRef.current) {
+      pendingCacheReloadRef.current = false;
+      loadCiclos();
+      if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: true });
+    }
+  }, [saving, showDiaModal, showRutinaModal, showPlanModal, loadCiclos, loadData, cicloSel]);
+
+  useEffect(() => {
     let timer = null;
     const onCacheUpdated = (ev) => {
-      if (saving || showDiaModal || showRutinaModal || showPlanModal) return;
       const table = ev?.detail?.table;
-      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios"].includes(table)) return;
+      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "metricas_progreso", "clientes", "*"].includes(table)) return;
+      if (saving || showDiaModal || showRutinaModal || showPlanModal) {
+        pendingCacheReloadRef.current = true;
+        return;
+      }
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        if (table === "ciclos") loadCiclos();
-        else if (cicloSel !== undefined) loadData(cicloSel, { silent: true });
-      }, 400);
+        if (!table || table === "*" || table === "ciclos") loadCiclos();
+        if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: true });
+      }, 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);

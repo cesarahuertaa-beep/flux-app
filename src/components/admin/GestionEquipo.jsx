@@ -69,7 +69,23 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     setLoading(false);
   }, [myId, isSuperadmin, equipo.length]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    let timer = null;
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["profiles", "*"].includes(table)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => load(), 250);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [load]);
 
   const invite = async () => {
     const cleanEmail = (form.email || "").trim().toLowerCase();

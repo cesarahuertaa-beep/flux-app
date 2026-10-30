@@ -126,7 +126,19 @@ export default function Login({ onLogin }) {
       }
     };
     fetchShowcaseNutris();
-    return () => { active = false; };
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (!table || table === "*" || table === "profiles" || table === "directorio_nutriologos_publicos") {
+        fetchShowcaseNutris();
+      }
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("focus", fetchShowcaseNutris);
+    return () => {
+      active = false;
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("focus", fetchShowcaseNutris);
+    };
   }, []);
 
   // Construir las 5 tarjetas del escaparate con rotación diaria justa

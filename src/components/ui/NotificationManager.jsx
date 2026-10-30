@@ -182,8 +182,7 @@ export default function NotificationManager({ session }) {
       checkingRef.current = true;
       try {
         const rows = await dbGet(
-          `notificaciones?profile_id=eq.${profileId}&leida=eq.false&order=created_at.asc&limit=15`,
-          { forceRefresh: true }
+          `notificaciones?profile_id=eq.${profileId}&leida=eq.false&order=created_at.asc&limit=15`
         );
         if (Array.isArray(rows) && rows.length > 0) {
           for (const n of rows) {
@@ -217,15 +216,24 @@ export default function NotificationManager({ session }) {
       }
     };
 
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (!table || table === "*" || table === "notificaciones" || table === "citas") {
+        checkUnread();
+      }
+    };
+
     window.addEventListener("focus", onFocusOrSync);
     window.addEventListener("visibilitychange", onFocusOrSync);
     window.addEventListener("flux:synced", onFocusOrSync);
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocusOrSync);
       window.removeEventListener("visibilitychange", onFocusOrSync);
       window.removeEventListener("flux:synced", onFocusOrSync);
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
     };
   }, [profileId]);
 

@@ -72,28 +72,43 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
     }).catch(e => console.error("Error refreshing roles in UserProfile:", e));
   }, [user?.email, form.email, session?.profileId]);
 
-  // Refrescar datos frescos desde la BD al montar, para no depender del caché del localStorage
+  // Refrescar datos frescos desde la BD al montar y cuando ocurran cambios en tiempo real
   useEffect(() => {
     const email = user?.email;
     if (!email) return;
-    const table = isCliente ? `clientes?email=ilike.${email}` : `profiles?email=ilike.${email}`;
-    dbGet(table).then(rows => {
-      if (rows && rows.length > 0) {
-        const p = rows[0];
-        setForm(prev => ({
-          ...prev,
-          nombre: p.nombre || prev.nombre,
-          telefono: p.telefono || prev.telefono,
-          avatar_url: p.avatar_url || prev.avatar_url,
-          fecha_nacimiento: p.fecha_nacimiento || "",
-          genero: p.genero || "",
-          pais: p.pais || prev.pais || "México",
-          estado_provincia: p.estado_provincia || "",
-        }));
-        if (isCliente && p.objetivo) setObjetivo(p.objetivo);
+    const query = isCliente ? `clientes?email=ilike.${email}` : `profiles?email=ilike.${email}`;
+    const loadPersonal = () => {
+      dbGet(query).then(rows => {
+        if (rows && rows.length > 0) {
+          const p = rows[0];
+          setForm(prev => ({
+            ...prev,
+            nombre: p.nombre || prev.nombre,
+            telefono: p.telefono || prev.telefono,
+            avatar_url: p.avatar_url || prev.avatar_url,
+            fecha_nacimiento: p.fecha_nacimiento || "",
+            genero: p.genero || "",
+            pais: p.pais || prev.pais || "México",
+            estado_provincia: p.estado_provincia || "",
+          }));
+          if (isCliente && p.objetivo) setObjetivo(p.objetivo);
+        }
+      }).catch(() => {});
+    };
+    loadPersonal();
+    const onCacheUpdated = (ev) => {
+      const tbl = ev?.detail?.table;
+      if (!tbl || tbl === "*" || tbl === "profiles" || tbl === "clientes") {
+        loadPersonal();
       }
-    }).catch(() => {});
-  }, [user?.email]);
+    };
+    window.addEventListener("flux:cache-updated", onCacheUpdated);
+    window.addEventListener("flux:synced", onCacheUpdated);
+    return () => {
+      window.removeEventListener("flux:cache-updated", onCacheUpdated);
+      window.removeEventListener("flux:synced", onCacheUpdated);
+    };
+  }, [user?.email, isCliente]);
 
   const handleSavePersonal = async (formData) => {
     setIsSaving(true);
