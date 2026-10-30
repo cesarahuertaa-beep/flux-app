@@ -4,7 +4,8 @@ import {
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
 , UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2,
-  Clock, Sparkles, ChevronDown
+  Clock, Sparkles, ChevronDown,
+  Mail, Phone, Target, ClipboardList
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
@@ -28,6 +29,15 @@ import ControlPagos from "../components/admin/ControlPagos";
 import MisComisiones from "../components/admin/MisComisiones";
 import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { peekClinicalRecord } from "../lib/clinicalRecord";
+import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
+import { calcEdadFromBirthdate } from "../lib/bodyComposition";
+
+const getInitials = (name) => {
+  if (!name) return "P";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -131,6 +141,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [retentionData, setRetentionData]   = useState({ activeCiclos: [], lastActivityMap: {} });
   const [filtroRetencion, setFiltroRetencion] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
   const [selectedWaClient, setSelectedWaClient] = useState(null);
+  const [expedienteClient, setExpedienteClient] = useState(null);
 
   const [myShadowClient, setMyShadowClient] = useState(() => {
     try {
@@ -590,6 +601,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   useBackButton(!!showNewClient, () => setShowNewClient(false), 20);
   useBackButton(!!editClient, () => setEditClient(null), 20);
   useBackButton(!!selectedWaClient, () => setSelectedWaClient(null), 25);
+  useBackButton(!!expedienteClient, () => setExpedienteClient(null), 25);
   useBackButton(!!selected, () => setSelected(null), 5);
 
   const createClient = async () => {
@@ -946,6 +958,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   };
 
+  useEffect(() => {
+    const onExpUpdated = () => {
+      setClientes(prev => [...prev]);
+    };
+    window.addEventListener("flux:expediente-updated", onExpUpdated);
+    return () => window.removeEventListener("flux:expediente-updated", onExpUpdated);
+  }, []);
+
   const activeCount = clientes.filter(c => c.activo).length;
   const inactivosCount = clientes.filter(c => c.activo && getPatientRetention(c).isInactivo).length;
   const venciendoCount = clientes.filter(c => c.activo && getPatientRetention(c).isVenciendo).length;
@@ -1170,175 +1190,263 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                     ? 'bg-rose-500' 
                     : 'bg-[var(--brand-primary)]';
 
+                  const clinRec = peekClinicalRecord(c.id);
+                  const edad = calcEdadFromBirthdate(c.fecha_nacimiento || clinRec?.anamnesis?.fecha_nacimiento, null);
+                  const generoRaw = c.genero || clinRec?.anamnesis?.genero;
+                  const genero = generoRaw ? (generoRaw.toLowerCase().startsWith("m") ? "Masculino" : generoRaw.toLowerCase().startsWith("f") ? "Femenino" : generoRaw) : null;
+                  const pesoVal = c.peso || clinRec?.anamnesis?.peso;
+                  const peso = pesoVal ? `${pesoVal} kg` : null;
+                  const demograficos = [edad ? `${edad} años` : null, genero, peso].filter(Boolean);
+
+                  const activeCycle = ret.activeCycle;
+                  const cleanCycleName = activeCycle?.nombre ? activeCycle.nombre.split("|")[0].trim() : null;
+                  const isIntakePending = clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada;
+
                   return (
                     <div 
                       key={c.id} 
-                      className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden flex flex-col hover:border-[var(--brand-primary)] transition-colors shadow-sm"
+                      className="bg-white rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-xs overflow-hidden"
                     >
-                      <div className="p-5 flex-1 relative">
-                        <div className={`absolute top-0 left-0 w-1.5 h-full ${barColor}`} />
-                        
-                        <div className="pl-2">
-                          <div className="flex items-start justify-between mb-1">
-                            <h3 className="font-bold text-[#0B1929] text-lg leading-tight truncate pr-2">
-                              {c.nombre}
-                            </h3>
-                          </div>
+                      {/* Barra superior de acento según estado */}
+                      <div className={`h-1.5 w-full ${barColor}`} />
 
-                          {/* Badges de Estado y Retención */}
-                          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                              c.activo 
-                                ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
-                                : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {c.activo ? "Activo" : "Inactivo"}
-                            </span>
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          {/* Cabecera con Avatar e Información Principal */}
+                          <div className="flex items-start justify-between gap-2.5 mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="relative shrink-0">
+                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
+                                  {getInitials(c.nombre)}
+                                </div>
+                                <span 
+                                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                                    !c.activo 
+                                      ? 'bg-slate-400' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-500' 
+                                      : ret.isVenciendo 
+                                      ? 'bg-amber-400' 
+                                      : 'bg-emerald-500'
+                                  }`} 
+                                  title={!c.activo ? "Inactivo" : ret.isInactivo ? "Requiere atención / Inactivo" : ret.isVenciendo ? "Por vencer" : "Activo y al día"}
+                                />
+                              </div>
 
-                            {c.activo && ret.isVenciendo && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                <Clock size={11} />
-                                {ret.isVencido 
-                                  ? `Plan vencido (${Math.abs(ret.daysToExpire)}d)` 
-                                  : (ret.daysToExpire === 0 ? "Vence hoy" : `Vence en ${ret.daysToExpire}d`)}
-                              </span>
-                            )}
-
-                            {c.activo && ret.isInactivo && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
-                                <AlertCircle size={11} />
-                                {ret.daysInactive ? `Inactivo (${ret.daysInactive}d)` : "Inactivo"}
-                              </span>
-                            )}
-
-                            {c.activo && ret.isAlDia && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 size={11} />
-                                Al día
-                              </span>
-                            )}
-
-                            {c.activo && ret.isNuevo && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                <Sparkles size={11} />
-                                Nuevo
-                              </span>
-                            )}
-
-                            {(() => {
-                              const clinRec = peekClinicalRecord(c.id);
-                              if (clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                    <Clock size={11} />
-                                    Expediente solicitado
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-
-                          <p className="text-xs text-[#6B7A8D] mb-3 truncate">{c.email}</p>
-                          
-                          <div className="text-sm text-[#4A5568] mb-4 line-clamp-2 min-h-[40px]">
-                            {c.objetivo || "Sin objetivo definido"}
-                          </div>
-
-                          {/* Botón WhatsApp Inteligente a 1 Clic */}
-                          {c.telefono ? (
-                            <div className="inline-flex items-stretch h-9 rounded-xl overflow-hidden shadow-sm" onClick={e => e.stopPropagation()}>
-                              {(() => {
-                                const clinRec = peekClinicalRecord(c.id);
-                                const isIntakePending = clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada;
-                                return (
-                                  <a 
-                                    href={getWhatsAppUrl(
-                                      c.telefono,
-                                      buildWhatsAppMessage(
-                                        c, 
-                                        isIntakePending ? "cuestionario" : (ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento")))
-                                      )
-                                    )} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className={`inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 transition-colors ${
-                                      isIntakePending
-                                        ? 'bg-blue-600 hover:bg-blue-700'
-                                        : ret.isVenciendo 
-                                        ? 'bg-amber-600 hover:bg-amber-700' 
-                                        : ret.isInactivo 
-                                        ? 'bg-rose-600 hover:bg-rose-700' 
-                                        : 'bg-[#25D366] hover:bg-[#20bd5a]'
-                                    }`}
-                                    title="Enviar mensaje por WhatsApp a 1 clic"
-                                  >
-                                    <MessageCircle size={14} className="fill-white shrink-0" />
-                                    <span>
-                                      {isIntakePending ? "Recordar Cuestionario" : ret.isVenciendo ? "Recordar Renovación" : ret.isInactivo ? "Check-in Adherencia" : "WhatsApp"}
-                                    </span>
-                                  </a>
-                                );
-                              })()}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedWaClient(c)}
-                                className={`w-9 flex items-center justify-center border-l border-white/20 transition-colors text-white shrink-0 ${
-                                  ret.isVenciendo 
-                                    ? 'bg-amber-700 hover:bg-amber-800' 
-                                    : ret.isInactivo 
-                                    ? 'bg-rose-700 hover:bg-rose-800' 
-                                    : 'bg-[#20bd5a] hover:bg-[#1caa50]'
-                                }`}
-                                title="Ver todas las plantillas de mensaje"
-                              >
-                                <ChevronDown size={14} />
-                              </button>
+                              <div className="min-w-0">
+                                <h3 className="font-bold text-[#0B1929] text-base leading-tight truncate" title={c.nombre}>
+                                  {c.nombre}
+                                </h3>
+                                <div className="text-xs text-[#6B7A8D] font-medium mt-0.5 truncate">
+                                  {demograficos.length > 0 ? demograficos.join(" • ") : (
+                                    <span className="text-[#9BA5B0] italic">Datos clínicos pendientes</span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-xs text-[#9BA5B0] italic">Sin teléfono registrado</span>
-                          )}
+
+                            {/* Badges de Estado y Retención */}
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                c.activo 
+                                  ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                {c.activo ? "Activo" : "Inactivo"}
+                              </span>
+
+                              {c.activo && ret.isVenciendo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                  <Clock size={10} />
+                                  {ret.isVencido 
+                                    ? `Vencido (${Math.abs(ret.daysToExpire)}d)` 
+                                    : (ret.daysToExpire === 0 ? "Vence hoy" : `Vence en ${ret.daysToExpire}d`)}
+                                </span>
+                              )}
+
+                              {c.activo && ret.isInactivo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+                                  <AlertCircle size={10} />
+                                  {ret.daysInactive ? `Inactivo (${ret.daysInactive}d)` : "Inactivo"}
+                                </span>
+                              )}
+
+                              {c.activo && ret.isAlDia && !ret.isVenciendo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                  <CheckCircle2 size={10} />
+                                  Al día
+                                </span>
+                              )}
+
+                              {c.activo && ret.isNuevo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                  <Sparkles size={10} />
+                                  Nuevo
+                                </span>
+                              )}
+
+                              {isIntakePending && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                  <Clock size={10} />
+                                  Expediente solicitado
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recuadro de Tratamiento Clínico y Plan Actual */}
+                          <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] space-y-2 mb-3">
+                            <div className="flex items-start gap-2 text-xs">
+                              <Target size={14} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[#6B7A8D] font-medium">Objetivo: </span>
+                                <span className="text-[#0B1929] font-bold truncate block sm:inline">
+                                  {c.objetivo || "General / Salud"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-2 text-xs">
+                              <UtensilsCrossed size={14} className="text-indigo-600 shrink-0 mt-0.5" />
+                              <div className="min-w-0 flex-1 flex items-center justify-between gap-1">
+                                <div className="min-w-0 flex-1 truncate">
+                                  <span className="text-[#6B7A8D] font-medium">Plan activo: </span>
+                                  {cleanCycleName ? (
+                                    <span className="text-[#0B1929] font-bold" title={cleanCycleName}>{cleanCycleName}</span>
+                                  ) : (
+                                    <span className="text-[#9BA5B0] italic">Sin plan asignado</span>
+                                  )}
+                                </div>
+                                {activeCycle && ret.daysToExpire !== null && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                                    ret.isVencido 
+                                      ? 'bg-rose-100 text-rose-700' 
+                                      : ret.isVenciendo 
+                                      ? 'bg-amber-100 text-amber-800' 
+                                      : 'bg-blue-100/80 text-[var(--brand-primary)]'
+                                  }`}>
+                                    {ret.isVencido 
+                                      ? `Vencido` 
+                                      : ret.daysToExpire === 0 
+                                      ? 'Vence hoy' 
+                                      : `${ret.daysToExpire}d rest.`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Contacto: Email y WhatsApp */}
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#F0F4FA]">
+                            <div className="flex items-center gap-1.5 text-xs text-[#6B7A8D] min-w-0 flex-1" title={c.email}>
+                              <Mail size={13} className="text-[#9BA5B0] shrink-0" />
+                              <span className="truncate">{c.email}</span>
+                            </div>
+
+                            {c.telefono ? (
+                              <div className="inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-2xs border border-emerald-500/20 shrink-0" onClick={e => e.stopPropagation()}>
+                                <a 
+                                  href={getWhatsAppUrl(
+                                    c.telefono,
+                                    buildWhatsAppMessage(
+                                      c, 
+                                      isIntakePending ? "cuestionario" : (ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento")))
+                                    )
+                                  )} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className={`inline-flex items-center gap-1 text-[11px] font-bold text-white px-2.5 transition-colors ${
+                                    isIntakePending
+                                      ? 'bg-blue-600 hover:bg-blue-700'
+                                      : ret.isVenciendo 
+                                      ? 'bg-amber-600 hover:bg-amber-700' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-600 hover:bg-rose-700' 
+                                      : 'bg-[#25D366] hover:bg-[#20bd5a]'
+                                  }`}
+                                  title="Enviar mensaje por WhatsApp a 1 clic"
+                                >
+                                  <MessageCircle size={12} className="fill-white shrink-0" />
+                                  <span>
+                                    {isIntakePending ? "Cuestionario" : ret.isVenciendo ? "Renovación" : ret.isInactivo ? "Check-in" : "WhatsApp"}
+                                  </span>
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedWaClient(c)}
+                                  className={`w-6 flex items-center justify-center border-l border-white/20 transition-colors text-white shrink-0 ${
+                                    ret.isVenciendo 
+                                      ? 'bg-amber-700 hover:bg-amber-800' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-700 hover:bg-rose-800' 
+                                      : 'bg-[#20bd5a] hover:bg-[#1caa50]'
+                                  }`}
+                                  title="Ver todas las plantillas de mensaje"
+                                >
+                                  <ChevronDown size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-[#9BA5B0] italic flex items-center gap-1 shrink-0">
+                                <Phone size={11} className="text-slate-300" /> Sin tel
+                              </span>
+                            )}
+                          </div>
 
                           {isSuperadmin && c.nutriologo_id && (
-                            <div className="text-[10px] text-[#6B7A8D] mt-3 font-medium flex items-center gap-1">
+                            <div className="text-[10px] text-[#6B7A8D] mt-2 font-medium flex items-center gap-1">
                               <Building2 size={12} /> {nutriologoMap[c.nutriologo_id] || "Nutriólogo desconocido"}
                             </div>
                           )}
                         </div>
+
+                        {/* Footer de Acciones */}
+                        <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex items-center gap-2">
+                          {role !== "administrativo" && (
+                            <button 
+                              onClick={() => { setSelected(c); setTab("programar"); }}
+                              className="flex-1 bg-[var(--brand-primary)] hover:opacity-90 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                              title="Programar nutrición y entrenamiento"
+                            >
+                              <CalendarDays size={14} />
+                              <span>Programar</span>
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => setExpedienteClient(c)}
+                            className="flex-1 bg-white border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#0B1929] px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer relative"
+                            title="Abrir expediente clínico integral"
+                          >
+                            <ClipboardList size={14} className="text-[var(--brand-primary)]" />
+                            <span>Expediente</span>
+                            {clinRec?.solicitud_activa && (
+                              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
+                            )}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditClient(c);
+                              setEditClientForm({ nombre: c.nombre || "", telefono: c.telefono || "", objetivo: c.objetivo || "" });
+                            }}
+                            className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-2 rounded-xl hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors cursor-pointer shrink-0"
+                            title="Editar datos básicos"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button 
+                            onClick={() => toggleActivo(c)}
+                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2 rounded-xl transition-colors cursor-pointer shrink-0 ${
+                              c.activo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50'
+                            }`}
+                            title={c.activo ? "Desactivar paciente" : "Activar paciente"}
+                          >
+                            {c.activo ? <X size={15} /> : <CheckCircle2 size={15} />}
+                          </button>
+                        </div>
                       </div>
-                    
-                    <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-3 flex items-center gap-2">
-                      {role !=="administrativo" && (
-                        <button 
-                          onClick={() => { setSelected(c); setTab("programar"); }}
-                          className="flex-1 bg-white border border-[#E2E8F0] text-[var(--brand-primary)] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[var(--brand-primary)] hover:text-white transition-colors"
-                        >
-                          Programar
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          setEditClient(c);
-                          setEditClientForm({ nombre:c.nombre||"", telefono:c.telefono||"", objetivo:c.objetivo||"" });
-                        }}
-                        className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-1.5 rounded-lg hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => toggleActivo(c)}
-                        className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-1.5 rounded-lg transition-colors ${
-                          c.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'
-                        }`}
-                        title={c.activo ?"Desactivar" :"Activar"}
-                      >
-                        {c.activo ? <X size={16} /> : <AlertCircle size={16} />}
-                      </button>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1853,6 +1961,24 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           )}
         </div>
       )}
+      {/* Modal de Expediente Clínico Integral desde Lista de Pacientes */}
+      {expedienteClient && (
+        <ExpedienteClinicoModal
+          cliente={expedienteClient}
+          isOpen={!!expedienteClient}
+          onClose={() => setExpedienteClient(null)}
+          onSaved={(savedRec, updatedClient) => {
+            if (updatedClient) {
+              setClientes((prev) =>
+                prev.map((cli) => (cli.id === updatedClient.id ? { ...cli, ...updatedClient } : cli))
+              );
+            }
+            setMsg("Expediente clínico guardado correctamente");
+            setTimeout(() => setMsg(""), 3000);
+          }}
+        />
+      )}
+
 </AppLayout>
   );
 }
