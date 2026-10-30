@@ -21,12 +21,10 @@ const FALLBACK_SHOWCASE = [
   { id: "fb-5", name: "FLUX Lab", specialty: "Suplementación", logo_url: "/flux_logo.jpeg", verified: true, badge: "Evidencia" },
 ];
 
-// Semilla semanal determinista para rotación justa entre nutriólogos registrados
-function getWeeklySeed() {
+// Semilla diaria determinista para rotación de nutriólogos día a día (se actualiza a las 00:00 cada día)
+function getDailySeed() {
   const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNumber = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
-  return now.getFullYear() * 100 + weekNumber;
+  return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
 }
 
 function seededShuffle(array, seed) {
@@ -101,21 +99,26 @@ export default function Login({ onLogin }) {
     }
   }, [showSplash, mode]);
 
-  // Cargar nutriólogos públicos para el escaparate rotativo superior
+  // Cargar nutriólogos públicos y estudiantes con foto de identidad profesional / consultorio
   useEffect(() => {
     let active = true;
     const fetchShowcaseNutris = async () => {
       try {
-        const nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,verificado,logo_url');
+        let nutris = await dbGet('profiles?select=id,nombre,role,nombre_marca,especialidad,verificado,logo_url&role=in.(nutriologo,nutriologo_estudiante)&logo_url=not.is.null&logo_url=neq.');
+        if (!Array.isArray(nutris) || nutris.length === 0) {
+          nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,verificado,logo_url');
+        }
         if (active && Array.isArray(nutris) && nutris.length > 0) {
-          const valid = nutris.map(n => ({
-            id: n.id,
-            name: n.nombre_marca || n.nombre || "Especialista FLUX",
-            specialty: n.especialidad || "Nutrición y Deporte",
-            logo_url: n.logo_url || "/flux_logo.jpeg",
-            verified: Boolean(n.verificado),
-            badge: n.verificado ? "Verificado" : "Especialista"
-          }));
+          const valid = nutris
+            .filter(n => n.logo_url && typeof n.logo_url === 'string' && n.logo_url.trim() !== '' && !n.logo_url.startsWith('photo-') && n.logo_url !== '/flux_logo.jpeg')
+            .map(n => ({
+              id: n.id,
+              name: n.nombre_marca || n.nombre || "Especialista FLUX",
+              specialty: n.especialidad || (n.role === 'nutriologo_estudiante' ? "Estudiante de Nutrición" : "Nutrición y Deporte"),
+              logo_url: n.logo_url,
+              verified: Boolean(n.verificado),
+              badge: n.verificado ? "Verificado" : (n.role === 'nutriologo_estudiante' ? "Estudiante" : "Especialista")
+            }));
           setNutriPool(valid);
         }
       } catch (e) {
@@ -126,24 +129,60 @@ export default function Login({ onLogin }) {
     return () => { active = false; };
   }, []);
 
-  // Construir las 5 tarjetas del escaparate con rotación semanal justa
+  // Construir las 5 tarjetas del escaparate con rotación diaria justa
   const showcaseCards = useMemo(() => {
-    const seed = getWeeklySeed();
-    const withLogo = nutriPool.filter(n => n.logo_url && !n.logo_url.startsWith("photo-"));
-    const withoutLogo = nutriPool.filter(n => !n.logo_url || n.logo_url.startsWith("photo-"));
-    const rotated = [
-      ...seededShuffle(withLogo, seed),
-      ...seededShuffle(withoutLogo, seed + 1)
-    ];
+    const seed = getDailySeed();
 
-    const finalFive = [];
-    for (let i = 0; i < 5; i++) {
-      if (rotated[i]) {
-        finalFive.push(rotated[i]);
-      } else {
-        finalFive.push(FALLBACK_SHOWCASE[i]);
-      }
+    // Nutriólogos con foto válida de identidad profesional / consultorio
+    const withLogo = nutriPool.filter(
+      n => n.logo_url && typeof n.logo_url === "string" && n.logo_url.trim() !== "" && !n.logo_url.startsWith("photo-") && n.logo_url !== "/flux_logo.jpeg"
+    );
+
+    if (withLogo.length === 0) {
+      return FALLBACK_SHOWCASE.slice(0, 5);
     }
+
+    // Rotación diaria determinista: barajamos justamente a los especialistas según la fecha del día
+    const rotated = seededShuffle(withLogo, seed);
+
+    // Si hay 5 o más nutriólogos, tomamos 5 distintos sin repetir
+    if (rotated.length >= 5) {
+      return rotated.slice(0, 5);
+    }
+
+    // Si hay menos de 5 nutriólogos:
+    // Se presentan los que haya SIN repetirse, y las posiciones restantes se cubren
+    // con las fotos del logo de FLUX (FALLBACK_SHOWCASE)
+    const count = rotated.length;
+    const finalFive = Array(5).fill(null);
+
+    if (count === 1) {
+      finalFive[0] = FALLBACK_SHOWCASE[0];
+      finalFive[1] = FALLBACK_SHOWCASE[1];
+      finalFive[2] = rotated[0]; // Hero central
+      finalFive[3] = FALLBACK_SHOWCASE[3];
+      finalFive[4] = FALLBACK_SHOWCASE[4];
+    } else if (count === 2) {
+      finalFive[0] = FALLBACK_SHOWCASE[0];
+      finalFive[1] = rotated[0];
+      finalFive[2] = rotated[1]; // Hero central
+      finalFive[3] = FALLBACK_SHOWCASE[3];
+      finalFive[4] = FALLBACK_SHOWCASE[4];
+    } else if (count === 3) {
+      // 3 nutriólogos: centrados simétricamente en slots 1, 2, 3 flanqueados por el logo de FLUX en 0 y 4
+      finalFive[0] = FALLBACK_SHOWCASE[0];
+      finalFive[1] = rotated[0];
+      finalFive[2] = rotated[1]; // Hero central
+      finalFive[3] = rotated[2];
+      finalFive[4] = FALLBACK_SHOWCASE[4];
+    } else if (count === 4) {
+      finalFive[0] = rotated[0];
+      finalFive[1] = rotated[1];
+      finalFive[2] = rotated[2]; // Hero central
+      finalFive[3] = rotated[3];
+      finalFive[4] = FALLBACK_SHOWCASE[4];
+    }
+
     return finalFive;
   }, [nutriPool]);
 

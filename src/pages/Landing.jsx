@@ -570,7 +570,10 @@ export default function Landing({ session, onLogout }) {
 
       try {
           // Cambiamos 'profiles' por la nueva vista 'directorio_nutriologos_publicos'
-          const nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
+          let nutris = await dbGet('profiles?select=id,nombre,role,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email&role=in.(nutriologo,nutriologo_estudiante)');
+        if (!Array.isArray(nutris) || nutris.length === 0) {
+          nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
+        }
           const allRatings = await dbGet('citas_ratings?select=nutriologo_id,puntuacion') || [];
         
         const ratingsMap = {};
