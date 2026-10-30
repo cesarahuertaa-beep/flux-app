@@ -3267,31 +3267,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               <h4 className="text-sm font-bold text-[#0B1929]">
                                 Meta Diaria Prescrita
                               </h4>
-                              {/* Badge de Modalidad */}
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                                prescMode === "ia"
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200/70"
-                                  : prescMode === "manual"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200/70"
-                                  : "bg-blue-50 text-blue-700 border-blue-200/70"
-                              }`}>
-                                {prescMode === "ia" ? (
-                                  <>
-                                    <Sparkles className="w-3 h-3 text-indigo-600" />
-                                    <span>Auditado con IA</span>
-                                  </>
-                                ) : prescMode === "manual" ? (
-                                  <>
-                                    <Edit2 className="w-3 h-3 text-amber-600" />
-                                    <span>Manual</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Calculator className="w-3 h-3 text-blue-600" />
-                                    <span>Matemático</span>
-                                  </>
-                                )}
-                              </span>
 
                               {smartPrescription.goalInfo?.title && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
@@ -3309,11 +3284,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 {smartPrescription.formulaShort || smartPrescription.formula}
                               </span>
                             </div>
-                            <p className="text-[11px] text-[#6B7A8D] truncate mt-0.5">
-                              {cycleMetrica?.fecha
-                                ? `Evaluación más reciente del plan (${fmtDate(cycleMetrica.fecha)}) • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`
-                                : `Sin evaluación vinculada • TMB: ${smartPrescription.tmb} kcal • GET: ${smartPrescription.get} kcal`}
-                            </p>
                           </div>
                         </div>
 
@@ -3637,11 +3607,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           <h4 className="text-sm font-bold text-[#0B1929]">
                             Directriz de Entrenamiento Prescrita
                           </h4>
-                          {/* Badge de Modalidad */}
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-indigo-50 text-indigo-700 border-indigo-200/70">
-                            <Sparkles className="w-3 h-3 text-indigo-600" />
-                            <span>Auditado con IA</span>
-                          </span>
 
                           {/* Badge de Objetivo */}
                           {p.goalTitle && (
@@ -3670,11 +3635,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-[#6B7A8D] truncate mt-0.5">
-                          {p.evalFecha
-                            ? `Evaluación más reciente (${fmtDate(p.evalFecha)}) • Nivel: ${p.nivelPrevio} • FAF: ${p.fafVal}`
-                            : `Basado en expediente clínico • Nivel: ${p.nivelPrevio} • FAF: ${p.fafVal}`}
-                        </p>
                       </div>
                     </div>
 

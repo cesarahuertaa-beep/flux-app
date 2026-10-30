@@ -139,19 +139,10 @@ export default function ClinicalAiSummaryCard({
             <h3 className="text-sm font-bold text-[#0B1929] tracking-tight">
               Resumen Clínico Inteligente
             </h3>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100/80 text-[var(--brand-primary)] border border-blue-200">
-              IA FLUX
-            </span>
-            {isGeminiOrigin && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>Auditado con IA</span>
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Right: Botón Auditar con IA + Flecha colapsar */}
+        {/* Right: Botón Auditar + Flecha colapsar */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
@@ -161,7 +152,7 @@ export default function ClinicalAiSummaryCard({
             title="Auditar y normalizar el expediente clínico con Google Gemini"
           >
             <Sparkles className={`w-3.5 h-3.5 ${loadingAi ? "animate-spin" : ""}`} />
-            <span>{loadingAi ? "Auditando..." : isGeminiOrigin ? "Reauditar con IA" : "Auditar con IA"}</span>
+            <span>{loadingAi ? "Auditando..." : isGeminiOrigin ? "Reauditar" : "Auditar"}</span>
           </button>
 
           <span className="text-xs font-semibold text-[#6B7A8D] hidden md:inline ml-1">
