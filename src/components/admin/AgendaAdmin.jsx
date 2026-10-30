@@ -21,7 +21,8 @@ import {
   ChevronDown,
   MapPin,
   Edit2,
-  X
+  X,
+  Check
 } from"lucide-react";
 
 // ── UI Components (Tailwind Light Theme) ──────────────────────────────────────
@@ -83,6 +84,15 @@ const Field = ({ label, children }) => (
 );
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const DIAS_CONFIG = [
+  { id: 1, label: "Lunes", short: "LUN" },
+  { id: 2, label: "Martes", short: "MAR" },
+  { id: 3, label: "Miércoles", short: "MIE" },
+  { id: 4, label: "Jueves", short: "JUE" },
+  { id: 5, label: "Viernes", short: "VIE" },
+  { id: 6, label: "Sábado", short: "SAB" },
+  { id: 0, label: "Domingo", short: "DOM" },
+];
 const DIAS_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const HORAS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
@@ -169,6 +179,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   });
   const [horarioForm, setHorarioForm]       = useState({
     dia_semana: 1,
+    dias_semana: [1, 2, 3, 4, 5],
     hora_inicio: "09:00",
     hora_fin: "17:00",
     duracion_minutos: 60,
@@ -349,6 +360,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setEditingHorarioId(null);
     setHorarioForm({
       dia_semana: 1,
+      dias_semana: [1, 2, 3, 4, 5],
       hora_inicio: "09:00",
       hora_fin: "17:00",
       duracion_minutos: duracionGlobal || 60,
@@ -360,6 +372,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
     setEditingHorarioId(h.id);
     setHorarioForm({
       dia_semana: h.dia_semana,
+      dias_semana: [h.dia_semana],
       hora_inicio: h.hora_inicio?.slice(0, 5) || "09:00",
       hora_fin: h.hora_fin?.slice(0, 5) || "17:00",
       duracion_minutos: h.duracion_minutos || duracionGlobal || 60,
@@ -372,21 +385,42 @@ export function AgendaAdmin({ setMsg, profileId }) {
       setMsg("❌ La hora de fin debe ser posterior a la hora de inicio");
       return;
     }
+
+    const dias = editingHorarioId ? [Number(horarioForm.dia_semana)] : (horarioForm.dias_semana || []);
+    if (!dias || dias.length === 0) {
+      setMsg("⚠️ Selecciona al menos un día de la semana");
+      return;
+    }
+
     setSaving(true);
     const durMin = Number(horarioForm.duracion_minutos) || duracionGlobal || 60;
-    const payload = {
-      dia_semana: Number(horarioForm.dia_semana),
-      hora_inicio: horarioForm.hora_inicio,
-      hora_fin: horarioForm.hora_fin,
-      duracion_minutos: durMin,
-    };
+
+    // Sincronizar también la duración elegida en el perfil del especialista
+    if (durMin && myId) {
+      setDuracionGlobal(durMin);
+      dbPatch(`profiles?id=eq.${myId}`, { duracion_cita: durMin }).catch(() => {});
+    }
+
     try {
       if (editingHorarioId) {
+        const payload = {
+          dia_semana: Number(horarioForm.dia_semana),
+          hora_inicio: horarioForm.hora_inicio,
+          hora_fin: horarioForm.hora_fin,
+          duracion_minutos: durMin,
+        };
         await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, payload);
         setMsg("Horario actualizado");
       } else {
-        await dbPost("disponibilidad", { ...payload, nutriologo_id: myId });
-        setMsg("Horario guardado");
+        const inserts = dias.map(d => ({
+          nutriologo_id: myId,
+          dia_semana: Number(d),
+          hora_inicio: horarioForm.hora_inicio,
+          hora_fin: horarioForm.hora_fin,
+          duracion_minutos: durMin,
+        }));
+        await dbPost("disponibilidad", inserts);
+        setMsg(dias.length === 1 ? "Horario guardado" : `Disponibilidad agregada para ${dias.length} días`);
       }
       setShowHorario(false);
       setEditingHorarioId(null);
@@ -394,11 +428,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
     } catch (e) {
       // Fallback si la columna duracion_minutos aún no está en Supabase
       try {
-        delete payload.duracion_minutos;
         if (editingHorarioId) {
+          const payload = {
+            dia_semana: Number(horarioForm.dia_semana),
+            hora_inicio: horarioForm.hora_inicio,
+            hora_fin: horarioForm.hora_fin,
+          };
           await dbPatch(`disponibilidad?id=eq.${editingHorarioId}`, payload);
         } else {
-          await dbPost("disponibilidad", { ...payload, nutriologo_id: myId });
+          const inserts = dias.map(d => ({
+            nutriologo_id: myId,
+            dia_semana: Number(d),
+            hora_inicio: horarioForm.hora_inicio,
+            hora_fin: horarioForm.hora_fin,
+          }));
+          await dbPost("disponibilidad", inserts);
         }
         setMsg("Horario guardado");
         setShowHorario(false);
@@ -688,36 +732,6 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : (
         // ── Vista de Horarios ───────────────────────────────────────────────
         <div>
-          {/* Card de Configuración de Duración Predeterminada */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-[#0B1929] flex items-center gap-2">
-                    Duración habitual de tus consultas
-                    {savingDuracion && <span className="text-[11px] font-normal text-[#6B7A8D] animate-pulse">Guardando…</span>}
-                  </h4>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5 max-w-xl leading-relaxed">
-                    Tus bloques de disponibilidad se dividirán automáticamente en citas de esta duración para que tus pacientes puedan agendar.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="w-56">
-                  <CustomSelect
-                    value={duracionGlobal}
-                    onChange={guardarDuracionGlobal}
-                    options={DURACIONES_CONSULTA}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="flex flex-wrap justify-between items-center mb-5 gap-3">
             <div>
               <h4 className="font-bold text-base text-[#0B1929]">Días y Bloques de Atención</h4>
@@ -800,13 +814,87 @@ export function AgendaAdmin({ setMsg, profileId }) {
           title={editingHorarioId ? "Editar disponibilidad" : "Agregar disponibilidad"} 
           onClose={() => { setShowHorario(false); setEditingHorarioId(null); }}
         >
-          <Field label="Día de la semana">
-            <CustomSelect 
-              value={horarioForm.dia_semana} 
-              onChange={val => setHorarioForm(p => ({ ...p, dia_semana: Number(val) }))}
-              options={DIAS_FULL.map((d, i) => ({ value: i, label: d }))}
-            />
-          </Field>
+          {editingHorarioId ? (
+            <Field label="Día de la semana">
+              <CustomSelect 
+                value={horarioForm.dia_semana} 
+                onChange={val => setHorarioForm(p => ({ ...p, dia_semana: Number(val) }))}
+                options={DIAS_FULL.map((d, i) => ({ value: i, label: d }))}
+              />
+            </Field>
+          ) : (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">
+                  Días de atención con este horario
+                </label>
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [1, 2, 3, 4, 5] }))}
+                    className="text-[var(--brand-primary)] hover:underline font-bold text-[11px] cursor-pointer"
+                  >
+                    Lun - Vie
+                  </button>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [1, 2, 3, 4, 5, 6, 0] }))}
+                    className="text-[var(--brand-primary)] hover:underline font-bold text-[11px] cursor-pointer"
+                  >
+                    Todos
+                  </button>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setHorarioForm(p => ({ ...p, dias_semana: [] }))}
+                    className="text-[#6B7A8D] hover:text-[#0B1929] text-[11px] cursor-pointer"
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {DIAS_CONFIG.map(({ id, label }) => {
+                  const isChecked = (horarioForm.dias_semana || []).includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setHorarioForm(p => {
+                          const current = p.dias_semana || [];
+                          const next = current.includes(id)
+                            ? current.filter(x => x !== id)
+                            : [...current, id];
+                          return { ...p, dias_semana: next };
+                        });
+                      }}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none text-left ${
+                        isChecked
+                          ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[var(--brand-primary)] font-bold shadow-2xs"
+                          : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:border-[#CBD5E1] hover:text-[#0B1929]"
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
+                        isChecked ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white" : "border-[#CBD5E1] bg-white"
+                      }`}>
+                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {(!horarioForm.dias_semana || horarioForm.dias_semana.length === 0) && (
+                <p className="text-[11px] text-amber-600 mt-1.5 font-medium">
+                  * Selecciona al menos un día para aplicar este horario.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 mt-1">
             <Field label="Hora inicio">
               <CustomSelect 
@@ -823,14 +911,21 @@ export function AgendaAdmin({ setMsg, profileId }) {
               />
             </Field>
           </div>
-          <Field label="Duración por cita en este horario">
+
+          <Field label="Duración habitual por cita en este horario">
             <CustomSelect 
               value={horarioForm.duracion_minutos || duracionGlobal || 60} 
-              onChange={val => setHorarioForm(p => ({ ...p, duracion_minutos: Number(val) }))}
+              onChange={val => {
+                const num = Number(val);
+                setHorarioForm(p => ({ ...p, duracion_minutos: num }));
+                setDuracionGlobal(num);
+              }}
               options={DURACIONES_CONSULTA}
+              icon={<Clock className="w-4 h-4 text-[#94A3B8]" />}
             />
           </Field>
-          <div className="flex gap-2 justify-end mt-3">
+
+          <div className="flex gap-2 justify-end mt-4">
             <Btn outline onClick={() => { setShowHorario(false); setEditingHorarioId(null); }}>Cancelar</Btn>
             <Btn grad onClick={guardarHorario} disabled={saving}>
               {saving ? "Guardando…" : (editingHorarioId ? "Guardar cambios" : "Guardar horario")}
