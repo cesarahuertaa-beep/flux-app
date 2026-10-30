@@ -3038,7 +3038,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
             <div>
               <p className="font-semibold text-[#0B1929] text-sm">Aún no hay planes configurados para este paciente</p>
-              <p className="text-[#6B7A8D] mt-0.5">Crea el primer plan para comenzar a estructurar la alimentación y el entrenamiento.</p>
+              <p className="text-[#6B7A8D] mt-0.5">Crea el primer plan para comenzar a estructurar la alimentación y la rutina.</p>
             </div>
             <button
               onClick={openCreatePlan}
@@ -3156,7 +3156,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         {[
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Evaluación" },
           ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
-          ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Entrenamiento" }] : []),
+          ...(serviciosActivos.entrenamiento ? [{ k:"deporte", ic: <Dumbbell className="w-4 h-4 shrink-0"/>, lb:"Rutina" }] : []),
         ].map(({ k, ic, lb }) => (
           <button 
             key={k} 
@@ -4087,7 +4087,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     </div>
                   </button>
 
-                  {/* Entrenamiento */}
+                  {/* Rutina */}
                   <button
                     type="button"
                     onClick={() => {
@@ -4105,7 +4105,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   >
                     <div className="flex items-center gap-2">
                       <Dumbbell className="w-4 h-4 shrink-0" />
-                      <span className="text-xs">Entrenamiento</span>
+                      <span className="text-xs">Rutina</span>
                     </div>
                     <div className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 ${
                       planForm.servicios.entrenamiento
