@@ -4,6 +4,7 @@ import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, Chev
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
 import BrandColorPicker from "../ui/BrandColorPicker";
+import PhotoUploadBox from "../ui/PhotoUploadBox";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 
@@ -52,22 +53,19 @@ const Field = ({ label, hint, children }) => (
   </div>
 );
 
-const LogoPicker = ({ value, onChange, uploading }) => {
-  const fileRef = useRef(null);
-  return (
-    <div className="flex items-center gap-4 mt-1">
-      <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-        {value ? <img src={value} alt="Logo" className="w-full h-full object-cover"/> : <span className="text-xs text-slate-400">N/A</span>}
-      </div>
-      <div className="flex-1">
-        <input type="file" accept="image/*" className="hidden" ref={fileRef} onChange={onChange}/>
-        <Btn small outline onClick={() => fileRef.current?.click()} disabled={uploading}>
-          {uploading ? "Subiendo..." : value ? "Cambiar logo" : "Subir logo"}
-        </Btn>
-      </div>
-    </div>
-  );
-};
+const LogoPicker = ({ value, onChange, onRemove, uploading }) => (
+  <div className="mt-1">
+    <PhotoUploadBox
+      value={value}
+      onChange={onChange}
+      onRemove={onRemove}
+      uploading={uploading}
+      label="Subir logo"
+      size="sm"
+      shape="square"
+    />
+  </div>
+);
 
 export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, setSelected, setTab, setEditClient, toggleActivo }) {
   const _peekNutris = dbPeek("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
@@ -839,7 +837,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </Field>
           <div className="grid grid-cols-2 gap-4 items-start">
             <Field label="Logo de marca">
-              <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} uploading={uploadingLogo}/>
+              <LogoPicker value={formNutri.logo_url} onChange={e => handleLogoChange(e, setFormNutri)} onRemove={() => setFormNutri(p => ({ ...p, logo_url: "" }))} uploading={uploadingLogo}/>
             </Field>
             <div className="flex flex-col items-end">
               <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>
@@ -907,7 +905,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </Field>
           <div className="grid grid-cols-2 gap-4 items-start">
             <Field label="Logo de marca">
-              <LogoPicker value={editFormNutri.logo_url} onChange={e => handleLogoChange(e, setEditFormNutri)} uploading={uploadingLogo}/>
+              <LogoPicker value={editFormNutri.logo_url} onChange={e => handleLogoChange(e, setEditFormNutri)} onRemove={() => setEditFormNutri(p => ({ ...p, logo_url: "" }))} uploading={uploadingLogo}/>
             </Field>
             <div className="flex flex-col items-end">
               <label className="block text-sm font-semibold text-slate-700 mb-1.5 text-right">Color de marca</label>

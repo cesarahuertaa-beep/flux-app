@@ -1,17 +1,17 @@
 import React, { useRef, useState } from "react";
-import { Building2, Image as ImageIcon } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { storageUpload, storageDelete } from "../../lib/supabase";
-import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
+import { cacheMediaUrl } from "../../lib/mediaCache";
 import { showFluxAlert } from "../ui/ConfirmModal";
 import BrandColorPicker from "../ui/BrandColorPicker";
+import PhotoUploadBox from "../ui/PhotoUploadBox";
 
 export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
-  const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [tempLogoFile, setTempLogoFile] = useState(null);
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
     setTempLogoFile(file);
     setUploading(true);
@@ -36,6 +36,18 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
     setUploading(false);
   };
 
+  const handleRemoveLogo = async () => {
+    setTempLogoFile(null);
+    if (form.logo_url && form.logo_url.includes("storage/v1/object/public/logos/")) {
+      const oldPath = form.logo_url.split("/public/logos/")[1];
+      if (oldPath) {
+        await storageDelete("logos", oldPath).catch(err => console.warn("No se pudo borrar logo", err));
+      }
+    }
+    setForm((prev) => ({ ...prev, logo_url: "" }));
+    onSave({ ...form, logo_url: "" });
+  };
+
   const handleColorChange = (newColor) => {
     setForm({ ...form, color_primario: newColor });
     onSave({ ...form, color_primario: newColor });
@@ -55,38 +67,16 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
       </h2>
       
       <div className="flex flex-col md:flex-row items-center gap-6 pb-8 border-b border-[#E2E8F0] mb-8">
-        <div className="relative group cursor-pointer" onClick={() => !uploading && fileInputRef.current?.click()}>
-          {uploading ? (
-            <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div>
-            </div>
-          ) : tempLogoFile ? (
-            <img 
-              src={URL.createObjectURL(tempLogoFile)} 
-              alt="Logo Preview" 
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
-            />
-          ) : form.logo_url ? (
-            <CachedImage 
-              src={form.logo_url} 
-              alt="Logo" 
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
-              fallback={
-                <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
-                  <ImageIcon size={32} />
-                </div>
-              }
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[var(--brand-primary)] transition-colors">
-              <ImageIcon size={32} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-white text-[10px] font-bold uppercase tracking-wider">Cambiar Logo</span>
-          </div>
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-        </div>
+        <PhotoUploadBox
+          value={currentLogo}
+          onChange={handleFileChange}
+          onRemove={currentLogo ? handleRemoveLogo : null}
+          uploading={uploading}
+          label="Subir logo"
+          size="md"
+          shape="square"
+        />
+
         <div className="flex-1 min-w-0 w-full text-center md:text-left">
           <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
           <p className="text-[#6B7A8D] text-sm">Este logo y color aparecerán en los PDFs de tus pacientes.</p>

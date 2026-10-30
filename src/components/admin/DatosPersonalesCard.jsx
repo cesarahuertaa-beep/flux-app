@@ -1,17 +1,17 @@
-import React, { useRef, useState } from "react";
-import { User, Phone, MapPin, Calendar, Camera } from "lucide-react";
+import React, { useState } from "react";
+import { User } from "lucide-react";
 import { PAISES, ESTADOS_MEXICO } from "../../lib/constants";
 import { storageUpload, storageDelete } from "../../lib/supabase";
-import { CachedImage, cacheMediaUrl } from "../../lib/mediaCache";
+import { cacheMediaUrl } from "../../lib/mediaCache";
 import { CustomSelect } from "../ui/CustomSelect";
 import { showFluxAlert } from "../ui/ConfirmModal";
+import PhotoUploadBox from "../ui/PhotoUploadBox";
 
 export default function DatosPersonalesCard({ form, setForm, loading, onSave, isSaving }) {
-  const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
@@ -30,7 +30,6 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       }
 
       setForm((prev) => ({ ...prev, avatar_url: url }));
-      // Optionally trigger save here if wanted, or let the user click save
       onSave({ ...form, avatar_url: url });
     } catch (error) {
       showFluxAlert("Error subiendo foto", error.message);
@@ -38,8 +37,19 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
     setUploading(false);
   };
 
+  const handleRemoveAvatar = async () => {
+    if (form.avatar_url && form.avatar_url.includes("storage/v1/object/public/logos/")) {
+      const oldPath = form.avatar_url.split("/public/logos/")[1];
+      if (oldPath) {
+        await storageDelete("logos", oldPath).catch(() => {});
+      }
+    }
+    setForm((prev) => ({ ...prev, avatar_url: "" }));
+    onSave({ ...form, avatar_url: "" });
+  };
+
   const calcularEdad = (fechaStr) => {
-    if (!fechaStr) return"";
+    if (!fechaStr) return "";
     const hoy = new Date();
     const nac = new Date(fechaStr);
     let edad = hoy.getFullYear() - nac.getFullYear();
@@ -64,32 +74,15 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       <div className="flex flex-col sm:flex-row gap-6 mb-6">
         {/* Avatar Upload */}
         <div className="flex flex-col items-center gap-2 shrink-0">
-          <div className="relative group cursor-pointer" onClick={() => !uploading && fileInputRef.current?.click()}>
-            {uploading ? (
-              <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B7A8D]"></div>
-              </div>
-            ) : form.avatar_url ? (
-              <CachedImage 
-                src={form.avatar_url} 
-                alt="Avatar" 
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg bg-[#F7F9FC]" 
-                fallback={
-                  <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
-                    <Camera size={32} />
-                  </div>
-                }
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1] group-hover:border-[var(--brand-primary)] transition-colors">
-                <Camera size={32} />
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="text-white text-[10px] font-bold uppercase tracking-wider">Cambiar</span>
-            </div>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-          </div>
+          <PhotoUploadBox
+            value={form.avatar_url}
+            onChange={handleFileChange}
+            onRemove={form.avatar_url ? handleRemoveAvatar : null}
+            uploading={uploading}
+            label="Subir foto"
+            shape="circle"
+            size="md"
+          />
           <p className="text-xs text-[#6B7A8D]">Foto de perfil</p>
         </div>
 

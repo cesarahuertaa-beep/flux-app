@@ -4,6 +4,7 @@ import { Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X, Shoppi
 import { useBackButton } from"../../lib/backButtonHandler";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
+import PhotoUploadBox from "../ui/PhotoUploadBox";
 
 export default function GestorTienda({ setMsg }) {
   const _peekProds = dbPeek("productos?order=created_at.desc");
@@ -275,18 +276,17 @@ export default function GestorTienda({ setMsg }) {
 
               <div>
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase mb-1.5">Imagen del producto</label>
-                <div className="flex items-center gap-3">
-                  {form.imagen_url && <img src={form.imagen_url} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-[#E2E8F0]" />}
-                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#E2E8F0] rounded-xl p-4 hover:bg-[#F0F4FA] cursor-pointer transition-colors text-center">
-                    <ImageIcon className="w-6 h-6 text-[#9BA5B0] mb-2" />
-                    <span className="text-xs font-medium text-[var(--brand-primary)]">
-                      {uploading ?"Subiendo..." :"Subir nueva foto (JPG/PNG)"}
-                    </span>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                      if(e.target.files[0]) uploadImg(e.target.files[0]);
-                    }} />
-                  </label>
-                </div>
+                <PhotoUploadBox
+                  value={form.imagen_url}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) uploadImg(e.target.files[0]);
+                  }}
+                  onRemove={() => setForm(p => ({ ...p, imagen_url: "" }))}
+                  uploading={uploading}
+                  label="Subir foto de producto"
+                  size="md"
+                  shape="square"
+                />
               </div>
             </div>
 
