@@ -1491,7 +1491,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <div className={tab === "mi_entrenamiento" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mi Plan Personal" subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones">
             {myShadowClient ? (
-              <ProgramarCliente clientes={[myShadowClient]} selected={myShadowClient} setSelected={() => {}} setMsg={setMsg} biblioteca={biblioteca} isMiPlan={true} />
+              <ProgramarCliente
+                key={`mi_plan_${myShadowClient.id}`}
+                clientes={[myShadowClient]}
+                selected={myShadowClient}
+                setSelected={() => {}}
+                setMsg={setMsg}
+                biblioteca={biblioteca}
+                isMiPlan={true}
+              />
             ) : (
               <ListSkeleton rows={4} />
             )}
@@ -1506,6 +1514,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             subtitle={selected ? null : "Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente"}
           >
             <ProgramarCliente
+              key={`programar_${selected?.id || "empty"}`}
               clientes={clientes}
               selected={selected}
               setSelected={setSelected}
@@ -1924,6 +1933,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           >
             {clienteData ? (
               <ProgramarCliente
+                key={`civil_plan_${clienteData?.id || "civil"}`}
                 clientes={[clienteData]}
                 selected={clienteData}
                 setSelected={() => {}}

@@ -490,13 +490,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       ciclo: cicloSel,
       cicloNombre: cicloSel?.nombre || "",
       smartPrescription,
+      isMiPlan,
     });
-  }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription]);
+  }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription, isMiPlan]);
+
+  // Sincronización inmediata de métricas cuando cambia el cliente seleccionado
+  useEffect(() => {
+    if (selected?.id) {
+      const ms = dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`);
+      const enrichedList = Array.isArray(ms) ? ms.map(enrichMetrica) : [];
+      setAllMetricas(enrichedList);
+      setLatestMetrica(enrichedList[0] || null);
+    } else {
+      setAllMetricas([]);
+      setLatestMetrica(null);
+    }
+  }, [selected?.id]);
 
   useEffect(() => {
     let active = true;
     if (selected?.id) {
       setClinicalLoaded(false);
+      setClinicalRec(peekClinicalRecord(selected.id));
       fetchClinicalRecord(selected.id).then(rec => {
         if (active) {
           if (rec) setClinicalRec(rec);
@@ -3601,7 +3616,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           <>
             {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
             {(() => {
-              if (!smartTrainingPrescription) return null;
+              if (!smartTrainingPrescription || !smartTrainingPrescription.hasEvaluation || !cycleMetrica) return null;
               const p = smartTrainingPrescription;
 
               return (

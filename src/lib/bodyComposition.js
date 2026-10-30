@@ -1228,6 +1228,7 @@ export function generateSmartTrainingPrescription({
   ciclo = null,
   cicloNombre = "",
   smartPrescription = null,
+  isMiPlan = false,
 }) {
   const anamnesis = clinicalRec?.anamnesis || {};
   const sintesisIa = clinicalRec?.sintesis_ia || anamnesis?.resumen_ia || {};
@@ -1382,10 +1383,13 @@ export function generateSmartTrainingPrescription({
   const deportePref = (anamnesis?.tipo_entrenamiento || anamnesis?.deporte_favorito || "Entrenamiento de fuerza en gimnasio").trim();
 
   let rationaleBiomecanico = "";
+  const sujeto = isMiPlan ? "Especialista / Atleta" : "Paciente";
   if (tieneLesiones) {
-    rationaleBiomecanico = `El paciente presenta reporte de ${lesionesRaw}. Se establece un diseño con adaptaciones biomecánicas obligatorias: priorizar patrones con soporte guiado (máquinas o bancos) y trabajo unilateral para corregir asimetrías, evitando sobrecargas axiales compresivas en las articulaciones afectadas. Esquema de ${diasSugeridos} días estructurado en ${splitSugerido} con control estricto de tempo y rango de movimiento indoloro.`;
+    rationaleBiomecanico = isMiPlan
+      ? `Reporte de ${lesionesRaw}. Se establece un diseño con adaptaciones biomecánicas obligatorias: priorizar patrones con soporte guiado (máquinas o bancos) y trabajo unilateral para corregir asimetrías, evitando sobrecargas axiales compresivas en las articulaciones afectadas. Esquema de ${diasSugeridos} días estructurado en ${splitSugerido} con control estricto de tempo y rango de movimiento indoloro.`
+      : `El paciente presenta reporte de ${lesionesRaw}. Se establece un diseño con adaptaciones biomecánicas obligatorias: priorizar patrones con soporte guiado (máquinas o bancos) y trabajo unilateral para corregir asimetrías, evitando sobrecargas axiales compresivas en las articulaciones afectadas. Esquema de ${diasSugeridos} días estructurado en ${splitSugerido} con control estricto de tempo y rango de movimiento indoloro.`;
   } else if (nivelPrevio.includes("Sedentario")) {
-    rationaleBiomecanico = `Paciente en transición de un nivel ${nivelPrevio.toLowerCase()} (${ocupacion || "actividad laboral habitual"}) hacia una frecuencia proyectada de ${diasSugeridos} días semanales (${fafInfo?.label || "FAF " + fafVal}). Se prescribe una división de ${splitSugerido} con acondicionamiento neuromuscular enfocada en dominar los patrones básicos de movimiento a intensidad moderada (${volumenRpe}) para inducir adaptaciones en tejido conectivo sin generar fatiga excesiva.`;
+    rationaleBiomecanico = `${sujeto} en transición de un nivel ${nivelPrevio.toLowerCase()} (${ocupacion || "actividad laboral habitual"}) hacia una frecuencia proyectada de ${diasSugeridos} días semanales (${fafInfo?.label || "FAF " + fafVal}). Se prescribe una división de ${splitSugerido} con acondicionamiento neuromuscular enfocada en dominar los patrones básicos de movimiento a intensidad moderada (${volumenRpe}) para inducir adaptaciones en tejido conectivo sin generar fatiga excesiva.`;
   } else {
     rationaleBiomecanico = `Perfil con experiencia previa favorable (${nivelPrevio.toLowerCase()}) orientado al objetivo de ${goalShortTitle}. Se recomienda implementar una división de ${splitSugerido} en ${diasSugeridos} sesiones semanales (${fafInfo?.label || "FAF " + fafVal}), priorizando sobrecarga progresiva en los ejercicios compuestos base y complementando con aislamiento metabólico en ${volumenRpe}.`;
   }
