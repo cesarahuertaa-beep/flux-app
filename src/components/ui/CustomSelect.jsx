@@ -9,10 +9,13 @@ export function CustomSelect({
   className = "",
   containerClassName = "",
   dropdownClassName = "",
+  icon = null,
+  disabled = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef(null);
+  const listRef = useRef(null);
 
   // Detect available space to open upward or downward
   useEffect(() => {
@@ -22,6 +25,16 @@ export function CustomSelect({
       const spaceAbove = rect.top;
       // If there's less than 230px below and more room above, flip upward
       setOpenUpward(spaceBelow < 230 && spaceAbove > spaceBelow);
+    }
+  }, [isOpen]);
+
+  // Auto-scroll to selected option when opened
+  useEffect(() => {
+    if (isOpen && listRef.current) {
+      const selectedEl = listRef.current.querySelector('[data-selected="true"]');
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: "nearest" });
+      }
     }
   }, [isOpen]);
 
@@ -55,10 +68,16 @@ export function CustomSelect({
     <div ref={containerRef} className={`relative ${containerClassName}`}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between gap-2 bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-[13px] outline-none hover:border-[var(--brand-primary)] focus:border-[var(--brand-primary)] transition-all font-['Inter',sans-serif] ${className}`}
+        className={`w-full flex items-center justify-between gap-2 bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm outline-none hover:border-[var(--brand-primary)] focus:border-[var(--brand-primary)] transition-all font-['Inter',sans-serif] ${
+          disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+        } ${className}`}
       >
-        <span className="truncate text-left font-medium">{displayLabel}</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {icon && <span className="shrink-0 flex items-center text-[#94A3B8]">{icon}</span>}
+          <span className="truncate text-left font-medium">{displayLabel}</span>
+        </div>
         <ChevronDown
           className={`w-4 h-4 text-[#6B7A8D] shrink-0 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""
@@ -68,6 +87,7 @@ export function CustomSelect({
 
       {isOpen && (
         <div
+          ref={listRef}
           className={`absolute z-[250] left-0 right-0 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl py-1 max-h-56 overflow-y-auto scroll-hide overscroll-contain animate-in fade-in zoom-in-95 duration-100 ${
             openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
           } ${dropdownClassName}`}
@@ -78,6 +98,7 @@ export function CustomSelect({
               <button
                 key={String(opt.value)}
                 type="button"
+                data-selected={isSelected ? "true" : undefined}
                 onClick={() => {
                   onChange(opt.value);
                   setIsOpen(false);

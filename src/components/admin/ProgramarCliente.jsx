@@ -4687,23 +4687,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         <Clock className="w-3.5 h-3.5 text-blue-500" />
                                         Hora sugerida (AM/PM)
                                       </label>
-                                      <div className="relative">
-                                        <select 
-                                          className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] font-medium focus:outline-none focus:border-[var(--brand-primary)] appearance-none cursor-pointer hover:border-[#CBD5E1] transition-colors" 
-                                          value={c.hora || ""} 
-                                          onChange={e => updComida(i, "hora", e.target.value)} 
-                                        >
-                                          <option value="">-- Seleccionar hora --</option>
-                                          {c.hora && !HORAS_ESTANDAR_AM_PM.includes(c.hora) && (
-                                            <option value={c.hora}>{c.hora} (Actual)</option>
-                                          )}
-                                          {HORAS_ESTANDAR_AM_PM.map(hora => (
-                                            <option key={hora} value={hora}>{hora}</option>
-                                          ))}
-                                        </select>
-                                        <Clock className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                        <ChevronDown className="w-4 h-4 text-[#94A3B8] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                      </div>
+                                      <CustomSelect
+                                        value={c.hora || ""}
+                                        onChange={val => updComida(i, "hora", val)}
+                                        placeholder="-- Seleccionar hora --"
+                                        options={[
+                                          { value: "", label: "-- Seleccionar hora --" },
+                                          ...(c.hora && !HORAS_ESTANDAR_AM_PM.includes(c.hora)
+                                            ? [{ value: c.hora, label: `${c.hora} (Actual)` }]
+                                            : []),
+                                          ...HORAS_ESTANDAR_AM_PM.map(hora => ({ value: hora, label: hora }))
+                                        ]}
+                                        icon={<Clock className="w-4 h-4 text-[#94A3B8]" />}
+                                      />
                                     </div>
 
                                     {/* 2. Calorías de la toma (Definidas por el nutriólogo con indicador de % restante) */}

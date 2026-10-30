@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { CustomSelect } from "../ui/CustomSelect";
 import { X, Calculator, Check, Flame, Sparkles, RotateCcw, Target } from "lucide-react";
 import {
   TMB_FORMULAS,
@@ -356,17 +357,14 @@ export default function MacroCalculatorModal({
               <label className="block text-xs font-bold text-[#0B1929] mb-1.5">
                 Factor de Actividad (FAF)
               </label>
-              <select
+              <CustomSelect
                 value={faf}
-                onChange={(e) => setFaf(Number(e.target.value))}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-              >
-                {ACTIVITY_FACTORS.map((af) => (
-                  <option key={af.value} value={af.value}>
-                    {af.short} — {af.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFaf(Number(val))}
+                options={ACTIVITY_FACTORS.map((af) => ({
+                  value: af.value,
+                  label: `${af.short} — ${af.label}`,
+                }))}
+              />
 
               <label className="block text-xs font-bold text-[#0B1929] mt-3 mb-1.5">
                 Objetivo Energético
