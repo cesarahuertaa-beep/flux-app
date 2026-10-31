@@ -59,7 +59,12 @@ export default function ClinicalAiSummaryCard({
     setLoadingAi(true);
     setAiError(null);
     try {
-      const res = await generateClinicalAiSynopsis(anamnesis, cliente);
+      const enrichedCliente = {
+        ...cliente,
+        genero: cliente?.genero || clinicalRec?.anamnesis?.sexo || clinicalRec?.anamnesis?.genero || "",
+        sexo: cliente?.sexo || clinicalRec?.anamnesis?.sexo || clinicalRec?.anamnesis?.genero || "",
+      };
+      const res = await generateClinicalAiSynopsis(anamnesis, enrichedCliente);
       if (res?.diagnostico || res?.texto) {
         const newAiData = {
           texto: res.diagnostico || res.texto,

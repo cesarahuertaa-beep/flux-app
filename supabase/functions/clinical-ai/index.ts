@@ -47,6 +47,12 @@ function joinSpanishList(items: string[]): string {
   return `${initial}${conj}${last}`;
 }
 
+function isFemenino(val: any): boolean {
+  if (!val) return false;
+  const s = String(val).trim().toUpperCase();
+  return s.startsWith("F") || s === "MUJER" || s === "FEMALE";
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -90,7 +96,7 @@ Tu tarea es AUDITAR CON RIGOR CLÍNICO Y PRECISIÓN LA PRESCRIPCIÓN ENERGÉTICA
 ═══════════════════════════════════════════════════════════
 1. EXPEDIENTE MÉDICO CLÍNICO (Atemporal / Antecedentes)
 ═══════════════════════════════════════════════════════════
-- Paciente: ${cliente.nombre || "Paciente"} (${cliente.genero === "F" || metrica.sexo === "F" ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
+- Paciente: ${cliente.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo) ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
 - Patologías y diagnósticos: ${anamnesis.patologias || "Ninguna reportada"}
 - Alergias e intolerancias alimentarias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Medicación y suplementación: ${anamnesis.medicacion_suplementos || "Ninguna"}
@@ -263,7 +269,7 @@ Analiza la siguiente comida/receta diseñada para un paciente y calcula con máx
 Adicionalmente, coteja los ingredientes contra el expediente del paciente para detectar si hay algún conflicto con alergias o aversiones personales.
 
 EXPEDIENTE DEL PACIENTE:
-- Nombre: ${cliente?.nombre || "Paciente"} (${cliente?.genero === "F" ? "Mujer" : "Hombre"})
+- Nombre: ${cliente?.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || anamnesis?.sexo) ? "Mujer" : "Hombre"})
 - Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Aversiones alimentarias (no le gusta comer): ${anamnesis.aversiones_alimentos || "Ninguna"}
 - Preferencias / favoritos: ${anamnesis.preferencias_alimentos || "Ninguna"}
@@ -873,6 +879,10 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
     const itemsExcluir = Array.from(exclusionesMap.values());
     const exclusionesStr = itemsExcluir.length > 0 ? itemsExcluir.join(", ") : "Ninguna";
 
+    const rawSexo = cliente.genero || cliente.sexo || anamnesis.sexo || anamnesis.genero || "";
+    const esMujer = isFemenino(rawSexo);
+    const sexoLabel = esMujer ? "Femenino" : "Masculino";
+
     if (geminiKey && geminiKey.trim().length >= 20) {
       const prompt = `Eres un médico especialista en medicina interna y nutrición clínica de élite en FLUX.
 Tu tarea es REALIZAR UNA AUDITORÍA Y SÍNTESIS INTEGRAL DEL EXPEDIENTE CLÍNICO DE UN PACIENTE REAL.
@@ -882,7 +892,7 @@ Debes interpretar datos médicos, corregir errores ortográficos o descripciones
 DATOS DEL PACIENTE:
 ═══════════════════════════════════════════════════════════
 - Nombre: ${cliente.nombre || "Paciente"}
-- Sexo: ${cliente.genero === "F" || cliente.sexo === "F" ? "Femenino" : "Masculino"}
+- Sexo: ${sexoLabel} (${esMujer ? "Mujer / Femenina" : "Hombre / Masculino"})
 - Edad: ${cliente.edad || "Adulto"} años
 - Objetivo declarado: ${objetivo || "Mejorar salud y composición corporal"}
 
@@ -914,6 +924,8 @@ INSTRUCCIONES CLÍNICAS CRÍTICAS:
    - Cruza las variables: si hay hipertensión + herencia de diabetes, enfatiza la prevención cardiovascular y el control glucémico; si toma medicación, evalúa interacciones con minerales (ej. sodio, potasio).
 4. DIRECTRICES CONCRETAS PARA EL NUTRIÓLOGO:
    - Proporciona entre 3 y 4 directrices dietoterapéuticas precisas y prácticas para la elaboración del plan de alimentación.
+5. CONCORDANCIA DE GÉNERO OBLIGATORIA:
+   - Respeta estrictamente el sexo del paciente indicado (${sexoLabel}). Redacta el diagnóstico, la ocupación y todo el contexto con la concordancia de género correspondiente (${esMujer ? 'femenina: mujer, paciente femenina, etc.' : 'masculino: hombre, paciente masculino, etc.'}). Bajo ninguna circunstancia uses el sexo opuesto.
 
 Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
 {
@@ -995,8 +1007,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
     }
 
     // Fallback analítico transparente para expediente
-    const sexoStr =
-      cliente?.genero === "F" || cliente?.sexo === "F" ? "Paciente femenina" : "Paciente masculino";
+    const sexoStr = esMujer ? "Paciente femenina" : "Paciente masculino";
     const sintesisParts: string[] = [];
 
     if (tienePatologias) {

@@ -43,6 +43,21 @@ export function joinSpanishList(items) {
 }
 
 /**
+ * Normaliza y detecta si el sexo/género corresponde al femenino.
+ * Soporta 'Femenino', 'F', 'Mujer', 'female', etc.
+ */
+export function isFemenino(val) {
+  if (!val) return false;
+  const s = String(val).trim().toUpperCase();
+  return s.startsWith("F") || s === "MUJER" || s === "FEMALE";
+}
+
+export function getSexoLabel(cliente = {}, fallbackAnamnesis = null) {
+  const raw = cliente?.genero || cliente?.sexo || fallbackAnamnesis?.sexo || fallbackAnamnesis?.genero || "";
+  return isFemenino(raw) ? "Femenino" : "Masculino";
+}
+
+/**
  * Extracts and classifies all critical points of an anamnesis record for quick nutritionist review.
  */
 export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
@@ -116,7 +131,8 @@ export function extractClinicalHighlights(anamnesis = {}, cliente = {}) {
   const tieneHeredo = heredo.length > 0 || (heredoRaw.length > 2 && !/^(no|ningun|nada|n\/a)/i.test(heredoRaw));
 
   // 10. Generación de Diagnóstico Clínico Estructurado (Motor Analítico Local Limpio)
-  const sexoStr = cliente?.genero === "F" || cliente?.sexo === "F" ? "Paciente femenina" : "Paciente masculino";
+  const esMujerLocal = isFemenino(cliente?.genero || cliente?.sexo || ana?.sexo || ana?.genero);
+  const sexoStr = esMujerLocal ? "Paciente femenina" : "Paciente masculino";
   let sintesisParts = [];
 
   // Oración 1: Patología y Diagnóstico con razonamiento metabólico y corrección de typos
@@ -304,6 +320,10 @@ export async function generateClinicalAiSynopsis(anamnesis, cliente) {
   const notasRaw = (anamnesis?.notas_consulta || "").trim();
   const objetivo = (anamnesis?.objetivo_principal || cliente?.objetivo || "").trim();
 
+  const rawSexo = cliente?.genero || cliente?.sexo || anamnesis?.sexo || anamnesis?.genero || "";
+  const esMujer = isFemenino(rawSexo);
+  const sexoLabel = esMujer ? "Femenino" : "Masculino";
+
   const prompt = `Eres un médico especialista en medicina interna y nutrición clínica de élite en FLUX.
 Tu tarea es REALIZAR UNA AUDITORÍA Y SÍNTESIS INTEGRAL DEL EXPEDIENTE CLÍNICO DE UN PACIENTE REAL.
 Debes interpretar datos médicos, corregir errores ortográficos o descripciones coloquiales del paciente y generar una síntesis profesional y estructurada.
@@ -312,7 +332,7 @@ Debes interpretar datos médicos, corregir errores ortográficos o descripciones
 DATOS DEL PACIENTE:
 ═══════════════════════════════════════════════════════════
 - Nombre: ${cliente?.nombre || "Paciente"}
-- Sexo: ${cliente?.genero === "F" || cliente?.sexo === "F" ? "Femenino" : "Masculino"}
+- Sexo: ${sexoLabel} (${esMujer ? "Mujer / Femenina" : "Hombre / Masculino"})
 - Objetivo: ${objetivo || "Mejorar salud y composición corporal"}
 
 INFORMACIÓN REPORTADA EN EL EXPEDIENTE:
@@ -331,6 +351,7 @@ INSTRUCCIONES CLÍNICAS:
 2. Si hay 'intolerancia a la lactosa', el alimento real a excluir son 'Lácteos y derivados con lactosa' (¡NUNCA digas 'excluir la intolerancia'!).
 3. Redacta un diagnóstico integral cruzando patologías, herencia y medicación.
 4. Proporciona entre 3 y 4 directrices dietoterapéuticas precisas para el nutriólogo.
+5. CONCORDANCIA DE GÉNERO OBLIGATORIA: Respeta estrictamente el sexo del paciente indicado (${sexoLabel}). Redacta el diagnóstico, la ocupación y todo el contexto con la concordancia adecuada (${esMujer ? 'femenina: mujer, paciente femenina, etc.' : 'masculino: hombre, paciente masculino, etc.'}). Bajo ninguna circunstancia uses el sexo opuesto.
 
 Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
 {
@@ -478,7 +499,7 @@ Tu tarea es AUDITAR CON RIGOR CLÍNICO Y PRECISIÓN LA PRESCRIPCIÓN ENERGÉTICA
 ═══════════════════════════════════════════════════════════
 1. EXPEDIENTE MÉDICO CLÍNICO (Atemporal / Antecedentes)
 ═══════════════════════════════════════════════════════════
-- Paciente: ${cliente.nombre || "Paciente"} (${cliente.genero === "F" || metrica.sexo === "F" ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
+- Paciente: ${cliente.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo) ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
 - Patologías y diagnósticos: ${anamnesis.patologias || "Ninguna reportada"}
 - Alergias e intolerancias alimentarias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Medicación y suplementación: ${anamnesis.medicacion_suplementos || "Ninguna"}
@@ -1092,7 +1113,7 @@ Analiza la siguiente comida/receta diseñada para un paciente y calcula con máx
 Adicionalmente, coteja los ingredientes contra el expediente del paciente para detectar si hay algún conflicto con alergias o aversiones personales.
 
 EXPEDIENTE DEL PACIENTE:
-- Nombre: ${cliente?.nombre || "Paciente"} (${cliente?.genero === "F" ? "Mujer" : "Hombre"})
+- Nombre: ${cliente?.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || anamnesis?.sexo) ? "Mujer" : "Hombre"})
 - Alergias e intolerancias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Aversiones alimentarias (no le gusta comer): ${anamnesis.aversiones_alimentos || "Ninguna"}
 - Preferencias / favoritos: ${anamnesis.preferencias_alimentos || "Ninguna"}
