@@ -12,7 +12,8 @@ import {
 import {
   peekLandingConfig,
   fetchLandingConfig,
-  formatWhatsAppUrl
+  formatWhatsAppUrl,
+  getActiveSalesWhatsApp
 } from "../lib/landingConfig";
 
 function Stars({ n }) {
@@ -376,10 +377,23 @@ function Hero({ config }) {
 
         {/* Insignias de Disponibilidad */}
         <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mt-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0F4FA] border border-[#E2E8F0] text-xs font-semibold text-[#6B7A8D]">
-            <Smartphone size={14} className="text-[#1A6FD4]" />
-            <span>Google Play: <strong className="text-[#0B1929]">Fase Beta / Próximamente</strong></span>
-          </div>
+          {config?.playstore_activo && config?.playstore_url ? (
+            <a
+              href={config.playstore_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
+            >
+              <Smartphone size={14} className="text-emerald-600" />
+              <span>Disponible en Google Play</span>
+              <ExternalLink size={12} />
+            </a>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0F4FA] border border-[#E2E8F0] text-xs font-semibold text-[#6B7A8D]">
+              <Smartphone size={14} className="text-[#1A6FD4]" />
+              <span>Google Play: <strong className="text-[#0B1929]">Fase Beta / Próximamente</strong></span>
+            </div>
+          )}
           <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
             <CheckCircle size={14} /> 100% Funcional en Navegador Web
           </div>
@@ -450,7 +464,7 @@ function SupplementsSection({ supplements, config }) {
       return { url: config.external_links[prod.id], isExternal: true };
     }
     // Si no, generamos el enlace de WhatsApp
-    const number = config?.whatsapp_ventas || "7751016733";
+    const number = getActiveSalesWhatsApp(config);
     let msg = config?.whatsapp_mensaje || "¡Hola FLUX! Me interesa adquirir [producto] por $[precio].";
     msg = msg.replace(/\[producto\]/gi, prod.name || "producto");
     msg = msg.replace(/\[precio\]/gi, `${prod.price || 0}`);
@@ -562,7 +576,7 @@ function ApparelSection({ apparel, config }) {
     if (config?.external_links?.[prod.id]) {
       return { url: config.external_links[prod.id], isExternal: true };
     }
-    const number = config?.whatsapp_ventas || "7751016733";
+    const number = getActiveSalesWhatsApp(config);
     let msg = config?.whatsapp_mensaje || "¡Hola FLUX! Me interesa adquirir [producto] por $[precio].";
     msg = msg.replace(/\[producto\]/gi, prod.name || "ropa");
     msg = msg.replace(/\[precio\]/gi, `${prod.price || 0}`);
@@ -788,8 +802,10 @@ function NutritionistsSection({ nutritionists }) {
 }
 
 // ── SECCIÓN DESCARGAS Y ACCESO (LLEVA FLUX CONTIGO) ──
-function Downloads() {
-  const currentUrl = window.location.origin;
+function Downloads({ config }) {
+  const isPlayStoreActive = Boolean(config?.playstore_activo && config?.playstore_url);
+  const qrTarget = config?.qr_destino_url || (typeof window !== "undefined" ? `${window.location.origin}/app` : "https://www.flux-sport.com/app");
+  const qrSrc = config?.qr_imagen_url || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrTarget)}`;
 
   return (
     <section id="descargas" className="py-20 bg-[#F7F9FC] border-t border-[#E2E8F0]">
@@ -832,12 +848,25 @@ function Downloads() {
               </div>
               <h3 className="text-base font-bold text-[#0B1929] mb-1">Android (Google Play)</h3>
               <p className="text-xs text-[#6B7A8D] leading-relaxed mb-4">
-                Actualmente en fase de pruebas cerrada para optimizar el rendimiento y la experiencia nativa.
+                {isPlayStoreActive
+                  ? "Descarga la aplicación oficial directamente desde Google Play Store en tu dispositivo Android."
+                  : "Actualmente en fase de pruebas cerrada para optimizar el rendimiento y la experiencia nativa."}
               </p>
             </div>
-            <div className="w-full bg-[#F0F4FA] text-[#6B7A8D] text-xs font-bold py-2.5 rounded-xl text-center border border-[#E2E8F0]">
-              Próximamente en Play Store
-            </div>
+            {isPlayStoreActive ? (
+              <a
+                href={config.playstore_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl text-center transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <Smartphone size={14} /> Descargar en Google Play
+              </a>
+            ) : (
+              <div className="w-full bg-[#F0F4FA] text-[#6B7A8D] text-xs font-bold py-2.5 rounded-xl text-center border border-[#E2E8F0]">
+                Próximamente en Play Store
+              </div>
+            )}
           </div>
 
           {/* Tarjeta 3: Código QR */}
@@ -851,9 +880,13 @@ function Downloads() {
                 Apunta la cámara de tu celular para abrir FLUX directo en tu teléfono.
               </p>
             </div>
-            {/* Visual simulada del QR */}
-            <div className="w-24 h-24 bg-[#0B1929] p-2 rounded-2xl flex items-center justify-center shadow-xs">
-              <QrCode size={64} className="text-white" />
+            {/* Visual real del QR Escaneable */}
+            <div className="w-24 h-24 bg-[#0B1929] p-1.5 rounded-2xl flex items-center justify-center shadow-xs overflow-hidden">
+              <img
+                src={qrSrc}
+                alt="QR Code"
+                className="w-full h-full object-contain rounded-xl bg-white p-0.5"
+              />
             </div>
           </div>
         </div>
@@ -1104,7 +1137,7 @@ export default function Landing({ session, onLogout }) {
       <SupplementsSection supplements={activeSupplements} config={config} />
       <ApparelSection apparel={activeApparel} config={config} />
       <NutritionistsSection nutritionists={dbNutritionists} />
-      <Downloads />
+      <Downloads config={config} />
       <Footer config={config} />
     </div>
   );

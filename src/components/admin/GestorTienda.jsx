@@ -51,6 +51,9 @@ export default function GestorTienda({ setMsg }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [uploadingScreen, setUploadingScreen] = useState(false);
   const [newScreenTitle, setNewScreenTitle] = useState("");
+  const [newAdvisorName, setNewAdvisorName] = useState("");
+  const [newAdvisorPhone, setNewAdvisorPhone] = useState("");
+  const [uploadingQr, setUploadingQr] = useState(false);
 
   const loadProductos = async () => {
     if (productos.length === 0 && _peekProds === null) setLoading(true);
@@ -230,6 +233,88 @@ export default function GestorTienda({ setMsg }) {
     setConfig(updatedConfig);
     await saveLandingConfig(updatedConfig);
     setMsg("Captura eliminada");
+  };
+
+  // ── GESTIÓN DE MÚLTIPLES NÚMEROS DE WHATSAPP ──
+  const handleAddAdvisor = () => {
+    const cleanPhone = newAdvisorPhone.trim().replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setMsg("Ingresa un número de WhatsApp válido (mínimo 10 dígitos)");
+      return;
+    }
+    const label = newAdvisorName.trim() || `Línea ${(config.whatsapp_ventas_numeros || []).length + 1}`;
+    const newAdv = {
+      id: `adv_${Date.now()}`,
+      nombre: label,
+      numero: cleanPhone,
+      activo: true
+    };
+    const currentList = Array.isArray(config.whatsapp_ventas_numeros) ? config.whatsapp_ventas_numeros : [];
+    const updatedList = [...currentList, newAdv];
+    const updatedConfig = {
+      ...config,
+      whatsapp_ventas_numeros: updatedList,
+      whatsapp_ventas: updatedList[0]?.numero || cleanPhone
+    };
+    setConfig(updatedConfig);
+    setNewAdvisorName("");
+    setNewAdvisorPhone("");
+    setMsg(`✓ Número añadido: ${label}`);
+  };
+
+  const handleToggleAdvisor = (id) => {
+    const currentList = Array.isArray(config.whatsapp_ventas_numeros) ? config.whatsapp_ventas_numeros : [];
+    const updatedList = currentList.map(a => a.id === id ? { ...a, activo: !a.activo } : a);
+    const activeFirst = updatedList.find(a => a.activo);
+    const updatedConfig = {
+      ...config,
+      whatsapp_ventas_numeros: updatedList,
+      whatsapp_ventas: activeFirst ? activeFirst.numero : config.whatsapp_ventas
+    };
+    setConfig(updatedConfig);
+  };
+
+  const handleRemoveAdvisor = (id) => {
+    const currentList = Array.isArray(config.whatsapp_ventas_numeros) ? config.whatsapp_ventas_numeros : [];
+    if (currentList.length <= 1) {
+      setMsg("Debe haber al menos un número de ventas configurado.");
+      return;
+    }
+    const updatedList = currentList.filter(a => a.id !== id);
+    const updatedConfig = {
+      ...config,
+      whatsapp_ventas_numeros: updatedList,
+      whatsapp_ventas: updatedList[0]?.numero || config.whatsapp_ventas
+    };
+    setConfig(updatedConfig);
+    setMsg("Número eliminado");
+  };
+
+  // ── SUBIDA DE QR PERSONALIZADO ──
+  const handleUploadCustomQr = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingQr(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fname = `custom_qr_${Date.now()}.${ext}`;
+      const url = await storageUpload("logos", fname, file);
+      const updatedConfig = { ...config, qr_imagen_url: url };
+      setConfig(updatedConfig);
+      await saveLandingConfig(updatedConfig);
+      setMsg("✓ Imagen personalizada del Código QR subida");
+    } catch (err) {
+      setMsg("Error al subir QR: " + err.message);
+    }
+    setUploadingQr(false);
+    e.target.value = "";
+  };
+
+  const handleRemoveCustomQr = async () => {
+    const updatedConfig = { ...config, qr_imagen_url: "" };
+    setConfig(updatedConfig);
+    await saveLandingConfig(updatedConfig);
+    setMsg("Imagen personalizada eliminada. Se usará el QR dinámico.");
   };
 
   const filtered = productos.filter(p => {
@@ -424,7 +509,7 @@ export default function GestorTienda({ setMsg }) {
       {/* ═══════════════════════════════════════════════════════════ */}
       {activeTab === "ajustes" && (
         <div className="flex-1 overflow-y-auto space-y-6 pb-12">
-          {/* Tarjeta 1: Canal de Ventas WhatsApp & Estado de Tienda */}
+          {/* Tarjeta 1: Canal de Ventas WhatsApp (Múltiples Números y Rotación) */}
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#F0F4FA]">
               <div className="flex items-center gap-3">
@@ -432,9 +517,9 @@ export default function GestorTienda({ setMsg }) {
                   <MessageCircle size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#0B1929]">Canal de Ventas por WhatsApp</h3>
+                  <h3 className="text-base font-bold text-[#0B1929]">Líneas de Ventas por WhatsApp (Múltiples Asesores)</h3>
                   <p className="text-xs text-[#6B7A8D] mt-0.5">
-                    Gestiona el número oficial al que llegarán los clientes al dar clic en &quot;Pedir por WhatsApp&quot;.
+                    Configura varios números. FLUX rotará automáticamente las solicitudes para repartir los leads de forma equitativa.
                   </p>
                 </div>
               </div>
@@ -461,40 +546,215 @@ export default function GestorTienda({ setMsg }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
-              <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  Número de WhatsApp de Ventas *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#9BA5B0]">+52</span>
-                  <input
-                    type="text"
-                    value={config.whatsapp_ventas || ""}
-                    onChange={e => setConfig(prev => ({ ...prev, whatsapp_ventas: e.target.value }))}
-                    placeholder="7751016733"
-                    className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-12 pr-4 py-2.5 text-sm font-semibold outline-none"
-                  />
-                </div>
-                <p className="text-[11px] text-[#9BA5B0] mt-1.5">
-                  Número de 10 dígitos (México). Puede cambiarse o actualizarse cuando gustes.
-                </p>
+            {/* Lista de Números Registrados */}
+            <div className="mt-5 space-y-3">
+              <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                Números Activos de Ventas ({(config.whatsapp_ventas_numeros || []).length})
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {(config.whatsapp_ventas_numeros || []).map((adv, idx) => (
+                  <div key={adv.id || idx} className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                    adv.activo ? 'bg-[#F7FDF9] border-emerald-200 shadow-2xs' : 'bg-gray-50 border-gray-200 opacity-60'
+                  }`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${adv.activo ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        <p className="text-xs font-bold text-[#0B1929] truncate">{adv.nombre || `Asesor ${idx + 1}`}</p>
+                      </div>
+                      <p className="text-xs font-mono font-bold text-emerald-700 mt-0.5">+52 {adv.numero}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAdvisor(adv.id)}
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg border cursor-pointer ${
+                          adv.activo
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-gray-200 text-gray-700 border-gray-300'
+                        }`}
+                        title={adv.activo ? "Pausar este asesor" : "Activar este asesor"}
+                      >
+                        {adv.activo ? "Activo" : "Pausado"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAdvisor(adv.id)}
+                        className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 cursor-pointer"
+                        title="Eliminar número"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div>
+              {/* Formulario para Agregar Nuevo Asesor */}
+              <div className="bg-[#F7F9FC] p-4 rounded-2xl border border-[#E2E8F0] mt-4 flex flex-col sm:flex-row items-end gap-3">
+                <div className="flex-1 w-full">
+                  <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">Nombre o Etiqueta</label>
+                  <input
+                    type="text"
+                    value={newAdvisorName}
+                    onChange={e => setNewAdvisorName(e.target.value)}
+                    placeholder="Ej: Ventas Sucursal 2"
+                    className="w-full bg-white border border-[#E2E8F0] focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-3 py-2 text-xs font-medium outline-none"
+                  />
+                </div>
+                <div className="w-full sm:w-48">
+                  <label className="block text-[11px] font-bold text-[#6B7A8D] uppercase mb-1">Teléfono (10 dígitos)</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#9BA5B0]">+52</span>
+                    <input
+                      type="text"
+                      value={newAdvisorPhone}
+                      onChange={e => setNewAdvisorPhone(e.target.value)}
+                      placeholder="7751234567"
+                      className="w-full bg-white border border-[#E2E8F0] focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-3 py-2 text-xs font-mono font-bold outline-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddAdvisor}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <Plus size={14} /> Agregar Número
+                </button>
+              </div>
+
+              {/* Mensaje Automático */}
+              <div className="pt-3 border-t border-[#F0F4FA] mt-4">
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
-                  Plantilla de Mensaje Automático
+                  Plantilla de Mensaje Automático para Pedidos
                 </label>
                 <input
                   type="text"
                   value={config.whatsapp_mensaje || ""}
                   onChange={e => setConfig(prev => ({ ...prev, whatsapp_mensaje: e.target.value }))}
                   placeholder="¡Hola FLUX! Me interesa adquirir [producto] por $[precio]."
-                  className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none"
+                  className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none font-medium"
                 />
                 <p className="text-[11px] text-[#9BA5B0] mt-1.5">
-                  Usa <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono">[producto]</code> y <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono">[precio]</code> para que se rellenen solos.
+                  Usa <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono">[producto]</code> y <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono">[precio]</code> para que se completen automáticamente al hacer clic.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjeta 2: Distribución de la App (Google Play Store y Código QR) */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <Smartphone size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#0B1929]">Distribución de la App (Google Play y Código QR)</h3>
+                <p className="text-xs text-[#6B7A8D] mt-0.5">
+                  Configura el enlace oficial a Play Store y el código QR de descarga para la Landing Page sin necesidad de modificar código.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Sección Google Play Store */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                    Enlace de Google Play Store
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#0B1929]">
+                      {config.playstore_activo ? "Público en Tienda" : "Fase Beta / Testers"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setConfig(prev => ({ ...prev, playstore_activo: !prev.playstore_activo }))}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                        config.playstore_activo ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          config.playstore_activo ? 'translate-x-4.5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  type="url"
+                  value={config.playstore_url || ""}
+                  onChange={e => setConfig(prev => ({ ...prev, playstore_url: e.target.value }))}
+                  placeholder="https://play.google.com/store/apps/details?id=com.fluxsport.app"
+                  className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-xs font-mono outline-none"
+                />
+                <p className="text-[11px] text-[#9BA5B0]">
+                  {config.playstore_activo
+                    ? "✓ Activo: Los botones del Hero y de la sección de Descargas dirigirán directamente a la Play Store."
+                    : "ℹ En fase beta: La landing mostrará la etiqueta de «Próximamente / Versión de prueba»."}
+                </p>
+              </div>
+
+              {/* Sección Código QR */}
+              <div className="space-y-4">
+                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                  Configuración del Código QR
+                </label>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#6B7A8D] mb-1">URL de Destino del QR</label>
+                  <input
+                    type="url"
+                    value={config.qr_destino_url || ""}
+                    onChange={e => setConfig(prev => ({ ...prev, qr_destino_url: e.target.value }))}
+                    placeholder="https://www.flux-sport.com/app"
+                    className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2 text-xs font-mono outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-4 pt-1">
+                  {/* Vista Previa del QR */}
+                  <div className="w-20 h-20 bg-[#0B1929] rounded-xl p-1.5 flex items-center justify-center shrink-0 shadow-xs">
+                    <img
+                      src={config.qr_imagen_url || `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(config.qr_destino_url || 'https://www.flux-sport.com/app')}`}
+                      alt="QR Preview"
+                      className="w-full h-full object-contain rounded-lg bg-white p-0.5"
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#F0F4FA] text-[#0B1929] hover:bg-[#E2E8F0] transition-colors cursor-pointer border border-[#E2E8F0] ${uploadingQr ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Upload size={13} />
+                      <span>{uploadingQr ? "Subiendo..." : "Subir QR Personalizado"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUploadCustomQr}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {config.qr_imagen_url ? (
+                      <button
+                        type="button"
+                        onClick={handleRemoveCustomQr}
+                        className="block text-[11px] text-red-600 hover:underline mt-1.5 font-semibold cursor-pointer"
+                      >
+                        Quitar imagen y usar QR automático
+                      </button>
+                    ) : (
+                      <p className="text-[11px] text-[#9BA5B0] mt-1.5">
+                        Generando QR dinámico en tiempo real hacia la URL indicada.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

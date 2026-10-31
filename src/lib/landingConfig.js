@@ -4,16 +4,29 @@ const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY_LANDING_CONFIG = "flux_landing_tienda_config";
 
 export const DEFAULT_LANDING_CONFIG = {
+  // Lista de números de ventas para rotación / balanceo
+  whatsapp_ventas_numeros: [
+    { id: "v1", nombre: "Ventas Principal", numero: "7751016733", activo: true }
+  ],
   whatsapp_ventas: "7751016733",
   whatsapp_mensaje: "¡Hola FLUX! Me interesa adquirir [producto] por $[precio].",
   tienda_activa: true,
+
+  // Configuración de Play Store y Descargas
+  playstore_url: "https://play.google.com/store/apps/details?id=com.fluxsport.app",
+  playstore_activo: false, // true = publicado para todos, false = fase beta/testers
+  qr_destino_url: "https://www.flux-sport.com/app",
+  qr_imagen_url: "",
+
+  // Canales de contacto y soporte
   whatsapp_soporte: "7751016733",
   email_contacto: "Flux.Sport.C@gmail.com",
   instagram_url: "",
   tiktok_url: "",
   youtube_url: "",
   facebook_url: "",
-  app_screenshots: [] // array de { id, url, title }
+  app_screenshots: [], // array de { id, url, title }
+  external_links: {} // mapa { [prodId]: url }
 };
 
 /**
@@ -43,6 +56,12 @@ export async function fetchLandingConfig() {
       const data = await r.json();
       if (data && typeof data === "object") {
         const merged = { ...DEFAULT_LANDING_CONFIG, ...data };
+        // Asegurar estructura de números de WhatsApp
+        if (!Array.isArray(merged.whatsapp_ventas_numeros) || merged.whatsapp_ventas_numeros.length === 0) {
+          merged.whatsapp_ventas_numeros = [
+            { id: "v1", nombre: "Ventas Principal", numero: merged.whatsapp_ventas || "7751016733", activo: true }
+          ];
+        }
         try {
           localStorage.setItem(KEY_LANDING_CONFIG, JSON.stringify(merged));
         } catch {}
@@ -86,4 +105,17 @@ export function formatWhatsAppUrl(number, message = "") {
   const fullNumber = clean.length === 10 ? `52${clean}` : clean;
   const encodedMsg = message ? encodeURIComponent(message) : "";
   return `https://wa.me/${fullNumber}${encodedMsg ? `?text=${encodedMsg}` : ""}`;
+}
+
+/**
+ * Obtiene un número de ventas activo rotando aleatoriamente entre los asesores habilitados.
+ */
+export function getActiveSalesWhatsApp(config) {
+  const list = Array.isArray(config?.whatsapp_ventas_numeros) ? config.whatsapp_ventas_numeros : [];
+  const activeList = list.filter(item => item && item.activo !== false && String(item.numero || '').replace(/\D/g, ''));
+  if (activeList.length > 0) {
+    const chosen = activeList[Math.floor(Math.random() * activeList.length)];
+    return chosen.numero;
+  }
+  return config?.whatsapp_ventas || "7751016733";
 }
