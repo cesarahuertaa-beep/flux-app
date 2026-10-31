@@ -125,7 +125,7 @@ const parseCycleData = (cycle, fallbackServicios = { nutricion: true, entrenamie
   return { nombreBase, semanas, dias, servicios, enfoque };
 };
 
-export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan, onModoAtleta }) {
+export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan }) {
   const brand = useBrand();
   const catalogRef = useRef(null);
   const [subtab, setSubtab] = useState(() => {
@@ -2927,111 +2927,105 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   return (
     <div className="w-full flex-1 flex flex-col pb-6">
-      {/* ── Cabecera cliente ── */}
-      
-        {/* Cabecera Civil Premium / Mi Plan */}
-        {isMiPlan && onModoAtleta && (
-          <div className="flex justify-end mb-4">
-              <button 
-                onClick={onModoAtleta}
-                className="bg-[var(--brand-primary)] text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:opacity-90 flex items-center gap-2 transition-all"
+      {/* ── Cabecera cliente / Mi Plan ── */}
+      <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+          
+          {/* Left: Info + Back button (solo si no es Mi Plan) */}
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            {!isMiPlan && (
+              <button
+                type="button"
+                onClick={() => (onBackToList ? onBackToList() : setSelected(null))}
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                title="Volver a la lista de pacientes"
               >
-              <Dumbbell size={18} /> Entrenar (Modo Atleta)
-            </button>
-          </div>
-        )}
-        
-        {!isMiPlan && (
-          <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-sm">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-              
-              {/* Left: Patient info + Back button */}
-              <div className="flex items-start sm:items-center gap-3 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => (onBackToList ? onBackToList() : setSelected(null))}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                  title="Volver a la lista de pacientes"
-                >
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate max-w-full">{selected.nombre}</h2>
-                    {edadStr && (
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
-                        {edadStr}
-                      </span>
-                    )}
-                    {sexoStr && (
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
-                        {sexoStr}
-                      </span>
-                    )}
-                    {pesoStr && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                        {pesoStr}
-                      </span>
-                    )}
-                    {selected.objetivo && (
-                      <span className="hidden xl:inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-blue-50/70 text-[var(--brand-primary)] truncate max-w-[220px]" title={selected.objetivo}>
-                        {selected.objetivo}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-[#6B7A8D] truncate mt-0.5 flex items-center gap-2 flex-wrap">
-                    <span className="truncate">{selected.email}</span>
-                    {selected.telefono && (
-                      <span className="flex items-center gap-1.5 shrink-0">
-                        <span>•</span>
-                        <a
-                          href={`https://wa.me/${sanitizeWhatsAppPhone(selected.telefono)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:underline font-semibold transition-colors"
-                          title="Abrir chat de WhatsApp con el paciente"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                          <span>{selected.telefono}</span>
-                        </a>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate max-w-full">
+                  {selected?.nombre || (isMiPlan ? "Mi Plan Personal" : "Paciente")}
+                </h2>
+                {edadStr && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
+                    {edadStr}
+                  </span>
+                )}
+                {sexoStr && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
+                    {sexoStr}
+                  </span>
+                )}
+                {pesoStr && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                    {pesoStr}
+                  </span>
+                )}
+                {selected?.objetivo && (
+                  <span className="hidden xl:inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-blue-50/70 text-[var(--brand-primary)] truncate max-w-[220px]" title={selected.objetivo}>
+                    {selected.objetivo}
+                  </span>
+                )}
               </div>
-
-              {/* Right: Histórico & Expediente */}
-              <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
-                <button
-                  type="button"
-                  onClick={() => setShowHistorico(true)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
-                  title="Abrir progreso histórico plan a plan en pantalla completa"
-                >
-                  <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                  <span>Histórico</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowExpediente(true)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
-                  title="Abrir Expediente Clínico Integral"
-                >
-                  <ClipboardList className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                  <span>Expediente</span>
-                  {clinicalRec?.solicitud_activa && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
-                  )}
-                </button>
+              <div className="text-xs text-[#6B7A8D] truncate mt-0.5 flex items-center gap-2 flex-wrap">
+                {selected?.email && <span className="truncate">{selected.email}</span>}
+                {!isMiPlan && selected?.telefono && (
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <span>•</span>
+                    <a
+                      href={`https://wa.me/${sanitizeWhatsAppPhone(selected.telefono)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:underline font-semibold transition-colors"
+                      title="Abrir chat de WhatsApp con el paciente"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                      <span>{selected.telefono}</span>
+                    </a>
+                  </span>
+                )}
+                {isMiPlan && (
+                  <span className="text-[#9BA5B0] font-medium">Gestión de objetivos y planificación personal</span>
+                )}
               </div>
-
             </div>
           </div>
-        )}
+
+          {/* Right: Acciones (Expediente e Histórico) */}
+          <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
+            {!isMiPlan && (
+              <button
+                type="button"
+                onClick={() => setShowHistorico(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
+                title="Abrir progreso histórico plan a plan en pantalla completa"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                <span>Histórico</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowExpediente(true)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
+              title="Abrir Expediente Clínico Integral"
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+              <span>Expediente</span>
+              {clinicalRec?.solicitud_activa && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
+              )}
+            </button>
+          </div>
+
+        </div>
+      </div>
 
       {/* ── Resumen Clínico Inteligente IA ── */}
-      {!isMiPlan && (clinicalRec?.anamnesis_completada || hasAnamnesisData(clinicalRec?.anamnesis)) && (
+      {(clinicalRec?.anamnesis_completada || hasAnamnesisData(clinicalRec?.anamnesis)) && (
         <ClinicalAiSummaryCard
           cliente={selected}
           clinicalRec={clinicalRec}

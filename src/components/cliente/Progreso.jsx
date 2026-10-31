@@ -5,7 +5,8 @@ import {
   Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown,
   Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X,
   ChevronDown, ChevronLeft, ChevronRight, Layers, Sparkles, Filter,
-  Stethoscope, Download, ArrowLeftRight, Check, Eye, Calendar
+  Stethoscope, Download, ArrowLeftRight, Check, Eye, Calendar,
+  FileText, ArrowUp, ArrowDown, Flame, Target, Zap, CheckCircle2
 } from "lucide-react";
 import { parseFotos, compressImageIfNeeded } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
@@ -15,7 +16,14 @@ import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
 import { ConfirmModal, showFluxAlert } from "../ui/ConfirmModal";
-import { enrichMetrica } from "../../lib/bodyComposition";
+import {
+  enrichMetrica,
+  linkMetricasToCiclos,
+  getMetodoLabel,
+  getGoalPresetInfo,
+  getActivityFactorInfo
+} from "../../lib/bodyComposition";
+import { generateProgresoPDF } from "../../utils/pdf";
 
 const EXACT_GROUPS = [
   "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
@@ -82,6 +90,8 @@ const getRank = (xp) => {
 export default function Progreso({ cliente, isSelfManaged }) {
   const _peekMetricas = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) : null;
   const [metricas, setMetricas] = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
+  const _peekCiclos = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`) : null;
+  const [ciclos, setCiclos] = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(() => _peekMetricas === null);
   const brand = useBrand();
@@ -115,11 +125,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setMetricas(Array.isArray(ms) ? ms.map(enrichMetrica) : []);
 
       // 2. Calcular progreso muscular
-      const [ciclosActivos, rutinas, progs] = await Promise.all([
-        dbGet(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`),
+      const [allCiclos, rutinas, progs] = await Promise.all([
+        dbGet(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`),
         dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`),
         dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`)
       ]);
+
+      const validCiclos = Array.isArray(allCiclos) ? allCiclos : [];
+      setCiclos(validCiclos);
+      const ciclosActivos = validCiclos.filter(c => c.activo);
 
       const ejMap = {};
       rutinas.forEach(r => {
@@ -471,8 +485,53 @@ export default function Progreso({ cliente, isSelfManaged }) {
   }, [lightboxIndex, handlePrevLightbox, handleNextLightbox]);
 
   if (loading) {
-    return (
-      <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+    
+  // Vincular cada métrica con su plan correspondiente
+  const allLinkedMetricas = useMemo(() => {
+    return linkMetricasToCiclos(metricas, ciclos);
+  }, [metricas, ciclos]);
+
+  // Orden cronológico para calcular deltas acumulados
+  const chronologicalEvals = useMemo(() => {
+    return [...allLinkedMetricas]
+      .filter((m) => m && m.fecha)
+      .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  }, [allLinkedMetricas]);
+
+  // KPIs de cambio total acumulado
+  const kpiStats = useMemo(() => {
+    if (chronologicalEvals.length === 0) return null;
+    const initial = chronologicalEvals[0];
+    const currentEval = chronologicalEvals[chronologicalEvals.length - 1];
+
+    const weightDelta =
+      initial.peso && currentEval.peso && initial.id !== currentEval.id
+        ? Number((Number(currentEval.peso) - Number(initial.peso)).toFixed(1))
+        : null;
+
+    const fatDelta =
+      initial.grasa_pct && currentEval.grasa_pct && initial.id !== currentEval.id
+        ? Number((Number(currentEval.grasa_pct) - Number(initial.grasa_pct)).toFixed(1))
+        : null;
+
+    const lbmDelta =
+      initial.masa_libre_grasa && currentEval.masa_libre_grasa && initial.id !== currentEval.id
+        ? Number((Number(currentEval.masa_libre_grasa) - Number(initial.masa_libre_grasa)).toFixed(1))
+        : null;
+
+    return {
+      initial,
+      current: currentEval,
+      weightDelta,
+      fatDelta,
+      lbmDelta,
+      totalEvals: allLinkedMetricas.length,
+      totalPlanes: ciclos.length,
+    };
+  }, [chronologicalEvals, allLinkedMetricas, ciclos]);
+
+  return (
+    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
         <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Mi Seguimiento</p>
           <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Mis Resultados</h1>
@@ -615,25 +674,157 @@ export default function Progreso({ cliente, isSelfManaged }) {
           </p>
         </div>
 
-        <div className="flex bg-[#F0F4FA] p-1 rounded-xl w-max">
-          <button
-            onClick={() => setView('metricas')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'metricas' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
-          >
-            Métricas
-          </button>
-          <button
-            onClick={() => setView('galeria')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'galeria' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
-          >
-            Galería
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {metricas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => generateProgresoPDF(cliente, metricas, brand)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[#0B1929] transition-all shadow-2xs cursor-pointer"
+              title="Descargar reporte PDF completo de evaluaciones"
+            >
+              <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
+              <span className="hidden sm:inline">Descargar PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </button>
+          )}
+
+          <div className="flex bg-[#F0F4FA] p-1 rounded-xl w-max">
+            <button
+              onClick={() => setView('metricas')}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${view === 'metricas' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+            >
+              Métricas
+            </button>
+            <button
+              onClick={() => setView('galeria')}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${view === 'galeria' ? 'bg-white text-[var(--brand-primary)] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}
+            >
+              Galería
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="px-6 md:px-8 py-6 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-8">
         {view === 'metricas' && (
           <>
+          {/* ── RESUMEN DE TRANSFORMACIÓN TOTAL ACUMULADA ── */}
+          {kpiStats && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Peso Total */}
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Peso Corporal
+                  </span>
+                  {kpiStats.weightDelta !== null && (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                        kpiStats.weightDelta < 0
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-blue-50 text-[var(--brand-primary)]"
+                      }`}
+                    >
+                      {kpiStats.weightDelta > 0 ? (
+                        <ArrowUp className="w-3 h-3" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3" />
+                      )}
+                      {Math.abs(kpiStats.weightDelta)} kg
+                    </span>
+                  )}
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-[#0B1929] font-['Rajdhani']">
+                  {kpiStats.current.peso || "—"}{" "}
+                  <span className="text-xs text-[#6B7A8D] font-normal">kg actual</span>
+                </div>
+                <div className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  Inicial: {kpiStats.initial.peso || "—"} kg ({fmtDate(kpiStats.initial.fecha)})
+                </div>
+              </div>
+
+              {/* % Grasa Total */}
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-amber-500" /> % Grasa
+                  </span>
+                  {kpiStats.fatDelta !== null && (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                        kpiStats.fatDelta < 0
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {kpiStats.fatDelta > 0 ? (
+                        <ArrowUp className="w-3 h-3" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3" />
+                      )}
+                      {Math.abs(kpiStats.fatDelta)}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-[#0B1929] font-['Rajdhani']">
+                  {kpiStats.current.grasa_pct ? `${kpiStats.current.grasa_pct}%` : "—"}{" "}
+                  <span className="text-xs text-[#6B7A8D] font-normal">actual</span>
+                </div>
+                <div className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  Inicial: {kpiStats.initial.grasa_pct ? `${kpiStats.initial.grasa_pct}%` : "—"}
+                </div>
+              </div>
+
+              {/* Masa Magra Total */}
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5">
+                    <BicepsFlexed className="w-3.5 h-3.5 text-emerald-600" /> Masa Magra
+                  </span>
+                  {kpiStats.lbmDelta !== null && (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                        kpiStats.lbmDelta > 0
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-[#6B7A8D]"
+                      }`}
+                    >
+                      {kpiStats.lbmDelta > 0 ? (
+                        <ArrowUp className="w-3 h-3" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3" />
+                      )}
+                      {Math.abs(kpiStats.lbmDelta)} kg
+                    </span>
+                  )}
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-[#0B1929] font-['Rajdhani']">
+                  {kpiStats.current.masa_libre_grasa || "—"}{" "}
+                  <span className="text-xs text-[#6B7A8D] font-normal">kg actual</span>
+                </div>
+                <div className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  Inicial: {kpiStats.initial.masa_libre_grasa || "—"} kg
+                </div>
+              </div>
+
+              {/* Planes y Evaluaciones */}
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+                <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                  <Layers className="w-3.5 h-3.5 text-purple-600" /> Etapas del Proceso
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-[#0B1929] font-['Rajdhani']">
+                  {kpiStats.totalPlanes}{" "}
+                  <span className="text-xs text-[#6B7A8D] font-normal">
+                    {kpiStats.totalPlanes === 1 ? "plan" : "planes"}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  {kpiStats.totalEvals} evaluación{kpiStats.totalEvals !== 1 ? "es" : ""} completada{kpiStats.totalEvals !== 1 ? "s" : ""}
+                </div>
+              </div>
+            </div>
+          )}
+
           {COMP_KEYS.length > 0 ? (
             <>
               {/* ── TOP 4 MÉTRICAS DESTACADAS ── */}
@@ -771,10 +962,192 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
             {/* GRÁFICAS DE EVOLUCIÓN Y SOMATOCARTA */}
             <EvolutionCharts
-              metricas={metricas}
+              metricas={allLinkedMetricas}
               isLocked={isEstandar}
               brandColor={brand?.color_primario}
             />
+
+            {/* ── DESGLOSE HISTÓRICO PLAN A PLAN ── */}
+            {ciclos.length > 0 && (
+              <div className="bg-white rounded-3xl p-5 md:p-7 border border-[#E2E8F0] shadow-sm space-y-5">
+                <div className="flex items-center justify-between gap-3 border-b border-[#F0F4FA] pb-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                        Evolución Histórica Plan a Plan
+                      </h3>
+                      <p className="text-xs text-[#6B7A8D]">
+                        Detalle de las evaluaciones registradas en cada plan de entrenamiento y nutrición
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-3 py-1 rounded-xl">
+                    {ciclos.length} Planes registrados
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {ciclos.map((c, cIdx) => {
+                    const planEvals = allLinkedMetricas.filter(
+                      (m) => String(m.ciclo_id) === String(c.id)
+                    );
+                    const isCurrent = c.activo;
+                    const firstEval = planEvals[planEvals.length - 1];
+                    const lastEval = planEvals[0];
+                    const weightDelta =
+                      firstEval?.peso && lastEval?.peso && firstEval.id !== lastEval.id
+                        ? (Number(lastEval.peso) - Number(firstEval.peso)).toFixed(1)
+                        : null;
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`rounded-2xl border p-4 sm:p-5 transition-all ${
+                          isCurrent
+                            ? "border-[var(--brand-primary)]/40 bg-blue-50/20 shadow-xs"
+                            : "border-[#E2E8F0] bg-white hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span
+                              className={`px-3 py-0.5 rounded-full text-xs font-bold ${
+                                isCurrent
+                                  ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                                  : "bg-gray-100 text-[#6B7A8D]"
+                              }`}
+                            >
+                              {isCurrent ? "Plan Activo" : `Plan #${ciclos.length - cIdx}`}
+                            </span>
+                            <h4 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                              {c.nombre?.split("|")[0]}
+                            </h4>
+                            {c.created_at && (
+                              <span className="text-xs text-[#6B7A8D] flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-[#94A3B8]" />
+                                {fmtDate(c.created_at)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2.5 text-xs">
+                            <span className="text-[#6B7A8D] font-medium">
+                              {planEvals.length} evaluación{planEvals.length !== 1 ? "es" : ""}
+                            </span>
+                            {weightDelta !== null && (
+                              <span
+                                className={`font-bold px-2.5 py-0.5 rounded-md ${
+                                  Number(weightDelta) < 0
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-blue-50 text-[var(--brand-primary)] border border-blue-200"
+                                }`}
+                              >
+                                Δ {Number(weightDelta) > 0 ? `+${weightDelta}` : weightDelta} kg
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Evaluaciones de este plan */}
+                        {planEvals.length === 0 ? (
+                          <div className="text-xs text-[#94A3B8] italic py-3 bg-white/60 rounded-xl px-4 border border-dashed border-[#E2E8F0]">
+                            Sin evaluaciones corporales registradas durante este plan.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-[#F0F4FA]">
+                            {planEvals.map((ev) => (
+                              <div
+                                key={ev.id}
+                                className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col justify-between gap-2.5 hover:shadow-xs transition-shadow"
+                              >
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                    {fmtDate(ev.fecha)}
+                                  </span>
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {ev.eval_objetivo && (() => {
+                                      const g = getGoalPresetInfo(ev.eval_objetivo);
+                                      return g ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                                          <Target className="w-2.5 h-2.5" /> {g.title}
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    {ev.metodo_evaluacion && (
+                                      <span className="text-[10px] font-bold text-[#6B7A8D] bg-gray-50 border border-[#E2E8F0] px-2 py-0.5 rounded-md">
+                                        {getMetodoLabel(ev.metodo_evaluacion)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0]/60">
+                                  <div>
+                                    <span className="text-[10px] text-[#6B7A8D] block">Peso</span>
+                                    <span className="text-xs font-bold text-[#0B1929]">
+                                      {ev.peso ? `${ev.peso} kg` : "—"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-[#6B7A8D] block">Grasa</span>
+                                    <span className="text-xs font-bold text-[#0B1929]">
+                                      {ev.grasa_pct ? `${ev.grasa_pct}%` : "—"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-[#6B7A8D] block">M. Magra</span>
+                                    <span className="text-xs font-bold text-emerald-700">
+                                      {ev.masa_libre_grasa ? `${ev.masa_libre_grasa} kg` : "—"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Check-in de Sensaciones */}
+                                {Boolean(
+                                  ev.checkin_energia ||
+                                    ev.checkin_saciedad ||
+                                    ev.checkin_observaciones
+                                ) && (
+                                  <div className="text-[11px] text-[#6B7A8D] bg-blue-50/50 rounded-lg p-2 border border-blue-100/60 space-y-1">
+                                    <div className="flex items-center justify-between font-bold text-[#0B1929]">
+                                      <span>Check-in consulta</span>
+                                      <span className="flex items-center gap-2">
+                                        {ev.checkin_energia && (
+                                          <span className="inline-flex items-center gap-1">
+                                            <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                            <span>{ev.checkin_energia}/5</span>
+                                          </span>
+                                        )}
+                                        {ev.checkin_saciedad && (
+                                          <span className="inline-flex items-center gap-1">
+                                            <Flame className="w-3 h-3 text-emerald-500 fill-emerald-500" />
+                                            <span>{ev.checkin_saciedad}/5</span>
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    {ev.checkin_observaciones && (
+                                      <p className="line-clamp-2 italic text-[#475569]">
+                                        "{ev.checkin_observaciones}"
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           </>
         ) : (
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
