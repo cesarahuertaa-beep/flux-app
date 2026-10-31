@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { dbPatch, dbGet, dbPost, storageListFolder, storageRemoveMany } from "../lib/supabase";
+import { dbPatch, dbGet, dbPost, dbDel, storageListFolder, storageRemoveMany } from "../lib/supabase";
 import { LogOut, ShoppingBag, RefreshCw, CheckCircle2, MapPin, User, Mail, Phone, Trash2, AlertTriangle, X } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import DatosPersonalesCard from "./admin/DatosPersonalesCard";
@@ -207,6 +207,16 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         await dbPost("rpc/eliminar_nutriologo_definitivo", {
           p_nutriologo_id: user.id,
         });
+      }
+
+      // Limpiar cualquier registro o solicitud profesional ligada a su correo (Cumplimiento Google Play)
+      const targetEmail = (user?.email || form?.email || "").trim();
+      if (targetEmail) {
+        try {
+          await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(targetEmail)}`);
+        } catch (solErr) {
+          console.warn("Aviso limpiando solicitudes_profesionales:", solErr);
+        }
       }
 
       localStorage.clear();

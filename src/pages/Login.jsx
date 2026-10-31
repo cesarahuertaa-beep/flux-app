@@ -294,6 +294,9 @@ export default function Login({ onLogin }) {
     if (m.includes("rate limit") || m.includes("too many requests")) {
       return "Demasiados intentos seguidos. Espera unos momentos antes de reintentar.";
     }
+    if (m.includes("solicitudes_profesionales") || m.includes("duplicate key") || m.includes("unique constraint")) {
+      return "Ya existe una solicitud registrada con este correo en proceso de revisión. Por favor espera la respuesta del superadministrador.";
+    }
     if (m.includes("violates row-level security") || m.includes("schema cache") || m.includes("pgrst")) {
       return "No se pudo registrar la solicitud en este momento. Por favor contacta a soporte.";
     }

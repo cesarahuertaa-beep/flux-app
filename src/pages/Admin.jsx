@@ -878,6 +878,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       
       // Ejecutar borrado en BD vía RPC usando dbPost
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: targetId, p_auth_id: targetAuthId });
+      const cliEmail = (editClient?.email || "").trim();
+      if (cliEmail) {
+        try { await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(cliEmail)}`); } catch (solErr) {}
+      }
       loadClientes({ silent: true, forceFresh: true });
     } catch(e) {
       setClientes(prevClientes);

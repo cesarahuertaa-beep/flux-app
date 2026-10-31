@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, updateQueryCache, invalidateCache } from "../../lib/supabase";
+import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
@@ -335,6 +335,12 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
       // 2. Ejecutar borrado en cascada en BD vía RPC
       await dbPost("rpc/eliminar_nutriologo_definitivo", { p_nutriologo_id: targetId });
+      const nutriEmail = (showEditNutri?.email || "").trim();
+      if (nutriEmail) {
+        try {
+          await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(nutriEmail)}`);
+        } catch (solErr) {}
+      }
       loadNutriologos({ forceFresh: true });
       loadClientes();
     } catch (e) {
