@@ -834,7 +834,7 @@ export default function Login({ onLogin }) {
   );
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-y-auto font-['Inter',sans-serif] text-[#0B1929] select-none">
+    <div className="h-[100dvh] md:h-auto md:min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-hidden md:overflow-y-auto font-['Inter',sans-serif] text-[#0B1929] select-none">
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
         <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -869,9 +869,9 @@ export default function Login({ onLogin }) {
       {/* ══════════════════════════════════════════════════════════════════
           VISTA 1: MÓVIL (< md) - CONSERVA 100% EL DISEÑO PWA Y PLAY STORE
          ══════════════════════════════════════════════════════════════════ */}
-      <div className="md:hidden flex-1 flex flex-col justify-between h-[100dvh] max-h-[100dvh]">
+      <div className="md:hidden w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden">
         {mode === "welcome" ? (
-          <div className="h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in">
+          <div className="h-[100dvh] max-h-[100dvh] flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in overflow-hidden">
           
           {/* 1. Escaparate Superior: Logos de los 5 nutriólogos con el contorno sobre su borde natural */}
           <div className="flex flex-col items-center pt-1">
@@ -953,7 +953,7 @@ export default function Login({ onLogin }) {
           </div>
         </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-start px-3.5 py-4 pb-16 relative z-10 overflow-y-auto overscroll-y-contain w-full min-h-0">
+          <div className="flex-1 h-full flex flex-col items-center justify-start px-3.5 py-4 pb-16 relative z-10 overflow-y-auto overscroll-y-contain w-full min-h-0">
             {renderAuthFormCard()}
           </div>
         )}
