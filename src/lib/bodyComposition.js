@@ -1119,7 +1119,14 @@ export function generateSmartMacroPrescription({
 
   return {
     hasEnoughData: peso > 0 && calcMatematico.targetKcal > 0,
-    hasEvaluation: Boolean(enriched),
+    hasEvaluation: Boolean(
+      enriched && (
+        (parseFloat(enriched.peso) > 0) ||
+        (parseFloat(enriched.grasa_pct) > 0) ||
+        (parseFloat(enriched.eval_faf) > 0) ||
+        Boolean(enriched.eval_objetivo)
+      )
+    ),
     hasExplicitEvalParams: Boolean(enriched?.eval_objetivo && enriched?.eval_faf),
     peso,
     estatura: rawEstatura > 0 ? rawEstatura : estatura,
@@ -1415,7 +1422,14 @@ export function generateSmartTrainingPrescription({
   }
 
   return {
-    hasEvaluation: Boolean(enriched),
+    hasEvaluation: Boolean(
+    enriched && (
+      (parseFloat(enriched.peso) > 0) ||
+      (parseFloat(enriched.grasa_pct) > 0) ||
+      (parseFloat(enriched.eval_faf) > 0) ||
+      Boolean(enriched.eval_objetivo)
+    )
+  ),
     evalFecha: enriched?.fecha || null,
     diasSugeridos,
     frecuenciaLabel,

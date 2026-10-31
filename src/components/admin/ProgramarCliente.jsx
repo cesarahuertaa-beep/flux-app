@@ -3231,7 +3231,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <>
                 {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
                 {(() => {
-                  if (!smartPrescription || !smartPrescription.hasEvaluation || !cycleMetrica || !smartPrescription.targetKcal || smartPrescription.targetKcal <= 0) {
+                  const hasExpediente = Boolean(
+                    clinicalRec?.anamnesis_completada ||
+                    clinicalRec?.anamnesis?.completado_por ||
+                    hasAnamnesisData(clinicalRec?.anamnesis)
+                  );
+                  if (
+                    !hasExpediente ||
+                    !smartPrescription ||
+                    !smartPrescription.hasEvaluation ||
+                    !cycleMetrica ||
+                    !smartPrescription.targetKcal ||
+                    smartPrescription.targetKcal <= 0
+                  ) {
                     return null;
                   }
                   const targetKcal = smartPrescription.targetKcal;
@@ -3593,7 +3605,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           <>
             {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
             {(() => {
-              if (!smartTrainingPrescription || !smartTrainingPrescription.hasEvaluation || !cycleMetrica) return null;
+              const hasExpediente = Boolean(
+                clinicalRec?.anamnesis_completada ||
+                clinicalRec?.anamnesis?.completado_por ||
+                hasAnamnesisData(clinicalRec?.anamnesis)
+              );
+              if (
+                !hasExpediente ||
+                !cycleMetrica ||
+                !smartTrainingPrescription ||
+                !smartTrainingPrescription.hasEvaluation ||
+                !smartPrescription ||
+                !smartPrescription.hasEvaluation ||
+                !smartPrescription.targetKcal ||
+                smartPrescription.targetKcal <= 0
+              ) {
+                return null;
+              }
               const p = smartTrainingPrescription;
 
               return (
