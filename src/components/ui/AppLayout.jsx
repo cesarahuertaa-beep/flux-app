@@ -116,15 +116,15 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
                 <CachedImage
                   src={liveAvatar}
                   alt={userName}
-                  className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-slate-200"
+                  className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-slate-200"
                   fallback={
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
                       <User size={13} strokeWidth={2} className="text-white" />
                     </div>
                   }
                 />
               ) : (
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background:"var(--brand-primary)" }}>
                   <User size={13} strokeWidth={2} className="text-white" />
                 </div>
               )}
@@ -136,7 +136,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 mt-4 mb-1">
-            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all overflow-hidden ${active ==="perfil" ?"ring-2 ring-offset-2 ring-[var(--brand-primary)]" :"hover:scale-105"}`} style={{ background:"var(--brand-primary)" }}>
+            <button onClick={() => setActive("perfil")} className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all overflow-hidden ${active ==="perfil" ?"ring-2 ring-offset-2 ring-[var(--brand-primary)]" :"hover:scale-105"}`} style={{ background:"var(--brand-primary)" }}>
               {liveAvatar ? (
                 <CachedImage
                   src={liveAvatar}

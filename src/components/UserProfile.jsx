@@ -287,9 +287,9 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
                 <CachedImage 
                   src={miNutriologo.logo_url} 
                   alt="Logo" 
-                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
                   fallback={
-                    <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                    <div className="w-20 h-20 rounded-2xl bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
                       <User size={32} />
                     </div>
                   }
@@ -299,16 +299,16 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
                 <CachedImage 
                   src={miNutriologo.avatar_url} 
                   alt="Avatar" 
-                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md bg-[#F7F9FC]" 
                   fallback={
-                    <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
+                    <div className="w-20 h-20 rounded-2xl bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border border-[#CBD5E1]">
                       <User size={32} />
                     </div>
                   }
                 />
               )}
               {!miNutriologo.logo_url && !miNutriologo.avatar_url && (
-                <div className="w-20 h-20 rounded-full bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
+                <div className="w-20 h-20 rounded-2xl bg-[#F0F4FA] text-[#6B7A8D] flex items-center justify-center shadow-inner border-2 border-dashed border-[#CBD5E1]">
                   <User size={32} />
                 </div>
               )}

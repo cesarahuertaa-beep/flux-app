@@ -80,7 +80,7 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
             onRemove={form.avatar_url ? handleRemoveAvatar : null}
             uploading={uploading}
             label="Subir foto"
-            shape="circle"
+            shape="square"
             size="md"
           />
           <p className="text-xs text-[#6B7A8D]">Foto de perfil</p>
