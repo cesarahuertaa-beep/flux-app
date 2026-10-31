@@ -2957,10 +2957,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente / Mi Plan ── */}
       <div className="mb-2 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3 sm:p-5 shadow-none md:shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-3">
           
           {/* Left: Info + Back button (solo si no es Mi Plan) */}
-          <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             {!isMiPlan && (
               <button
                 type="button"
@@ -3022,7 +3022,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
 
           {/* Right: Acciones (Expediente e Histórico) */}
-          <div className="flex items-center justify-between sm:justify-start lg:justify-end gap-2 pt-2.5 lg:pt-0 border-t lg:border-t-0 border-[#F0F4FA] flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {!isMiPlan && (
               <button
                 type="button"

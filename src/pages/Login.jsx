@@ -834,7 +834,10 @@ export default function Login({ onLogin }) {
   );
 
   return (
-    <div className="h-[100dvh] md:h-auto md:min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-hidden md:overflow-y-auto font-['Inter',sans-serif] text-[#0B1929] select-none">
+    <div
+      style={{ height: '100dvh', minHeight: '100dvh' }}
+      className="h-screen min-h-screen md:h-auto md:min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-hidden md:overflow-y-auto font-['Inter',sans-serif] text-[#0B1929] select-none"
+    >
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
         <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -869,9 +872,9 @@ export default function Login({ onLogin }) {
       {/* ══════════════════════════════════════════════════════════════════
           VISTA 1: MÓVIL (< md) - CONSERVA 100% EL DISEÑO PWA Y PLAY STORE
          ══════════════════════════════════════════════════════════════════ */}
-      <div className="md:hidden w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden">
+      <div className="md:hidden flex-1 w-full h-full flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
         {mode === "welcome" ? (
-          <div className="h-[100dvh] max-h-[100dvh] flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in overflow-hidden">
+          <div className="flex-1 h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-6 sm:pb-8 relative z-10 animate-in overflow-hidden">
           
           {/* 1. Escaparate Superior: Logos de los 5 nutriólogos con el contorno sobre su borde natural */}
           <div className="flex flex-col items-center pt-1">
@@ -892,8 +895,8 @@ export default function Login({ onLogin }) {
             </div>
           </div>
 
-          {/* 2. Bloque de Información: Asentado ligeramente arriba del botón de comenzar */}
-          <div className="flex flex-col items-center text-center mt-auto mb-6">
+          {/* 2. Bloque de Información: Asentado en el centro del espacio vertical */}
+          <div className="flex flex-col items-center text-center my-auto px-1">
             {/* Wordmark FLUX estilo Netflix */}
             <div className="text-4xl sm:text-5xl font-black tracking-[4px] sm:tracking-[6px] text-[#0B1929] uppercase leading-none font-['Space_Grotesk',sans-serif]">
               FLUX
@@ -928,7 +931,7 @@ export default function Login({ onLogin }) {
           </div>
 
           {/* 3. Bloque Inferior: Botón COMENZAR tipo Píldora + KEEP GOING + Línea divisoria de lado a lado */}
-          <div className="w-full flex flex-col items-center">
+          <div className="w-full flex flex-col items-center shrink-0">
             <button
               onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
               className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-sky-500/30 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"

@@ -1519,35 +1519,43 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {/* ── EVALUACIONES ── */}
       {activeSection === "evaluaciones" && (
         <div>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 px-3.5 md:px-0">
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+          <div className="flex items-center justify-between gap-2.5 mb-3 px-3.5 md:px-0">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               <span className="font-bold text-[#0B1929] text-sm sm:text-base">
-                {cycleInfo.enfoque ? (
-                  <>
-                    <span>{cycleInfo.enfoque}</span>
-                    <span className="text-xs sm:text-sm font-semibold text-[var(--brand-primary)] ml-1.5">
-                      · {cycleInfo.nombreBase}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>Evaluación del plan:</span>{" "}
-                    <span className="text-[var(--brand-primary)]">{cycleInfo.nombreBase}</span>
-                  </>
-                )}
-                <span className="text-[#6B7A8D] font-normal ml-1.5">
-                  ({displayedMetricas.length})
+                {/* En móvil: Breve y limpio sin saturar la pantalla */}
+                <span className="inline sm:hidden">
+                  Evaluaciones{" "}
+                  <span className="text-[#6B7A8D] font-normal">({displayedMetricas.length})</span>
+                </span>
+                {/* En desktop: Título descriptivo completo */}
+                <span className="hidden sm:inline">
+                  {cycleInfo.enfoque ? (
+                    <>
+                      <span>{cycleInfo.enfoque}</span>
+                      <span className="text-xs sm:text-sm font-semibold text-[var(--brand-primary)] ml-1.5">
+                        · {cycleInfo.nombreBase}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Evaluación del plan:</span>{" "}
+                      <span className="text-[var(--brand-primary)]">{cycleInfo.nombreBase}</span>
+                    </>
+                  )}
+                  <span className="text-[#6B7A8D] font-normal ml-1.5">
+                    ({displayedMetricas.length})
+                  </span>
                 </span>
               </span>
 
               {Boolean(cycleInfo.dias && cycleInfo.semanas) && (
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
-                  {cycleInfo.dias} días • {cycleInfo.semanas} sem
+                <span className="text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                  {cycleInfo.dias}d • {cycleInfo.semanas}sem
                 </span>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {displayedMetricas.length > 0 && (
                 <button
                   onClick={() => {
@@ -1565,7 +1573,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     }
                     generateProgresoPDF(selected, displayedMetricas, brand);
                   }}
-                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
                   <span>PDF</span>
@@ -1577,8 +1585,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </button>
               )}
               {!isReadOnly && (
-                <button onClick={openNewEvaluation} className="bg-[var(--brand-primary)] text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm">
-                  <Plus className="w-4 h-4" /> Nueva evaluación
+                <button
+                  onClick={openNewEvaluation}
+                  className={`${displayedMetricas.length === 0 ? "hidden sm:inline-flex" : "inline-flex"} bg-[var(--brand-primary)] text-white px-3 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors items-center gap-1.5 cursor-pointer shadow-sm`}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Nueva evaluación</span>
+                  <span className="sm:hidden">Nueva</span>
                 </button>
               )}
             </div>
