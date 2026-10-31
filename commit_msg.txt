@@ -1,1 +1,0 @@
-fix: mover calculo de kpiStats fuera del bloque loading en Progreso
