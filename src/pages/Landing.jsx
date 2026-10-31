@@ -709,37 +709,58 @@ function NutritionistsSection({ nutritionists }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((n) => (
-              <div key={n.id} className="bg-white rounded-3xl border border-[#E2E8F0] p-5 hover:shadow-md hover:border-[#1A6FD4]/40 transition-all flex flex-col justify-between">
+            {filtered.map((n) => {
+              const isEstudiante = n.role === "nutriologo_estudiante";
+              return (
+              <div key={n.id} className="relative bg-white rounded-3xl border border-[#E2E8F0] p-5 hover:shadow-md hover:border-[#1A6FD4]/40 transition-all flex flex-col justify-between">
+                {/* Banner Esquina Superior Derecha: Profesional vs Estudiante */}
+                <span
+                  className={`absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                    isEstudiante
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-blue-50 text-[#1A6FD4] border-blue-200"
+                  }`}
+                >
+                  {isEstudiante ? "Estudiante" : "Profesional"}
+                </span>
+
                 <div>
                   <div className="flex items-start gap-4 mb-4">
                     <div className="relative flex-shrink-0">
                       <img
-                        src={n.img && n.img.startsWith('photo-') ? `https://images.unsplash.com/${n.img}?w=80&h=80&fit=crop&auto=format&face` : (n.img || '')}
+                        src={n.img || "/flux_logo.jpeg"}
                         alt={n.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/flux_logo.jpeg";
+                        }}
                         className="w-14 h-14 rounded-2xl object-cover bg-[#E8ECF2]"
                       />
                       <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${n.available ? "bg-emerald-500" : "bg-[#CBD5E1]"}`} />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-20">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h3 className="text-sm font-bold text-[#0B1929] leading-tight">{n.name}</h3>
                         {n.verified && <CheckCircle size={14} className="text-[#1A6FD4] flex-shrink-0" />}
                       </div>
-                      <p className="text-xs text-[#6B7A8D] mt-1 line-clamp-1">{n.specialty}</p>
-                      <p className="text-[11px] font-mono text-[#9BA5B0] mt-1 flex items-center gap-1">
-                        <MapPin size={11} /> {n.location}
-                      </p>
+                      {n.specialty && (
+                        <p className="text-xs text-[#6B7A8D] mt-1 line-clamp-1">{n.specialty}</p>
+                      )}
+                      {n.location && (
+                        <p className="text-[11px] font-mono text-[#9BA5B0] mt-1 flex items-center gap-1">
+                          <MapPin size={11} className="shrink-0" /> <span className="truncate">{n.location}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-semibold text-[#6B7A8D] bg-[#F0F4FB] px-3 py-2 rounded-xl mb-4">
                     {n.reviewCount > 0 ? (
                       <div className="flex items-center gap-1">
-                        <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating.toFixed(1)} ({n.reviewCount} reseñas)
+                        <Star size={12} className="fill-[#1A6FD4] text-[#1A6FD4]" /> {n.rating.toFixed(1)} ({n.reviewCount} {n.reviewCount === 1 ? "reseña" : "reseñas"})
                       </div>
                     ) : (
-                      <span className="text-[11px] text-[#9BA5B0] italic">Especialista Certificado</span>
+                      <span className="text-[11px] text-[#9BA5B0] italic">Sin reseñas</span>
                     )}
                   </div>
                 </div>
@@ -767,7 +788,8 @@ function NutritionistsSection({ nutritionists }) {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1019,7 +1041,7 @@ export default function Landing({ session, onLogout }) {
       try {
         let nutris = await dbGet('profiles?select=id,nombre,role,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email&role=in.(nutriologo,nutriologo_estudiante)');
         if (!Array.isArray(nutris) || nutris.length === 0) {
-          nutris = await dbGet('directorio_nutriologos_publicos?select=id,nombre,nombre_marca,especialidad,ubicacion_texto,mapa_url,verificado,logo_url,telefono,email');
+          nutris = await dbGet('directorio_nutriologos_publicos?select=*');
         }
         const allRatings = await dbGet('citas_ratings?select=nutriologo_id,puntuacion') || [];
 
@@ -1031,21 +1053,26 @@ export default function Landing({ session, onLogout }) {
         });
 
         if (Array.isArray(nutris) && nutris.length > 0) {
-          const formattedNutris = nutris.map(n => ({
-            id: n.id,
-            name: n.nombre_marca || n.nombre || 'Especialista',
-            specialty: n.especialidad || 'Nutrición Integral',
-            location: n.ubicacion_texto || 'Consulta Online',
-            rating: ratingsMap[n.id] ? (ratingsMap[n.id].sum / ratingsMap[n.id].count) : 0,
-            reviewCount: ratingsMap[n.id] ? ratingsMap[n.id].count : 0,
-            patients: 0,
-            available: true,
-            img: n.logo_url || 'photo-1559839734-2b71ea197ec2',
-            verified: n.verificado || false,
-            mapa_url: n.mapa_url || '',
-            telefono: n.telefono || '',
-            email: n.email || ''
-          }));
+          const formattedNutris = nutris.map(n => {
+            const rawLogo = (n.logo_url || '').trim();
+            const validImg = rawLogo && !rawLogo.startsWith('photo-') ? rawLogo : '/flux_logo.jpeg';
+            return {
+              id: n.id,
+              name: n.nombre_marca || n.nombre || 'Especialista',
+              role: n.role || 'nutriologo',
+              specialty: (n.especialidad || '').trim(),
+              location: (n.ubicacion_texto || '').trim(),
+              rating: ratingsMap[n.id] ? (ratingsMap[n.id].sum / ratingsMap[n.id].count) : 0,
+              reviewCount: ratingsMap[n.id] ? ratingsMap[n.id].count : 0,
+              patients: 0,
+              available: true,
+              img: validImg,
+              verified: n.verificado || false,
+              mapa_url: n.mapa_url || '',
+              telefono: n.telefono || '',
+              email: n.email || ''
+            };
+          });
           setDbNutritionists(formattedNutris);
         }
       } catch (e) {
