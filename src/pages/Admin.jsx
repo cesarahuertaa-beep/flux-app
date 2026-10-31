@@ -166,6 +166,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   const hasCheckedPagoRef = useRef(false);
   const hasHealedShadowRef = useRef(false);
+  const hasLoadedClientesRef = useRef(_peekClientes !== null);
+  const myShadowClientRef = useRef(myShadowClient);
+  myShadowClientRef.current = myShadowClient;
+  const lastAthleteTabRef = useRef("nutricion");
+  if (tab === "entrenamiento") lastAthleteTabRef.current = "deporte";
+  else if (tab === "progreso_atleta") lastAthleteTabRef.current = "progreso";
+  else if (tab === "nutricion") lastAthleteTabRef.current = "nutricion";
 
   // ── VERIFICACIÓN DE MORA (Nutriólogos y Civiles) ──
   useEffect(() => {
@@ -328,9 +335,27 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const bibliotecaFilter ="biblioteca_ejercicios?order=nombre.asc";
 
   const loadClientes = useCallback(async ({ silent = false, forceFresh = false } = {}) => {
-    if (!silent && clientes.length === 0) setLoading(true);
+    if (!silent && !hasLoadedClientesRef.current) setLoading(true);
     let _allNutris = [];
     let _me = [];
+
+    const setShadowClientStable = (nextClone) => {
+      if (!nextClone) return;
+      myShadowClientRef.current = nextClone;
+      setMyShadowClient(prev => {
+        if (
+          prev &&
+          prev.id === nextClone.id &&
+          prev.nombre === nextClone.nombre &&
+          prev.email === nextClone.email &&
+          prev.plan_tipo === nextClone.plan_tipo &&
+          prev.activo === nextClone.activo
+        ) {
+          return prev;
+        }
+        return nextClone;
+      });
+    };
 
     const getJwtEmail = () => {
       try {
@@ -344,11 +369,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     };
 
     const findShadowCandidates = (list, myEmailNorm) => {
-      return (Array.isArray(list) ? list : []).filter(c =>
+      const matches = (Array.isArray(list) ? list : []).filter(c =>
         (c.nutriologo_id === myId && c.objetivo === "Mi entrenamiento personal") ||
-        (c.auth_id && c.auth_id === myId) ||
+        (c.auth_id && c.auth_id === myId && (c.nutriologo_id === myId || !c.nutriologo_id)) ||
         (myEmailNorm && (c.email || "").trim().toLowerCase() === myEmailNorm && (c.nutriologo_id === myId || !c.nutriologo_id))
       );
+      return matches.sort((a, b) => {
+        const aScore = (a.objetivo === "Mi entrenamiento personal" ? 2 : 0) + (a.nutriologo_id === myId ? 1 : 0);
+        const bScore = (b.objetivo === "Mi entrenamiento personal" ? 2 : 0) + (b.nutriologo_id === myId ? 1 : 0);
+        return bScore - aScore;
+      });
     };
 
     const updateState = (r, allNutris, me) => {
@@ -365,7 +395,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       const candidates = findShadowCandidates(r, myEmailNorm);
       if (candidates.length > 0) {
-        setMyShadowClient(candidates[0]);
+        const currentShadowId = myShadowClientRef.current?.id;
+        const preferred = (currentShadowId && candidates.find(c => c.id === currentShadowId)) || candidates[0];
+        setShadowClientStable(preferred);
       }
 
       const shadowIds = new Set(candidates.map(c => c.id));
@@ -446,8 +478,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         lastActivityMap: activityMap
       });
 
-      // Auto-sanar perfil de atleta sombra (reintentar hasta asegurar que myShadowClient existe)
-      if (!isCivil && role !== "staff" && role !== "administrativo" && (!hasHealedShadowRef.current || !myShadowClient)) {
+      // Auto-sanar perfil de atleta sombra (máximo una vez por sesión)
+      if (!isCivil && role !== "staff" && role !== "administrativo" && !hasHealedShadowRef.current) {
+        hasHealedShadowRef.current = true;
         const jwtEmail = getJwtEmail();
         const meProfile = (me && me.length > 0) ? me[0] : (session?.data || {});
         const trueEmail = (meProfile.email || jwtEmail || "").trim();
@@ -486,8 +519,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               plan_tipo: "premium"
             });
             if (created && created.length > 0) {
-              setMyShadowClient(created[0]);
-              hasHealedShadowRef.current = true;
+              setShadowClientStable(created[0]);
             }
           } catch (err) {
             console.error("Error auto-creando perfil atleta:", err);
@@ -522,7 +554,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
 
           const patchPayload = {};
-          if (trueEmail && primaryClone.email !== trueEmail) patchPayload.email = trueEmail;
+          if (trueEmail && (primaryClone.email || "").toLowerCase() !== myEmailNorm) patchPayload.email = trueEmail;
           if (myId && primaryClone.auth_id !== myId) patchPayload.auth_id = myId;
           if (primaryClone.nutriologo_id !== myId) patchPayload.nutriologo_id = myId;
           if (primaryClone.plan_tipo !== "premium") patchPayload.plan_tipo = "premium";
@@ -538,11 +570,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             }
           }
 
-          setMyShadowClient(primaryClone);
-          hasHealedShadowRef.current = true;
+          setShadowClientStable(primaryClone);
         }
       }
     } catch(e) { console.error("Error cargando clientes:", e); }
+    hasLoadedClientesRef.current = true;
     setLoading(false);
   }, [clientesFilter, myId, isCivil, role, session?.token]);
 
@@ -1985,7 +2017,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 session={{ role:'cliente', data: isCivil ? clienteData : myShadowClient, token:session?.token, profileId: session?.profileId, adminRole: session?.role }}
                 isAtletaMode={false}
                 isEmbedded={true}
-                embeddedTab={tab === 'entrenamiento' ? 'deporte' : tab === 'progreso_atleta' ? 'progreso' : 'nutricion'}
+                embeddedTab={lastAthleteTabRef.current}
                 onLogout={onLogout}
               />
             </Suspense>

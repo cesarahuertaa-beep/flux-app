@@ -62,6 +62,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const [configSuccess, setConfigSuccess] = useState(false);
   const [configError, setConfigError] = useState(false);
   const isFirstRenderConfig = useRef(true);
+  const hasPatchedEmailRef = useRef(false);
   const [solicitudes, setSolicitudes] = useState([]);
 
   useEffect(() => {
@@ -95,7 +96,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
               const payload = JSON.parse(atob(tok.split(".")[1]));
               if (payload.email) {
                 resolvedEmail = payload.email.trim();
-                dbPatch(`profiles?id=eq.${profileId}`, { email: resolvedEmail }).catch(() => {});
+                if (!hasPatchedEmailRef.current) {
+                  hasPatchedEmailRef.current = true;
+                  dbPatch(`profiles?id=eq.${profileId}`, { email: resolvedEmail }).catch(() => {});
+                }
               }
             }
           } catch {}

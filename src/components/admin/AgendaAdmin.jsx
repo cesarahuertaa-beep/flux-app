@@ -270,6 +270,8 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
   const [clientes, setClientes]             = useState(() => Array.isArray(_peekClis) ? _peekClis : []);
   const [loading, setLoading]               = useState(() => _peekCitas === null);
+  const hasLoadedRef                        = useRef(_peekCitas !== null);
+  const autoCompletedIdsRef                 = useRef(new Set());
   const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
   const [filtro, setFiltro]                 = useState("todos");   // "todos" | "pendiente" | "confirmada" | "rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
@@ -343,7 +345,10 @@ export function AgendaAdmin({ setMsg, profileId }) {
             const diffHours = (now - citaTime) / (1000 * 60 * 60);
             if (diffHours >= 1) {
               cita.estado = 'completada';
-              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+              if (!autoCompletedIdsRef.current.has(cita.id)) {
+                autoCompletedIdsRef.current.add(cita.id);
+                dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+              }
             }
           }
         }
@@ -368,8 +373,9 @@ export function AgendaAdmin({ setMsg, profileId }) {
   }, [myId]);
 
   const load = useCallback(async () => {
-    if (citas.length === 0 && _peekCitas === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     await Promise.all([loadCitas(), loadDisponibilidad(), loadClientes(), loadProfile()]);
+    hasLoadedRef.current = true;
     setLoading(false);
   }, [loadCitas, loadDisponibilidad, loadClientes, loadProfile]);
 

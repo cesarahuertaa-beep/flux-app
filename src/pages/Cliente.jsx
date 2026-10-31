@@ -122,6 +122,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return npMap;
   });
   const [loading, setLoading] = useState(() => !(_peekCiclos !== null || _peekRs !== null || _peekNs !== null));
+  const hasLoadedRef = useRef(_peekCiclos !== null || _peekRs !== null || _peekNs !== null);
   const [cicloActivo, setCicloActivo] = useState(() => _peekCiclo);
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
@@ -138,7 +139,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [showIntakeForms, setShowIntakeForms] = useState(false);
 
   const loadData = async ({ silent = false, forceFresh = false } = {}) => {
-    if (!silent && dias.length === 0 && rutinas.length === 0 && _peekCiclos === null) {
+    if (!silent && !hasLoadedRef.current) {
       setLoading(true);
     }
     const fetcher = forceFresh ? dbGetFresh : dbGet;
@@ -226,27 +227,30 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     } catch (e) {
       console.error("Error cargando datos del cliente:", e);
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 
   useEffect(() => {
-    loadData({ silent: !loading });
+    loadData({ silent: hasLoadedRef.current });
     let cacheTimer = null;
 
     const onFocus = () => {
       if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: true });
     };
 
-    const onCacheUpdated = () => {
+    const onCacheUpdated = (ev) => {
+      const table = ev?.detail?.table;
+      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "progreso", "nutricion_progreso", "metricas_progreso", "*"].includes(table)) return;
       if (cacheTimer) clearTimeout(cacheTimer);
       cacheTimer = setTimeout(() => {
         if (
           Object.keys(pendingSavesRef.current || {}).length === 0 &&
           Object.keys(pendingNutriSavesRef.current || {}).length === 0
         ) {
-          loadData({ silent: true, forceFresh: true });
+          loadData({ silent: true, forceFresh: false });
         }
-      }, 200);
+      }, 250);
     };
 
     const onPlanUpdated = (e) => {

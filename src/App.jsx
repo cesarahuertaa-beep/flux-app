@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
@@ -92,6 +92,10 @@ export default function App() {
   captureAuthHashSynchronously(isNativePlatform());
 
   const [session,    setSession]    = useState(null);
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
+  const isValidatingLivenessRef = useRef(false);
+  const lastLivenessCheckRef = useRef(0);
   const [atletaData, setAtletaData] = useState(() => {
     try {
       const s = sessionStorage.getItem("flux_atleta_data");
@@ -121,10 +125,16 @@ export default function App() {
     setSession(null);
   }, []);
 
-  const validateSessionLiveness = useCallback(async (targetSession) => {
-    const s = targetSession || session;
+  const validateSessionLiveness = useCallback(async (targetSession, force = false) => {
+    const s = targetSession || sessionRef.current;
     if (!s || !s.role) return true;
     if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+    if (isValidatingLivenessRef.current) return true;
+    const now = Date.now();
+    if (!force && now - lastLivenessCheckRef.current < 15000) return true;
+
+    isValidatingLivenessRef.current = true;
+    lastLivenessCheckRef.current = now;
 
     const currentRole = s.role;
     const isClientOrCivil = currentRole === "cliente" || currentRole === "civil";
@@ -193,8 +203,10 @@ export default function App() {
         return false;
       }
       return true;
+    } finally {
+      isValidatingLivenessRef.current = false;
     }
-  }, [session, handleLogout]);
+  }, [handleLogout]);
 
   useEffect(() => {
     initBackButtonHandler();

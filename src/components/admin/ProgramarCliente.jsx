@@ -838,7 +838,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         chosen = activeCycle || finalCycles[0] || null;
       }
 
-      setCicloSel(chosen);
+      setCicloSel(prev => {
+        if (
+          prev &&
+          chosen &&
+          prev.id === chosen.id &&
+          prev.nombre === chosen.nombre &&
+          prev.activo === chosen.activo &&
+          prev.fecha_inicio === chosen.fecha_inicio
+        ) {
+          return prev;
+        }
+        return chosen;
+      });
       return chosen;
     } catch(e) { 
       if (!isOfflineError(e)) {
@@ -846,19 +858,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
       return null;
     }
-  }, [selected, isMiPlan]);
+  }, [selected?.id, isMiPlan]);
+
+  const loadedCycleKeyRef = useRef(null);
 
   // ── Cargar datos del ciclo seleccionado ──
   const loadData = useCallback(async (targetCiclo = cicloSel, opts = {}) => {
-    if (!selected) return;
+    if (!selected?.id) return;
     const { silent = false, forceFresh = false } = opts;
     const currentCiclo = targetCiclo !== undefined ? targetCiclo : cicloSel;
+    const cycleKey = `${selected.id}_${currentCiclo?.id || "null"}`;
     const cicloFilter = currentCiclo
       ? `ciclo_id=eq.${currentCiclo.id}`
       : `ciclo_id=is.null`;
     const hasCached = dbPeek(`nutricion?cliente_id=eq.${selected.id}&${cicloFilter}`) !== null ||
                       dbPeek(`rutinas?cliente_id=eq.${selected.id}&${cicloFilter}&select=*,ejercicios(*)&order=orden.asc`) !== null;
-    if (!silent && !hasCached && dias.length === 0 && rutinas.length === 0) setLoading(true);
+    if (!silent && !hasCached && loadedCycleKeyRef.current !== cycleKey) setLoading(true);
     try {
 
       const fetchFn = forceFresh ? dbGetFresh : dbGet;
@@ -895,8 +910,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> { e.message }</div>); 
       }
     }
-    if (!silent) setLoading(false);
-  }, [selected, cicloSel]);
+    loadedCycleKeyRef.current = cycleKey;
+    setLoading(false);
+  }, [selected?.id, cicloSel?.id]);
 
   const handleApplyPrescribedMacros = async ({ calorias, proteinas, carbohidratos, grasas }) => {
     if (!selected) return;
@@ -956,7 +972,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (!table || table === "*" || table === "ciclos") loadCiclos();
-        if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: true });
+        if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: false });
       }, 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);

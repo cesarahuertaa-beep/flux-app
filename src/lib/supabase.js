@@ -259,6 +259,12 @@ const applyOptimisticUpsert = (path, rows) => {
   for (const [key, entry] of queryCache.entries()) {
     if (key.split("?")[0] !== table || !Array.isArray(entry.data)) continue;
     const kq = key.split("?")[1] || "";
+    // Si la consulta en caché tiene un select= parcial que no incluye las llaves de conflicto, no insertar filas completas ahí
+    const selMatch = /(?:^|&)select=([^&]+)/.exec(kq);
+    if (selMatch) {
+      const selCols = decodeURIComponent(selMatch[1]).split(",");
+      if (!selCols.includes("*") && !keys.every((k) => selCols.includes(k))) continue;
+    }
     const cm = /(?:^|&)cliente_id=eq\.([^&]+)/.exec(kq);
     const data = entry.data.slice();
     for (const row of rows) {
@@ -644,6 +650,7 @@ const queueMutation = async (method, path, body, prefer) => {
   if (method === "POST" && (table === "progreso" || table === "nutricion_progreso")) {
     try { const b = JSON.parse(body); applyOptimisticUpsert(path, Array.isArray(b) ? b : [b]); } catch { /* ignore */ }
   }
+  invalidateCache(table);
 };
 
 // Deduplicación de peticiones GET simultáneas para evitar peticiones duplicadas al mismo endpoint
@@ -822,7 +829,14 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
     if (method === "PATCH" || method === "DELETE") {
       applyOptimistic(method, path, opts.body);
     }
-    invalidateCache(table);
+    // Marcar entradas relacionadas como obsoletas sin disparar evento aún (el evento se emite al concluir la petición)
+    const targets = table ? (RELATED_TABLES[table] || [table]) : null;
+    for (const [key, entry] of queryCache.entries()) {
+      const keyTable = key.split("?")[0];
+      if (!targets || targets.includes(keyTable)) {
+        entry.invalidated = true;
+      }
+    }
   }
 
   return fetchNetwork();
@@ -869,12 +883,19 @@ export const dbUpsert = async (p, b, opts = {}) => {
 
   // Actualización Optimista Inmediata en la base local (tanto online como offline)
   applyOptimisticUpsert(p, rows);
-  invalidateCache(table);
+  const targets = table ? (RELATED_TABLES[table] || [table]) : null;
+  for (const [key, entry] of queryCache.entries()) {
+    const keyTable = key.split("?")[0];
+    if (!targets || targets.includes(keyTable)) {
+      entry.invalidated = true;
+    }
+  }
 
   const prefer = opts?.headers?.Prefer || "resolution=merge-duplicates,return=representation";
   const body = JSON.stringify(normalizedBody);
   const queueIt = async () => {
     await addMutation({ method: "POST", path: p, body, prefer, table });
+    invalidateCache(table);
     return rows;
   };
   if (isOfflineNow() || _netDown) return queueIt();

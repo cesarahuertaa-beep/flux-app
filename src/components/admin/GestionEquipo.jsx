@@ -1,5 +1,5 @@
 import { useBrand } from "../BrandContext";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Edit2, Mail, Loader2, Circle, CircleDashed, Trash2, Crown } from "lucide-react";
 import { authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, getProfileId, updateQueryCache, invalidateCache } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
@@ -19,6 +19,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       : []
   );
   const [loading, setLoading]       = useState(() => _peekRows === null);
+  const hasLoadedRef                = useRef(_peekRows !== null);
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving]         = useState(false);
   const [form, setForm]             = useState({ nombre:"", email:"", telefono:"" });
@@ -42,7 +43,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   useBackButton(!!confirmPremium, () => setConfirmPremium(null), 30);
 
   const load = useCallback(async ({ forceFresh = false } = {}) => {
-    if (equipo.length === 0 && _peekRows === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       const rows = await fetcher(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc`);
@@ -66,8 +67,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
         } catch { }
       }
     } catch { }
+    hasLoadedRef.current = true;
     setLoading(false);
-  }, [myId, isSuperadmin, equipo.length]);
+  }, [myId, isSuperadmin]);
 
   useEffect(() => {
     load();

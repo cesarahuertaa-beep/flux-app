@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dbPeek, dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import {
   CreditCard,
@@ -40,6 +40,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   });
   const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
   const [loading, setLoading] = useState(() => _peekCfg === null && _peekRecibos === null);
+  const hasLoadedRef = useRef(_peekCfg !== null || _peekRecibos !== null);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [origen, setOrigen] = useState(clienteData?.premium_origen || null);
@@ -98,7 +99,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   }, [expirationDate, isPremium]);
 
   const loadData = async () => {
-    if (!rawCfg && _peekCfg === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const [cfg, recibos] = await Promise.all([
         dbGet("configuracion_plataforma?id=eq.1"),
@@ -130,6 +131,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     } catch (e) {
       console.error("Error cargando config de pago:", e);
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
     }
   };

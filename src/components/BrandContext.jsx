@@ -113,14 +113,28 @@ export function BrandProvider({ children, session }) {
               color_primario: p.color_primario?.trim() || superadminBrand.color_primario,
               logo_url: p.logo_url?.trim() || superadminBrand.logo_url,
             };
-            setBrand(resolved);
+            setBrand((prev) =>
+              prev &&
+              prev.nombre_marca === resolved.nombre_marca &&
+              prev.color_primario === resolved.color_primario &&
+              prev.logo_url === resolved.logo_url
+                ? prev
+                : resolved
+            );
             return;
           }
         }
 
         // 4. Si es atleta independiente (civil), staff, o paciente directo de FLUX:
         if (active) {
-          setBrand(superadminBrand);
+          setBrand((prev) =>
+            prev &&
+            prev.nombre_marca === superadminBrand.nombre_marca &&
+            prev.color_primario === superadminBrand.color_primario &&
+            prev.logo_url === superadminBrand.logo_url
+              ? prev
+              : superadminBrand
+          );
         }
       } catch (e) {
         if (active) {
@@ -148,7 +162,7 @@ export function BrandProvider({ children, session }) {
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onBrandUpdated);
     };
-  }, [session]);
+  }, [session?.role, session?.profileId, session?.data?.id, session?.data?.nutriologo_id]);
 
   // Generamos variables CSS dinámicas basadas en el color primario de la marca.
   const cssVars = {

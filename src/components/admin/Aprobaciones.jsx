@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2 } from "lucide-react";
 import { dbPeek, dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -7,16 +7,18 @@ export default function Aprobaciones({ setMsg }) {
   const _peekSols = dbPeek("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
   const [solicitudes, setSolicitudes] = useState(() => Array.isArray(_peekSols) ? _peekSols : []);
   const [loading, setLoading] = useState(() => _peekSols === null);
+  const hasLoadedRef = useRef(_peekSols !== null);
   const [confirmAction, setConfirmAction] = useState(null);
 
   const loadData = async () => {
-    if (solicitudes.length === 0 && _peekSols === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const data = await dbGet("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
       setSolicitudes(data || []);
     } catch (e) {
       setMsg("❌ Error al cargar solicitudes.");
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 

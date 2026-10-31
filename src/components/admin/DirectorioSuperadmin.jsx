@@ -78,6 +78,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     return Array.isArray(_peekNutris) ? _peekNutris : [];
   });
   const [loading, setLoading] = useState(() => _peekNutris === null);
+  const hasLoadedRef = useRef(_peekNutris !== null);
   const [search, setSearch] = useState("");
   
   // Modals state
@@ -107,7 +108,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [myRole, setMyRole] = useState("superadmin");
 
   const loadNutriologos = async ({ forceFresh = false } = {}) => {
-    if (nutriologos.length === 0) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       const data = await fetcher("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
@@ -144,6 +145,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       const isOffline = !navigator.onLine || (e?.message || "").toLowerCase().includes("offline");
       if (!isOffline) setMsg("❌ Error cargando nutriólogos");
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 

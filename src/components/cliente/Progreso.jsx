@@ -94,6 +94,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [ciclos, setCiclos] = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(() => _peekMetricas === null);
+  const hasLoadedRef = useRef(_peekMetricas !== null);
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium' && cliente.objetivo !== 'Mi entrenamiento personal';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
@@ -116,7 +117,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   const loadData = useCallback(async () => {
     if (!cliente?.id) return;
-    if (metricas.length === 0 && dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) === null) {
+    if (!hasLoadedRef.current) {
       setLoading(true);
     }
     try {
@@ -231,8 +232,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
     } catch (e) {
       console.error(e);
     }
+    hasLoadedRef.current = true;
     setLoading(false);
-  }, [cliente]);
+  }, [cliente?.id]);
 
   const loadPersonalPhotos = useCallback(async () => {
     if (!cliente?.id) return;

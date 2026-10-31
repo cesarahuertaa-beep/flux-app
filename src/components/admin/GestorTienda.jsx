@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import {
   Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X,
@@ -24,6 +24,7 @@ export default function GestorTienda({ setMsg }) {
   const _peekProds = dbPeek("productos?order=created_at.desc");
   const [productos, setProductos] = useState(() => Array.isArray(_peekProds) ? _peekProds : []);
   const [loading, setLoading] = useState(() => _peekProds === null);
+  const hasLoadedRef = useRef(_peekProds !== null);
   const [showModal, setShowModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -56,7 +57,7 @@ export default function GestorTienda({ setMsg }) {
   const [uploadingQr, setUploadingQr] = useState(false);
 
   const loadProductos = async () => {
-    if (productos.length === 0 && _peekProds === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const rows = await dbGet('productos?order=created_at.desc');
       if (Array.isArray(rows)) setProductos(rows);
@@ -64,6 +65,7 @@ export default function GestorTienda({ setMsg }) {
       console.error(e);
       setMsg("Error al cargar productos. ¿Ejecutaste el script setup_store.sql?");
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 

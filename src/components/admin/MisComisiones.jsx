@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from"react";
+import React, { useState, useEffect, useMemo, useRef } from"react";
 import { dbPeek, dbGet, dbPatch } from"../../lib/supabase";
 import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
 import { getRatesForCutoff } from"../../utils/tarifas";
@@ -12,10 +12,11 @@ export default function MisComisiones({ myId, setMsg }) {
   const [nominas, setNominas] = useState([]);
   const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
   const [loading, setLoading] = useState(() => _peekMe === null);
+  const hasLoadedRef = useRef(_peekMe !== null);
   const [filtroMes, setFiltroMes] = useState("todos");
 
   const loadData = async () => {
-    if (_peekMe === null && recibos.length === 0) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       // Obtener el nombre propio del colaborador y config de plataforma
       const [me, cfg] = await Promise.all([
@@ -25,7 +26,7 @@ export default function MisComisiones({ myId, setMsg }) {
       if (cfg && cfg.length > 0) setRawCfg(cfg[0]);
       const nombre = me[0]?.nombre ||"";
       setMyName(nombre);
-      if (!nombre) { setLoading(false); return; }
+      if (!nombre) { hasLoadedRef.current = true; setLoading(false); return; }
 
       // Obtener los nutriólogos y estudiantes que este colaborador invitó
       const profiles = await dbGet(`profiles?role=in.(nutriologo,nutriologo_estudiante)&creado_por_nombre=eq.${encodeURIComponent(nombre)}&select=id,nombre`);
@@ -47,6 +48,7 @@ export default function MisComisiones({ myId, setMsg }) {
       console.error(e);
       setMsg("❌ Error cargando comisiones:" + e.message);
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 

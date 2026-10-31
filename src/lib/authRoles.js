@@ -1,5 +1,7 @@
 import { dbGet, dbGetFresh, dbPeek, dbPatch } from "./supabase";
 
+const _linkedClientIds = new Set();
+
 /**
  * Consulta en Supabase todos los perfiles asociados a un usuario (Admin/Especialista,
  * Paciente de consultorio y Atleta Independiente) a partir de su auth_id y su email.
@@ -104,10 +106,11 @@ export async function refreshUserRoles(authUserId, userEmail) {
     throw lastError || new Error("OFFLINE");
   }
 
-  // Si algún registro de cliente no tenía auth_id vinculado, enlazarlo automáticamente
+  // Si algún registro de cliente no tenía auth_id vinculado, enlazarlo automáticamente (máximo 1 vez por sesión)
   if (authUserId) {
     for (const c of clientRows) {
-      if (!c.auth_id) {
+      if (!c.auth_id && c.id && !_linkedClientIds.has(c.id)) {
+        _linkedClientIds.add(c.id);
         dbPatch(`clientes?id=eq.${c.id}`, { auth_id: authUserId }).catch(() => {});
         c.auth_id = authUserId;
       }

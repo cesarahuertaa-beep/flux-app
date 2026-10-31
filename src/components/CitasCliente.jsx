@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from"react";
+import { useState, useEffect, useCallback, useRef } from"react";
 import { dbPeek, dbGet, dbPost, dbPatch } from"../lib/supabase";
 import {
   CalendarDays, Clock, Video, MapPin, Check, X,
@@ -91,6 +91,8 @@ export function CitasCliente({ cliente }) {
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
   const [ratedCitas, setRatedCitas] = useState({});
   const [loading, setLoading] = useState(() => _peekCitas === null);
+  const hasLoadedRef = useRef(_peekCitas !== null);
+  const autoCompletedIdsRef = useRef(new Set());
   
   // Estados del Modal de Agendar
   const [showModal, setShowModal] = useState(false);
@@ -116,7 +118,7 @@ export function CitasCliente({ cliente }) {
   const [nutriologoDuracion, setNutriologoDuracion] = useState(60);
 
   const loadData = useCallback(async () => {
-    if (citas.length === 0 && _peekCitas === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const [c, d, r, nProf] = await Promise.all([
         dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`).catch(() => 
@@ -140,7 +142,10 @@ export function CitasCliente({ cliente }) {
             const dur = Number(cita.duracion_minutos) || nutriologoDuracion || 60;
             if (diffMinutes >= dur) {
               cita.estado = 'completada';
-              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+              if (!autoCompletedIdsRef.current.has(cita.id)) {
+                autoCompletedIdsRef.current.add(cita.id);
+                dbPatch(`citas?id=eq.${cita.id}`, { estado: 'completada' }).catch(console.error);
+              }
             }
           }
         }
@@ -159,6 +164,7 @@ export function CitasCliente({ cliente }) {
     } catch (e) {
       console.error("Error al cargar citas o ratings", e);
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   }, [clienteId, nutriologoId, nutriologoDuracion]);
 

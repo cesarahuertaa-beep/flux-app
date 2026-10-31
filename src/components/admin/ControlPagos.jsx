@@ -23,6 +23,7 @@ export default function ControlPagos({ setMsg }) {
   const [recibos, setRecibos] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [nutriologos, setNutriologos] = useState({});
   const [loading, setLoading] = useState(() => _peekRecibos === null);
+  const hasLoadedRef = useRef(_peekRecibos !== null);
   const [modalImg, setModalImg] = useState(null);
 
   useBackButton(!!modalImg, () => setModalImg(null), 50);
@@ -36,6 +37,7 @@ export default function ControlPagos({ setMsg }) {
   const [recibosCivil, setRecibosCivil] = useState(() => Array.isArray(_peekRecibosCivil) ? _peekRecibosCivil : []);
   const [clientesCivil, setClientesCivil] = useState({});
   const [loadingCivil, setLoadingCivil] = useState(() => _peekRecibosCivil === null);
+  const hasLoadedCivilRef = useRef(_peekRecibosCivil !== null);
   const [filtroEstadoCivil, setFiltroEstadoCivil] = useState("pendiente");
 
   // ── Estado Configuración de Tarifas y Planes (Opción A) ─────────────────
@@ -53,7 +55,7 @@ export default function ControlPagos({ setMsg }) {
   });
 
   const loadData = async () => {
-    if (recibos.length === 0 && _peekRecibos === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const [dataRecibos, profiles, dataNominas, cfg] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),
@@ -87,6 +89,7 @@ export default function ControlPagos({ setMsg }) {
       console.error(e);
       setMsg("❌ Error cargando pagos:" + e.message);
     }
+    hasLoadedRef.current = true;
     setLoading(false);
   };
 
@@ -139,7 +142,7 @@ export default function ControlPagos({ setMsg }) {
   };
 
   const loadDataCivil = async () => {
-    setLoadingCivil(true);
+    if (!hasLoadedCivilRef.current) setLoadingCivil(true);
     try {
       const [dataRec, clientes] = await Promise.all([
         dbGet("recibos_pago_civil?order=created_at.desc"),
@@ -153,6 +156,7 @@ export default function ControlPagos({ setMsg }) {
       console.error("Error cargando pagos civil:", e);
       // No mostrar error si la tabla aún no existe
     }
+    hasLoadedCivilRef.current = true;
     setLoadingCivil(false);
   };
 

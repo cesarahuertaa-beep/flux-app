@@ -445,14 +445,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       }
     }
     setNutriProgreso(npMap);
-  }, [selected]);
+  }, [selected?.id]);
 
   useEffect(() => {
     if (cicloActivo?.id && cicloSel?.id !== cicloActivo.id) {
       setCicloSel(cicloActivo);
       loadCicloData(cicloActivo);
     }
-  }, [cicloActivo, cicloSel?.id, loadCicloData]);
+  }, [cicloActivo?.id, cicloSel?.id, loadCicloData]);
 
   const load = useCallback(async (force = false) => {
     if (!selected?.id) return;
@@ -650,13 +650,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   // Load routines & nutrition for any selected cycle (used when the user clicks a cycle pill)
   const loadRutinas = useCallback(async (ciclo) => {
-    if (!selected) return;
-    setLoading(true);
+    if (!selected?.id) return;
     try {
       await loadCicloData(ciclo);
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
-    setLoading(false);
-  }, [selected, loadCicloData, setMsg]);
+  }, [selected?.id, loadCicloData, setMsg]);
 
   const updForm = (key, val) => {
     setForm(p => {

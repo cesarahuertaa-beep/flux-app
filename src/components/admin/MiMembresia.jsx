@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dbPeek, dbGet, dbPost, storageUpload } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import {
@@ -49,6 +49,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   });
   const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
   const [loading, setLoading] = useState(() => _peekPerfil === null && _peekCfg === null);
+  const hasLoadedRef = useRef(_peekPerfil !== null || _peekCfg !== null);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [patrocinios, setPatrocinios] = useState([]);
@@ -58,7 +59,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   const loadData = async () => {
     if (!profileId) return;
-    if (!perfil && _peekPerfil === null) setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const [data, cfg, recibos] = await Promise.all([
         dbGet(`profiles?id=eq.${profileId}`),
@@ -92,6 +93,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     } catch (e) {
       console.error("Error cargando perfil:", e);
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
     }
   };
