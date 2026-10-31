@@ -288,11 +288,26 @@ function normalizeText(str) {
 }
 
 /**
+ * Devuelve el catálogo activo de platillos (incluye los creados o editados por Superadmin/Staff).
+ */
+export function getPlatillosCatalog() {
+  try {
+    const raw = localStorage.getItem("flux_biblioteca_platillos");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return CATALOGO_PLATILLOS_BASE;
+}
+
+/**
  * Busca platillos en el catálogo filtrando por texto y categoría.
  */
 export function buscarPlatillosCatalogo(query = "", categoria = "todos") {
   const q = normalizeText(query);
-  return CATALOGO_PLATILLOS_BASE.filter(item => {
+  const list = getPlatillosCatalog();
+  return list.filter(item => {
     const coincideCat = categoria === "todos" || item.categoria === categoria;
     if (!coincideCat) return false;
     if (!q) return true;
@@ -317,10 +332,10 @@ export async function searchDishPhotoInCatalog(dishText, customKeywords = []) {
   let bestMatch = null;
   let maxScore = 0;
 
-  // 1. Evaluar en la biblioteca base de FLUX
-  for (const item of CATALOGO_PLATILLOS_BASE) {
+  // 1. Evaluar en la biblioteca de platillos (incluye personalizados)
+  for (const item of getPlatillosCatalog()) {
     let score = 0;
-    for (const kw of item.keywords) {
+    for (const kw of (item.keywords || [])) {
       const normKw = normalizeText(kw);
       if (words.has(normKw) || normalized.includes(normKw)) {
         score += 1.5;

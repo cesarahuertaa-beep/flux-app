@@ -152,11 +152,26 @@ function normalizar(texto) {
 }
 
 /**
+ * Devuelve el catálogo activo de ingredientes (incluye los creados o editados por Superadmin/Staff).
+ */
+export function getIngredientesCatalog() {
+  try {
+    const raw = localStorage.getItem("flux_biblioteca_ingredientes");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return INGREDIENTES_CATALOGO;
+}
+
+/**
  * Busca ingredientes en el catálogo filtrando por texto y categoría.
  */
 export function buscarIngredientes(query = "", categoria = "todos") {
   const q = normalizar(query);
-  return INGREDIENTES_CATALOGO.filter(item => {
+  const list = getIngredientesCatalog();
+  return list.filter(item => {
     const coincideCat = categoria === "todos" || item.categoria === categoria;
     if (!coincideCat) return false;
     if (!q) return true;
