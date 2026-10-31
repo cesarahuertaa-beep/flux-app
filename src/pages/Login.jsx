@@ -495,7 +495,7 @@ export default function Login({ onLogin }) {
   ];
 
   const renderAuthFormCard = () => (
-    <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-6 pb-6 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto">
+    <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-5 pb-5 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain">
             
             {/* Botón superior para regresar a la pantalla de Bienvenida */}
             <div className="flex items-center justify-between mb-4">
@@ -683,52 +683,52 @@ export default function Login({ onLogin }) {
 
             {/* SIGNUP PRO */}
             {mode === "signup_pro" && <>
-              <div className="mb-4 text-center">
-                <h3 className="text-base font-bold text-[#0B1929] mb-1">{signupType === 'nutriologo' ? 'Solicitud Nutriólogo' : 'Solicitud Estudiante de Nutrición'}</h3>
+              <div className="mb-3 text-center">
+                <h3 className="text-base font-bold text-[#0B1929] mb-0.5">{signupType === 'nutriologo' ? 'Solicitud Nutriólogo' : 'Solicitud Estudiante de Nutrición'}</h3>
                 <p className="text-xs text-[#6B7A8D]">Revisaremos tus datos para habilitar tu cuenta.</p>
               </div>
-              <div className="mb-3.5">
-                <div className="text-[11px] text-[#6B7A8D] mb-1.5 font-semibold uppercase tracking-[1px]">Nombre Completo</div>
+              <div className="mb-2.5">
+                <div className="text-[10px] text-[#6B7A8D] mb-1 font-semibold uppercase tracking-[1px]">Nombre Completo</div>
                 <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><User size={18} /></div>
-                  <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-2.5 w-full outline-none transition-all text-sm" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><User size={16} /></div>
+                  <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-9 pr-3 py-2 w-full outline-none transition-all text-xs sm:text-sm" />
                 </div>
               </div>
-              <div className="mb-3.5">
-                <div className="text-[11px] text-[#6B7A8D] mb-1.5 font-semibold uppercase tracking-[1px]">Email</div>
+              <div className="mb-2.5">
+                <div className="text-[10px] text-[#6B7A8D] mb-1 font-semibold uppercase tracking-[1px]">Email</div>
                 <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Mail size={18} /></div>
-                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" type="email" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-10 pr-4 py-2.5 w-full outline-none transition-all text-sm" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Mail size={16} /></div>
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" type="email" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl pl-9 pr-3 py-2 w-full outline-none transition-all text-xs sm:text-sm" />
                 </div>
               </div>
-              <div className="mb-3.5">
-                <div className="text-[11px] text-[#6B7A8D] mb-1.5 font-semibold uppercase tracking-[1px]">Nombre de Consultorio/Marca</div>
+              <div className="mb-2.5">
+                <div className="text-[10px] text-[#6B7A8D] mb-1 font-semibold uppercase tracking-[1px]">Nombre de Consultorio/Marca</div>
                 <div className="relative">
-                  <input value={nombreMarca} onChange={e => setNombreMarca(e.target.value)} placeholder="Ej. NutriFit" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 w-full outline-none transition-all text-sm" />
+                  <input value={nombreMarca} onChange={e => setNombreMarca(e.target.value)} placeholder="Ej. NutriFit" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-3 py-2 w-full outline-none transition-all text-xs sm:text-sm" />
                 </div>
               </div>
-              <div className="mb-3.5">
-                <div className="text-[11px] text-[#6B7A8D] mb-1.5 font-semibold uppercase tracking-[1px]">Ubicación (Google Maps) (Opcional)</div>
+              <div className="mb-2.5">
+                <div className="text-[10px] text-[#6B7A8D] mb-1 font-semibold uppercase tracking-[1px]">Ubicación (Google Maps) (Opcional)</div>
                 <div className="relative">
-                  <input value={mapaUrl} onChange={e => setMapaUrl(e.target.value)} placeholder="Enlace de Maps" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 w-full outline-none transition-all text-sm" />
+                  <input value={mapaUrl} onChange={e => setMapaUrl(e.target.value)} placeholder="Enlace de Maps" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-3 py-2 w-full outline-none transition-all text-xs sm:text-sm" />
                 </div>
               </div>
               {signupType === 'nutriologo' && (
-                <div className="mb-4">
-                  <div className="text-[11px] text-[#6B7A8D] mb-1.5 font-semibold uppercase tracking-[1px]">Número de Cédula Profesional</div>
+                <div className="mb-2.5">
+                  <div className="text-[10px] text-[#6B7A8D] mb-1 font-semibold uppercase tracking-[1px]">Número de Cédula Profesional</div>
                   <div className="relative">
-                    <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu número de cédula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 w-full outline-none transition-all text-sm" />
+                    <input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Tu número de cédula" type="text" className="bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-3 py-2 w-full outline-none transition-all text-xs sm:text-sm" />
                   </div>
                 </div>
               )}
-              <div className="mb-4 flex items-start gap-2">
-                <input type="checkbox" id="aviso_pro" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-1 accent-[#10B981]" />
-                <label htmlFor="aviso_pro" className="text-xs text-[#6B7A8D] leading-tight cursor-pointer">
+              <div className="mb-3 flex items-start gap-2">
+                <input type="checkbox" id="aviso_pro" checked={avisoAceptado} onChange={e => setAvisoAceptado(e.target.checked)} className="mt-0.5 accent-[#10B981]" />
+                <label htmlFor="aviso_pro" className="text-[11px] text-[#6B7A8D] leading-tight cursor-pointer">
                   He leído y acepto el <Link to="/privacidad" className="text-[var(--brand-primary)] underline">Aviso de Privacidad</Link> para el tratamiento de mis datos personales y de salud.
                 </label>
               </div>
-              <button onClick={submitProRequest} disabled={loading} className={`w-full p-3.5 rounded-xl font-extrabold text-sm mb-3 tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-lg shadow-emerald-500/30'}`}>
-                {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={16} /></>}
+              <button onClick={submitProRequest} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl font-extrabold text-xs tracking-[1.5px] font-['Space_Grotesk',sans-serif] transition-all duration-300 flex items-center justify-center gap-2 mb-2 ${loading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#10B981] text-white hover:bg-[#059669] cursor-pointer shadow-md shadow-emerald-500/25'}`}>
+                {loading ? "ENVIANDO..." : <>ENVIAR SOLICITUD <CheckCircle size={15} /></>}
               </button>
               <div className="text-center">
                 <button onClick={() => setMode("signup_type")} className="text-xs text-[#6B7A8D] hover:text-[#0B1929] cursor-pointer">Volver</button>
@@ -834,7 +834,7 @@ export default function Login({ onLogin }) {
   );
 
   return (
-    <div className="min-h-[100dvh] md:h-screen md:max-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-y-auto md:overflow-hidden font-['Inter',sans-serif] text-[#0B1929] select-none">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-y-auto font-['Inter',sans-serif] text-[#0B1929] select-none">
       {/* ── Splash Screen Overlay ── */}
       {showSplash && (
         <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -962,7 +962,7 @@ export default function Login({ onLogin }) {
       {/* ══════════════════════════════════════════════════════════════════
           VISTA 2: ESCRITORIO (>= md) - DISEÑO HERO WEB INTEGRAL
          ══════════════════════════════════════════════════════════════════ */}
-      <main className="hidden md:flex flex-1 w-full max-w-6xl mx-auto px-6 lg:px-10 py-6 lg:py-10 items-center justify-between gap-8 lg:gap-14 z-10">
+      <main className="hidden md:flex flex-1 w-full max-w-6xl mx-auto px-6 lg:px-10 py-4 lg:py-6 items-center justify-between gap-8 lg:gap-14 z-10 my-auto">
         
         {/* Columna Izquierda: Showcase de Marca, Pilares y Especialistas */}
         <div className="flex-1 flex flex-col justify-center max-w-xl pr-2">
