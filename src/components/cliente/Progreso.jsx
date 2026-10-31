@@ -484,8 +484,6 @@ export default function Progreso({ cliente, isSelfManaged }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxIndex, handlePrevLightbox, handleNextLightbox]);
 
-  if (loading) {
-    
   // Vincular cada métrica con su plan correspondiente
   const allLinkedMetricas = useMemo(() => {
     return linkMetricasToCiclos(metricas, ciclos);
@@ -530,8 +528,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
     };
   }, [chronologicalEvals, allLinkedMetricas, ciclos]);
 
-  return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
         <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Mi Seguimiento</p>
           <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Mis Resultados</h1>
