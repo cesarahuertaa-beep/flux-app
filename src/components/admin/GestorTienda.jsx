@@ -328,7 +328,7 @@ export default function GestorTienda({ setMsg }) {
   return (
     <div className="h-full flex flex-col">
       {/* ── BARRA SUPERIOR CON SUB-PESTAÑAS ── */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4 md:mb-6 px-4 pt-3 md:px-0 md:pt-0">
         <div>
           <h2 className="text-xl font-bold text-[#0B1929]">Gestor de Tienda y Landing</h2>
           <p className="text-sm text-[#6B7A8D] mt-0.5">
@@ -372,7 +372,7 @@ export default function GestorTienda({ setMsg }) {
       {/* ═══════════════════════════════════════════════════════════ */}
       {activeTab === "catalogo" && (
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center mb-4 md:mb-6 px-3.5 md:px-0">
             <div className="flex flex-col md:flex-row gap-3 flex-1 w-full bg-white p-2.5 rounded-2xl border border-[#E2E8F0] shadow-xs">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0] w-4 h-4" />
@@ -426,7 +426,7 @@ export default function GestorTienda({ setMsg }) {
                 <p className="text-[#6B7A8D] text-xs sm:text-sm mt-1">No se encontraron productos que coincidan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6 px-3.5 md:px-0">
                 {filtered.map(p => {
                   const extLink = config.external_links?.[p.id];
                   return (
@@ -512,7 +512,7 @@ export default function GestorTienda({ setMsg }) {
       {activeTab === "ajustes" && (
         <div className="flex-1 overflow-y-auto space-y-6 pb-12">
           {/* Tarjeta 1: Canal de Ventas WhatsApp (Múltiples Números y Rotación) */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#F0F4FA]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -648,7 +648,7 @@ export default function GestorTienda({ setMsg }) {
           </div>
 
           {/* Tarjeta 2: Distribución de la App (Google Play Store y Código QR) */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex items-center gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
               <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
                 <Smartphone size={20} />
@@ -762,7 +762,7 @@ export default function GestorTienda({ setMsg }) {
           </div>
 
           {/* Tarjeta 2: Redes Sociales y Soporte */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex items-center gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
               <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
                 <Share2 size={20} />
@@ -863,7 +863,7 @@ export default function GestorTienda({ setMsg }) {
           </div>
 
           {/* Tarjeta 3: Capturas de la App (Showcase para el Landing) */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
@@ -937,8 +937,8 @@ export default function GestorTienda({ setMsg }) {
       {/* ── MODAL: NUEVO / EDITAR PRODUCTO ── */}
       {/* ═══════════════════════════════════════════════════════════ */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-3xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden animate-in zoom-in-95 flex flex-col">
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0">
               <h2 className="text-base font-bold text-[#0B1929]">{editProd ? 'Editar Producto' : 'Nuevo Producto'}</h2>
               <button onClick={() => setShowModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] cursor-pointer">

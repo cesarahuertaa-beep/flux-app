@@ -244,7 +244,7 @@ export default function Nutrition({
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-4 sm:px-6 md:px-8 pt-5 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
+      <div className="px-4 sm:px-6 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -330,9 +330,9 @@ export default function Nutrition({
       </div>
 
       {/* ── Day Content (Habits & Adherence + Meals) — scrolls smoothly with page ── */}
-      <div className="px-4 sm:px-6 md:px-8 flex-1 space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-2.5 md:space-y-3 pb-6 md:pb-8 min-h-0">
         {/* Habits & Adherence Widget */}
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] px-4 py-3.5 sm:p-4 shadow-none md:shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2 text-xs">
@@ -420,7 +420,7 @@ export default function Nutrition({
         </div>
 
         {/* Subtítulo del día activo */}
-        <div className="pt-1">
+        <div className="pt-1 px-4 md:px-0">
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
             {getDayFull(diaActual?.dia || diaActual?.nombre, activeDay)}
           </p>
@@ -431,7 +431,7 @@ export default function Nutrition({
           const meta = parseDiaMetadata(diaActual?.dia || diaActual?.nombre);
           if (!meta.agua && !meta.suplementos) return null;
           return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pb-1 px-3.5 md:px-0">
               {meta.agua && (
                 <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 flex items-center gap-2.5 text-xs text-blue-950 shadow-2xs">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
@@ -459,7 +459,7 @@ export default function Nutrition({
         })()}
 
         {comidas.length === 0 && (
-          <p className="text-sm text-[#6B7A8D] italic">No hay comidas registradas para este día.</p>
+          <p className="text-sm text-[#6B7A8D] italic px-4 md:px-0">No hay comidas registradas para este día.</p>
         )}
 
         {comidas.map((meal, idx) => {
@@ -476,7 +476,7 @@ export default function Nutrition({
           return (
             <div
               key={meal.id || idx}
-              className={`bg-white rounded-xl border overflow-hidden transition-all ${
+              className={`bg-white rounded-none md:rounded-xl border-y md:border overflow-hidden transition-all ${
                 isDone
                   ? "border-emerald-200 bg-emerald-50/20 shadow-xs"
                   : isExpanded
@@ -485,7 +485,7 @@ export default function Nutrition({
               }`}
             >
               {/* ── Row header ── */}
-              <div className="w-full flex items-center gap-3 px-5 py-4">
+              <div className="w-full flex items-center gap-3 px-4 md:px-5 py-3.5 md:py-4">
                 {/* Botón de Check de Comida Realizada */}
                 <button
                   type="button"
@@ -540,7 +540,7 @@ export default function Nutrition({
 
               {/* ── Expanded content: diseño vertical optimizado para móviles ── */}
               {isExpanded && (
-                <div className="px-5 pb-5 border-t border-[#F0F4FA]">
+                <div className="px-4 md:px-5 pb-4 md:pb-5 border-t border-[#F0F4FA]">
 
                     {/* Layout: imagen izquierda, contenido derecha igual que en Entrenamiento */}
                     <div className="flex mt-4 gap-3 sm:gap-4">

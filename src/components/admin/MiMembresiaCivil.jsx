@@ -233,8 +233,8 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   // ── CASO: Premium Incluido (Staff o Patrocinado por Nutriólogo) ──
   if (origen === "staff" || origen === "patrocinado") {
     return (
-      <div className="w-full max-w-4xl mx-auto space-y-6 pb-6">
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-[#E2E8F0]">
+      <div className="w-full max-w-4xl mx-auto space-y-4 md:space-y-6 pb-6 pt-2 md:pt-0">
+        <div className="bg-white p-5 md:p-8 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#F0F4FA]">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -276,7 +276,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 pb-6">
+    <div className="w-full max-w-4xl mx-auto space-y-4 md:space-y-6 pb-6 pt-2 md:pt-0">
       <input
         type="file"
         id="comprobanteUploadCivil"
@@ -286,7 +286,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       />
 
       {/* ── BANNER DE ESTADO COMPACTO Y ELEGANTE ── */}
-      <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
             Estado Actual
@@ -341,7 +341,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       {/* ── TARJETA PRINCIPAL: PLAN Y FACTURACIÓN ── */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Columna Izquierda: Beneficios del Plan (5 cols) */}
-        <div className="md:col-span-5 bg-gradient-to-br from-[#0B1929] to-[#152336] text-white p-6 md:p-7 rounded-3xl shadow-sm flex flex-col justify-between">
+        <div className="md:col-span-5 bg-gradient-to-br from-[#0B1929] to-[#152336] text-white p-6 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm flex flex-col justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-4 border border-white/10">
               <Sparkles size={12} />
@@ -382,7 +382,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         </div>
 
         {/* Columna Derecha: Método de Pago (7 cols) */}
-        <div className="md:col-span-7 bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
+        <div className="md:col-span-7 bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col justify-between">
           {isPlayApp ? (
             /* ── FACTURACIÓN GOOGLE PLAY (ANDROID) ── */
             <div className="flex flex-col justify-between h-full">
@@ -609,7 +609,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       </div>
 
       {/* ── REGLAS DE MEMBRESÍA ── */}
-      <div className="bg-white border border-[#E2E8F0] rounded-3xl p-5 md:p-6 shadow-xs">
+      <div className="bg-white border-y md:border border-[#E2E8F0] rounded-none md:rounded-3xl p-5 md:p-6 shadow-none md:shadow-xs">
         <h3 className="text-xs font-bold uppercase tracking-wider text-[#6B7A8D] mb-4 flex items-center gap-1.5">
           <Info size={14} />
           Reglas de Tu Suscripción
@@ -637,7 +637,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       </div>
 
       {/* ── HISTORIAL DE PAGOS ── */}
-      <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-[#E2E8F0]">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
         <h3 className="text-base font-bold text-[#0B1929] mb-4">
           Historial de Pagos
         </h3>

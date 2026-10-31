@@ -344,8 +344,8 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] bg-[#0B1929]/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+      <div className="bg-white rounded-none md:rounded-3xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-2xl border-0 md:border md:border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
         <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">

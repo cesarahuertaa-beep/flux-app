@@ -229,7 +229,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   return (
     <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* Header estandarizado */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
           Mi Cuenta
         </p>
@@ -241,7 +241,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-8 px-4 sm:px-6 md:px-8 pt-6 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto w-full pb-8 px-0 md:px-8 pt-3 md:pt-6 overflow-x-hidden">
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 
@@ -337,7 +337,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         )}
       </IdentidadEmpresarialCard>
 
-      <div className="mt-8 flex flex-col sm:flex-row gap-4">
+      <div className="mt-4 md:mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 px-4 md:px-0">
         {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
           <button onClick={() => window.location.href = "/"} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <ShoppingBag size={18} /> Ir a la tienda FLUX

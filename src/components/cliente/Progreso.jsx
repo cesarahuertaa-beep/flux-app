@@ -662,7 +662,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* HEADER ESTÁNDAR */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col sm:flex-row sm:items-end justify-between gap-3 md:gap-4">
         <div>
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             Mi Seguimiento
@@ -721,12 +721,12 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
       </div>
 
-      <div className="px-6 md:px-8 py-6 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-8">
+      <div className="px-0 md:px-8 py-3 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
         {view === 'metricas' && (
           <>
           {/* ── RESUMEN DE TRANSFORMACIÓN TOTAL ACUMULADA ── */}
           {kpiStats && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
               {/* Peso Total */}
               <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-1.5">
@@ -844,7 +844,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
           {COMP_KEYS.length > 0 ? (
             <>
               {/* ── TOP 4 MÉTRICAS DESTACADAS ── */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
                 {primaryKeys.map(k => {
                   const val = current[k.key];
                   const hasPrev = metricas.length > 1;
@@ -906,7 +906,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
               {/* ── ACORDEÓN DESPLEGABLE: MEDIDAS ADICIONALES ── */}
               {secondaryKeys.length > 0 && (
-                <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden transition-all">
+                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden transition-all">
                   <button
                     type="button"
                     onClick={() => setShowAllMetrics(prev => !prev)}
@@ -985,7 +985,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
             {/* ── DESGLOSE HISTÓRICO PLAN A PLAN ── */}
             {ciclos.length > 0 && (
-              <div className="bg-white rounded-3xl p-5 md:p-7 border border-[#E2E8F0] shadow-sm space-y-5">
+              <div className="bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm space-y-5">
                 <div className="flex items-center justify-between gap-3 border-b border-[#F0F4FA] pb-3.5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -1166,7 +1166,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
           </>
         ) : (
-          <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-[#E2E8F0]">
+          <div className="bg-white rounded-none md:rounded-3xl p-8 text-center shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
             <Scale className="w-12 h-12 text-[#9BA5B0] mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#0B1929] mb-2">Sin métricas de composición</h3>
             <p className="text-sm text-[#6B7A8D]">{isSelfManaged ? "Aún no has registrado ninguna evaluación física." : "Tu nutriólogo aún no ha registrado evaluaciones físicas."}</p>
@@ -1189,7 +1189,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               </div>
             </div>
           )}
-          <div className={`bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
+          <div className={`bg-white rounded-none md:rounded-3xl px-4 py-6 md:p-8 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
           
           <h2 className="text-lg font-bold text-[#0B1929] mb-2 relative z-10">Desarrollo Muscular</h2>
           <p className="text-sm text-[#9BA5B0] mb-8 relative z-10">Progreso de fuerza estimado según tu historial de entrenamiento.</p>
@@ -1284,7 +1284,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         {view === 'galeria' && (
           <div className="space-y-6">
             {/* ── BARRA DE HERRAMIENTAS Y FILTROS ESTILO INSTAGRAM ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
               {/* Filtros por pestaña/píldora */}
               <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
                 <button
@@ -1385,7 +1385,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
             {/* ── GRID DE FOTOS ESTILO INSTAGRAM ── */}
             {filteredPhotos.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 md:gap-4.5 px-3 md:px-0">
                 {filteredPhotos.map((p, idx) => (
                   <div
                     key={p.id}

@@ -60,7 +60,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
   const currentLogo = tempLogoFile || form.logo_url;
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] mb-8">
+    <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] mb-3 md:mb-8">
       <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
         <Building2 size={20} className="text-[var(--brand-primary)]" />
         {isSuperadmin ? "Identidad de Marca (FLUX)" : "Identidad de Marca (Consultorio)"}

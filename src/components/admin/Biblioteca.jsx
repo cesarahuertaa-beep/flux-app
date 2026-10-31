@@ -424,9 +424,9 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5 pt-2 md:pt-0">
       {/* ── Sub-tabs Superiores: Selector de Colección (Multi-Módulo) ── */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-1.5 shadow-sm flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] px-3.5 py-2.5 md:p-1.5 shadow-none md:shadow-sm flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-1.5 overflow-x-auto scroll-hide w-full sm:w-auto">
           {/* Tab Ejercicios */}
           <button
@@ -526,7 +526,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {subtab === "ejercicios" && (
         <div className="space-y-4">
           {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm items-center">
+          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
             <div className="relative flex-1 min-w-[160px] max-w-[240px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
               <input
@@ -564,7 +564,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px] px-3.5 md:px-0">
               {ejerciciosFiltrados.map((e, i) => {
                 const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
                 return (
@@ -646,7 +646,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {subtab === "platillos" && (
         <div className="space-y-4">
           {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm items-center">
+          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
             <div className="relative flex-1 min-w-[160px] max-w-[240px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
               <input
@@ -684,7 +684,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 px-3.5 md:px-0">
               {platillosFiltrados.map((p) => {
                 const badge = platilloCatColors[p.categoria] || { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" };
                 const catLabel = CATEGORIAS_PLATILLOS.find(c => c.id === p.categoria)?.nombre || p.categoria;
@@ -800,7 +800,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {subtab === "ingredientes" && (
         <div className="space-y-4">
           {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm items-center">
+          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
             <div className="relative flex-1 min-w-[160px] max-w-[240px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
               <input
@@ -838,7 +838,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5 px-3.5 md:px-0">
               {ingredientesFiltrados.map((ing) => {
                 const catInfo = CATEGORIAS_INGREDIENTES.find(c => c.id === ing.categoria);
 
@@ -906,8 +906,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
       {/* Modal Ejercicio */}
       {showEjModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editEj ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar ejercicio</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo ejercicio</>}
@@ -979,8 +979,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
       {/* Modal Platillo */}
       {showPlatilloModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editPlatillo ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar platillo</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo platillo</>}
@@ -1146,8 +1146,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
       {/* Modal Ingrediente */}
       {showIngModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editIng ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar ingrediente</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo ingrediente</>}
@@ -1248,10 +1248,10 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {recipePreviewModal && (
         <div
           onClick={() => setRecipePreviewModal(null)}
-          className="fixed inset-0 bg-[#0B1929]/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in"
+          className="fixed inset-0 bg-[#0B1929]/50 backdrop-blur-sm z-[200] flex items-center justify-center p-0 md:p-4 animate-in fade-in"
         >
           <div
-            className="bg-white rounded-3xl max-w-lg w-full overflow-hidden border border-[#E2E8F0] shadow-2xl relative flex flex-col max-h-[90vh]"
+            className="bg-white rounded-none md:rounded-3xl md:max-w-lg w-full h-full max-h-full md:h-auto md:max-h-[90vh] overflow-hidden border-0 md:border border-[#E2E8F0] shadow-2xl relative flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Header con Imagen */}

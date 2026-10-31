@@ -33,13 +33,13 @@ const Btn = ({ children, onClick, disabled, small, outline, grad, className = ""
 const Modal = ({ title, onClose, children }) => {
   useBackButton(true, onClose, 20);
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl border border-[#E2E8F0] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
           <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">{title}</h3>
           <button onClick={onClose} className="p-1 rounded-md text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-100 transition-colors"><X size={20} /></button>
         </div>
-        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">{children}</div>
+        <div className="p-5 md:p-6 space-y-4 flex-1 md:max-h-[80vh] overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -529,7 +529,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     const isExpanded = expandedNutri === n.id;
     
     return (
-      <div key={n.id} className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
+      <div key={n.id} className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-sm transition-all hover:border-slate-300">
         {/* Nutriologo Row */}
         <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -646,7 +646,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* Header */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -679,7 +679,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       </div>
 
       {/* Directorio List */}
-      <div className="flex-1 p-6 md:p-8">
+      <div className="flex-1 px-0 py-3 md:p-8">
         {loading ? (
           <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
         ) : (
@@ -690,7 +690,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
               const isExpanded = expandedNutri === "__atletas__";
               return (
-                <div key="__atletas__" className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm transition-all hover:border-slate-300">
+                <div key="__atletas__" className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-sm transition-all hover:border-slate-300">
                   {/* Header row */}
                   <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-4 min-w-0">

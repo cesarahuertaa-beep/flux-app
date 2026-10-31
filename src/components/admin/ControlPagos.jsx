@@ -344,10 +344,10 @@ export default function ControlPagos({ setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-4">
+    <div className="w-full max-w-6xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-4 pt-2 md:pt-0">
 
       {/* ── PANEL DE CONFIGURACIÓN DE TARIFAS Y PLANES (OPCIÓN A) ────────── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
         <div className="p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
@@ -550,7 +550,7 @@ export default function ControlPagos({ setMsg }) {
       </div>
 
       {/* ── SECCIÓN NUTRIÓLOGOS ─────────────────────────────────────────── */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-4 md:gap-6">
         <div className="flex-1">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
             <Banknote className="text-green-500" />
@@ -580,7 +580,7 @@ export default function ControlPagos({ setMsg }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
         {loading ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[700px] hidden md:table">
@@ -676,7 +676,7 @@ export default function ControlPagos({ setMsg }) {
 
       {/* ── COMISIONES POR COLABORADOR ──────────────────────────────────── */}
       {!loading && comisiones.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+        <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
           <div className="p-6 border-b border-[#E2E8F0] flex items-center gap-3">
             <UserCheck className="text-indigo-500" size={22} />
             <div>
@@ -749,7 +749,7 @@ export default function ControlPagos({ setMsg }) {
       )}
 
       {/* ── SECCIÓN ATLETAS INDEPENDIENTES ──────────────────────────────── */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-4 md:gap-6">
         <div className="flex-1">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
             <Dumbbell className="text-[var(--brand-primary)]" size={22} />
@@ -764,7 +764,7 @@ export default function ControlPagos({ setMsg }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
         {loadingCivil ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[600px] hidden md:table">

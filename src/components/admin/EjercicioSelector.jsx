@@ -16,7 +16,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
   });
 
   return (
-    <div className="bg-[#F7F9FC] rounded-2xl border border-[#E2E8F0] p-4 mb-4 shadow-sm">
+    <div className="bg-[#F7F9FC] rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] -mx-3.5 px-3.5 py-3.5 md:mx-0 md:p-4 mb-4 shadow-none md:shadow-sm">
       <div className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-3">
         Agregar de la Biblioteca
       </div>

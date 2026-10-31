@@ -266,7 +266,7 @@ export function BeforeAfterComparator({
 
   if (!photos || photos.length < 2) {
     return (
-      <div className="bg-white rounded-3xl p-6 text-center border border-[#E2E8F0] shadow-sm my-6">
+      <div className="bg-white rounded-none md:rounded-3xl p-6 text-center border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm my-3 md:my-6">
         <Sparkles className="w-8 h-8 text-[var(--brand-primary)] mx-auto mb-2 opacity-50" />
         <h4 className="text-sm font-bold text-[#0B1929]">Se requieren al menos 2 fotos</h4>
         <p className="text-xs text-[#6B7A8D] mt-1 max-w-sm mx-auto">
@@ -289,7 +289,7 @@ export function BeforeAfterComparator({
   const timeDiff = getDaysDiff(beforeItem?.fecha, afterItem?.fecha);
 
   return (
-    <div className="bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] my-6 transition-all">
+    <div className="bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] my-3 md:my-6 transition-all">
       {/* ── TOP HEADER ── */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5 min-w-0">

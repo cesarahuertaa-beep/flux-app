@@ -178,8 +178,8 @@ export default function Aprobaciones({ setMsg }) {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="px-0 py-4 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap px-4 md:px-0">
         <div>
           <h2 className="text-2xl font-bold text-[#0B1929]">Aprobaciones Profesionales</h2>
           <p className="text-sm text-[#6B7A8D] mt-1">Revisa, autoriza o gestiona las solicitudes de acceso.</p>
@@ -217,7 +217,7 @@ export default function Aprobaciones({ setMsg }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {solicitudes.map(s => (
-            <div key={s.id} className="bg-white rounded-2xl p-5 shadow-sm border border-[#E2E8F0] flex flex-col gap-4">
+            <div key={s.id} className="bg-white rounded-none md:rounded-2xl p-4 sm:p-5 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-[#0B1929]">{s.nombre}</h3>

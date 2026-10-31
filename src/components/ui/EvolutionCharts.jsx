@@ -167,11 +167,11 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
       : null;
 
   return (
-    <div className="space-y-6 my-6">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="space-y-3 md:space-y-6 my-3 md:my-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6">
         {/* ── 1. CURVA DE EVOLUCIÓN CORPORAL ── */}
         <div
-          className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-7"
+          className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-7"
         >
           {isLocked && (
             <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
@@ -352,7 +352,7 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
         </div>
 
         {/* ── 2. SOMATOCARTA DE HEATH-CARTER ── */}
-        <div className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
+        <div className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
           {isLocked && (
             <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
               <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2 shadow-xs">

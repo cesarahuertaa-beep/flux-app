@@ -29,7 +29,7 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
   };
 
   return (
-    <div className="mb-8">
+    <div className="mb-4 md:mb-8 px-4 md:px-0">
       <h3 className="text-sm font-bold text-[#0B1929] mb-4 flex items-center gap-2">
         <RefreshCw size={16} className="text-[#6B7A8D]" /> Cambiar Perfil
       </h3>

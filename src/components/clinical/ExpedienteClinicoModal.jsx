@@ -233,10 +233,10 @@ export default function ExpedienteClinicoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl border border-[#E2E8F0] overflow-hidden">
+    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-xl border-0 md:border md:border-[#E2E8F0] overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
+        <div className="px-4 py-3.5 md:px-5 md:py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
               <ClipboardList className="w-5 h-5" />
@@ -291,7 +291,7 @@ export default function ExpedienteClinicoModal({
         </div>
 
         {/* Sub-tabs de navegación de las 2 áreas del Expediente Atemporal */}
-        <div className="px-5 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
+        <div className="px-4 py-2.5 md:px-5 md:py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-1.5 w-full sm:w-auto">
             {[
               { id: "perfil", label: "1. Ficha de Identificación", icon: User },
@@ -325,11 +325,11 @@ export default function ExpedienteClinicoModal({
         </div>
 
         {/* Body del Expediente */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-4">
           {/* SECCIÓN 1: IDENTIFICACIÓN PERMANENTE */}
           {historiaStep === "perfil" && (
             <div className="space-y-4">
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 space-y-3.5">
+              <div className="bg-transparent border-0 rounded-none p-0 md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl md:p-4 space-y-3.5">
                 <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
                   Ficha de Identificación del Paciente
                 </span>
@@ -545,7 +545,7 @@ export default function ExpedienteClinicoModal({
         </div>
 
         {/* Footer del Modal */}
-        <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
+        <div className="px-4 py-3 md:px-5 md:py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
           {mode === "nutriologo" ? (
             <button
               type="button"

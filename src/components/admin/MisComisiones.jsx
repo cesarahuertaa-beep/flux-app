@@ -129,10 +129,10 @@ export default function MisComisiones({ myId, setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in pb-4">
+    <div className="w-full max-w-4xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-4 pt-2 md:pt-0">
       
       {/* Encabezado */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
             <Banknote className="text-indigo-500" />
@@ -161,7 +161,7 @@ export default function MisComisiones({ myId, setMsg }) {
       ) : (
         <>
           {/* Tarjeta Principal de Ingresos */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
             <div className="p-8 bg-gradient-to-br from-indigo-50 to-white flex flex-col items-center justify-center text-center">
               <p className="text-sm font-bold text-[#6B7A8D] uppercase tracking-wider mb-2">Total a recibir este periodo</p>
               <h1 className="text-5xl font-black text-indigo-600 tracking-tight">${miPago.toFixed(2)}</h1>

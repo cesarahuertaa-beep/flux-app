@@ -556,8 +556,8 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         </Suspense>
       )}
       {showIntakeForms && (
-        <div className="fixed inset-0 z-[120] bg-[#F7F9FC] overflow-y-auto flex flex-col p-3 sm:p-6 animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl mx-auto flex justify-end mb-1">
+        <div className="fixed inset-0 z-[120] bg-white md:bg-[#F7F9FC] overflow-y-auto flex flex-col p-0 md:p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl mx-auto flex justify-end px-3 py-2 md:px-0 md:py-0 md:mb-1 border-b border-[#E2E8F0] md:border-0 bg-white md:bg-transparent sticky top-0 z-10 md:static">
             <button
               type="button"
               onClick={() => setShowIntakeForms(false)}

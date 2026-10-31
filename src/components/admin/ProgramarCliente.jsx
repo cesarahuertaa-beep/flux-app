@@ -2870,7 +2870,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
        (c.email || "").toLowerCase().includes(searchProg.toLowerCase()))
     );
     return (
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm max-w-2xl">
+      <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 md:p-6 shadow-none md:shadow-sm max-w-2xl">
         <h3 className="text-base font-bold text-[#0B1929] mb-1">Selecciona un paciente para programar</h3>
         <p className="text-xs text-[#6B7A8D] mb-4">Elige a quién deseas asignarle o editarle su plan de alimentación, rutina o evaluación corporal.</p>
         <div className="relative mb-4">
@@ -2956,7 +2956,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   return (
     <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente / Mi Plan ── */}
-      <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-sm">
+      <div className="mb-3 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
           
           {/* Left: Info + Back button (solo si no es Mi Plan) */}
@@ -3062,7 +3062,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       )}
 
       {/* ── Selector de Ciclos ── */}
-      <div className="mb-5 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
+      <div className="mb-3.5 md:mb-5 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3.5 md:p-4 shadow-none md:shadow-sm">
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">{isMiPlan ? "Mis Planes" : "Planes del Paciente"}</span>
           <div className="flex items-center gap-2">
@@ -3202,7 +3202,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       {ciclos.length > 0 && (
         <>
       {/* ── Sub-tabs ── */}
-      <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max overflow-x-auto scroll-hide">
+      <div className="flex gap-1 mb-3.5 md:mb-4 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max overflow-x-auto scroll-hide">
         {[
           { k:"progreso", ic: <BarChart2 className="w-4 h-4 shrink-0"/>, lb:"Evaluación" },
           ...(serviciosActivos.nutricion ? [{ k:"nutri", ic: <Utensils className="w-4 h-4 shrink-0"/>, lb:"Nutrición" }] : []),
@@ -3228,7 +3228,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         {subtab ==="nutri" && (
           <div>
             {/* Sub-pestañas: Programar vs Tracking */}
-            <div className="flex gap-1 mb-4 bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-max">
+            <div className="flex gap-1 mb-3.5 md:mb-4 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max">
               <button
                 type="button"
                 onClick={() => setNutriView("programar")}
@@ -3285,7 +3285,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   const prescMode = smartPrescription.prescriptionMode || "matematico";
 
                   return (
-                    <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
+                    <div className="mb-3.5 md:mb-4 bg-white border-y md:border border-[#E2E8F0] rounded-none md:rounded-2xl shadow-none md:shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
                       {/* Cabecera de la tarjeta (Colapsable) */}
                       <div
                         onClick={() => setMetaPrescritaCollapsed((p) => !p)}
@@ -3477,7 +3477,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   );
                 })()}
 
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5 px-3.5 md:px-0">
               <div className="flex items-center gap-2.5 flex-wrap min-w-0">
                 <span className="font-semibold text-[#0B1929]">
                   {parsedActiveCycle.enfoque ? (
@@ -3537,7 +3537,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   return (
                     <SortableItem key={d.id} id={d.id}>
                       {({ dragHandle, isDragging }) => (
-                        <div className="bg-white rounded-xl border border-[#E2E8F0] px-4 py-3 mb-2 flex justify-between items-center gap-3 shadow-2xs hover:border-gray-300 transition-all">
+                        <div className="bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3 mb-2 flex justify-between items-center gap-3 shadow-none md:shadow-2xs hover:border-gray-300 transition-all">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             {!isReadOnly && <div className="shrink-0 text-slate-400 hover:text-slate-600">{dragHandle}</div>}
                             <div className="flex flex-col min-w-0">
@@ -3653,7 +3653,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               const p = smartTrainingPrescription;
 
               return (
-                <div className="mb-4 bg-white border border-[#E2E8F0] rounded-2xl shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
+                <div className="mb-3.5 md:mb-4 bg-white border-y md:border border-[#E2E8F0] rounded-none md:rounded-2xl shadow-none md:shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
                   {/* Cabecera de la tarjeta (Colapsable) */}
                   <div
                     onClick={() => setMetaEntrenoCollapsed((prev) => !prev)}
@@ -3852,7 +3852,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               );
             })()}
 
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-3 px-3.5 md:px-0">
               <div className="flex items-center gap-2.5 flex-wrap min-w-0">
                 <span className="font-semibold text-[#0B1929]">
                   {parsedActiveCycle.enfoque ? (
@@ -3896,7 +3896,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   return (
                     <SortableItem key={r.id} id={r.id}>
                       {({ dragHandle, isDragging }) => (
-                        <div className={`bg-white rounded-xl border border-[#E2E8F0] px-3.5 py-2.5 mb-2 flex justify-between items-center gap-2 ${isReadOnly ? 'opacity-75' : ''}`}>
+                        <div className={`bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3 mb-2 flex justify-between items-center gap-2 ${isReadOnly ? 'opacity-75' : ''}`}>
                           <div className="flex items-center gap-2.5 flex-1 min-w-0">
                             {!isReadOnly && <div className="shrink-0">{dragHandle}</div>}
                             <div className="flex flex-col min-w-0">
@@ -3963,8 +3963,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
       {/* ── Modal Inteligente de Plan (Crear y Editar) ── */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl border border-[#E2E8F0] flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl border-0 md:border md:border-[#E2E8F0] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[#E2E8F0] bg-white">
               <div className="min-w-0">
@@ -4332,13 +4332,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
 
             {/* Main Content Area: 2-Column Split on Desktop */}
-            <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="max-w-7xl w-full mx-auto px-0 py-2 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6 items-start">
               
               {/* Left Column (Sticky on Desktop): Programación + Balance + Hidratación & Suplementos */}
               <div className="lg:col-span-4 lg:sticky lg:top-20 flex flex-col gap-5">
                 
                 {/* Card 1: Configuración del Día */}
-                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
                   <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-[var(--brand-primary)]" />
                     Programación del Día
@@ -4471,7 +4471,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 </div>
 
                 {/* Card 3: Hidratación y Suplementación */}
-                <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm space-y-4">
+                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm space-y-4">
                   <h4 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
                     <Droplets className="w-3.5 h-3.5 text-blue-500" />
                     Hidratación y Suplementación
@@ -4534,7 +4534,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               </div>
 
               {/* Right Column: Lista de Comidas (Siempre Desplegadas y Visibles) */}
-              <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
+              <div className="lg:col-span-8 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
                 <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
@@ -4781,7 +4781,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
 
                                   {/* Row 2: Opción Principal (A) con Switch Platillo vs Ingredientes */}
-                                  <div className="mb-3.5 p-3.5 rounded-xl bg-white border border-[#E2E8F0]">
+                                  <div className="mb-3.5 p-0 border-0 bg-transparent md:p-3.5 md:rounded-xl md:bg-white md:border md:border-[#E2E8F0]">
                                     <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                                       <div className="flex items-center gap-2.5 flex-wrap">
                                         <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -5686,8 +5686,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
       {/* ── Modal de Catálogo de Platillos FLUX ── */}
       {photoCatalogModal && (
-        <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
+        <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full md:max-w-3xl rounded-none md:rounded-2xl shadow-2xl flex flex-col h-full max-h-full md:h-auto md:max-h-[88vh] overflow-hidden">
             {/* Header */}
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
               <div>
@@ -5850,12 +5850,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
 
           {/* Main Content Area: 2-Column Split on Desktop */}
-          <div className="max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="max-w-7xl w-full mx-auto px-0 py-2 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6 items-start">
 
             {/* Left Column (Sticky on Desktop): Configuración + Catálogo de Ejercicios */}
             <div className="lg:col-span-5 lg:sticky lg:top-20 flex flex-col gap-5">
               {/* Card 1: Configuración de la Rutina */}
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+              <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
                 <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-[var(--brand-primary)]" />
                   Programación de la Rutina
@@ -5920,7 +5920,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               </div>
 
               {/* Card 2: Selector del Catálogo */}
-              <div ref={catalogRef} className={`bg-white rounded-2xl border p-5 shadow-sm transition-all ${activeAltSlot !== null ? 'border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary)]/20' : 'border-[#E2E8F0]'}`}>
+              <div ref={catalogRef} className={`bg-white rounded-none md:rounded-2xl border-y md:border p-4 sm:p-5 shadow-none md:shadow-sm transition-all ${activeAltSlot !== null ? 'border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary)]/20' : 'border-[#E2E8F0]'}`}>
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-2">
                     <Dumbbell className="w-4 h-4 text-[var(--brand-primary)]" />
@@ -5948,7 +5948,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
 
             {/* Right Column: Ejercicios Programados & Alternativas */}
-            <div className="lg:col-span-7 bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 shadow-sm">
+            <div className="lg:col-span-7 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">

@@ -356,8 +356,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === 0) {
     return (
-      <div className="max-w-2xl mx-auto w-full py-8 md:py-12 px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden p-6 md:p-10">
+      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden p-4 sm:p-6 md:p-10">
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
@@ -452,8 +452,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "solicitud_enviada") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-8 md:py-12 px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm p-6 md:p-10 text-center">
+      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center">
           <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-200 shadow-2xs">
             <Send className="w-8 h-8" />
           </div>
@@ -514,8 +514,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "pending_patient") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-8 md:py-12 px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm p-6 md:p-10 text-center">
+      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center">
           <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-2xs">
             <Clock className="w-8 h-8" />
           </div>
@@ -581,8 +581,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "patient_success") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-12 px-4 animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm p-8 md:p-12 text-center">
+      <div className="max-w-2xl mx-auto w-full py-4 md:py-12 px-0 md:px-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-6 md:p-12 text-center">
           <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-5 border border-emerald-200 shadow-2xs">
             <CheckCircle2 className="w-9 h-9" />
           </div>
@@ -613,10 +613,10 @@ export function NuevoExpedienteForms({
   const progressPct = step === 1 ? 50 : 100;
 
   return (
-    <div className="max-w-3xl mx-auto w-full py-6 md:py-10 px-4 flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="max-w-3xl mx-auto w-full py-0 md:py-10 px-0 md:px-4 flex flex-col gap-0 md:gap-6 animate-in fade-in duration-200">
       
       {/* ── Top Bar con Barra de Progreso ── */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 sm:p-5 shadow-2xs">
+      <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-3.5 sm:p-5 shadow-none md:shadow-2xs">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)] bg-blue-50 px-2.5 py-1 rounded-lg">
@@ -669,7 +669,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Contenido de la Página Actual ── */}
-      <div className="bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-8 shadow-sm">
+      <div className="bg-white rounded-none md:rounded-3xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 md:p-8 shadow-none md:shadow-sm">
         
         {/* ═══════════════════════════════════════════════════════
             PÁGINA 1: FICHA DE IDENTIFICACIÓN Y DATOS PERSONALES
@@ -915,7 +915,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className="flex items-center justify-between gap-3 pt-2">
+      <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-0 md:py-0 md:pt-2 bg-white md:bg-transparent">
         <div>
           {step === 2 ? (
             <button

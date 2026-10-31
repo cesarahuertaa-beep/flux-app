@@ -282,7 +282,7 @@ export function CitasCliente({ cliente }) {
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-6">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-3 md:mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -327,7 +327,7 @@ export function CitasCliente({ cliente }) {
       )}
 
       {/* ── Main Content ── */}
-      <div className="px-6 md:px-8 flex-1 pb-6 md:pb-8">
+      <div className="px-0 md:px-8 flex-1 pb-6 md:pb-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-[#6B7A8D]">
             <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />
@@ -350,7 +350,7 @@ export function CitasCliente({ cliente }) {
             {/* Próximas Citas */}
             {citasProximas.length > 0 && (
               <div className="mb-8">
-                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-4">
+                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-3 md:mb-4 px-4 md:px-0">
                   Citas Próximas
                 </p>
                 <div className="space-y-4">
@@ -359,7 +359,7 @@ export function CitasCliente({ cliente }) {
                     const { dia, hora } = fmtFechaHora(cita.fecha_hora);
                     const barColor = cita.estado === "confirmada" ? "bg-emerald-500" : cita.estado === "pendiente" ? "bg-amber-400" : "bg-red-500";
                     return (
-                      <div key={cita.id} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden flex relative">
+                      <div key={cita.id} className="bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden flex relative">
                         {/* Status color bar */}
                         <div className={`w-1.5 flex-shrink-0 ${barColor}`} />
                         
@@ -401,7 +401,7 @@ export function CitasCliente({ cliente }) {
             {/* Historial */}
             {citasPasadas.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-4">
+                <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-3 md:mb-4 px-4 md:px-0">
                   Historial de Citas
                 </p>
                 <div className="space-y-3">
@@ -409,7 +409,7 @@ export function CitasCliente({ cliente }) {
                       const estado = ESTADOS[cita.estado] || ESTADOS.cancelada;
                       const yaCalificado = ratedCitas[cita.id];
                       return (
-                        <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm">
+                        <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-[#0B1929] capitalize">
                               {fmtFechaCorta(cita.fecha_hora)}
@@ -458,8 +458,8 @@ export function CitasCliente({ cliente }) {
 
       {/* ── Modal Agendar Cita ── */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-[480px] bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full md:max-w-[480px] bg-white rounded-none md:rounded-2xl shadow-2xl flex flex-col h-full max-h-full md:h-auto md:max-h-[90vh] animate-in zoom-in-95">
             
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0">

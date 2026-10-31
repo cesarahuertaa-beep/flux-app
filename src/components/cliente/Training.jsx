@@ -269,7 +269,7 @@ function TimerCard({ brandColor }) {
 
   return (
     <div
-      className={`border shadow-sm rounded-xl p-4 flex items-center gap-4 mb-3 transition-all duration-200 ${
+      className={`border-y md:border shadow-none md:shadow-sm rounded-none md:rounded-xl p-4 flex items-center gap-4 mb-2.5 md:mb-3 transition-all duration-200 ${
         isProgrammingPreset
           ? "bg-amber-50/40 border-amber-400 ring-2 ring-amber-400/20"
           : "bg-white border-[#E2E8F0]"
@@ -712,7 +712,7 @@ export default function Training({
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] mb-4 shrink-0">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] mb-2 md:mb-4 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -736,7 +736,7 @@ export default function Training({
       </div>
 
       {/* ── Day tabs (las rutinas/días del cliente) ── */}
-      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-6 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-3.5 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
         <div className="flex gap-2 overflow-x-auto scroll-hide">
           {rutinasValidas.map((r, i) => {
             const isActive = safeActiveIdx === i;
@@ -776,7 +776,7 @@ export default function Training({
       </div>
 
       {/* ✨ Subtítulo del día activo ✨ */}
-      <div className="px-6 md:px-8 mb-3 shrink-0">
+      <div className="px-4 md:px-8 mb-2.5 md:mb-3 shrink-0">
         <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
           {(() => {
             const nombre = rutinaActiva?.nombre;
@@ -789,10 +789,10 @@ export default function Training({
       </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-6 md:px-8 flex-1 space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-2.5 md:space-y-3 pb-6 md:pb-8 min-h-0">
 
         {/* Barra de Progreso de la Sesión del Día */}
-        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-3.5 flex flex-col gap-2">
+        <div className="bg-white border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm rounded-none md:rounded-xl px-4 py-3.5 flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#0B1929]">
               Progreso del Día: {completedSetsDay}/{totalSetsDay} series
@@ -849,12 +849,12 @@ export default function Training({
           return (
             <div
               key={ex.id || i}
-              className={`bg-white rounded-xl border overflow-hidden transition-all ${
+              className={`bg-white rounded-none md:rounded-xl border-y md:border overflow-hidden transition-all ${
                 isExpanded ?"border-[var(--brand-primary)] shadow-sm" :"border-[#E2E8F0]"
               }`}
             >
               <button
-                className="w-full flex items-center gap-4 px-5 py-4 text-left"
+                className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
                 onClick={() => setExpandedEx(isExpanded ? null : i)}
               >
                 <div className="w-8 h-8 rounded-lg bg-[#E8F1FB] flex items-center justify-center flex-shrink-0">
@@ -881,7 +881,7 @@ export default function Training({
               </button>
 
               {isExpanded && (
-                <div className="px-5 pb-5 border-t border-[#F0F4FA] pt-4">
+                <div className="px-4 md:px-5 pb-4 md:pb-5 border-t border-[#F0F4FA] pt-4">
 
                   {/* Fila superior: Miniatura GIF + Alternativas */}
                   <div className="flex items-start gap-4 mb-5">
@@ -1156,7 +1156,7 @@ export default function Training({
 
         {/* Botón para abrir Resumen y Recompensas del Entrenamiento */}
         {completedSetsDay > 0 && (
-          <div className="pt-3">
+          <div className="pt-3 px-4 md:px-0">
             <button
               onClick={() => setShowResumen(true)}
               className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm text-white shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
@@ -1182,11 +1182,11 @@ export default function Training({
       {showResumen && (
         <div
           onClick={() => setShowResumen(false)}
-          className="fixed inset-0 bg-[#0B1929]/55 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-[#0B1929]/55 backdrop-blur-sm z-[200] flex items-center justify-center p-0 md:p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-md w-full p-6 md:p-7 border border-[#E2E8F0] shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-none md:rounded-3xl md:max-w-md w-full h-full max-h-full md:h-auto md:max-h-[90vh] p-5 md:p-7 border-0 md:border md:border-[#E2E8F0] shadow-2xl relative overflow-y-auto"
           >
             <button
               onClick={() => setShowResumen(false)}

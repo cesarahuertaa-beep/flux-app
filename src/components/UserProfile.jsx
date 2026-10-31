@@ -235,7 +235,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
           Mi Cuenta
         </p>
@@ -247,7 +247,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-8 px-4 sm:px-6 md:px-8 pt-6">
+      <div className="max-w-4xl mx-auto w-full pb-8 px-0 md:px-8 pt-3 md:pt-6">
 
       <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={currentMultiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 
@@ -260,7 +260,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       />
 
       {isCliente && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] mb-8">
+        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] mb-3 md:mb-8">
           <label className="block text-sm font-bold text-[#0B1929] mb-2">
             Objetivo Principal
           </label>
@@ -276,7 +276,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       )}
 
       {isCliente && miNutriologo && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0] mb-8">
+        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] mb-3 md:mb-8">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
             <User size={20} className="text-[var(--brand-primary)]" />
             Mi Especialista
@@ -354,7 +354,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 md:gap-4 px-4 md:px-0">
         {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
           <button 
             onClick={() => window.location.href = "/"}
@@ -376,8 +376,8 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
 
       {/* Zona de Privacidad y Eliminación de Cuenta (Requisito Google Play) */}
       {!isSuperadmin && (
-        <div className="mt-10 pt-8 border-t border-[#E2E8F0]">
-          <div className="bg-white rounded-2xl border border-red-100 p-5 sm:p-6 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mt-6 md:mt-10 pt-4 md:pt-8 border-t border-[#E2E8F0]">
+          <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-red-100 px-4 py-5 sm:p-6 shadow-none md:shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-[#0B1929] flex items-center gap-2">
                 <Trash2 size={16} className="text-red-500" />

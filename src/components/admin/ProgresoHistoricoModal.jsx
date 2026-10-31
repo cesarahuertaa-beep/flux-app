@@ -265,10 +265,10 @@ export default function ProgresoHistoricoModal({
 
       {/* ── Cuerpo a Pantalla Completa ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl w-full mx-auto p-4 md:p-8 space-y-6">
+        <div className="max-w-7xl w-full mx-auto px-0 py-3 md:p-8 space-y-3 md:space-y-6">
         {/* Banner de Resumen Global KPIs */}
         {kpiStats && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 px-3 md:px-0">
             {/* Peso */}
             <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-2xs">
               <div className="flex items-center justify-between mb-1.5">
@@ -386,7 +386,7 @@ export default function ProgresoHistoricoModal({
 
         {/* ── 1. Gráficas de Evolución en función del tiempo ── */}
         {allLinkedMetricas.length > 0 ? (
-          <div className="bg-white rounded-3xl p-5 md:p-7 border border-[#E2E8F0] shadow-2xs">
+          <div className="bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-2xs">
             <div className="flex items-center justify-between gap-3 mb-3 border-b border-[#F0F4FA] pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center">
@@ -409,7 +409,7 @@ export default function ProgresoHistoricoModal({
             />
           </div>
         ) : (
-          <div className="text-center py-16 text-[#6B7A8D] bg-white rounded-3xl border border-dashed border-[#E2E8F0] p-8 shadow-2xs">
+          <div className="text-center py-12 md:py-16 text-[#6B7A8D] bg-white rounded-none md:rounded-3xl border-y md:border border-dashed border-[#E2E8F0] p-6 md:p-8 shadow-none md:shadow-2xs">
             <div className="flex justify-center mb-3 text-[#CBD5E1]">
               <TrendingUp className="w-14 h-14" />
             </div>
@@ -424,7 +424,7 @@ export default function ProgresoHistoricoModal({
 
         {/* ── 2. Comparador Visual de Fotos ── */}
         {allClientPhotos.length >= 2 && (
-          <div className="bg-white rounded-3xl p-5 md:p-7 border border-[#E2E8F0] shadow-2xs">
+          <div className="bg-white rounded-none md:rounded-3xl px-4 py-4 md:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-2xs">
             <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-[#F0F4FA]">
               <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                 <Camera className="w-4 h-4" />
@@ -449,7 +449,7 @@ export default function ProgresoHistoricoModal({
 
         {/* ── 3. Desglose Detallado Plan a Plan ── */}
         {ciclos.length > 0 && (
-          <div className="bg-white rounded-3xl p-5 md:p-7 border border-[#E2E8F0] shadow-2xs space-y-5">
+          <div className="bg-white rounded-none md:rounded-3xl px-3.5 py-4 md:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-2xs space-y-4 md:space-y-5">
             <div className="flex items-center justify-between gap-3 border-b border-[#F0F4FA] pb-3.5">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -750,11 +750,11 @@ export default function ProgresoHistoricoModal({
       {selectedEval && (
         <div
           onClick={() => setSelectedEval(null)}
-          className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex justify-center p-0 md:p-4 overflow-y-auto animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl w-full max-w-xl my-auto flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden max-h-[88vh]"
+            className="bg-white rounded-none md:rounded-3xl w-full md:max-w-xl my-0 md:my-auto flex flex-col shadow-2xl border-0 md:border md:border-[#E2E8F0] overflow-hidden h-full max-h-full md:h-auto md:max-h-[88vh]"
           >
             {/* Header del detalle */}
             <div className="px-5 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white shrink-0">

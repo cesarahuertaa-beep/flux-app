@@ -129,7 +129,7 @@ export default function ClinicalAiSummaryCard({
       : [];
 
   return (
-    <div className="mb-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white rounded-2xl border border-blue-200/80 shadow-sm overflow-hidden transition-all duration-200">
+    <div className="mb-3 md:mb-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white rounded-none md:rounded-2xl border-y md:border border-blue-200/80 shadow-none md:shadow-sm overflow-hidden transition-all duration-200">
       
       {/* ── Barra Superior (Encabezado Limpio y Colapsable) ── */}
       <div

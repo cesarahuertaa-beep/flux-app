@@ -50,7 +50,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
-      <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
+      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div>
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
@@ -61,7 +61,7 @@ const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Ad
         {action}
       </div>
     )}
-    <div className="flex-1 w-full relative p-4 md:p-8">
+    <div className="flex-1 w-full relative p-0 md:p-8">
       <Suspense fallback={<ListSkeleton rows={4} />}>
         {children}
       </Suspense>
@@ -1127,7 +1127,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
         <div className={tab === "clientes" ? "flex-1 flex flex-col bg-[#F7F9FC] min-h-full" : "hidden"}>
           {/* Header */}
-          <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-4 pr-12 md:pr-8">
+          <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3.5 md:gap-4 pr-12 md:pr-8">
             {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>
@@ -1213,7 +1213,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           </div>
 
           {/* Lista de Clientes */}
-          <div className="flex-1 p-6 md:p-8">
+          <div className="flex-1 px-0 py-2 md:p-8">
             {loading ? (
               <CardGridSkeleton count={6} />
             ) : filteredClientes.length === 0 ? (
@@ -1227,7 +1227,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <p className="text-sm text-[#6B7A8D]">Agrega un nuevo paciente para comenzar.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
                 {filteredClientes.map((c) => {
                   const ret = getPatientRetention(c);
                   const barColor = !c.activo 
@@ -1253,7 +1253,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                   return (
                     <div 
                       key={c.id} 
-                      className="bg-white rounded-2xl border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-xs overflow-hidden"
+                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
                     >
                       {/* Barra superior de acento según estado */}
                       <div className={`h-1.5 w-full ${barColor}`} />
@@ -1612,8 +1612,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {/* Modals (z-[100] para sobreponerse a la barra móvil que tiene z-50) */}
       {conflictClient && (
-        <div className="fixed inset-0 bg-[#0B1929]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-[#0B1929]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-lg h-full md:h-auto overflow-y-auto p-5 md:p-6 animate-in zoom-in-95">
             <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-5">
               <AlertCircle className="w-5 h-5 text-yellow-500" /> Usuario Existente
             </h3>
@@ -1664,15 +1664,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {showNewClient && (
-        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-md h-full md:h-auto flex flex-col overflow-hidden animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
               <h2 className="text-lg font-bold text-[#0B1929]">Nuevo Paciente</h2>
               <button onClick={() => setShowNewClient(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre completo</label>
                 <input value={newClient.nombre} onChange={e=>setNewClient(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Ana García" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
@@ -1704,15 +1704,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {editClient && (
-        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-md h-full md:h-auto flex flex-col overflow-hidden animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
               <h2 className="text-lg font-bold text-[#0B1929]">Editar Paciente</h2>
               <button onClick={() => setEditClient(null)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
               {editClient.email && (
                 <div>
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Correo de acceso</label>

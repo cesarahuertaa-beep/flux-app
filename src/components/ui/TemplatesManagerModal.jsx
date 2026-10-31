@@ -239,8 +239,8 @@ export default function TemplatesManagerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#E2E8F0] overflow-hidden animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+      <div className="bg-white rounded-none md:rounded-3xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-2xl border-0 md:border md:border-[#E2E8F0] overflow-hidden animate-in fade-in slide-in-from-bottom-6 md:zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
         <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">

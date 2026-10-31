@@ -305,7 +305,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   return (
     <div>
       {/* Top action bar */}
-      <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+      <div className="flex justify-between items-center mb-4 md:mb-5 flex-wrap gap-3 px-4 pt-3 md:px-0 md:pt-0">
         <div className="text-sm text-[#6B7A8D] font-medium">
           {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
         </div>
@@ -318,7 +318,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       </div>
 
       {/* Explicación */}
-      <div className="bg-[#F8FAFC] border border-[#BFDBFE] rounded-xl px-5 py-3.5 text-sm text-[#6B7A8D] mb-6 leading-relaxed">
+      <div className="bg-[#F8FAFC] border-y md:border border-[#BFDBFE] rounded-none md:rounded-xl px-4 md:px-5 py-3.5 text-sm text-[#6B7A8D] mb-4 md:mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         {isSuperadmin 
           ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa. " 
@@ -350,7 +350,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       ) : (
         <div className="flex flex-col gap-3">
           {equipo.map((p, i) => (
-            <div key={p.id} className="animate-in bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between flex-wrap gap-3 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
+            <div key={p.id} className="animate-in bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 flex items-center justify-between flex-wrap gap-3 relative overflow-hidden shadow-none md:shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
               {/* Barra lateral de estado */}
               <div className={`absolute left-0 top-[15%] bottom-[15%] w-1 rounded-r-md ${p.activo !== false ? 'bg-[var(--brand-primary)]' : 'bg-[#EF4444]'}`} />
 
@@ -522,8 +522,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
       {/* Modal Invitar */}
       {showInvite && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] shadow-xl w-full md:max-w-md h-full max-h-full md:h-auto p-5 md:p-6 overflow-y-auto animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
                 <Folder className="w-5 h-5 text-[var(--brand-primary)]" /> Invitar colaborador
@@ -605,8 +605,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
       {/* Modal Editar */}
       {editUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] shadow-xl w-full md:max-w-md h-full max-h-full md:h-auto p-5 md:p-6 overflow-y-auto animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 truncate">
                 <Edit2 className="w-5 h-5 text-[var(--brand-primary)]" /> Editar colaborador

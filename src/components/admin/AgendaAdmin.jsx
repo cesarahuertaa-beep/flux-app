@@ -60,8 +60,8 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
 const Modal = ({ title, onClose, children }) => {
   useBackButton(true, onClose, 20);
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-visible">
+    <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+      <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto shadow-2xl flex flex-col overflow-visible">
         <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0">
           <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
           <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors p-1 rounded-lg hover:bg-[#F0F4FA]">
@@ -720,7 +720,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   return (
     <div className="w-full">
       {/* Top bar: status summary + Sub-tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0">
         <div className="text-sm text-[#6B7A8D]">
           {pendientesCount > 0
             ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
@@ -745,7 +745,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
           {/* Barra de filtros y acción nueva cita */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 md:px-0">
             <div className="flex flex-wrap gap-2">
               {[
                 ["todos", `Todas (${citas.length})`],
@@ -784,7 +784,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
                 const StateIcon = estado.Icon;
                 const tel = clienteTelefono(cita.cliente_id);
                 return (
-                  <div key={cita.id} className="animate-in bg-white rounded-xl border border-[#E2E8F0] p-4 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
+                  <div key={cita.id} className="animate-in bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 relative overflow-hidden shadow-none md:shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
                     {/* Barra lateral estado */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${estado.bar}`} />
 
@@ -876,7 +876,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : (
         // ── Vista de Horarios ───────────────────────────────────────────────
         <div>
-          <div className="flex flex-wrap justify-between items-center mb-5 gap-3">
+          <div className="flex flex-wrap justify-between items-center mb-4 md:mb-5 gap-3 px-4 md:px-0">
             <div>
               <h4 className="font-bold text-base text-[#0B1929]">Días y Bloques de Atención</h4>
               <div className="text-xs text-[#6B7A8D]">
@@ -899,7 +899,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {disponibilidad.map(h => (
-                <div key={h.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow">
+                <div key={h.id} className="bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-none md:shadow-sm hover:shadow-md transition-shadow">
                   <div>
                     <div className="font-bold text-sm text-[#0B1929] mb-1 flex items-center gap-2">
                       <span>{DIAS_FULL[h.dia_semana]}</span>

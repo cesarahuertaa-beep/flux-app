@@ -193,10 +193,10 @@ export default function MacroCalculatorModal({
     (Number(protPct) || 0) + (Number(carbPct) || 0) + (Number(fatPct) || 0);
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl border border-[#E2E8F0] overflow-hidden">
+    <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+      <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-xl border-0 md:border md:border-[#E2E8F0] overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
+        <div className="px-4 py-3.5 md:px-5 md:py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-5 h-5" />
@@ -227,7 +227,7 @@ export default function MacroCalculatorModal({
         </div>
 
         {/* Body */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-5">
+        <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-5">
           {/* Banner de Diagnóstico y Sugerencia IA */}
           {smartDefault.hasEnoughData && (
             <div className="bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-emerald-50/50 border border-indigo-100 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -577,7 +577,7 @@ export default function MacroCalculatorModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-end gap-2">
+        <div className="px-4 py-3 md:px-5 md:py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}

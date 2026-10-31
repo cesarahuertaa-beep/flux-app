@@ -500,7 +500,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   // Renderizador de la tarjeta de transferencia SPEI (EXCLUSIVA para versión Web)
   const renderSpeiCard = (customSubtitle) => (
-    <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
+    <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col justify-between">
       <div>
         <div className="flex items-center gap-2.5 mb-2">
           <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
@@ -643,7 +643,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in pb-6">
+    <div className="w-full max-w-5xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-6 pt-2 md:pt-0">
       {/* Input de archivo: SOLO en Web para no infringir normas de Google Play en Android */}
       {!isPlayApp && (
         <input
@@ -656,7 +656,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       )}
 
       {/* ── BANNER DE ESTADO COMPACTO Y PROFESIONAL ── */}
-      <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
             Estado de tu Cuenta
@@ -718,7 +718,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
            ══════════════════════════════════════════════════════════ */
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Columna Izquierda: Plan y Beneficios (5 cols) */}
-          <div className="md:col-span-5 bg-gradient-to-br from-[#0B1929] to-[#152336] text-white p-6 md:p-7 rounded-3xl shadow-sm flex flex-col justify-between">
+          <div className="md:col-span-5 bg-gradient-to-br from-[#0B1929] to-[#152336] text-white p-6 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm flex flex-col justify-between">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-4 border border-white/10">
                 <GraduationCap size={13} />
@@ -794,7 +794,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             )}
             {isPlayApp ? (
               /* Google Play Subscription (Android Oficial — Sin transferencias para cumplir políticas de Google) */
-              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
+              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-2">
                     <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -944,7 +944,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           {/* Columna Izquierda: Nivel, Termómetro y Desglose de Pacientes (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
             {/* Termómetro de Nivel */}
-            <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0]">
+            <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
                   <BarChart3 size={20} className="text-[var(--brand-primary)]" />
@@ -1013,7 +1013,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             </div>
 
             {/* Desglose para Próximo Corte */}
-            <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+            <div className="bg-white rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
               <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
                 <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
                   <FileText size={20} className="text-[var(--brand-primary)]" />
@@ -1144,7 +1144,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           */}
           <div className="lg:col-span-5 space-y-4">
             {isPlayApp ? (
-              <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col justify-between">
+              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
@@ -1201,7 +1201,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       )}
 
       {/* ── REGLAS DE FACTURACIÓN ── */}
-      <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-6">
+      <div className="bg-slate-50 border-y md:border border-slate-200/80 rounded-none md:rounded-3xl p-5 md:p-6">
         <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
           <Info size={16} className="text-[#6B7A8D]" />
           <span>Reglas de Facturación y Días de Gracia</span>
@@ -1250,7 +1250,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       </div>
 
       {/* ── HISTORIAL DE PAGOS ── */}
-      <div className="bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-[#E2E8F0]">
+      <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0]">
         <h3 className="text-base font-bold text-[#0B1929] mb-4">
           Historial de Recibos y Comprobantes
         </h3>
