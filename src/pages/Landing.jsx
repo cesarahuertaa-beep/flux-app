@@ -15,18 +15,6 @@ import {
   formatWhatsAppUrl
 } from "../lib/landingConfig";
 
-const MOCK_SUPPLEMENTS = [
-  { id: 1, name: "Proteína Whey Flux", subtitle: "Aislada + Concentrada", price: 899, rating: 4.9, reviews: 218, tag: "Más vendido", img: "photo-1593095948071-474c5cc2989d", flavors: ["Chocolate", "Vainilla", "Fresa"], badge: "bg-blue-100 text-blue-700" },
-  { id: 2, name: "Creatina Monohidratada", subtitle: "Fuerza y recuperación", price: 449, rating: 4.8, reviews: 143, tag: "Nuevo", img: "photo-1584308666744-24d5c474f2ae", flavors: ["Sin sabor"], badge: "bg-green-100 text-green-700" },
-  { id: 3, name: "Pre-Entreno Flux Rush", subtitle: "Energía sostenida | Sin crash", price: 649, rating: 4.7, reviews: 97, tag: null, img: "photo-1571019614242-c5c5dee9f50b", flavors: ["Sandía", "Blue Raspberry"], badge: "" },
-  { id: 4, name: "BCAA + Electrolitos", subtitle: "Recuperación muscular", price: 549, rating: 4.8, reviews: 185, tag: null, img: "photo-1593095948071-474c5cc2989d", flavors: ["Limón", "Mango"], badge: "" },
-];
-
-const MOCK_APPAREL = [
-  { id: 1, name: "Playera Compression Pro", subtitle: "Tejido técnico anti-sudor", price: 699, rating: 4.9, reviews: 132, img: "photo-1521572163474-6864f9cf17ab", sizes: ["S", "M", "L", "XL"], color: "#1A6FD4" },
-  { id: 2, name: "Shorts Training Flux", subtitle: "Ergonómico | 4-way stretch", price: 549, rating: 4.7, reviews: 88, img: "photo-1605296867304-46d5465a13f1", sizes: ["S", "M", "L", "XL", "XXL"], color: "#0B1929" },
-];
-
 function Stars({ n }) {
   const safeN = typeof n === 'number' && !isNaN(n) ? n : 5;
   return (
@@ -501,8 +489,9 @@ function SupplementsSection({ supplements, config }) {
                 <div key={s.id} className="group bg-white rounded-3xl border border-[#E2E5EA] overflow-hidden hover:shadow-md hover:border-[#1A6FD4]/40 transition-all flex flex-col">
                   <div className="relative h-48 bg-[#F0F4FB] overflow-hidden">
                     <img
-                      src={s.img.startsWith('photo-') ? `https://images.unsplash.com/${s.img}?w=500&h=300&fit=crop&auto=format` : s.img}
+                      src={s.img && !s.img.startsWith('photo-') ? s.img : '/flux_logo.jpeg'}
                       alt={s.name || 'Producto'}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/flux_logo.jpeg'; }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     {s.tag && (
@@ -612,8 +601,9 @@ function ApparelSection({ apparel, config }) {
                 <div key={a.id} className="group bg-white rounded-3xl border border-[#E2E5EA] overflow-hidden hover:shadow-md hover:border-[#1A6FD4]/40 transition-all flex flex-col">
                   <div className="relative h-60 bg-[#E8ECF2] overflow-hidden">
                     <img
-                      src={a.img && a.img.startsWith('photo-') ? `https://images.unsplash.com/${a.img}?w=500&h=600&fit=crop&auto=format` : (a.img || '')}
+                      src={a.img && !a.img.startsWith('photo-') ? a.img : '/flux_logo.jpeg'}
                       alt={a.name}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/flux_logo.jpeg'; }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
@@ -1025,7 +1015,7 @@ export default function Landing({ session, onLogout }) {
             rating: p.rating,
             reviews: p.num_reviews,
             tag: p.badge,
-            img: p.imagen_url || 'photo-1593095948071-474c5cc2989d',
+            img: p.imagen_url || '/flux_logo.jpeg',
             flavors: Array.isArray(p.variantes) ? p.variantes : [],
             sizes: Array.isArray(p.variantes) ? p.variantes : [],
             categoria: p.categoria,
@@ -1033,9 +1023,14 @@ export default function Landing({ session, onLogout }) {
           }));
           setDbSupplements(mappedProd.filter(p => p.categoria === 'suplemento'));
           setDbApparel(mappedProd.filter(p => p.categoria === 'ropa'));
+        } else {
+          setDbSupplements([]);
+          setDbApparel([]);
         }
       } catch (e) {
         console.error('Error cargando productos', e);
+        setDbSupplements([]);
+        setDbApparel([]);
       }
 
       try {
@@ -1098,8 +1093,8 @@ export default function Landing({ session, onLogout }) {
     };
   }, []);
 
-  const activeSupplements = dbSupplements.length > 0 ? dbSupplements : MOCK_SUPPLEMENTS;
-  const activeApparel = dbApparel.length > 0 ? dbApparel : MOCK_APPAREL;
+  const activeSupplements = dbSupplements;
+  const activeApparel = dbApparel;
 
   return (
     <div className="min-h-screen bg-white text-[#0B1929] font-['Inter',sans-serif]">
