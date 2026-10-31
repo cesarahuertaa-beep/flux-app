@@ -1174,11 +1174,17 @@ export default function Progreso({ cliente, isSelfManaged }) {
         {/* EVALUACIÓN MUSCULAR (Simétrico) */}
         <div className="relative">
           {isEstandar && (
-            <div className="absolute inset-0 z-50 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#1E2D3D]">
-              <Lock size={48} className="text-amber-400 mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Desarrollo Muscular Premium</h3>
-              <p className="text-slate-200 text-sm max-w-sm mb-6">Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.</p>
-              <div className="text-[11px] uppercase tracking-widest font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-4 py-2 rounded-lg">Adquiere Premium en Mi Membresía</div>
+            <div className="absolute inset-0 z-50 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm animate-in fade-in">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-3 shadow-xs">
+                <Lock size={28} className="text-amber-600" />
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-[#0B1929] mb-1.5">Desarrollo Muscular Premium</h3>
+              <p className="text-[#6B7A8D] text-xs sm:text-sm max-w-sm mb-5 leading-relaxed">
+                Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.
+              </p>
+              <div className="text-[11px] uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-4 py-2 rounded-xl shadow-2xs">
+                Adquiere Premium en Mi Membresía
+              </div>
             </div>
           )}
           <div className={`bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>

@@ -174,13 +174,15 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
           className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-7"
         >
           {isLocked && (
-            <div className="absolute inset-0 z-30 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center">
-              <Lock size={40} className="text-amber-400 mb-3" />
-              <h3 className="text-lg font-bold text-white mb-1">Gráficas de Evolución Premium</h3>
-              <p className="text-slate-200 text-xs max-w-xs mb-4">
+            <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2.5 shadow-xs">
+                <Lock size={24} className="text-amber-600" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-[#0B1929] mb-1">Gráficas de Evolución Premium</h3>
+              <p className="text-[#6B7A8D] text-xs max-w-xs mb-3.5 leading-relaxed">
                 Desbloquea tus curvas históricas de peso, porcentaje de grasa, masa muscular y somatocarta.
               </p>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-3.5 py-1.5 rounded-lg">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-3.5 py-1.5 rounded-lg shadow-2xs">
                 Exclusivo Plan Premium
               </span>
             </div>
@@ -352,10 +354,12 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
         {/* ── 2. SOMATOCARTA DE HEATH-CARTER ── */}
         <div className="relative bg-white rounded-3xl p-5 md:p-7 shadow-sm border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
           {isLocked && (
-            <div className="absolute inset-0 z-30 backdrop-blur-md bg-[#0B1929]/75 rounded-3xl flex flex-col items-center justify-center p-6 text-center">
-              <Lock size={36} className="text-amber-400 mb-2" />
-              <h3 className="text-base font-bold text-white mb-1">Somatocarta Heath-Carter</h3>
-              <p className="text-slate-200 text-xs max-w-xs">
+            <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2 shadow-xs">
+                <Lock size={20} className="text-amber-600" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mb-1">Somatocarta Heath-Carter</h3>
+              <p className="text-[#6B7A8D] text-xs max-w-xs leading-relaxed">
                 Visualiza tu biotipo corporal y su trayectoria hacia el mesomorfismo.
               </p>
             </div>
