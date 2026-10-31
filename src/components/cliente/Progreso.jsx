@@ -677,13 +677,28 @@ export default function Progreso({ cliente, isSelfManaged }) {
           {metricas.length > 0 && (
             <button
               type="button"
-              onClick={() => generateProgresoPDF(cliente, metricas, brand)}
+              onClick={() => {
+                if (isEstandar) {
+                  showFluxAlert({
+                    title: "Reporte PDF Exclusivo Premium",
+                    message: "La exportación de reportes clínicos y ejecutivos en PDF es una función exclusiva del Plan Premium. Puedes adquirirlo en la sección Mi Membresía.",
+                    type: "warning",
+                  });
+                  return;
+                }
+                generateProgresoPDF(cliente, metricas, brand);
+              }}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[#0B1929] transition-all shadow-2xs cursor-pointer"
               title="Descargar reporte PDF completo de evaluaciones"
             >
               <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
               <span className="hidden sm:inline">Descargar PDF</span>
               <span className="sm:hidden">PDF</span>
+              {isEstandar && (
+                <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                  PRO
+                </span>
+              )}
             </button>
           )}
 

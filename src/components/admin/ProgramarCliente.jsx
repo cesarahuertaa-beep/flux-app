@@ -2097,6 +2097,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   });
 
   const handleAuditDayWithAi = async () => {
+    if (isEstandar) {
+      setMsg(
+        <div className="flex items-center gap-2">
+          <span className="text-xl">⭐</span>
+          <div>
+            <strong>Auditoría con IA Exclusiva de Premium.</strong>
+            <div className="text-xs opacity-90 mt-0.5">La auditoría clínica de menús con IA está reservada para el Plan Premium. Adquiérela en Mi Membresía.</div>
+          </div>
+        </div>
+      );
+      return;
+    }
     if (!diaForm.comidas || diaForm.comidas.length === 0) {
       alert("Agrega al menos una comida al día para auditar.");
       return;
@@ -4522,7 +4534,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     onClick={handleAuditDayWithAi}
                     disabled={isAuditingDay || diaForm.comidas.length === 0}
                     className="text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50 shadow-xs cursor-pointer"
-                    title="Auditar menú completo del día con IA Clínica"
+                    title={isEstandar ? "Función exclusiva del Plan Premium" : "Auditar menú completo del día con IA Clínica"}
                   >
                     {isAuditingDay ? (
                       <>
@@ -4533,6 +4545,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       <>
                         <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                         <span>Auditar con IA</span>
+                        {isEstandar && (
+                          <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full font-extrabold ml-0.5">
+                            PRO
+                          </span>
+                        )}
                       </>
                     )}
                   </button>

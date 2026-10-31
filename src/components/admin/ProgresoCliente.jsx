@@ -249,6 +249,7 @@ const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { y
 
 export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, isReadOnly: propReadOnly }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
+  const isFreemium = isCivil && selected?.plan_tipo !== "premium";
   const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
   const _peekCiclos = selected?.id ? dbPeek(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`) : null;
   const _peekActiveCiclo = Array.isArray(_peekCiclos) ? (_peekCiclos.find(c => c.activo) || _peekCiclos[0] || null) : null;
@@ -781,6 +782,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [prescriptionMode, liveSmartMacros, manualMacros, aiAuditResult, form.peso]);
 
   const handleAuditMacrosWithAi = async () => {
+    if (isFreemium) {
+      setAiAuditError("La auditoría clínica con Gemini IA es una función exclusiva del Plan Premium. Adquiérela en Mi Membresía.");
+      return;
+    }
     if (!liveSmartMacros || !liveSmartMacros.hasEnoughData) {
       setAiAuditError("Ingresa al menos el peso del paciente en la evaluación para auditar con IA.");
       return;
@@ -1546,8 +1551,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {displayedMetricas.length > 0 && (
-                <button onClick={() => generateProgresoPDF(selected, displayedMetricas, brand)} className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
-                  <FileText className="w-4 h-4 text-[var(--brand-primary)]" /> PDF
+                <button
+                  onClick={() => {
+                    if (isFreemium) {
+                      setMsg(
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">⭐</span>
+                          <div>
+                            <strong>Reporte PDF Exclusivo Premium.</strong>
+                            <div className="text-xs opacity-90 mt-0.5">La descarga del reporte ejecutivo en PDF está disponible en el Plan Premium. Adquiérela en tu Membresía.</div>
+                          </div>
+                        </div>
+                      );
+                      return;
+                    }
+                    generateProgresoPDF(selected, displayedMetricas, brand);
+                  }}
+                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
+                  <span>PDF</span>
+                  {isFreemium && (
+                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                      PRO
+                    </span>
+                  )}
                 </button>
               )}
               {!isReadOnly && (
