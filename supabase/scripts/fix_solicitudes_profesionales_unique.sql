@@ -48,13 +48,16 @@ BEGIN
     -- Desvincular clientes asignados
     UPDATE public.clientes SET nutriologo_id = NULL WHERE nutriologo_id = p_nutriologo_id;
     
-    -- Borrar citas y disponibilidad
+    -- Borrar citas, disponibilidad y biblioteca personalizada
     DELETE FROM public.citas WHERE nutriologo_id = p_nutriologo_id;
     DELETE FROM public.disponibilidad WHERE nutriologo_id = p_nutriologo_id;
+    DELETE FROM public.biblioteca_ejercicios WHERE nutriologo_id = p_nutriologo_id;
     
-    -- Borrar recibos y patrocinios
+    -- Borrar recibos, patrocinios, notificaciones y solicitudes enviadas
     DELETE FROM public.recibos_pago WHERE nutriologo_id = p_nutriologo_id;
     DELETE FROM public.premium_patrocinado WHERE patrocinador_id = p_nutriologo_id;
+    DELETE FROM public.notificaciones WHERE profile_id = p_nutriologo_id;
+    DELETE FROM public.solicitudes_entrenamiento WHERE from_nutriologo_id = p_nutriologo_id;
     
     -- Borrar cualquier solicitud profesional asociada a su correo (Cumplimiento Google Play)
     IF v_email IS NOT NULL AND v_email <> '' THEN
@@ -92,36 +95,31 @@ BEGIN
         SELECT email INTO v_email FROM public.profiles WHERE id = v_auth_id;
     END IF;
 
-    -- 2. Borrar métricas y registros de progreso de entrenamiento y nutrición
+    -- 2. Borrar citas y registros con clave foránea NO ACTION hacia clientes
+    DELETE FROM public.citas WHERE cliente_id = p_cliente_id;
     DELETE FROM public.metricas_progreso WHERE cliente_id = p_cliente_id;
     DELETE FROM public.progreso WHERE cliente_id = p_cliente_id;
     DELETE FROM public.nutricion_progreso WHERE cliente_id = p_cliente_id;
-    DELETE FROM public.notas_nutriologo WHERE cliente_id = p_cliente_id;
-    DELETE FROM public.citas WHERE cliente_id = p_cliente_id;
-
-    -- 3. Borrar planes asignados o personalizados del atleta
+    DELETE FROM public.citas_ratings WHERE cliente_id = p_cliente_id;
+    DELETE FROM public.recibos_pago_civil WHERE cliente_id = p_cliente_id;
     DELETE FROM public.ciclos WHERE cliente_id = p_cliente_id;
     DELETE FROM public.rutinas WHERE cliente_id = p_cliente_id;
     DELETE FROM public.nutricion WHERE cliente_id = p_cliente_id;
 
-    -- 4. Borrar recibos de pago si es atleta civil (ignorar si la tabla no existe)
-    BEGIN
-        DELETE FROM public.recibos_pago_civil WHERE cliente_id = p_cliente_id;
-    EXCEPTION WHEN undefined_table THEN NULL;
-    END;
-
-    -- 5. Borrar el registro del cliente
+    -- 3. Borrar el registro del cliente
     DELETE FROM public.clientes WHERE id = p_cliente_id;
 
-    -- 6. Si cuenta con auth_id, borrar su perfil y cuenta en auth.users
+    -- 4. Si cuenta con auth_id, borrar sus notificaciones, perfil y cuenta en auth.users
     IF v_auth_id IS NOT NULL THEN
+        DELETE FROM public.notificaciones WHERE profile_id = v_auth_id;
         DELETE FROM public.profiles WHERE id = v_auth_id;
         DELETE FROM auth.users WHERE id = v_auth_id;
     END IF;
 
-    -- 7. Borrar cualquier solicitud profesional asociada a su correo (Cumplimiento Google Play)
+    -- 5. Borrar cualquier solicitud profesional o de entrenamiento asociada a su correo (Cumplimiento Google Play)
     IF v_email IS NOT NULL AND v_email <> '' THEN
         DELETE FROM public.solicitudes_profesionales WHERE LOWER(TRIM(email)) = LOWER(TRIM(v_email));
+        DELETE FROM public.solicitudes_entrenamiento WHERE LOWER(TRIM(to_email)) = LOWER(TRIM(v_email));
     END IF;
 END;
 $$;
