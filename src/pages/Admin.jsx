@@ -50,13 +50,13 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
-      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-4 shrink-0">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-2 md:gap-4 shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+          <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
           </p>
-          <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>{title}</h1>
-          {subtitle && <p className="text-sm text-[#6B7A8D] mt-1">{subtitle}</p>}
+          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>{title}</h1>
+          {subtitle && <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -1127,17 +1127,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
         <div className={tab === "clientes" ? "flex-1 flex flex-col bg-[#F7F9FC] min-h-full" : "hidden"}>
           {/* Header */}
-          <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3.5 md:gap-4 pr-12 md:pr-8">
+          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-2.5 md:gap-4 pr-12 md:pr-8">
             {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+                <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
                   Panel de Administración
                 </p>
-                <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
+                <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily:"DM Sans" }}>
                   Pacientes
                 </h1>
-                <p className="text-sm text-[#6B7A8D] mt-1">
+                <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
                   {activeCount} pacientes activos de {clientes.length} totales
                 </p>
               </div>

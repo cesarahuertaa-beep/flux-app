@@ -235,14 +235,14 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
-      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
-        <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+        <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
           Mi Cuenta
         </p>
-        <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+        <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
           Mi Perfil
         </h1>
-        <p className="text-sm text-[#6B7A8D] mt-1">
+        <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
           Gestiona tu información personal e identidad en la plataforma.
         </p>
       </div>

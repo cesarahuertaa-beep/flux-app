@@ -282,17 +282,17 @@ export function CitasCliente({ cliente }) {
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-3 md:mb-6">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-3 md:mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Agenda
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
               Mis Citas
             </h1>
             {cliente?.nombre && (
-              <p className="text-sm text-[#6B7A8D] mt-1">
+              <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
                 Paciente: <span className="text-[var(--brand-primary)] font-medium">{cliente.nombre}</span>
               </p>
             )}

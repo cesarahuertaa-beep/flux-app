@@ -354,7 +354,7 @@ export default function ControlPagos({ setMsg }) {
               <Settings size={20} className="text-[var(--brand-primary)]" />
               Costos por Perfil, Planes y Comisiones
             </h2>
-            <p className="text-xs text-[#6B7A8D] mt-0.5">
+            <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5">
               Define los precios de suscripción para Nutriólogos, Atletas Independientes y el porcentaje de comisión de Staff.
             </p>
           </div>
@@ -556,7 +556,7 @@ export default function ControlPagos({ setMsg }) {
             <Banknote className="text-green-500" />
             Auditoría de Pagos — Nutriólogos
           </h2>
-          <p className="text-[#6B7A8D] mt-1 text-sm">Revisa y valida las transferencias mensuales de los nutriólogos.</p>
+          <p className="hidden md:block text-[#6B7A8D] mt-1 text-sm">Revisa y valida las transferencias mensuales de los nutriólogos.</p>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
@@ -755,7 +755,7 @@ export default function ControlPagos({ setMsg }) {
             <Dumbbell className="text-[var(--brand-primary)]" size={22} />
             Pagos — Atletas Independientes
           </h2>
-          <p className="text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium (${ratesForm.civil_premium} MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
+          <p className="hidden md:block text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium (${ratesForm.civil_premium} MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
         </div>
         <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full shrink-0">
           {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (

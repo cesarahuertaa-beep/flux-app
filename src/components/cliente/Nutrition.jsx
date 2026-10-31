@@ -244,22 +244,22 @@ export default function Nutrition({
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
       {/* ── Header ── */}
-      <div className="px-4 sm:px-6 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
+      <div className="px-4 sm:px-6 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-0.5 sm:mb-1 whitespace-nowrap">
+              <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-0.5 sm:mb-1 whitespace-nowrap">
                 Plan de Alimentación
               </p>
-              <h1 className="text-xl sm:text-2xl font-bold text-[#0B1929] whitespace-nowrap" style={{ fontFamily: "DM Sans" }}>
+              <h1 className="text-lg md:text-2xl font-bold text-[#0B1929] whitespace-nowrap" style={{ fontFamily: "DM Sans" }}>
                 Nutrición Semanal
               </h1>
               {isSelfManaged ? (
-                <p className="text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
+                <p className="hidden md:block text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
                   Tu plan de alimentación activo — Semana {semanaActualCiclo}
                 </p>
               ) : clienteNombre ? (
-                <p className="text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
+                <p className="hidden md:block text-xs sm:text-sm text-[#6B7A8D] mt-0.5 sm:mt-1">
                   Paciente: <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
                 </p>
               ) : null}

@@ -330,8 +330,8 @@ export default function GestorTienda({ setMsg }) {
       {/* ── BARRA SUPERIOR CON SUB-PESTAÑAS ── */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4 md:mb-6 px-4 pt-3 md:px-0 md:pt-0">
         <div>
-          <h2 className="text-xl font-bold text-[#0B1929]">Gestor de Tienda y Landing</h2>
-          <p className="text-sm text-[#6B7A8D] mt-0.5">
+          <h2 className="text-lg md:text-xl font-bold text-[#0B1929]">Gestor de Tienda y Landing</h2>
+          <p className="hidden md:block text-sm text-[#6B7A8D] mt-0.5">
             Administra los productos, números de venta por WhatsApp, redes sociales y capturas de la App.
           </p>
         </div>

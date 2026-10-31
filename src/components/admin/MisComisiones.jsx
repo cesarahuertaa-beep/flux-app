@@ -138,7 +138,7 @@ export default function MisComisiones({ myId, setMsg }) {
             <Banknote className="text-indigo-500" />
             Mis Comisiones
           </h2>
-          <p className="text-[#6B7A8D] mt-1 text-sm">Resumen de ingresos generados por los nutriólogos que invitaste.</p>
+          <p className="hidden md:block text-[#6B7A8D] mt-1 text-sm">Resumen de ingresos generados por los nutriólogos que invitaste.</p>
         </div>
         
         <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">

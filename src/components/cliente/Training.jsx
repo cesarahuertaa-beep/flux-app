@@ -712,21 +712,21 @@ export default function Training({
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-4 md:px-8 pt-4 md:pt-8 pb-4 md:pb-6 bg-white border-b border-[#F0F4FA] mb-2 md:mb-4 shrink-0">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] mb-2 md:mb-4 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
               Rutina Semanal
             </p>
-            <h1 className="text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
               Entrenamiento
             </h1>
             {isSelfManaged ? (
-              <p className="text-sm text-[#6B7A8D] mt-1">
+              <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
                 Tu rutina activa — Semana {semanaActualCiclo}
               </p>
             ) : clienteNombre ? (
-              <p className="text-sm text-[#6B7A8D] mt-1">
+              <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
                 Paciente:{" "}
                 <span className="text-[var(--brand-primary)] font-medium">{clienteNombre}</span>
               </p>

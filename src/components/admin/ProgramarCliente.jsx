@@ -2956,7 +2956,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   return (
     <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente / Mi Plan ── */}
-      <div className="mb-3 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm">
+      <div className="mb-2 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3 sm:p-5 shadow-none md:shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
           
           {/* Left: Info + Back button (solo si no es Mi Plan) */}
@@ -3015,7 +3015,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   </span>
                 )}
                 {isMiPlan && (
-                  <span className="text-[#9BA5B0] font-medium">Gestión de objetivos y planificación personal</span>
+                  <span className="hidden md:inline text-[#9BA5B0] font-medium">Gestión de objetivos y planificación personal</span>
                 )}
               </div>
             </div>

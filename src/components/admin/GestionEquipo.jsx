@@ -318,7 +318,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       </div>
 
       {/* Explicación */}
-      <div className="bg-[#F8FAFC] border-y md:border border-[#BFDBFE] rounded-none md:rounded-xl px-4 md:px-5 py-3.5 text-sm text-[#6B7A8D] mb-4 md:mb-6 leading-relaxed">
+      <div className="hidden md:block bg-[#F8FAFC] border-y md:border border-[#BFDBFE] rounded-none md:rounded-xl px-4 md:px-5 py-3.5 text-sm text-[#6B7A8D] mb-4 md:mb-6 leading-relaxed">
         <strong className="text-[#0B1929]">¿Qué puede hacer un colaborador?</strong><br />
         {isSuperadmin 
           ? "Tiene acceso al Directorio general, a la Biblioteca de ejercicios, y a la Tienda de suplementos corporativa. " 

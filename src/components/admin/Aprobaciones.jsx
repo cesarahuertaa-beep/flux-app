@@ -181,8 +181,8 @@ export default function Aprobaciones({ setMsg }) {
     <div className="px-0 py-4 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap px-4 md:px-0">
         <div>
-          <h2 className="text-2xl font-bold text-[#0B1929]">Aprobaciones Profesionales</h2>
-          <p className="text-sm text-[#6B7A8D] mt-1">Revisa, autoriza o gestiona las solicitudes de acceso.</p>
+          <h2 className="text-lg md:text-2xl font-bold text-[#0B1929]">Aprobaciones Profesionales</h2>
+          <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">Revisa, autoriza o gestiona las solicitudes de acceso.</p>
         </div>
         <div className="flex bg-[#F0F4FA] p-1 rounded-xl">
           <button
