@@ -1,1 +1,0 @@
-feat: candados premium para auditoria de menus con IA y exportacion de reporte PDF en atletas civiles
