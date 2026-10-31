@@ -495,7 +495,7 @@ export default function Login({ onLogin }) {
   ];
 
   const renderAuthFormCard = () => (
-    <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-5 pb-5 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain">
+    <div className="animate-in w-full max-w-[420px] px-5 sm:px-8 pt-5 pb-6 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-lg relative my-auto md:max-h-[calc(100vh-5.5rem)] md:overflow-y-auto md:overscroll-contain">
             
             {/* Botón superior para regresar a la pantalla de Bienvenida */}
             <div className="flex items-center justify-between mb-4">
@@ -953,7 +953,7 @@ export default function Login({ onLogin }) {
           </div>
         </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 relative z-10 overflow-y-auto max-h-[100dvh]">
+          <div className="flex-1 flex flex-col items-center justify-start px-3.5 py-4 pb-16 relative z-10 overflow-y-auto overscroll-y-contain w-full min-h-0">
             {renderAuthFormCard()}
           </div>
         )}
