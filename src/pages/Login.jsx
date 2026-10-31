@@ -494,106 +494,8 @@ export default function Login({ onLogin }) {
     "w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] rounded-2xl opacity-75 scale-95 -ml-1.5 z-10 border border-[#E2E8F0] shadow-sm",
   ];
 
-  return (
-    <div className="h-[100dvh] max-h-[100dvh] bg-[#F8FAFC] flex flex-col justify-between relative overflow-hidden font-['Inter',sans-serif] text-[#0B1929] select-none">
-      {/* ── Splash Screen Overlay ── */}
-      {showSplash && (
-        <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[260px] h-auto" />
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════
-          MODO 1: PANTALLA DE BIENVENIDA (HERO SHOWCASE)
-         ══════════════════════════════════════════════════════════════════ */}
-      {mode === "welcome" ? (
-        <div className="h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in">
-          
-          {/* 1. Escaparate Superior: Logos de los 5 nutriólogos con el contorno sobre su borde natural */}
-          <div className="flex flex-col items-center pt-1">
-            <div className="flex items-center justify-center w-full py-1">
-              {showcaseCards.map((card, idx) => (
-                <div
-                  key={card.id || idx}
-                  className={`${cardSlotStyles[idx]} bg-white flex items-center justify-center relative overflow-hidden transition-all duration-300`}
-                >
-                  <img
-                    src={card.logo_url || "/flux_logo.jpeg"}
-                    alt="Logo especialista"
-                    onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. Bloque de Información: Asentado ligeramente arriba del botón de comenzar */}
-          <div className="flex flex-col items-center text-center mt-auto mb-6">
-            {/* Wordmark FLUX estilo Netflix */}
-            <div className="text-4xl sm:text-5xl font-black tracking-[4px] sm:tracking-[6px] text-[#0B1929] uppercase leading-none font-['Space_Grotesk',sans-serif]">
-              FLUX
-            </div>
-
-            <div className="tracking-[3.5px] text-[11px] sm:text-xs font-bold text-[var(--brand-primary)] uppercase mt-2 mb-1.5 font-['Space_Grotesk',sans-serif]">
-              SPORT SUPPLEMENTS
-            </div>
-
-            <h1 className="text-sm sm:text-base font-bold text-[#0B1929] leading-snug max-w-[290px] sm:max-w-[320px] mx-auto mt-1 mb-3" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Tu nutrición clínica y entrenamiento de alto rendimiento, en un mismo lugar.
-            </h1>
-
-            {/* Barra de 4 pilares en UNA SOLA FILA */}
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9.5px] font-bold tracking-wider uppercase text-[#6B7A8D] whitespace-nowrap overflow-x-hidden px-1">
-              <span className="flex items-center gap-1 text-[#0B1929]">
-                <Apple size={11} className="text-[var(--brand-primary)] shrink-0" /> Nutrición
-              </span>
-              <span className="text-[#CBD5E1] text-[7px]">•</span>
-              <span className="flex items-center gap-1 text-[#0B1929]">
-                <Dumbbell size={11} className="text-[var(--brand-primary)] shrink-0" /> Rutinas
-              </span>
-              <span className="text-[#CBD5E1] text-[7px]">•</span>
-              <span className="flex items-center gap-1 text-[#0B1929]">
-                <TrendingUp size={11} className="text-[var(--brand-primary)] shrink-0" /> Progreso
-              </span>
-              <span className="text-[#CBD5E1] text-[7px]">•</span>
-              <span className="flex items-center gap-1 text-[#0B1929]">
-                <ShoppingBag size={11} className="text-[var(--brand-primary)] shrink-0" /> Store
-              </span>
-            </div>
-          </div>
-
-          {/* 3. Bloque Inferior: Botón COMENZAR tipo Píldora + KEEP GOING + Línea divisoria de lado a lado */}
-          <div className="w-full flex flex-col items-center">
-            <button
-              onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
-              className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-sky-500/30 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
-            >
-              COMENZAR
-            </button>
-
-            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold tracking-[2.5px] uppercase text-[#6B7A8D] font-['Space_Grotesk',sans-serif]">
-              <span>KEEP GOING</span>
-              <Flame size={13} className="text-[var(--brand-primary)]" />
-            </div>
-
-            {/* Línea divisoria que cruza de lado a lado la pantalla */}
-            <div className="w-[calc(100%+3rem)] -mx-6 border-t border-[#E2E8F0] mt-4 pt-3 text-center">
-              <button
-                onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
-                className="w-full py-1 text-xs font-bold tracking-[2px] uppercase text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
-              >
-                INICIAR SESIÓN
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ══════════════════════════════════════════════════════════════════
-            MODO 2: FORMULARIOS (LOGIN, REGISTRO, RECUPERACIÓN)
-           ══════════════════════════════════════════════════════════════════ */
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 relative z-10 overflow-y-auto max-h-[100dvh]">
-          <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-6 pb-6 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto">
+  const renderAuthFormCard = () => (
+    <div className="animate-in w-full max-w-[420px] px-6 sm:px-8 pt-6 pb-6 bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl relative my-auto">
             
             {/* Botón superior para regresar a la pantalla de Bienvenida */}
             <div className="flex items-center justify-between mb-4">
@@ -929,8 +831,289 @@ export default function Login({ onLogin }) {
               <Flame size={12} className="text-[var(--brand-primary)]" />
             </div>
           </div>
+  );
+
+  return (
+    <div className="min-h-[100dvh] md:h-screen md:max-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0]/50 flex flex-col justify-between relative overflow-y-auto md:overflow-hidden font-['Inter',sans-serif] text-[#0B1929] select-none">
+      {/* ── Splash Screen Overlay ── */}
+      {showSplash && (
+        <div className={`fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-[700ms] ease-out ${fadeSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <img src="/flux_logo.jpeg" alt="Flux Splash" className="w-[260px] h-auto" />
         </div>
       )}
+
+      {/* ── Top Bar Desktop (Visible solo en pantallas medianas y grandes) ── */}
+      <header className="hidden md:flex items-center justify-between px-8 lg:px-12 py-3.5 bg-white/80 backdrop-blur-md border-b border-[#E2E8F0] shrink-0 z-20">
+        <div className="flex items-center gap-3">
+          <img src="/flux_logo.jpeg" alt="FLUX Logo" className="w-8 h-8 rounded-xl object-cover shadow-xs border border-[#E2E8F0]" />
+          <div>
+            <span className="font-extrabold text-sm tracking-wider text-[#0B1929] block leading-tight font-['Space_Grotesk',sans-serif]">FLUX</span>
+            <span className="text-[10px] font-bold text-[var(--brand-primary)] tracking-[1.5px] uppercase block font-mono">Health & Performance</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <Link to="/" className="text-xs font-semibold text-[#6B7A8D] hover:text-[var(--brand-primary)] transition-colors flex items-center gap-1.5">
+            <ShoppingBag size={14} className="text-[var(--brand-primary)]" />
+            <span>Tienda y Suplementos</span>
+          </Link>
+          <Link to="/privacidad" className="text-xs font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+            Aviso de Privacidad
+          </Link>
+          <Link to="/terminos" className="text-xs font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-colors">
+            Términos y Condiciones
+          </Link>
+        </div>
+      </header>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          VISTA 1: MÓVIL (< md) - CONSERVA 100% EL DISEÑO PWA Y PLAY STORE
+         ══════════════════════════════════════════════════════════════════ */}
+      <div className="md:hidden flex-1 flex flex-col justify-between h-[100dvh] max-h-[100dvh]">
+        {mode === "welcome" ? (
+          <div className="h-full flex flex-col justify-between w-full max-w-[420px] mx-auto px-6 pt-5 pb-5 relative z-10 animate-in">
+          
+          {/* 1. Escaparate Superior: Logos de los 5 nutriólogos con el contorno sobre su borde natural */}
+          <div className="flex flex-col items-center pt-1">
+            <div className="flex items-center justify-center w-full py-1">
+              {showcaseCards.map((card, idx) => (
+                <div
+                  key={card.id || idx}
+                  className={`${cardSlotStyles[idx]} bg-white flex items-center justify-center relative overflow-hidden transition-all duration-300`}
+                >
+                  <img
+                    src={card.logo_url || "/flux_logo.jpeg"}
+                    alt="Logo especialista"
+                    onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Bloque de Información: Asentado ligeramente arriba del botón de comenzar */}
+          <div className="flex flex-col items-center text-center mt-auto mb-6">
+            {/* Wordmark FLUX estilo Netflix */}
+            <div className="text-4xl sm:text-5xl font-black tracking-[4px] sm:tracking-[6px] text-[#0B1929] uppercase leading-none font-['Space_Grotesk',sans-serif]">
+              FLUX
+            </div>
+
+            <div className="tracking-[3.5px] text-[11px] sm:text-xs font-bold text-[var(--brand-primary)] uppercase mt-2 mb-1.5 font-['Space_Grotesk',sans-serif]">
+              SPORT SUPPLEMENTS
+            </div>
+
+            <h1 className="text-sm sm:text-base font-bold text-[#0B1929] leading-snug max-w-[290px] sm:max-w-[320px] mx-auto mt-1 mb-3" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Tu nutrición clínica y entrenamiento de alto rendimiento, en un mismo lugar.
+            </h1>
+
+            {/* Barra de 4 pilares en UNA SOLA FILA */}
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9.5px] font-bold tracking-wider uppercase text-[#6B7A8D] whitespace-nowrap overflow-x-hidden px-1">
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <Apple size={11} className="text-[var(--brand-primary)] shrink-0" /> Nutrición
+              </span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <Dumbbell size={11} className="text-[var(--brand-primary)] shrink-0" /> Rutinas
+              </span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <TrendingUp size={11} className="text-[var(--brand-primary)] shrink-0" /> Progreso
+              </span>
+              <span className="text-[#CBD5E1] text-[7px]">•</span>
+              <span className="flex items-center gap-1 text-[#0B1929]">
+                <ShoppingBag size={11} className="text-[var(--brand-primary)] shrink-0" /> Store
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Bloque Inferior: Botón COMENZAR tipo Píldora + KEEP GOING + Línea divisoria de lado a lado */}
+          <div className="w-full flex flex-col items-center">
+            <button
+              onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
+              className="w-full py-4 rounded-full bg-[var(--brand-primary)] hover:opacity-90 text-white font-extrabold text-sm tracking-[2px] uppercase shadow-lg shadow-sky-500/30 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif]"
+            >
+              COMENZAR
+            </button>
+
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold tracking-[2.5px] uppercase text-[#6B7A8D] font-['Space_Grotesk',sans-serif]">
+              <span>KEEP GOING</span>
+              <Flame size={13} className="text-[var(--brand-primary)]" />
+            </div>
+
+            {/* Línea divisoria que cruza de lado a lado la pantalla */}
+            <div className="w-[calc(100%+3rem)] -mx-6 border-t border-[#E2E8F0] mt-4 pt-3 text-center">
+              <button
+                onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
+                className="w-full py-1 text-xs font-bold tracking-[2px] uppercase text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer font-['Space_Grotesk',sans-serif]"
+              >
+                INICIAR SESIÓN
+              </button>
+            </div>
+          </div>
+        </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 relative z-10 overflow-y-auto max-h-[100dvh]">
+            {renderAuthFormCard()}
+          </div>
+        )}
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          VISTA 2: ESCRITORIO (>= md) - DISEÑO HERO WEB INTEGRAL
+         ══════════════════════════════════════════════════════════════════ */}
+      <main className="hidden md:flex flex-1 w-full max-w-6xl mx-auto px-6 lg:px-10 py-6 lg:py-10 items-center justify-between gap-8 lg:gap-14 z-10">
+        
+        {/* Columna Izquierda: Showcase de Marca, Pilares y Especialistas */}
+        <div className="flex-1 flex flex-col justify-center max-w-xl pr-2">
+          
+          {/* Badge superior */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] font-bold text-[var(--brand-primary)] uppercase tracking-wider mb-4 w-fit shadow-2xs">
+            <Flame size={14} className="text-[var(--brand-primary)]" />
+            <span>Ecosistema de Salud Clínica & Alto Rendimiento</span>
+          </div>
+
+          {/* Gran titular */}
+          <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-[#0B1929] tracking-tight leading-[1.15]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+            Tu nutrición clínica y entrenamiento, <span className="text-[var(--brand-primary)]">en un mismo lugar.</span>
+          </h1>
+
+          <p className="text-sm lg:text-base text-[#6B7A8D] mt-3.5 mb-6 leading-relaxed" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            Accede a tus planes dietoterapéuticos calculados al gramo, registra tus rutinas con sobrecarga progresiva y sincroniza tus avances antropométricos directamente con tu especialista.
+          </p>
+
+          {/* Grid de 4 Pilares */}
+          <div className="grid grid-cols-2 gap-3 mb-7">
+            <div className="p-3.5 bg-white/90 backdrop-blur-xs rounded-2xl border border-[#E2E8F0] shadow-2xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                <Apple size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#0B1929] leading-tight">Nutrición Clínica</h4>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-snug">Menús y macros adaptados a tu salud.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white/90 backdrop-blur-xs rounded-2xl border border-[#E2E8F0] shadow-2xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-100">
+                <Dumbbell size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#0B1929] leading-tight">Rutinas Progresivas</h4>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-snug">Sobrecarga, series y control de cargas.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white/90 backdrop-blur-xs rounded-2xl border border-[#E2E8F0] shadow-2xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                <TrendingUp size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#0B1929] leading-tight">Analítica & Progreso</h4>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-snug">Bioimpedancia, medidas e histórico visual.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white/90 backdrop-blur-xs rounded-2xl border border-[#E2E8F0] shadow-2xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+                <ShoppingBag size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#0B1929] leading-tight">FLUX Store</h4>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-snug">Suplementación y ropa oficial.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Escaparate de Especialistas Certificados en Desktop */}
+          <div className="flex items-center gap-4 pt-1 border-t border-[#E2E8F0]/80">
+            <div className="flex items-center -space-x-2">
+              {showcaseCards.map((card, idx) => (
+                <div key={card.id || idx} className="w-9 h-9 rounded-full border-2 border-white shadow-sm overflow-hidden bg-white shrink-0">
+                  <img
+                    src={card.logo_url || "/flux_logo.jpeg"}
+                    alt="Especialista"
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[#0B1929] leading-tight flex items-center gap-1.5">
+                <span>Especialistas y Consultorios Verificados</span>
+                <ShieldCheck size={14} className="text-emerald-500" />
+              </p>
+              <p className="text-[11px] text-[#6B7A8D] mt-0.5">Atención presencial y consulta en línea personalizada.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Columna Derecha: Tarjeta de Acceso Interactiva */}
+        <div className="w-full max-w-[420px] shrink-0 flex items-center justify-center">
+          {mode === "welcome" ? (
+            <div className="w-full bg-white text-[#0B1929] rounded-3xl border border-[#E2E8F0] shadow-xl p-7 lg:p-8 flex flex-col items-center text-center animate-in">
+              
+              {/* Escaparate de logos sobre la tarjeta */}
+              <div className="flex items-center justify-center w-full py-1 mb-5">
+                {showcaseCards.map((card, idx) => (
+                  <div
+                    key={card.id || idx}
+                    className={`${cardSlotStyles[idx]} bg-white flex items-center justify-center relative overflow-hidden transition-all duration-300`}
+                  >
+                    <img
+                      src={card.logo_url || "/flux_logo.jpeg"}
+                      alt="Logo especialista"
+                      onError={(e) => { e.currentTarget.src = "/flux_logo.jpeg"; }}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-3xl font-black tracking-[4px] text-[#0B1929] uppercase leading-none font-['Space_Grotesk',sans-serif]">
+                FLUX
+              </div>
+              <div className="tracking-[3px] text-[10px] font-bold text-[var(--brand-primary)] uppercase mt-2 mb-2 font-['Space_Grotesk',sans-serif]">
+                SPORT SUPPLEMENTS
+              </div>
+              
+              <p className="text-xs text-[#6B7A8D] mb-6 max-w-[280px] leading-relaxed">
+                Ingresa con tu cuenta para acceder a tu expediente o regístrate en la plataforma.
+              </p>
+
+              <div className="w-full space-y-3">
+                <button
+                  onClick={() => { setMode("login"); setErr(""); setInfo(""); }}
+                  className="w-full py-3.5 rounded-2xl bg-[var(--brand-primary)] hover:opacity-90 text-white font-extrabold text-xs tracking-[2px] uppercase shadow-lg shadow-sky-500/25 active:scale-[0.98] transition-all cursor-pointer font-['Space_Grotesk',sans-serif] flex items-center justify-center gap-2"
+                >
+                  <span>INICIAR SESIÓN</span>
+                  <ArrowRight size={15} />
+                </button>
+                <button
+                  onClick={() => { setMode("signup_type"); setErr(""); setInfo(""); }}
+                  className="w-full py-3.5 rounded-2xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] font-bold text-xs tracking-[1.5px] uppercase transition-all cursor-pointer font-['Space_Grotesk',sans-serif] flex items-center justify-center gap-2"
+                >
+                  <span>COMENZAR / CREAR CUENTA</span>
+                </button>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-[#E2E8F0] w-full flex items-center justify-center gap-1.5 text-[10px] font-bold tracking-[2px] uppercase text-[#6B7A8D] font-['Space_Grotesk',sans-serif]">
+                <span>KEEP GOING</span>
+                <Flame size={12} className="text-[var(--brand-primary)]" />
+              </div>
+            </div>
+          ) : (
+            renderAuthFormCard()
+          )}
+        </div>
+      </main>
+
+      {/* ── Pie de página Desktop ── */}
+      <footer className="hidden md:flex items-center justify-between px-8 lg:px-12 py-3 text-[11px] text-[#94A3B8] border-t border-[#E2E8F0]/70 bg-white/50 shrink-0">
+        <span>FLUX Health System &copy; {new Date().getFullYear()} &bull; Todos los derechos reservados</span>
+        <span>Nutrición Clínica &bull; Rendimiento Físico &bull; Suplementación Deportiva</span>
+      </footer>
     </div>
   );
 }
