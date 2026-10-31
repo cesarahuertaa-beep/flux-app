@@ -29,6 +29,7 @@ export default function ClinicalAiSummaryCard({
   const [collapsed, setCollapsed] = useState(true);
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [aiReported, setAiReported] = useState(false);
 
   const [aiData, setAiData] = useState(() => {
     const raw = anamnesis?.resumen_ia;
@@ -393,6 +394,28 @@ export default function ClinicalAiSummaryCard({
                     <strong className="text-[#0B1929]">Notas de consulta:</strong> {highlights.notasConsulta}
                   </div>
                 )}
+
+                <div className="mt-2.5 pt-2 border-t border-[#F0F4FA] flex items-center justify-between gap-2 flex-wrap text-[10px] text-[#6B7A8D]">
+                  <span>
+                    Contenido asistido por IA con fines orientativos. Valide siempre con criterio clínico profesional.
+                  </span>
+                  {aiReported ? (
+                    <span className="text-emerald-700 font-semibold">
+                      ✓ Respuesta de IA reportada para revisión
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAiReported(true);
+                      }}
+                      className="text-[#6B7A8D] hover:text-red-600 underline cursor-pointer font-semibold"
+                    >
+                      Reportar respuesta IA
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -156,6 +156,10 @@ public class FluxSyncWorker extends Worker {
                                 String clientId, boolean includeProgressByIds) throws Exception {
         fetchAndStore(cacheMap, supaUrl, supaKey, token,
             "nutricion_progreso?cliente_id=eq." + clientId + "&limit=1000");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token,
+            "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc&limit=1");
+        fetchAndStore(cacheMap, supaUrl, supaKey, token,
+            "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc");
         JSONArray csActive = fetchAndStore(cacheMap, supaUrl, supaKey, token,
             "ciclos?cliente_id=eq." + clientId + "&activo=eq.true&limit=1");
         JSONArray csAll = fetchAndStore(cacheMap, supaUrl, supaKey, token,

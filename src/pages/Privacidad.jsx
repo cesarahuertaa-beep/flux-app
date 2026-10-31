@@ -70,6 +70,11 @@ export default function Privacidad() {
             Sus datos de salud son compartidos únicamente con el profesional que usted tiene asignado dentro de la plataforma (si aplica), para efectos del seguimiento de su plan. No vendemos ni compartimos sus datos sensibles con terceros ajenos al servicio. Podemos compartir datos no sensibles con proveedores de infraestructura (hosting, procesamiento de pagos) únicamente para operar el servicio, quienes están obligados contractualmente a proteger su información.
           </p>
 
+          <p>
+            <strong>Funciones asistidas por Inteligencia Artificial (IA) y Descargo de Responsabilidad Médica</strong><br/>
+            La plataforma incluye herramientas opcionales de asistencia clínica y nutricional impulsadas por inteligencia artificial (Google Gemini API) para generar síntesis de expedientes, sugerencias de distribución de macronutrientes y estructuración de menús. Los parámetros enviados a este motor se procesan de manera segura y efímera exclusivamente para generar la respuesta solicitada dentro de la aplicación, sin venderse a terceros ni utilizarse para entrenar modelos públicos externos. Todas las estimaciones, alertas y sugerencias generadas por IA tienen carácter estrictamente orientativo e informativo, no constituyen un diagnóstico médico definitivo y no sustituyen el juicio profesional de un médico o nutriólogo titulado. Los usuarios cuentan dentro de la aplicación con botones directos («Reportar respuesta IA») para señalar cualquier resultado inexacto o inapropiado.
+          </p>
+
           <div id="eliminacion" className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-xs space-y-3">
             <h2 className="text-lg font-bold text-[#0B1929]">
               Derechos ARCO y Eliminación Definitiva de Cuenta (Política de Retención y Baja de Datos)

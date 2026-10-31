@@ -3643,6 +3643,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   Volver a auditar con IA
                                 </button>
                               </div>
+
+                              <div className="pt-1.5 border-t border-indigo-100/50 flex items-center justify-between gap-2 flex-wrap text-[10px] text-[#64748B]">
+                                <span>Sugerencia generada por IA; valide siempre con criterio clínico profesional.</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setMsg && setMsg("✓ Respuesta de IA reportada al equipo de revisión de FLUX.")}
+                                  className="text-[#64748B] hover:text-red-600 underline cursor-pointer font-semibold"
+                                >
+                                  Reportar respuesta IA
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>

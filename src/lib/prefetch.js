@@ -1,8 +1,11 @@
+import { Capacitor } from "@capacitor/core";
 import { dbGetFresh, syncNativeCredentials } from "./supabase";
 import { precacheMediaList } from "./mediaCache";
+import { fetchClinicalRecord } from "./clinicalRecord";
+import { fetchCustomPlatillos, fetchCustomIngredientes } from "./customCatalogs";
 
 const KEY = "flux_last_prefetch";
-const MIN_INTERVAL = 45 * 1000;
+const MIN_INTERVAL = Capacitor.isNativePlatform() ? 20 * 1000 : 45 * 1000;
 
 const safe = async (p) => {
   try { return await dbGetFresh(p); } catch { return null; }
@@ -73,11 +76,16 @@ export const prefetchPlanCliente = async (clienteId, mediaUrls = []) => {
     });
   }
 
-  // 4. Verificaciones de datos rápidos usadas por Admin.jsx y progreso nutricional
-  await safe(`nutricion_progreso?cliente_id=eq.${clienteId}&limit=1000`);
-  await safe(`ciclos?cliente_id=eq.${clienteId}&select=id&limit=1`);
-  await safe(`rutinas?cliente_id=eq.${clienteId}&select=id&limit=1`);
-  await safe(`metricas_progreso?cliente_id=eq.${clienteId}&select=id&limit=1`);
+  // 4. Verificaciones de datos rápidos usadas por Admin.jsx, expediente clínico y progreso nutricional/corporal
+  await Promise.all([
+    safe(`nutricion_progreso?cliente_id=eq.${clienteId}&limit=1000`),
+    safe(`ciclos?cliente_id=eq.${clienteId}&select=id&limit=1`),
+    safe(`rutinas?cliente_id=eq.${clienteId}&select=id&limit=1`),
+    safe(`metricas_progreso?cliente_id=eq.${clienteId}&select=id&limit=1`),
+    safe(`metricas_progreso?cliente_id=eq.${clienteId}&order=fecha.desc&limit=1`),
+    safe(`metricas_progreso?cliente_id=eq.${clienteId}&order=fecha.desc`),
+    fetchClinicalRecord(clienteId).catch(() => null),
+  ]);
 };
 
 /**
@@ -291,7 +299,21 @@ export const prefetchAdmin = async (profileId, role) => {
     ]);
   }
 
-  // 6. Descargar pasivamente todos los medios recolectados
+  // 6. Descargar catálogos globales personalizados (platillos e ingredientes) para uso offline
+  await Promise.all([
+    fetchCustomPlatillos().then((plats) => {
+      if (Array.isArray(plats)) {
+        plats.forEach((p) => { if (p.foto_url) mediaUrls.push(p.foto_url); });
+      }
+    }).catch(() => {}),
+    fetchCustomIngredientes().then((ings) => {
+      if (Array.isArray(ings)) {
+        ings.forEach((i) => { if (i.foto) mediaUrls.push(i.foto); });
+      }
+    }).catch(() => {}),
+  ]);
+
+  // 7. Descargar pasivamente todos los medios recolectados
   if (mediaUrls.length > 0) {
     precacheMediaList(mediaUrls).catch(() => {});
   }

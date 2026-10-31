@@ -53,7 +53,8 @@ export const initSyncManager = () => {
     }
   }, 10000);
 
-  // Ejecución pasiva periódica continua
-  setInterval(() => runSync(), 45000);
+  // Ejecución pasiva periódica continua (priorizada cada 25s en la app nativa de Play Store para caché offline inmediata)
+  const syncIntervalMs = Capacitor.isNativePlatform() ? 25000 : 45000;
+  setInterval(() => runSync(), syncIntervalMs);
   setTimeout(runSync, 1200);
 };

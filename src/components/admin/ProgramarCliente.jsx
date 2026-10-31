@@ -5208,6 +5208,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                            <div className="text-[11.5px] leading-relaxed mt-1">
                                              {c.evaluacionClinica.mensaje}
                                            </div>
+                                           <div className="mt-1 flex items-center justify-between gap-2 text-[10px] opacity-75">
+                                             <span>Análisis asistido por IA orientativo</span>
+                                             <button
+                                               type="button"
+                                               onClick={() => setMsg && setMsg("✓ Respuesta de IA reportada para revisión.")}
+                                               className="underline hover:opacity-100 cursor-pointer font-semibold"
+                                             >
+                                               Reportar IA
+                                             </button>
+                                           </div>
                                          </div>
                                        </div>
                                      ) : c.alertaClinica ? (
