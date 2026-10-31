@@ -58,6 +58,7 @@ const FullScreenLoader = () => (
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
+  if (s.profileId) setProfileId(s.profileId);
   // Copia de la sesión para arrancar al instante (y sin internet) la próxima vez
   try {
     localStorage.setItem("flux_session_snapshot", JSON.stringify({
@@ -108,6 +109,7 @@ export default function App() {
   const handleLogout = useCallback((reasonMsg = null) => {
     if (reasonMsg && typeof reasonMsg === "string") {
       sessionStorage.setItem("flux_pending_auth_error", reasonMsg);
+      sessionStorage.setItem("flux_login_mode", "login");
     }
     setAuthToken(null);
     setProfileId(null);
@@ -125,24 +127,29 @@ export default function App() {
     if (typeof navigator !== "undefined" && !navigator.onLine) return true;
 
     const currentRole = s.role;
-    const currentClientId = (currentRole === "cliente" || currentRole === "civil")
+    const isClientOrCivil = currentRole === "cliente" || currentRole === "civil";
+    const currentClientId = isClientOrCivil
       ? (s.data?.id || localStorage.getItem("flux_client_id"))
       : null;
-    const currentProfileId = s.profileId || s.data?.id;
+    const currentProfileId = s.profileId || s.data?.auth_id || restoreProfileId() || (!isClientOrCivil ? s.data?.id : null);
 
     try {
+      let verifiedCurrentRoleActive = false;
+
       if (currentClientId) {
         const rows = await dbGetFresh(`clientes?id=eq.${currentClientId}&select=id,activo,nutriologo_id`);
         if (!Array.isArray(rows) || rows.length === 0 || rows[0]?.activo === false) {
           handleLogout("Esta cuenta ha sido eliminada o dada de baja. La sesión se cerró por seguridad.");
           return false;
         }
+        verifiedCurrentRoleActive = true;
       } else if (currentProfileId && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(currentRole)) {
         const profiles = await dbGetFresh(`profiles?id=eq.${currentProfileId}&select=id,activo,role`);
         if (!Array.isArray(profiles) || profiles.length === 0 || (profiles[0]?.activo === false && profiles[0]?.role !== "superadmin")) {
           handleLogout("Tu cuenta profesional ha sido eliminada o desactivada. La sesión se cerró.");
           return false;
         }
+        verifiedCurrentRoleActive = true;
       }
 
       const emailToLookup = s.data?.email;
@@ -150,8 +157,11 @@ export default function App() {
         const latestRoles = await refreshUserRoles(currentProfileId, emailToLookup);
         if (Array.isArray(latestRoles)) {
           if (latestRoles.length === 0) {
-            handleLogout("Esta cuenta ya no cuenta con perfiles activos asociados.");
-            return false;
+            if (!verifiedCurrentRoleActive) {
+              handleLogout("Esta cuenta ya no cuenta con perfiles activos asociados.");
+              return false;
+            }
+            return true;
           }
           localStorage.setItem("flux_multi_roles", JSON.stringify(latestRoles));
           setSession(prev => {
@@ -394,10 +404,12 @@ export default function App() {
       } catch {}
     }
 
-    // Heartbeat cada 12 segundos mientras la aplicación esté activa
+    // Heartbeat cada 60 segundos solo cuando la pestaña esté visible
     const heartbeatTimer = setInterval(() => {
-      validateSessionLiveness();
-    }, 12000);
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        validateSessionLiveness();
+      }
+    }, 60000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);

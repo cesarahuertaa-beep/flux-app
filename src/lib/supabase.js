@@ -91,9 +91,29 @@ const withTimeout = (ms) => {
   return { signal: ctrl.signal, done: () => clearTimeout(timer) };
 };
 
+// Sincronizar _authToken entre pestañas del navegador cuando otra pestaña renueva la sesión
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === "flux_token" && e.newValue && e.newValue !== _authToken) {
+      _authToken = e.newValue;
+    }
+  });
+}
+
 /** Renovar el access_token silenciosamente usando el refresh_token */
 export const refreshSession = async () => {
-  // Primero verificar si el WorkManager nativo ya renovó el token recientemente
+  // 0. Verificar si otra pestaña del navegador ya renovó el access_token en localStorage
+  try {
+    if (typeof window !== "undefined") {
+      const latestStored = localStorage.getItem("flux_token");
+      if (latestStored && latestStored !== _authToken) {
+        _authToken = latestStored;
+        return true;
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 1. Verificar si el WorkManager nativo ya renovó el token recientemente
   try {
     if (typeof window !== "undefined" && window.FluxNativeSync?.getRefreshedTokens) {
       const raw = window.FluxNativeSync.getRefreshedTokens();
@@ -108,6 +128,7 @@ export const refreshSession = async () => {
     }
   } catch { /* ignore */ }
 
+  const tokenBeforeRefresh = _authToken;
   const rt = localStorage.getItem("flux_refresh_token");
   if (!rt) {
     // Si hay token actual aunque sea viejo, en modo offline no cerrar la sesión
@@ -129,6 +150,16 @@ export const refreshSession = async () => {
       if (!errBody) return "OFFLINE"; // Portal cautivo devolvió HTML
       const errCode = String(errBody.error || errBody.error_code || errBody.msg || "").toLowerCase();
       if (errCode.includes("invalid_grant") || errCode.includes("refresh_token_not_found")) {
+        // Verificar si otra pestaña del navegador renovó el token en paralelo mientras corríamos fetch
+        try {
+          if (typeof window !== "undefined") {
+            const afterStored = localStorage.getItem("flux_token");
+            if (afterStored && afterStored !== tokenBeforeRefresh) {
+              _authToken = afterStored;
+              return true;
+            }
+          }
+        } catch { /* ignore */ }
         // Verificar por segunda vez si el WorkManager nativo rotó el refresh_token en paralelo
         try {
           if (typeof window !== "undefined" && window.FluxNativeSync?.getRefreshedTokens) {

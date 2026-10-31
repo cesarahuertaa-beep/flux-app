@@ -45,7 +45,10 @@ export default function Login({ onLogin }) {
   const [accessToken, setAccessToken] = useState(() => sessionStorage.getItem('flux_pending_auth_token') || "");
   const [mode, setMode] = useState(() => {
     if (sessionStorage.getItem('flux_pending_auth_token')) return "set_password";
-    if (sessionStorage.getItem('flux_pending_auth_error')) return "reset";
+    const pendingErr = sessionStorage.getItem('flux_pending_auth_error');
+    if (pendingErr) {
+      return pendingErr.toLowerCase().includes("enlace") ? "reset" : "login";
+    }
     if (sessionStorage.getItem('flux_pending_auth_info')) return "login";
     const saved = sessionStorage.getItem('flux_login_mode') || "welcome";
     if (saved === "set_password" && !sessionStorage.getItem('flux_pending_auth_token')) return "welcome";
@@ -236,7 +239,8 @@ export default function Login({ onLogin }) {
       } else if (pendingError) {
         sessionStorage.removeItem('flux_pending_auth_error');
         setErr(pendingError);
-        setMode("reset");
+        const isRecoveryLinkErr = pendingError.toLowerCase().includes("enlace");
+        setMode(isRecoveryLinkErr ? "reset" : "login");
         setShowSplash(false);
       } else if (pendingInfo) {
         sessionStorage.removeItem('flux_pending_auth_info');

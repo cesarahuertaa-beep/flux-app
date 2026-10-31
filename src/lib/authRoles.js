@@ -1,27 +1,46 @@
-import { dbGet, dbGetFresh, dbPatch } from "./supabase";
+import { dbGet, dbGetFresh, dbPeek, dbPatch } from "./supabase";
 
 /**
  * Consulta en Supabase todos los perfiles asociados a un usuario (Admin/Especialista,
  * Paciente de consultorio y Atleta Independiente) a partir de su auth_id y su email.
  * Si detecta que faltaba vincular el auth_id en clientes, lo actualiza silenciosamente.
- * Si la cuenta fue eliminada de la base de datos, devuelve un arreglo vacío sin auto-crear cuentas fantasma.
+ * Si hay un fallo de red o timeout, propaga el error en lugar de devolver un arreglo vacío,
+ * evitando que un micro-corte de red se confunda con una cuenta eliminada.
  */
 export async function refreshUserRoles(authUserId, userEmail) {
   const cleanEmail = (userEmail || "").trim().toLowerCase();
   if (!cleanEmail && !authUserId) return [];
 
   let availableRoles = [];
+  let hadNetworkOrQueryError = false;
+  let lastError = null;
 
   // 1. Perfiles de administración / especialista (profiles) - Consulta fresca a la BD
   let profiles = [];
   try {
     if (authUserId) {
-      profiles = await dbGetFresh(`profiles?id=eq.${authUserId}`).catch(() => []);
+      try {
+        profiles = await dbGetFresh(`profiles?id=eq.${authUserId}`);
+      } catch (err) {
+        hadNetworkOrQueryError = true;
+        lastError = err;
+        const cached = dbPeek(`profiles?id=eq.${authUserId}`) || dbPeek(`profiles?id=eq.${authUserId}&select=id,activo,role`);
+        if (Array.isArray(cached) && cached.length > 0) {
+          profiles = cached;
+        }
+      }
     }
     if ((!profiles || profiles.length === 0) && cleanEmail) {
-      profiles = await dbGetFresh(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
+      try {
+        profiles = await dbGetFresh(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      } catch (err) {
+        hadNetworkOrQueryError = true;
+        lastError = err;
+      }
     }
   } catch (e) {
+    hadNetworkOrQueryError = true;
+    lastError = e;
     console.error("Error consultando profiles:", e);
   }
 
@@ -37,7 +56,7 @@ export async function refreshUserRoles(authUserId, userEmail) {
 
   if (adminRole && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole)) {
     if (["nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(adminRole) && profiles[0].activo === false) {
-      // Cuenta suspendida
+      // Cuenta suspendida explícitamente (activo === false)
     } else {
       availableRoles.push({
         role: adminRole,
@@ -50,21 +69,39 @@ export async function refreshUserRoles(authUserId, userEmail) {
   let clientRows = [];
   try {
     if (cleanEmail) {
-      const byEmail = await dbGetFresh(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
-      if (Array.isArray(byEmail)) clientRows.push(...byEmail);
+      try {
+        const byEmail = await dbGetFresh(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+        if (Array.isArray(byEmail)) clientRows.push(...byEmail);
+      } catch (err) {
+        hadNetworkOrQueryError = true;
+        lastError = err;
+      }
     }
     if (authUserId) {
-      const byAuth = await dbGetFresh(`clientes?auth_id=eq.${authUserId}`).catch(() => []);
-      if (Array.isArray(byAuth)) {
-        for (const c of byAuth) {
-          if (!clientRows.some(x => x.id === c.id)) {
-            clientRows.push(c);
+      try {
+        const byAuth = await dbGetFresh(`clientes?auth_id=eq.${authUserId}`);
+        if (Array.isArray(byAuth)) {
+          for (const c of byAuth) {
+            if (!clientRows.some(x => x.id === c.id)) {
+              clientRows.push(c);
+            }
           }
         }
+      } catch (err) {
+        hadNetworkOrQueryError = true;
+        lastError = err;
       }
     }
   } catch (e) {
+    hadNetworkOrQueryError = true;
+    lastError = e;
     console.error("Error consultando clientes:", e);
+  }
+
+  // Si hubo un fallo de red/timeout y no se pudo recuperar ningún rol, lanzar el error
+  // para que el validador de sesión conserve la sesión activa en lugar de desloguear.
+  if (availableRoles.length === 0 && clientRows.length === 0 && hadNetworkOrQueryError) {
+    throw lastError || new Error("OFFLINE");
   }
 
   // Si algún registro de cliente no tenía auth_id vinculado, enlazarlo automáticamente
