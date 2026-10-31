@@ -1,1 +1,0 @@
-feat: biblioteca global multi-modulo con administracion de ejercicios platillos e ingredientes
