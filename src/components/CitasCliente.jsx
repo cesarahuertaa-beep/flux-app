@@ -87,12 +87,23 @@ export function CitasCliente({ cliente }) {
     : null;
   const _peekDisp = nutriologoId ? dbPeek(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`) : null;
 
-  const [citas, setCitas] = useState(() => Array.isArray(_peekCitas) ? _peekCitas : []);
+  const [citas, setCitas] = useState(() => {
+    if (!Array.isArray(_peekCitas)) return [];
+    const now = new Date();
+    return _peekCitas.map(cita => {
+      const citaTime = new Date(cita.fecha_hora);
+      if (cita.estado === 'pendiente' && citaTime < now) {
+        return { ...cita, estado: 'cancelada' };
+      }
+      return cita;
+    });
+  });
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
   const [ratedCitas, setRatedCitas] = useState({});
   const [loading, setLoading] = useState(() => _peekCitas === null);
   const hasLoadedRef = useRef(_peekCitas !== null);
   const autoCompletedIdsRef = useRef(new Set());
+  const autoCanceledIdsRef = useRef(new Set());
   
   // Estados del Modal de Agendar
   const [showModal, setShowModal] = useState(false);
@@ -136,8 +147,15 @@ export function CitasCliente({ cliente }) {
       const now = new Date();
       if (Array.isArray(c)) {
         for (const cita of c) {
-          if (cita.estado === 'confirmada') {
-            const citaTime = new Date(cita.fecha_hora);
+          const citaTime = new Date(cita.fecha_hora);
+          // Si la cita estaba pendiente y ya pasó su fecha y hora, se autocancela
+          if (cita.estado === 'pendiente' && citaTime < now) {
+            cita.estado = 'cancelada';
+            if (!autoCanceledIdsRef.current.has(cita.id)) {
+              autoCanceledIdsRef.current.add(cita.id);
+              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'cancelada' }).catch(console.error);
+            }
+          } else if (cita.estado === 'confirmada') {
             const diffMinutes = (now - citaTime) / (1000 * 60);
             const dur = Number(cita.duracion_minutos) || nutriologoDuracion || 60;
             if (diffMinutes >= dur) {

@@ -277,7 +277,17 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
   const _peekDisp = myId ? dbPeek(`disponibilidad?nutriologo_id=eq.${myId}&order=dia_semana.asc,hora_inicio.asc`) : null;
   const _peekClis = myId ? (dbPeek(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono,objetivo&order=nombre.asc`) || dbPeek(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc`)) : null;
 
-  const [citas, setCitas]                   = useState(() => Array.isArray(_peekCitas) ? _peekCitas : []);
+  const [citas, setCitas]                   = useState(() => {
+    if (!Array.isArray(_peekCitas)) return [];
+    const now = new Date();
+    return _peekCitas.map(cita => {
+      const citaTime = new Date(cita.fecha_hora);
+      if (cita.estado === 'pendiente' && citaTime < now) {
+        return { ...cita, estado: 'cancelada' };
+      }
+      return cita;
+    });
+  });
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
   const [clientes, setClientes]             = useState(() => {
     if (Array.isArray(clientesProp) && clientesProp.length > 0) return clientesProp;
@@ -292,8 +302,9 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
   const [loading, setLoading]               = useState(() => _peekCitas === null);
   const hasLoadedRef                        = useRef(_peekCitas !== null);
   const autoCompletedIdsRef                 = useRef(new Set());
+  const autoCanceledIdsRef                  = useRef(new Set());
   const [subTab, setSubTab]                 = useState("citas");   // "citas" | "horarios"
-  const [filtro, setFiltro]                 = useState("todos");   // "todos" | "pendiente" | "confirmada" | "rechazada"
+  const [filtro, setFiltro]                 = useState("todos");   // "todos" | "pendiente" | "confirmada" | "completada" | "cancelada" | "rechazada"
   const [modalRechazo, setModalRechazo]     = useState(null);      // cita a rechazar
   const [motivoRechazo, setMotivoRechazo]   = useState("");
   const [saving, setSaving]                 = useState(false);
@@ -360,8 +371,17 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
       const now = new Date();
       if (Array.isArray(rows)) {
         for (const cita of rows) {
-          if (cita.estado === 'confirmada') {
-            const citaTime = new Date(cita.fecha_hora);
+          const citaTime = new Date(cita.fecha_hora);
+          // Si la cita estaba pendiente y ya pasó su fecha y hora, se autocancela
+          if (cita.estado === 'pendiente' && citaTime < now) {
+            cita.estado = 'cancelada';
+            if (!autoCanceledIdsRef.current.has(cita.id)) {
+              autoCanceledIdsRef.current.add(cita.id);
+              dbPatch(`citas?id=eq.${cita.id}`, { estado: 'cancelada' }).catch(console.error);
+            }
+          }
+          // Si la cita estaba confirmada y ya transcurrió al menos 1 hora desde su inicio, pasa a completada
+          else if (cita.estado === 'confirmada') {
             const diffHours = (now - citaTime) / (1000 * 60 * 60);
             if (diffHours >= 1) {
               cita.estado = 'completada';
@@ -794,6 +814,7 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
                 ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
                 ["confirmada", `Confirmadas (${citas.filter(c => c.estado === "confirmada").length})`],
                 ["completada", `Completadas (${citas.filter(c => c.estado === "completada").length})`],
+                ["cancelada", `Canceladas (${citas.filter(c => c.estado === "cancelada").length})`],
                 ["rechazada", `Rechazadas (${citas.filter(c => c.estado === "rechazada").length})`],
               ].map(([k, lb]) => (
                 <button
