@@ -316,7 +316,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [showExpediente, setShowExpediente] = useState(false);
   const [clinicalRec,  setClinicalRec]  = useState(() => peekClinicalRecord(selected?.id));
   const [evalSexo,     setEvalSexo]     = useState(() => normalizeSexo(selected?.genero || selected?.sexo || peekClinicalRecord(selected?.id)?.anamnesis?.genero));
-  const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+  const [evalEdad,     setEvalEdad]     = useState(() => calcEdadFromBirthdate(selected?.fecha_nacimiento || peekClinicalRecord(selected?.id)?.anamnesis?.fecha_nacimiento, 25));
   const [form,         setForm]         = useState(emptyForm());
   const [autoSyncMacros, setAutoSyncMacros] = useState(true);
   const [prescriptionMode, setPrescriptionMode] = useState("matematico"); // "matematico" | "ia" | "manual"
@@ -572,10 +572,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [selected?.id, loadCicloData, setMsg, cicloActivo, cicloSel, filterDeleted, mode, initialNutriDias, initialRutinas, nutriDias.length, rutinas.length, _peekMetricas, _peekCiclos]);
 
   useEffect(() => {
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
-    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
-    setClinicalRec(peekClinicalRecord(selected?.id));
-  }, [selected, clinicalRec?.anamnesis?.genero]);
+    const clin = peekClinicalRecord(selected?.id);
+    setClinicalRec(clin);
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento, 25));
+  }, [selected, clinicalRec?.anamnesis?.genero, clinicalRec?.anamnesis?.fecha_nacimiento]);
 
   useEffect(() => {
     const onExpedienteUpdated = (e) => {
@@ -660,8 +661,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
     }
 
-    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
-    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento, 25));
+    const clin = clinicalRec || peekClinicalRecord(selected?.id);
+    setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
+    setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento, 25));
     setForm(base);
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
@@ -3220,15 +3222,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Edad y Fecha */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5">
+                        <div
+                          className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5 select-none"
+                          title="Edad demográfica calculada a partir de la fecha de nacimiento del paciente"
+                        >
                           <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
-                          <input
-                            type="number"
-                            readOnly={isReadOnly}
-                            value={evalEdad}
-                            onChange={e => !isReadOnly && setEvalEdad(Number(e.target.value) || 25)}
-                            className="w-12 bg-transparent text-xs font-bold text-[#0B1929] text-center focus:outline-none"
-                          />
+                          <span className="text-xs font-bold text-[#0B1929]">{evalEdad} {evalEdad === 1 ? "año" : "años"}</span>
                         </div>
 
                         <input
