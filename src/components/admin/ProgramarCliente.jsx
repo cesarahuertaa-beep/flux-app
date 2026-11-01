@@ -3868,39 +3868,55 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               );
             })()}
 
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-3 px-3.5 md:px-0">
-              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                <span className="font-semibold text-[#0B1929]">
-                  {parsedActiveCycle.enfoque ? (
-                    <>
-                      <span>{parsedActiveCycle.enfoque}</span>
-                      <span className="text-xs font-semibold text-[var(--brand-primary)] ml-1.5">
-                        · Rutinas
-                      </span>
-                    </>
-                  ) : (
-                    <span>Rutinas</span>
-                  )}
-                  <span className="text-[#6B7A8D] font-normal ml-1.5">({rutinas.length})</span>
+            <div className="flex items-center justify-between mb-3 gap-2 px-3.5 md:px-0 flex-nowrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink min-w-0">
+                <span className="font-bold text-[#0B1929] text-sm sm:text-base whitespace-nowrap">
+                  {/* En móvil: Breve y limpio sin saturar la pantalla */}
+                  <span className="inline sm:hidden">
+                    Rutinas <span className="text-[#6B7A8D] font-normal">({rutinas.length})</span>
+                  </span>
+                  {/* En desktop: Título descriptivo completo */}
+                  <span className="hidden sm:inline">
+                    {parsedActiveCycle.enfoque ? (
+                      <>
+                        <span>{parsedActiveCycle.enfoque}</span>
+                        <span className="text-xs sm:text-sm font-semibold text-[var(--brand-primary)] ml-1.5">
+                          · Rutinas
+                        </span>
+                      </>
+                    ) : (
+                      <span>Rutinas</span>
+                    )}
+                    <span className="text-[#6B7A8D] font-normal ml-1.5">({rutinas.length})</span>
+                  </span>
                 </span>
                 {Boolean(parsedActiveCycle.dias && parsedActiveCycle.semanas) && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
-                    {parsedActiveCycle.dias} días • {parsedActiveCycle.semanas} sem
+                  <span className="text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-md sm:rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0 whitespace-nowrap">
+                    {parsedActiveCycle.dias}d • {parsedActiveCycle.semanas}sem
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {!isReadOnly && (
                   <button
                     onClick={() => setTemplateModal("rutina")}
-                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white text-[#0B1929] hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)] font-semibold shadow-sm transition-colors cursor-pointer"
+                    className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer"
                     title="Biblioteca de Plantillas de Rutinas"
                   >
-                    <Bookmark className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                    <span>Plantillas</span>
+                    <Bookmark className="w-4 h-4 text-[var(--brand-primary)] shrink-0" />
+                    <span className="hidden sm:inline">Plantillas</span>
                   </button>
                 )}
-                {!isReadOnly && <button className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--brand-primary)] text-white font-semibold shadow-sm hover:opacity-90 transition-opacity" onClick={openNewRutina}><Plus className="w-3.5 h-3.5" /> Rutina</button>}
+                {!isReadOnly && (
+                  <button
+                    className="w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold shadow-sm hover:opacity-90 transition-opacity flex items-center justify-center sm:gap-1.5 cursor-pointer"
+                    onClick={openNewRutina}
+                    title="Agregar Rutina"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    <span className="hidden sm:inline">Rutina</span>
+                  </button>
+                )}
               </div>
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndRutinas}>
