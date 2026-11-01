@@ -78,24 +78,8 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
       {/* Título Identidad de Marca abajo del logo */}
       <h2 className="text-lg md:text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-3">
         <Building2 size={18} className="text-[var(--brand-primary)]" />
-        {isSuperadmin ? "Identidad de Marca (FLUX)" : "Identidad de Marca (Consultorio)"}
+        Identidad de Marca
       </h2>
-      
-      {/* Vista previa y Color de Marca */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] mb-4">
-        <div className="text-center sm:text-left">
-          <h3 className="text-base font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h3>
-          <p className="text-[#6B7A8D] text-xs">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Color de Marca</span>
-          <BrandColorPicker
-            value={form.color_primario || "#1A6FD4"}
-            onChange={handleColorChange}
-            logoSource={currentLogo}
-          />
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div>
@@ -108,6 +92,17 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
             placeholder="Ej: NutriFit, FLUX Sport"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[#0B1929] mb-1">Color de Marca</label>
+          <div className="flex items-center">
+            <BrandColorPicker
+              value={form.color_primario || "#1A6FD4"}
+              onChange={handleColorChange}
+              logoSource={currentLogo}
+            />
+          </div>
+          <p className="text-xs text-[#6B7A8D] mt-1">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Especialidad</label>
