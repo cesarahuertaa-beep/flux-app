@@ -37,15 +37,18 @@ export default function Nutrition({
 
   const getDayShort = (nombre, i) => {
     if (!nombre) return DAY_SHORT[i] ?? `Día ${i + 1}`;
-    const parts = String(nombre).split("|");
-    return parts.length > 1 ? parts[0] : "S/D";
+    const meta = parseDiaMetadata(nombre);
+    return meta.dayCode && meta.dayCode !== "S/D" ? meta.dayCode : (DAY_SHORT[i] || "S/D");
   };
 
   const getDayFull = (nombre, i) => {
-    if (!nombre) return DAY_FULL[i] || `Día ${i + 1}`;
-    const parts = String(nombre).split("|");
-    const title = parts.length > 1 ? parts.slice(1).join("|") : parts[0];
-    return `${title || DAY_FULL[i] || `Día ${i + 1}`} — Semana ${semanaActualCiclo}`;
+    const meta = parseDiaMetadata(nombre);
+    const dayLabel = DAY_FULL[i] || `Día ${i + 1}`;
+    const customTitle = meta.titulo && meta.titulo !== "DIETA" ? meta.titulo.trim() : "";
+    if (customTitle) {
+      return `${dayLabel} • ${customTitle} • Semana ${semanaActualCiclo}`;
+    }
+    return `${dayLabel} • Semana ${semanaActualCiclo}`;
   };
 
   // Auto-seleccionar la pestaña del día actual (en hora local del dispositivo) al cargar el plan
@@ -81,7 +84,11 @@ export default function Nutrition({
   const comidas       = diaActual?.comidas || [];
 
   const pesoKg = parseFloat(ultimoPeso || cliente?.peso || nutri?.peso || 0);
-  const metaAguaMl = pesoKg > 0 ? Math.round((pesoKg * 35) / 50) * 50 : 2500;
+  const parsedDiaMeta = parseDiaMetadata(diaActual?.dia || diaActual?.nombre);
+  const parsedAguaLitros = parseFloat(parsedDiaMeta?.agua);
+  const metaAguaMl = (!isNaN(parsedAguaLitros) && parsedAguaLitros > 0)
+    ? Math.round(parsedAguaLitros * 1000)
+    : (pesoKg > 0 ? Math.round((pesoKg * 35) / 50) * 50 : 2500);
 
   // ── Hábitos por Día del Plan + Semana del Ciclo (se conserva toda la semana y se reinicia al llegar la nueva semana) ──
   const habitStorageKey = `flux_nutri_habits_${cliente?.id || "user"}_s${semanaActualCiclo}_dia_${diaId || safeActiveDay}`;
@@ -309,7 +316,7 @@ export default function Nutrition({
       </div>
 
       {/* ── Day tabs ── */}
-      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-4 sm:px-6 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-4 sm:px-6 md:px-8 py-2.5 mb-0 md:mb-2 border-b border-[#E2E8F0]/60 shrink-0">
         <div className="flex gap-2 overflow-x-auto scroll-hide">
           {dias.map((d, i) => {
             // El nombre del día viene en d.dia o d.nombre
@@ -332,9 +339,9 @@ export default function Nutrition({
       </div>
 
       {/* ── Day Content (Habits & Adherence + Meals) — scrolls smoothly with page ── */}
-      <div className="px-0 md:px-8 flex-1 space-y-2.5 md:space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-6 md:pb-8 min-h-0">
         {/* Habits & Adherence Widget */}
-        <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] px-4 py-3.5 sm:p-4 shadow-none md:shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-3.5 sm:p-4 shadow-none md:shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2 text-xs">
@@ -422,70 +429,57 @@ export default function Nutrition({
         </div>
 
         {/* Subtítulo del día activo */}
-        <div className="pt-1 px-4 md:px-0">
+        <div className="py-2.5 px-4 md:px-0 bg-[#F8FAFC] md:bg-transparent border-b md:border-b-0 border-[#E2E8F0]">
           <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
             {getDayFull(diaActual?.dia || diaActual?.nombre, activeDay)}
           </p>
         </div>
 
-        {/* Metadatos del día: Hidratación recomendada y Suplementación asignada */}
+        {/* Metadatos del día: Suplementación asignada (el banner redundante de agua fue eliminado) */}
         {(() => {
           const meta = parseDiaMetadata(diaActual?.dia || diaActual?.nombre);
-          if (!meta.agua && !meta.suplementos) return null;
+          if (!meta.suplementos) return null;
           return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pb-1 px-3.5 md:px-0">
-              {meta.agua && (
-                <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 flex items-center gap-2.5 text-xs text-blue-950 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                    <Droplets className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Meta de Agua para hoy</div>
-                    <div className="text-sm font-extrabold text-blue-900">{meta.agua} Litros</div>
-                  </div>
-                </div>
-              )}
-              {meta.suplementos && (
-                <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200/60 flex items-center gap-2.5 text-xs text-purple-950 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                    <Pill className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Suplementación prescrita</div>
-                    <div className="text-xs font-bold text-purple-900 truncate" title={meta.suplementos}>{meta.suplementos}</div>
-                  </div>
-                </div>
-              )}
+            <div className="px-4 md:px-0 py-2.5 bg-purple-50/70 border-b md:border border-purple-200/60 md:rounded-xl flex items-center gap-2.5 text-xs text-purple-950">
+              <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                <Pill className="w-3.5 h-3.5 text-purple-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Suplementación prescrita</div>
+                <div className="text-xs font-bold text-purple-900 truncate" title={meta.suplementos}>{meta.suplementos}</div>
+              </div>
             </div>
           );
         })()}
 
         {comidas.length === 0 && (
-          <p className="text-sm text-[#6B7A8D] italic px-4 md:px-0">No hay comidas registradas para este día.</p>
+          <p className="text-sm text-[#6B7A8D] italic px-4 md:px-0 py-4">No hay comidas registradas para este día.</p>
         )}
 
-        {comidas.map((meal, idx) => {
-          const isExpanded = expandedMeal === idx;
-          const isDone = isMealDone(meal, idx);
-          // Etiqueta visual: usamos meal.nombre como label principal
-          const label = meal.nombre || `Comida ${idx + 1}`;
-          const hora  = meal.hora || "";
-          // Extracto de texto para mostrar en el acordeón cerrado
-          const preview = meal.opcion1
-            ? meal.opcion1.split(",")[0].substring(0, 50)
-            : label;
+        {/* Contenedor continuo de comidas sin gaps en móvil */}
+        <div className="bg-white md:bg-transparent rounded-none md:rounded-xl border-b md:border-b-0 border-[#E2E8F0] divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-3">
+          {comidas.map((meal, idx) => {
+            const isExpanded = expandedMeal === idx;
+            const isDone = isMealDone(meal, idx);
+            // Etiqueta visual: usamos meal.nombre como label principal
+            const label = meal.nombre || `Comida ${idx + 1}`;
+            const hora  = meal.hora || "";
+            // Extracto de texto para mostrar en el acordeón cerrado
+            const preview = meal.opcion1
+              ? meal.opcion1.split(",")[0].substring(0, 50)
+              : label;
 
-          return (
-            <div
-              key={meal.id || idx}
-              className={`bg-white rounded-none md:rounded-xl border-y md:border overflow-hidden transition-all ${
-                isDone
-                  ? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-                  : isExpanded
-                  ? "border-[var(--brand-primary)] shadow-sm"
-                  : "border-[#E2E8F0]"
-              }`}
-            >
+            return (
+              <div
+                key={meal.id || idx}
+                className={`bg-white rounded-none md:rounded-xl border-0 md:border overflow-hidden transition-all ${
+                  isDone
+                    ? "bg-emerald-50/20 md:border-emerald-200 md:shadow-xs"
+                    : isExpanded
+                    ? "bg-white md:border-[var(--brand-primary)] md:shadow-sm"
+                    : "bg-white md:border-[#E2E8F0]"
+                }`}
+              >
               {/* ── Row header ── */}
               <div className="w-full flex items-center gap-3 px-4 md:px-5 py-3.5 md:py-4">
                 {/* Botón de Check de Comida Realizada */}
@@ -627,6 +621,7 @@ export default function Nutrition({
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* ── Modal de Lista de Compras del Súper ── */}
