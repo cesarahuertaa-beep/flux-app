@@ -3168,19 +3168,37 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 {/* Paso 5: Mediciones Corporales y Antropometría */}
                 <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                         <Ruler className="w-5 h-5" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider shrink-0">
                             Paso 5
                           </span>
-                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
-                            Mediciones Corporales y Antropometría
-                          </h3>
+
+                          {/* En móvil: Fecha y Edad a la derecha de Paso 5 */}
+                          <div className="sm:hidden flex items-center gap-1.5 shrink-0">
+                            <span
+                              className="text-[11px] font-bold text-[#475569] bg-[#F1F5F9] border border-[#E2E8F0] rounded-lg px-2 py-0.5 whitespace-nowrap"
+                              title="Edad demográfica"
+                            >
+                              {evalEdad} {evalEdad === 1 ? "año" : "años"}
+                            </span>
+                            <input
+                              type="date"
+                              readOnly={isReadOnly}
+                              value={form.fecha}
+                              onChange={e => !isReadOnly && updForm("fecha", e.target.value)}
+                              className="bg-[#F1F5F9] border border-[#E2E8F0] rounded-lg px-1.5 py-0.5 text-[11px] font-bold text-[#0B1929] focus:outline-none"
+                            />
+                          </div>
                         </div>
+
+                        <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mt-1 sm:mt-0.5">
+                          Mediciones Corporales y Antropometría
+                        </h3>
                         <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
                           Selecciona el protocolo de medición (Básico, Plicometría o Bioimpedancia) e ingresa las medidas corporales del paciente.
                         </p>
@@ -3221,8 +3239,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </button>
                       </div>
 
-                      {/* Edad y Fecha */}
-                      <div className="flex flex-wrap items-center gap-2">
+                      {/* Edad y Fecha (En escritorio se muestran aquí, en móvil ya están a la derecha de Paso 5) */}
+                      <div className="hidden sm:flex flex-wrap items-center gap-2">
                         <div
                           className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5 select-none"
                           title="Edad demográfica calculada a partir de la fecha de nacimiento del paciente"
