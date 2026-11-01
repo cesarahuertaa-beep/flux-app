@@ -931,16 +931,11 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
       ) : (
         // ── Vista de Horarios ───────────────────────────────────────────────
         <div>
-          <div className="flex flex-wrap justify-between items-center mb-4 md:mb-5 gap-3 px-4 md:px-0">
-            <div>
-              <h4 className="font-bold text-base text-[#0B1929]">Días y Bloques de Atención</h4>
-              <div className="text-xs text-[#6B7A8D]">
-                Define los días y horas en que los clientes pueden solicitar una cita.
-              </div>
+          <div className="mb-4 md:mb-5 px-4 md:px-0">
+            <h4 className="font-bold text-base text-[#0B1929]">Días y Bloques de Atención</h4>
+            <div className="text-xs text-[#6B7A8D]">
+              Define los días y horas en que los clientes pueden solicitar una cita.
             </div>
-            <Btn small grad onClick={abrirNuevoHorario} className="hidden md:inline-flex">
-              <Plus className="w-4 h-4" /> Agregar horario
-            </Btn>
           </div>
 
           {disponibilidad.length === 0 ? (
