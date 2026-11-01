@@ -1523,8 +1523,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     { key:"presion_arterial",   label:"Presión",   unit:"",      icon:<Heart className="w-3.5 h-3.5" /> },
   ];
 
-  if (loading) return <ListSkeleton rows={4} />;
-
   const allClientPhotos = useMemo(() => {
     const list = (mode === "historico" || sub === "historico") ? allLinkedMetricas : displayedMetricas;
     return list.flatMap(m =>
@@ -1541,6 +1539,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   }, [mode, sub, allLinkedMetricas, displayedMetricas]);
 
   const activeSection = mode || sub;
+
+  if (loading) return <ListSkeleton rows={4} />;
 
   return (
     <div className="pb-2">
