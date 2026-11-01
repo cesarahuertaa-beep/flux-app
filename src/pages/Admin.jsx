@@ -1125,9 +1125,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           />
         </Suspense>
       ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
-        <div className={tab === "clientes" ? "flex-1 flex flex-col bg-[#F7F9FC] min-h-full" : "hidden"}>
+        <div className={tab === "clientes" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC] min-h-full" : "hidden"}>
           {/* Header */}
-          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-2.5 md:gap-4">
+          <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex flex-col gap-2.5 md:gap-4">
             {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>
@@ -1168,7 +1168,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             </div>
 
             {/* Píldoras de filtro por Retención y Estado (scroll horizontal estilo agenda) */}
-            <div className="flex items-center gap-2 pt-1.5 border-t border-[#F0F4FA] overflow-x-auto scroll-hide pb-0.5 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="flex items-center gap-2 pt-0 overflow-x-auto scroll-hide pb-0.5 -mx-4 px-4 md:mx-0 md:px-0">
               <button
                 onClick={() => setFiltroRetencion("todos")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
@@ -1216,7 +1216,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           </div>
 
           {/* Lista de Clientes */}
-          <div className="flex-1 px-0 py-2 md:p-8">
+          <div className="flex-1 px-0 py-0 md:p-8">
             {loading ? (
               <CardGridSkeleton count={6} />
             ) : filteredClientes.length === 0 ? (
@@ -1230,7 +1230,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <p className="text-sm text-[#6B7A8D]">Agrega un nuevo paciente para comenzar.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4">
                 {filteredClientes.map((c) => {
                   const ret = getPatientRetention(c);
                   const barColor = !c.activo 
@@ -1256,7 +1256,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                   return (
                     <div 
                       key={c.id} 
-                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
+                      className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
                     >
                       {/* Barra superior de acento según estado */}
                       <div className={`h-1.5 w-full ${barColor}`} />
