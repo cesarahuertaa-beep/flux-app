@@ -1144,8 +1144,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             </div>
             
             {/* Controles de búsqueda y acción */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-              <div className="relative flex-1 w-full">
+            <div className="flex items-center gap-2 sm:gap-3 w-full">
+              <div className="relative flex-1 min-w-0">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
                 <input
                   type="text"
@@ -1156,11 +1156,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 />
               </div>
               <button
+                type="button"
                 onClick={() => setShowNewClient(true)}
-                className="flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity w-full sm:w-auto"
+                className="flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-[42px] px-3 sm:px-4 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
+                title="Nuevo Paciente"
+                aria-label="Nuevo Paciente"
               >
-                <Plus size={18} />
-                <span>Nuevo Paciente</span>
+                <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+                <span className="hidden sm:inline">Nuevo Paciente</span>
               </button>
             </div>
 
