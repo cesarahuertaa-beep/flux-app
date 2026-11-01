@@ -234,8 +234,8 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
+    <div className="w-full flex-1 flex flex-col bg-white md:bg-[#F7F9FC] min-h-full">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
           Mi Cuenta
         </p>
@@ -260,7 +260,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       />
 
       {isCliente && (
-        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] mb-0 md:mb-8">
+        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] mb-0 md:mb-8">
           <label className="block text-sm font-bold text-[#0B1929] mb-2">
             Objetivo Principal
           </label>
@@ -276,7 +276,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       )}
 
       {isCliente && miNutriologo && (
-        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] mb-0 md:mb-8">
+        <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] mb-0 md:mb-8">
           <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
             <User size={20} className="text-[var(--brand-primary)]" />
             Mi Especialista
@@ -354,7 +354,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         </div>
       )}
 
-      <div className="bg-white md:bg-transparent px-4 py-4 md:p-0 border-b md:border-0 border-[#E2E8F0] flex flex-col sm:flex-row gap-3 md:gap-4 mb-0 md:mb-8">
+      <div className="bg-white md:bg-transparent px-4 py-4 md:p-0 border-0 border-[#E2E8F0] flex flex-col sm:flex-row gap-3 md:gap-4 mb-0 md:mb-8">
         {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
           <button 
             onClick={() => window.location.href = "/"}
@@ -377,7 +377,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       {/* Zona de Privacidad y Eliminación de Cuenta (Requisito Google Play) */}
       {!isSuperadmin && (
         <div className="mt-0 md:mt-10 pt-0 md:pt-8 border-t-0 md:border-t border-[#E2E8F0]">
-          <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] md:border-red-100 px-4 py-5 sm:p-6 shadow-none md:shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] md:border-red-100 px-4 py-5 sm:p-6 shadow-none md:shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-[#0B1929] flex items-center gap-2">
                 <Trash2 size={16} className="text-red-500" />

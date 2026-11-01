@@ -65,29 +65,29 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
   }
 
   return (
-    <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] mb-0 md:mb-8">
-      <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
+    <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] mb-0 md:mb-8">
+      {/* Foto de perfil arriba */}
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <PhotoUploadBox
+          value={form.avatar_url}
+          onChange={handleFileChange}
+          onRemove={form.avatar_url ? handleRemoveAvatar : null}
+          uploading={uploading}
+          label="Subir foto"
+          shape="square"
+          size="md"
+        />
+        <p className="text-xs text-[#6B7A8D]">Foto de perfil</p>
+      </div>
+
+      {/* Título Datos Personales abajo de la foto */}
+      <h2 className="text-lg md:text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-4">
         <User size={20} className="text-[var(--brand-primary)]" />
         Datos Personales
       </h2>
-      
-      <div className="flex flex-col sm:flex-row gap-6 mb-6">
-        {/* Avatar Upload */}
-        <div className="flex flex-col items-center gap-2 shrink-0">
-          <PhotoUploadBox
-            value={form.avatar_url}
-            onChange={handleFileChange}
-            onRemove={form.avatar_url ? handleRemoveAvatar : null}
-            uploading={uploading}
-            label="Subir foto"
-            shape="square"
-            size="md"
-          />
-          <p className="text-xs text-[#6B7A8D]">Foto de perfil</p>
-        </div>
 
-        {/* Fields Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-w-0">
+      {/* Fields Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-[#0B1929] mb-1">Nombre Completo</label>
             <input 
@@ -176,7 +176,6 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
             </div>
           </div>
         </div>
-      </div>
       {isSaving && <div className="text-xs text-[#6B7A8D] flex items-center gap-1 mt-2 justify-end"><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#6B7A8D]"></div> Guardando...</div>}
     </div>
   );
