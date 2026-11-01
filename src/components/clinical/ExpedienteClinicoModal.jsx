@@ -280,12 +280,6 @@ export default function ExpedienteClinicoModal({
               );
             })}
           </div>
-
-          {anamnesis.completado_por && (
-            <span className="text-[11px] font-semibold text-[#6B7A8D] bg-slate-100 px-2.5 py-1 rounded-lg">
-              Llenado por: {anamnesis.completado_por === "paciente" ? "Paciente" : "Nutriólogo"}
-            </span>
-          )}
         </div>
 
         {/* Body del Expediente */}
