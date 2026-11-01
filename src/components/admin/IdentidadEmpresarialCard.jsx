@@ -60,13 +60,9 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
   const currentLogo = tempLogoFile || form.logo_url;
 
   return (
-    <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] mb-3 md:mb-8">
-      <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-6">
-        <Building2 size={20} className="text-[var(--brand-primary)]" />
-        {isSuperadmin ? "Identidad de Marca (FLUX)" : "Identidad de Marca (Consultorio)"}
-      </h2>
-      
-      <div className="flex flex-col md:flex-row items-center gap-6 pb-8 border-b border-[#E2E8F0] mb-8">
+    <div className="bg-white px-4 pt-4 pb-4 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-t md:border border-[#E2E8F0] mb-0 md:mb-8">
+      {/* Logo de la marca arriba centrado */}
+      <div className="flex flex-col items-center gap-1.5 mb-4">
         <PhotoUploadBox
           value={currentLogo}
           onChange={handleFileChange}
@@ -76,13 +72,23 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
           size="md"
           shape="square"
         />
+        <p className="text-xs text-[#6B7A8D]">Logo de la marca / consultorio</p>
+      </div>
 
-        <div className="flex-1 min-w-0 w-full text-center md:text-left">
-          <h2 className="text-xl font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h2>
-          <p className="text-[#6B7A8D] text-sm">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
+      {/* Título Identidad de Marca abajo del logo */}
+      <h2 className="text-lg md:text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-3">
+        <Building2 size={18} className="text-[var(--brand-primary)]" />
+        {isSuperadmin ? "Identidad de Marca (FLUX)" : "Identidad de Marca (Consultorio)"}
+      </h2>
+      
+      {/* Vista previa y Color de Marca */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] mb-4">
+        <div className="text-center sm:text-left">
+          <h3 className="text-base font-bold text-[#0B1929] truncate">{form.nombre_marca || "Nombre de tu Consultorio"}</h3>
+          <p className="text-[#6B7A8D] text-xs">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
         </div>
-        <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
-          <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Color de Marca</label>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Color de Marca</span>
           <BrandColorPicker
             value={form.color_primario || "#1A6FD4"}
             onChange={handleColorChange}
@@ -91,7 +97,7 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Nombre de la Marca / Consultorio</label>
           <input 
