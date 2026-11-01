@@ -269,7 +269,7 @@ function TimerCard({ brandColor }) {
 
   return (
     <div
-      className={`border-y md:border shadow-none md:shadow-sm rounded-none md:rounded-xl p-4 flex items-center gap-4 mb-2.5 md:mb-3 transition-all duration-200 ${
+      className={`border-b md:border shadow-none md:shadow-sm rounded-none md:rounded-xl p-4 flex items-center gap-4 mb-0 md:mb-3 transition-all duration-200 ${
         isProgrammingPreset
           ? "bg-amber-50/40 border-amber-400 ring-2 ring-amber-400/20"
           : "bg-white border-[#E2E8F0]"
@@ -712,7 +712,7 @@ export default function Training({
         </div>
       )}
       {/* ── Header ── */}
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] mb-2 md:mb-4 shrink-0">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -736,7 +736,7 @@ export default function Training({
       </div>
 
       {/* ── Day tabs (las rutinas/días del cliente) ── */}
-      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-3.5 md:px-8 py-2.5 mb-2 border-b border-[#E2E8F0]/60 shrink-0">
+      <div className="sticky top-0 z-30 bg-[#F7F9FC]/95 backdrop-blur-sm px-4 sm:px-6 md:px-8 py-2.5 mb-0 md:mb-2 border-b border-[#E2E8F0]/60 shrink-0">
         <div className="flex gap-2 overflow-x-auto scroll-hide">
           {rutinasValidas.map((r, i) => {
             const isActive = safeActiveIdx === i;
@@ -776,8 +776,8 @@ export default function Training({
       </div>
 
       {/* ✨ Subtítulo del día activo ✨ */}
-      <div className="px-4 md:px-8 mb-2.5 md:mb-3 shrink-0">
-        <span className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
+      <div className="py-2.5 px-4 md:px-8 bg-[#F8FAFC] md:bg-transparent border-b md:border-b-0 border-[#E2E8F0] shrink-0 mb-0 md:mb-3">
+        <p className="text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase">
           {(() => {
             const nombre = rutinaActiva?.nombre;
             if (!nombre) return `Rutina — Semana ${semanaActualCiclo}`;
@@ -785,14 +785,14 @@ export default function Training({
             const title = parts.length > 1 ? parts.slice(1).join('|') : parts[0];
             return `${title} — Semana ${semanaActualCiclo}`;
           })()}
-        </span>
+        </p>
       </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-0 md:px-8 flex-1 space-y-2.5 md:space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-6 md:pb-8 min-h-0">
 
         {/* Barra de Progreso de la Sesión del Día */}
-        <div className="bg-white border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm rounded-none md:rounded-xl px-4 py-3.5 flex flex-col gap-2">
+        <div className="bg-white border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm rounded-none md:rounded-xl px-4 py-3.5 flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#0B1929]">
               Progreso del Día: {completedSetsDay}/{totalSetsDay} series
@@ -825,34 +825,42 @@ export default function Training({
         {/* Cronómetro inline, justo antes del primer ejercicio (igual que Figma) */}
         <TimerCard brandColor="var(--brand-primary)" />
 
-        {ejercicios.map((ex, i) => {
-          const numSeries = ex.num_series || 3;
-          const isExpanded = expandedEx === i;
+        {ejercicios.length === 0 ? (
+          <div className="bg-white border-b md:border border-[#E2E8F0] rounded-none md:rounded-xl p-6 text-center">
+            <p className="text-sm text-[#6B7A8D] italic">No hay ejercicios registrados para este día.</p>
+          </div>
+        ) : (
+          <div className="bg-white md:bg-transparent rounded-none md:rounded-xl border-b md:border-b-0 border-[#E2E8F0] divide-y divide-[#E2E8F0] md:divide-y-0 md:space-y-3">
+            {ejercicios.map((ex, i) => {
+              const numSeries = ex.num_series || 3;
+              const isExpanded = expandedEx === i;
 
-          const varData = getVariantObj(ex);
-          const activeObj = varData.obj;
-          const activeVarId = varData.variantId;
-          const exPR = getExercisePRData(ex, activeVarId, activeObj);
+              const varData = getVariantObj(ex);
+              const activeObj = varData.obj;
+              const activeVarId = varData.variantId;
+              const exPR = getExercisePRData(ex, activeVarId, activeObj);
 
-          const otherVariants = [];
-          if (activeVarId !=="original") {
-            otherVariants.push({ obj: ex, variantId:"original" });
-          }
-          (ex.alternativas || []).forEach((alt, altIdx) => {
-            const vid = `alt_${altIdx}`;
-            if (vid !== activeVarId) otherVariants.push({ obj: alt, variantId: vid });
-          });
+              const otherVariants = [];
+              if (activeVarId !=="original") {
+                otherVariants.push({ obj: ex, variantId:"original" });
+              }
+              (ex.alternativas || []).forEach((alt, altIdx) => {
+                const vid = `alt_${altIdx}`;
+                if (vid !== activeVarId) otherVariants.push({ obj: alt, variantId: vid });
+              });
 
-          // Check if there is data this week for any variant of this exercise
-          const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
+              // Check if there is data this week for any variant of this exercise
+              const isSaved = ["original","alt_0","alt_1"].some(vid => progreso[`${ex.id}-${wi}-0-reps-${vid}`] !== undefined);
 
-          return (
-            <div
-              key={ex.id || i}
-              className={`bg-white rounded-none md:rounded-xl border-y md:border overflow-hidden transition-all ${
-                isExpanded ?"border-[var(--brand-primary)] shadow-sm" :"border-[#E2E8F0]"
-              }`}
-            >
+              return (
+                <div
+                  key={ex.id || i}
+                  className={`bg-white rounded-none md:rounded-xl border-0 md:border overflow-hidden transition-all ${
+                    isExpanded
+                      ? "bg-white md:border-[var(--brand-primary)] md:shadow-sm"
+                      : "bg-white md:border-[#E2E8F0]"
+                  }`}
+                >
               <button
                 className="w-full flex items-center gap-3.5 md:gap-4 px-4 md:px-5 py-3.5 md:py-4 text-left"
                 onClick={() => setExpandedEx(isExpanded ? null : i)}
@@ -1150,9 +1158,11 @@ export default function Training({
                   </div>
                 </div>
               )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
         {/* Botón para abrir Resumen y Recompensas del Entrenamiento */}
         {completedSetsDay > 0 && (
