@@ -201,6 +201,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [autoOpenCheckinTrigger, setAutoOpenCheckinTrigger] = useState(0);
   const [nutriView, setNutriView] = useState("programar"); // "programar" | "tracking"
   const [entrenoView, setEntrenoView] = useState("programar"); // "programar" | "tracking"
+  const [visitedNutriTracking, setVisitedNutriTracking] = useState(false);
+  const [visitedEntrenoTracking, setVisitedEntrenoTracking] = useState(false);
+
+  useEffect(() => {
+    if (nutriView === "tracking") setVisitedNutriTracking(true);
+  }, [nutriView]);
+
+  useEffect(() => {
+    if (entrenoView === "tracking") setVisitedEntrenoTracking(true);
+  }, [entrenoView]);
+
+  useEffect(() => {
+    setVisitedNutriTracking(false);
+    setVisitedEntrenoTracking(false);
+  }, [selected?.id, cicloSel?.id]);
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
   const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"" });
@@ -3255,9 +3270,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               </button>
             </div>
 
-            {nutriView === "programar" ? (
-              <>
-                {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
+            <div className={nutriView === "programar" ? "" : "hidden"}>
+              {/* ── Tarjeta Inteligente de Prescripción Energética & Macros (IA) ── */}
                 {(() => {
                   const hasExpediente = Boolean(
                     clinicalRec?.anamnesis_completada ||
@@ -3602,19 +3616,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 })}
               </SortableContext>
             </DndContext>
-          </>
-        ) : (
-          <Suspense fallback={<ListSkeleton rows={4} />}>
-            <ProgresoCliente
-              selected={selected}
-              setMsg={setMsg}
-              isMiPlan={isMiPlan}
-              mode="nutricion"
-              cicloActivo={cicloSel}
-              isReadOnly={isReadOnly}
-            />
-          </Suspense>
-        )}
+            </div>
+
+            {(nutriView === "tracking" || visitedNutriTracking) && (
+              <div className={nutriView === "tracking" ? "" : "hidden"}>
+                <Suspense fallback={<ListSkeleton rows={4} />}>
+                  <ProgresoCliente
+                    key={`track_nutri_${selected?.id || "sel"}_${cicloSel?.id || "act"}`}
+                    selected={selected}
+                    setMsg={setMsg}
+                    isMiPlan={isMiPlan}
+                    mode="nutricion"
+                    cicloActivo={cicloSel}
+                    initialNutriDias={dias}
+                    isReadOnly={isReadOnly}
+                  />
+                </Suspense>
+              </div>
+            )}
       </div>
     )}
 
@@ -3649,9 +3668,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </button>
         </div>
 
-        {entrenoView === "programar" ? (
-          <>
-            {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
+        <div className={entrenoView === "programar" ? "" : "hidden"}>
+          {/* ── Tarjeta Inteligente de Prescripción de Entrenamiento (IA & Biomecánica) ── */}
             {(() => {
               const hasExpediente = Boolean(
                 clinicalRec?.anamnesis_completada ||
@@ -3965,18 +3983,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             {rutinas.length === 0 && !isReadOnly && (
               <div className="text-center py-8 text-[#6B7A8D] text-[13px]">Sin rutinas en este ciclo. ¡Agrega la primera!</div>
             )}
-          </>
-        ) : (
-          <Suspense fallback={<ListSkeleton rows={4} />}>
-            <ProgresoCliente
-              selected={selected}
-              setMsg={setMsg}
-              isMiPlan={isMiPlan}
-              mode="rutinas"
-              cicloActivo={cicloSel}
-              isReadOnly={isReadOnly}
-            />
-          </Suspense>
+        </div>
+
+        {(entrenoView === "tracking" || visitedEntrenoTracking) && (
+          <div className={entrenoView === "tracking" ? "" : "hidden"}>
+            <Suspense fallback={<ListSkeleton rows={4} />}>
+              <ProgresoCliente
+                key={`track_rutina_${selected?.id || "sel"}_${cicloSel?.id || "act"}`}
+                selected={selected}
+                setMsg={setMsg}
+                isMiPlan={isMiPlan}
+                mode="rutinas"
+                cicloActivo={cicloSel}
+                initialRutinas={rutinas}
+                isReadOnly={isReadOnly}
+              />
+            </Suspense>
+          </div>
         )}
       </div>
     )}
@@ -3984,11 +4007,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     {subtab === "progreso" && (
       <Suspense fallback={<ListSkeleton rows={4} />}>
         <ProgresoCliente
+          key={`eval_${selected?.id || "sel"}_${cicloSel?.id || "act"}`}
           selected={selected}
           setMsg={setMsg}
           isMiPlan={isMiPlan}
           mode="evaluaciones"
           cicloActivo={cicloSel}
+          initialRutinas={rutinas}
+          initialNutriDias={dias}
           isReadOnly={isReadOnly}
         />
       </Suspense>

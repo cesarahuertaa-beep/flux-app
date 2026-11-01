@@ -247,7 +247,7 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
-export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, isReadOnly: propReadOnly }) {
+export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, initialNutriDias, initialRutinas, isReadOnly: propReadOnly }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const isFreemium = isCivil && selected?.plan_tipo !== "premium";
   const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
@@ -255,21 +255,61 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const _peekActiveCiclo = Array.isArray(_peekCiclos) ? (_peekCiclos.find(c => c.activo) || _peekCiclos[0] || null) : null;
   const _peekFilter = _peekActiveCiclo ? `ciclo_id=eq.${_peekActiveCiclo.id}` : `ciclo_id=is.null`;
   const _peekRs = selected?.id ? dbPeek(`rutinas?cliente_id=eq.${selected.id}&${_peekFilter}&select=*,ejercicios(*)&order=orden.asc`) : null;
+  const _peekNutriProgreso = selected?.id ? dbPeek(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`) : null;
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [metricas,     setMetricas]     = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
-  const [rutinas,      setRutinas]      = useState(() =>
-    Array.isArray(_peekRs)
+  const [rutinas,      setRutinas]      = useState(() => {
+    if (Array.isArray(initialRutinas) && initialRutinas.length > 0) return initialRutinas;
+    return Array.isArray(_peekRs)
       ? _peekRs.map(r => ({ ...r, ejercicios: Array.isArray(r.ejercicios) ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0)) : [] }))
-      : []
-  );
-  const [nutriDias,    setNutriDias]    = useState([]);
-  const [nutriProgreso,setNutriProgreso]= useState({});
+      : [];
+  });
+  const [nutriDias,    setNutriDias]    = useState(() => {
+    if (Array.isArray(initialNutriDias) && initialNutriDias.length > 0) return initialNutriDias;
+    return [];
+  });
+  const [nutriProgreso,setNutriProgreso]= useState(() => {
+    const npMap = {};
+    if (Array.isArray(_peekNutriProgreso)) {
+      _peekNutriProgreso.forEach(r => {
+        if (r?.dia_id && r?.semana != null) {
+          npMap[`${r.dia_id}-${r.semana}`] = r;
+        }
+      });
+    }
+    return npMap;
+  });
   const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
   const [showPastWeeks, setShowPastWeeks] = useState(false);
   const [ciclos,       setCiclos]       = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
   const [cicloSel,     setCicloSel]     = useState(() => cicloActivo || _peekActiveCiclo);
-  const [progreso,     setProgreso]     = useState({});
+  const [progreso,     setProgreso]     = useState(() => {
+    const rs = (Array.isArray(initialRutinas) && initialRutinas.length > 0) ? initialRutinas : (_peekRs || []);
+    const allIds = rs.flatMap(r => (r.ejercicios || []).map(e => e.id));
+    if (selected?.id && allIds.length > 0) {
+      const ps = dbPeek(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`) ||
+                 dbPeek(`progreso?cliente_id=eq.${selected.id}&limit=3000`);
+      if (Array.isArray(ps)) {
+        const pm = {};
+        ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+        return pm;
+      }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    if (Array.isArray(initialNutriDias) && initialNutriDias.length > 0) {
+      setNutriDias(initialNutriDias);
+    }
+  }, [initialNutriDias]);
+
+  useEffect(() => {
+    if (Array.isArray(initialRutinas) && initialRutinas.length > 0) {
+      setRutinas(initialRutinas);
+    }
+  }, [initialRutinas]);
   const [loading,      setLoading]      = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [showModal,    setShowModal]    = useState(false);
@@ -363,89 +403,110 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     if (!selected) return;
     const cicloFiltro = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
 
-    // 1. Rutinas y progreso de pesas
-    const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
-    const rsFull = await Promise.all((rs || []).map(async (r) => {
-      const ejs = Array.isArray(r.ejercicios)
-        ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0))
-        : await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
-      return { ...r, ejercicios: ejs };
-    }));
-    setRutinas(rsFull);
+    // 1. Rutinas y progreso de pesas (solo si mode no es "nutricion")
+    if (mode !== "nutricion") {
+      let rsFull = (Array.isArray(initialRutinas) && initialRutinas.length > 0) ? initialRutinas : null;
+      if (!rsFull) {
+        const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
+        rsFull = await Promise.all((rs || []).map(async (r) => {
+          const ejs = Array.isArray(r.ejercicios)
+            ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0))
+            : await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
+          return { ...r, ejercicios: ejs };
+        }));
+        setRutinas(rsFull);
+      }
 
-    const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
-    if (allIds.length) {
-      const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
-      const pm = {};
-      (ps || []).forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-      setProgreso(pm);
-    } else {
-      setProgreso({});
-    }
-
-    // 2. Plan de Nutrición y progreso de hábitos (agua y comidas por semana)
-    const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFiltro}`).catch(() => []);
-    let diasLoaded = [];
-    if (Array.isArray(ns) && ns.length > 0) {
-      const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
-      diasLoaded = (ds || []).map(d => ({
-        ...d,
-        comidas: (d.comidas || []).sort((a, b) => (a.orden || 0) - (b.orden || 0))
-      }));
-      setNutriDias(diasLoaded);
-    } else {
-      setNutriDias([]);
-    }
-
-    const npRows = await dbGet(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`).catch(() => []);
-    const npMap = {};
-    if (Array.isArray(npRows)) {
-      npRows.forEach(r => {
-        if (r?.dia_id && r?.semana != null) {
-          npMap[`${r.dia_id}-${r.semana}`] = r;
-        }
-      });
-    }
-
-    // Respaldo de lectura desde localStorage si se consulta en el mismo dispositivo
-    if (diasLoaded.length > 0) {
-      for (let w = 1; w <= 12; w++) {
-        diasLoaded.forEach((d, idx) => {
-          const mapKey = `${d.id}-${w}`;
-          if (npMap[mapKey]) return;
-          try {
-            const k1 = `flux_nutri_habits_${selected.id}_s${w}_dia_${d.id}`;
-            const k2 = `flux_nutri_habits_${selected.id}_s${w}_d${idx}`;
-            const raw = localStorage.getItem(k1) || localStorage.getItem(k2);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              const comidasList = d.comidas || [];
-              const doneMap = (parsed && typeof parsed.comidasDone === "object" && parsed.comidasDone !== null) ? parsed.comidasDone : {};
-              let doneCount = comidasList.filter((c, cIdx) => Boolean(
-                (c.id && doneMap[c.id]) ||
-                doneMap[cIdx] ||
-                doneMap[String(cIdx)] ||
-                (c.orden != null && doneMap[c.orden])
-              )).length;
-              if ((Number(parsed?.agua) > 0) || doneCount > 0) {
-                npMap[mapKey] = {
-                  cliente_id: selected.id,
-                  dia_id: d.id,
-                  semana: w,
-                  agua_ml: Number(parsed.agua) || 0,
-                  meta_agua_ml: 2500,
-                  comidas_done: parsed.comidasDone || {},
-                  comidas_realizadas: doneCount,
-                  total_comidas: comidasList.length,
-                };
-              }
-            }
-          } catch {}
-        });
+      const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
+      if (allIds.length) {
+        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
+        const pm = {};
+        (ps || []).forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
+        setProgreso(pm);
+      } else {
+        setProgreso({});
       }
     }
-    setNutriProgreso(npMap);
-  }, [selected?.id]);
+
+    // 2. Plan de Nutrición y progreso de hábitos (solo si mode no es "rutinas")
+    if (mode !== "rutinas") {
+      let diasLoaded = (Array.isArray(initialNutriDias) && initialNutriDias.length > 0) ? initialNutriDias : null;
+
+      const promises = [
+        dbGet(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`).catch(() => [])
+      ];
+
+      if (!diasLoaded) {
+        promises.push(
+          (async () => {
+            const ns = await dbGet(`nutricion?cliente_id=eq.${selected.id}&${cicloFiltro}`).catch(() => []);
+            if (Array.isArray(ns) && ns.length > 0) {
+              const ds = await dbGet(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+              return (ds || []).map(d => ({
+                ...d,
+                comidas: (d.comidas || []).sort((a, b) => (a.orden || 0) - (b.orden || 0))
+              }));
+            }
+            return [];
+          })()
+        );
+      }
+
+      const [npRows, loadedFromDb] = await Promise.all(promises);
+      if (!diasLoaded && loadedFromDb) {
+        diasLoaded = loadedFromDb;
+        setNutriDias(diasLoaded);
+      }
+
+      const npMap = {};
+      if (Array.isArray(npRows)) {
+        npRows.forEach(r => {
+          if (r?.dia_id && r?.semana != null) {
+            npMap[`${r.dia_id}-${r.semana}`] = r;
+          }
+        });
+      }
+
+      // Respaldo de lectura desde localStorage si se consulta en el mismo dispositivo
+      if (diasLoaded && diasLoaded.length > 0) {
+        for (let w = 1; w <= 12; w++) {
+          diasLoaded.forEach((d, idx) => {
+            const mapKey = `${d.id}-${w}`;
+            if (npMap[mapKey]) return;
+            try {
+              const k1 = `flux_nutri_habits_${selected.id}_s${w}_dia_${d.id}`;
+              const k2 = `flux_nutri_habits_${selected.id}_s${w}_d${idx}`;
+              const raw = localStorage.getItem(k1) || localStorage.getItem(k2);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                const comidasList = d.comidas || [];
+                const doneMap = (parsed && typeof parsed.comidasDone === "object" && parsed.comidasDone !== null) ? parsed.comidasDone : {};
+                let doneCount = comidasList.filter((c, cIdx) => Boolean(
+                  (c.id && doneMap[c.id]) ||
+                  doneMap[cIdx] ||
+                  doneMap[String(cIdx)] ||
+                  (c.orden != null && doneMap[c.orden])
+                )).length;
+                if ((Number(parsed?.agua) > 0) || doneCount > 0) {
+                  npMap[mapKey] = {
+                    cliente_id: selected.id,
+                    dia_id: d.id,
+                    semana: w,
+                    agua_ml: Number(parsed.agua) || 0,
+                    meta_agua_ml: 2500,
+                    comidas_done: parsed.comidasDone || {},
+                    comidas_realizadas: doneCount,
+                    total_comidas: comidasList.length,
+                  };
+                }
+              }
+            } catch {}
+          });
+        }
+      }
+      setNutriProgreso(npMap);
+    }
+  }, [selected?.id, mode, initialNutriDias, initialRutinas]);
 
   useEffect(() => {
     if (cicloActivo?.id && cicloSel?.id !== cicloActivo.id) {
@@ -456,33 +517,59 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   const load = useCallback(async (force = false) => {
     if (!selected?.id) return;
-    if (!initialLoadedRef.current && _peekMetricas === null && _peekCiclos === null) {
+
+    // Solo mostrar skeleton si realmente NO tenemos datos mínimos para la sección activa
+    const hasInitialData = (mode === "nutricion" && ((initialNutriDias && initialNutriDias.length > 0) || nutriDias.length > 0)) ||
+                           (mode === "rutinas" && ((initialRutinas && initialRutinas.length > 0) || rutinas.length > 0)) ||
+                           (!mode && (_peekMetricas !== null || _peekCiclos !== null)) ||
+                           (mode === "evaluaciones" && (_peekMetricas !== null || _peekCiclos !== null));
+
+    if (!initialLoadedRef.current && !hasInitialData) {
       setLoading(true);
     }
     initialLoadedRef.current = true;
+
     try {
-      const qPath = `metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`;
-      const ms = force
-        ? await dbGetFresh(qPath).catch(() => [])
-        : await dbGet(qPath, (bg) => {
-            if (Array.isArray(bg)) setMetricas(filterDeleted(bg.map(enrichMetrica)));
-          }).catch(() => []);
-      if (Array.isArray(ms)) {
-        setMetricas(filterDeleted(ms.map(enrichMetrica)));
+      if (mode === "nutricion" || mode === "rutinas") {
+        // En modos específicos de tracking, SOLO cargamos el ciclo activo y los datos de ese tracking
+        const activeCiclo = cicloActivo || cicloSel;
+        if (!activeCiclo) {
+          const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
+          setCiclos(cs || []);
+          const resolved = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
+          setCicloSel(resolved);
+          await loadCicloData(resolved);
+        } else {
+          await loadCicloData(activeCiclo);
+        }
+      } else {
+        // Modo evaluaciones o vista completa: consultar en paralelo con Promise.all
+        const qPath = `metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`;
+        const [ms, cs] = await Promise.all([
+          force
+            ? dbGetFresh(qPath).catch(() => [])
+            : dbGet(qPath, (bg) => {
+                if (Array.isArray(bg)) setMetricas(filterDeleted(bg.map(enrichMetrica)));
+              }).catch(() => []),
+          dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []),
+          fetchClinicalRecord(selected.id).then(rec => setClinicalRec(rec)).catch(() => {})
+        ]);
+
+        if (Array.isArray(ms)) {
+          setMetricas(filterDeleted(ms.map(enrichMetrica)));
+        }
+        setCiclos(cs || []);
+        const activeCiclo = cicloActivo || (cs || []).find(c => c.activo) || (cs || [])[0] || null;
+        setCicloSel(prev => prev ?? activeCiclo);
+
+        await loadCicloData(activeCiclo);
       }
-
-      fetchClinicalRecord(selected.id).then(rec => setClinicalRec(rec)).catch(() => {});
-
-      // Load cycles and select the active one by default
-      const cs = await dbGet(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => []);
-      setCiclos(cs || []);
-      const activeCiclo = cicloActivo || (cs || []).find(c => c.activo) || (cs || [])[0] || null;
-      setCicloSel(prev => prev ?? activeCiclo); // Only set on first load
-
-      await loadCicloData(activeCiclo);
-    } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
-    setLoading(false);
-  }, [selected?.id, loadCicloData, setMsg, cicloActivo?.id, filterDeleted]);
+    } catch(e) {
+      setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
+    } finally {
+      setLoading(false);
+    }
+  }, [selected?.id, loadCicloData, setMsg, cicloActivo, cicloSel, filterDeleted, mode, initialNutriDias, initialRutinas, nutriDias.length, rutinas.length, _peekMetricas, _peekCiclos]);
 
   useEffect(() => {
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero));
