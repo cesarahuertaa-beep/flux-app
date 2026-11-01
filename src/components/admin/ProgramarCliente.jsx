@@ -249,9 +249,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
         if (dish.grasas) c.grasas = dish.grasas;
         c.modoEdicion = "platillo";
-        if (!c.nombre || /^Comida\s+\d+$/i.test(c.nombre)) {
-          c.nombre = dish.nombre || "";
-        }
       }
       c.opcionesModoEdicion = {
         ...(c.opcionesModoEdicion || {}),
@@ -5901,11 +5898,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   onClick={() => {
                     const idx = photoCatalogModal.mealIndex;
                     updComida(idx, "foto_url", item.foto_url);
-                    // Si el nombre de la comida es genérico, sugerir el nombre del platillo
-                    const curComida = diaForm.comidas[idx];
-                    if (!curComida?.nombre || /^Comida\s+\d+$/i.test(curComida.nombre)) {
-                      updComida(idx, "nombre", item.nombre || item.titulo || "");
-                    }
                     setPhotoCatalogModal(null);
                     setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto asignada del catálogo</div>);
                   }}

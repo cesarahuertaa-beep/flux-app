@@ -461,23 +461,11 @@ export default function Nutrition({
           {comidas.map((meal, idx) => {
             const isExpanded = expandedMeal === idx;
             const isDone = isMealDone(meal, idx);
+            const mealName = (meal.nombre || "").trim() || `Comida ${idx + 1}`;
             const hora = meal.hora || "";
-
-            const rawNombre = (meal.nombre || "").trim();
-            const isGeneric = !rawNombre || /^Comida\s+\d+$/i.test(rawNombre);
-
-            // Extraer el nombre/título real del platillo de la opción 1
-            const opt1Raw = (meal.opcion1 || "").trim();
-            const firstLine = opt1Raw.split("\n")[0].trim();
-            const dishTitle = (firstLine.length > 60 && firstLine.includes(","))
-              ? firstLine.split(",")[0].trim()
-              : firstLine;
-
-            // Etiqueta del momento (ej. "DESAYUNO", "CENA", o "COMIDA 1")
-            const momentoTag = !isGeneric ? rawNombre : `Comida ${idx + 1}`;
-
-            // Nombre principal del platillo/comida
-            const mainTitle = dishTitle || (!isGeneric ? rawNombre : `Comida ${idx + 1}`);
+            const preview = meal.opcion1
+              ? meal.opcion1.split("\n")[0].substring(0, 65)
+              : "";
 
             return (
               <div
@@ -518,14 +506,16 @@ export default function Nutrition({
                           <span className="w-1 h-1 rounded-full bg-[#CBD5E1]" />
                         </>
                       )}
-                      <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ${isDone ? "text-emerald-600" : "text-[var(--brand-primary)]"}`}>
-                        <span>{momentoTag}</span>
+                      <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1 ${isDone ? "text-emerald-600" : "text-[var(--brand-primary)]"}`}>
+                        <span>{mealName}</span>
                         {isDone && <Check className="w-3 h-3 stroke-[3]" />}
                       </span>
                     </div>
-                    <p className={`text-sm font-bold mt-0.5 truncate ${isDone ? "text-gray-500" : "text-[#0B1929]"}`}>
-                      {mainTitle}
-                    </p>
+                    {preview && preview !== mealName && (
+                      <p className={`text-sm font-medium mt-0.5 truncate ${isDone ? "text-gray-500" : "text-[#0B1929]"}`}>
+                        {preview}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     {meal.calorias > 0 && (
@@ -555,7 +545,7 @@ export default function Nutrition({
                         <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm relative flex items-center justify-center">
                           <CachedImage
                             src={meal.foto_url || meal.imagen_url}
-                            alt={mainTitle}
+                            alt={mealName}
                             className="w-full h-full object-contain mix-blend-multiply"
                             fallback={<Apple size={28} className="text-[#6B7A8D]" />}
                           />
@@ -565,24 +555,16 @@ export default function Nutrition({
                       {/* Contenido: nombre, opciones dinámicas */}
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-blue-50 text-[var(--brand-primary)] border border-blue-100">
-                            {momentoTag}
-                          </span>
-                          {hora && <span className="text-xs font-mono text-[#6B7A8D]">{hora}</span>}
+                          <p className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug">{mealName}</p>
+                          {hora && <span className="text-xs font-mono text-[#6B7A8D]">({hora})</span>}
                         </div>
-                        <p className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug">{mainTitle}</p>
 
                         {(() => {
                           const options = parseMealOptions(meal);
                           if (options.length <= 1) {
-                            if (!meal.opcion1) return null;
-                            let desc = meal.opcion1.trim();
-                            if (dishTitle && desc.startsWith(dishTitle)) {
-                              desc = desc.substring(dishTitle.length).replace(/^[\s:\-–—\n]+/, "").trim();
-                            }
-                            return desc ? (
-                              <p className="text-sm text-[#6B7A8D] leading-relaxed mt-1">
-                                {desc}
+                            return meal.opcion1 ? (
+                              <p className="text-sm text-[#6B7A8D] leading-relaxed whitespace-pre-line mt-1">
+                                {meal.opcion1}
                               </p>
                             ) : null;
                           }
