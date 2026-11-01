@@ -914,7 +914,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className="mt-4 flex items-center gap-3 px-4 pb-4 sm:py-4 md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent">
+      <div className="mt-4 flex items-center gap-3 px-4 pb-12 sm:pb-4 md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent">
         <div className="w-2/5 sm:w-auto">
           {step === 2 ? (
             <button
