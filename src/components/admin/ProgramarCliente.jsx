@@ -1495,6 +1495,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const handleApplyNutriTemplate = async (tpl) => {
     if (!selected) return;
+    if (isEstandar && (dias.length + (tpl.dias || []).length > 3)) {
+      setMsg(
+        <div className="flex items-center gap-2">
+          <span className="text-xl">⭐</span>
+          <div>
+            <strong>Límite de Plan Estándar.</strong>
+            <div className="text-xs opacity-90 mt-0.5">Esta plantilla excede el límite de 3 días del Plan Estándar. Pasa a Premium para aplicarla completa.</div>
+          </div>
+        </div>
+      );
+      return;
+    }
     setSaving(true);
     try {
       let activeCiclo = cicloSel;
@@ -1788,6 +1800,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
     const editDiaSnap = editDia;
     const prevDias = dias;
+
+    if (isEstandar && !editDiaSnap) {
+      const dSeleccionados = formSnap.diasSeleccionados || [];
+      const creationDays = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+      const remaining = Math.max(0, 3 - dias.length);
+      if (creationDays.length > remaining) {
+        setMsg(
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⭐</span>
+            <div>
+              <strong>Límite de Plan Estándar.</strong>
+              <div className="text-xs opacity-90 mt-0.5">
+                {remaining <= 0
+                  ? "Has alcanzado el límite de 3 días en el Plan Estándar. Ve a tu Membresía para adquirir Premium y tener días ilimitados."
+                  : `Solo puedes agregar ${remaining} día${remaining > 1 ? "s" : ""} más (máximo 3 días en total). Seleccionaste ${creationDays.length} días.`}
+              </div>
+            </div>
+          </div>
+        );
+        return;
+      }
+    }
 
     const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
     const finalName = formatDiaMetadata({
@@ -2543,6 +2577,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const prevRutinas = rutinas;
     const activeCiclo = cicloSel;
     const dSeleccionados = formSnap.diasSeleccionados || [];
+
+    if (isEstandar && !editRutinaSnap) {
+      const diasToCreate = dSeleccionados.length > 0 ? dSeleccionados : ["S/D"];
+      const remaining = Math.max(0, 3 - rutinas.length);
+      if (diasToCreate.length > remaining) {
+        setMsg(
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⭐</span>
+            <div>
+              <strong>Límite de Plan Estándar.</strong>
+              <div className="text-xs opacity-90 mt-0.5">
+                {remaining <= 0
+                  ? "Has alcanzado el límite de 3 rutinas en el Plan Estándar. Ve a tu Membresía para adquirir Premium y tener rutinas ilimitadas."
+                  : `Solo puedes agregar ${remaining} rutina${remaining > 1 ? "s" : ""} más (máximo 3 en total). Seleccionaste ${diasToCreate.length}.`}
+              </div>
+            </div>
+          </div>
+        );
+        return;
+      }
+    }
 
     // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
     if (editRutinaSnap) {
@@ -4441,12 +4496,34 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             key={d}
                             type="button"
                             onClick={() => {
-                              setDiaForm(p => ({
-                                ...p,
-                                diasSeleccionados: editDia ? [d] : (p.diasSeleccionados?.includes(d) 
-                                  ? p.diasSeleccionados.filter(x => x !== d) 
-                                  : [...(p.diasSeleccionados || []), d])
-                              }));
+                              setDiaForm(p => {
+                                if (editDia) return { ...p, diasSeleccionados: [d] };
+                                const current = p.diasSeleccionados || [];
+                                const isSelected = current.includes(d);
+                                if (isSelected) {
+                                  return { ...p, diasSeleccionados: current.filter(x => x !== d) };
+                                }
+                                if (isEstandar) {
+                                  const remaining = Math.max(0, 3 - dias.length);
+                                  if (current.length >= remaining) {
+                                    setMsg(
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">⭐</span>
+                                        <div>
+                                          <strong>Límite de Plan Estándar.</strong>
+                                          <div className="text-xs opacity-90 mt-0.5">
+                                            {remaining <= 0
+                                              ? "Has alcanzado el límite de 3 días en el Plan Estándar."
+                                              : `Solo puedes seleccionar hasta ${remaining} día${remaining > 1 ? "s" : ""} (máximo 3 días en total).`}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                    return p;
+                                  }
+                                }
+                                return { ...p, diasSeleccionados: [...current, d] };
+                              });
                             }}
                             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
                               diaForm.diasSeleccionados?.includes(d) 
@@ -5964,12 +6041,34 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           key={d}
                           type="button"
                           onClick={() => {
-                            setRutinaForm(p => ({
-                              ...p,
-                              diasSeleccionados: editRutina ? [d] : (p.diasSeleccionados?.includes(d) 
-                                ? p.diasSeleccionados.filter(x => x !== d) 
-                                : [...(p.diasSeleccionados || []), d])
-                            }));
+                            setRutinaForm(p => {
+                              if (editRutina) return { ...p, diasSeleccionados: [d] };
+                              const current = p.diasSeleccionados || [];
+                              const isSelected = current.includes(d);
+                              if (isSelected) {
+                                return { ...p, diasSeleccionados: current.filter(x => x !== d) };
+                              }
+                              if (isEstandar) {
+                                const remaining = Math.max(0, 3 - rutinas.length);
+                                if (current.length >= remaining) {
+                                  setMsg(
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">⭐</span>
+                                      <div>
+                                        <strong>Límite de Plan Estándar.</strong>
+                                        <div className="text-xs opacity-90 mt-0.5">
+                                          {remaining <= 0
+                                            ? "Has alcanzado el límite de 3 rutinas en el Plan Estándar."
+                                            : `Solo puedes seleccionar hasta ${remaining} rutina${remaining > 1 ? "s" : ""} (máximo 3 en total).`}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                  return p;
+                                }
+                              }
+                              return { ...p, diasSeleccionados: [...current, d] };
+                            });
                           }}
                           className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
                             rutinaForm.diasSeleccionados?.includes(d) 
