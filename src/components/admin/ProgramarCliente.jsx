@@ -3289,12 +3289,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       {/* Cabecera de la tarjeta (Colapsable) */}
                       <div
                         onClick={() => setMetaPrescritaCollapsed((p) => !p)}
-                        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                        className={`p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none transition-colors ${
                           metaPrescritaCollapsed ? "hover:bg-[#F8FAFC]" : "pb-3 border-b border-[#F0F4FA] bg-[#F8FAFC]/40"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                        <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border mt-0.5 sm:mt-0 ${
                             prescMode === "ia"
                               ? "bg-indigo-50 text-indigo-600 border-indigo-200/60"
                               : prescMode === "manual"
@@ -3334,8 +3334,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           </div>
                         </div>
 
-                        {/* Control de Colapso con Flecha */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        {/* Control de Colapso con Flecha (Alineado arriba a la derecha en móvil) */}
+                        <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] font-semibold text-[#6B7A8D] hidden sm:inline">
                             {metaPrescritaCollapsed ? "Ver desglose" : "Ocultar"}
                           </span>
@@ -3578,16 +3578,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           {!isReadOnly && (
                             <div className="flex gap-1.5 shrink-0">
                               <button
-                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors cursor-pointer"
+                                className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-blue-50 transition-colors cursor-pointer"
                                 onClick={() => openEditDia(d)}
+                                title="Editar día"
                               >
-                                <Edit2 className="w-3.5 h-3.5" /> <span className="text-xs font-semibold">Editar</span>
+                                <Edit2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                                <span className="hidden sm:inline text-xs font-semibold">Editar</span>
                               </button>
                               <button
-                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                                className="flex items-center justify-center gap-1.5 w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                                 onClick={() => deleteDia(d)}
+                                title="Borrar día"
                               >
-                                <Trash2 className="w-3.5 h-3.5" /> <span className="text-xs font-semibold">Borrar</span>
+                                <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                                <span className="hidden sm:inline text-xs font-semibold">Borrar</span>
                               </button>
                             </div>
                           )}
