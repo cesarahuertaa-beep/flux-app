@@ -252,13 +252,6 @@ export default function ProgresoHistoricoModal({
                 <span className="sm:hidden">PDF</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-xl bg-gray-100 text-[#0B1929] text-xs sm:text-sm font-bold hover:bg-gray-200 transition-colors cursor-pointer"
-            >
-              Cerrar
-            </button>
           </div>
         </div>
       </div>
