@@ -15,7 +15,8 @@ import {
   Users,
   GraduationCap,
   Clock,
-  Sparkles
+  Sparkles,
+  ExternalLink
 } from "lucide-react";
 import { getRatesForCutoff } from "../../utils/tarifas";
 import {
@@ -36,7 +37,7 @@ import {
  * - En Web (!isPlayApp):
  *     • Se muestran todos los datos SPEI, CLABE con copiado a 1 clic, concepto y subida de comprobantes.
  */
-export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded }) {
+export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUploaded, role: roleProp }) {
   const isPlayApp = isNativePlayApp();
   const _peekPerfil = profileId ? dbPeek(`profiles?id=eq.${profileId}`) : null;
   const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
@@ -116,7 +117,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     };
   }, [profileId]);
 
-  const isEstudiante = perfil?.role === "nutriologo_estudiante";
+  const isEstudiante = (roleProp || perfil?.role) === "nutriologo_estudiante";
 
   // Cálculos de fechas, periodos y tarifas
   const {
@@ -148,7 +149,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const lastValid = historial.find(r => r.estado === "aprobado" || r.estado === "pendiente");
       let targetCutoff, expDate = null;
 
-      // Calcular primer paciente para el periodo de prueba de 30 días
+      // Calcular primer paciente para el periodo de prueba de 7 días (excluyendo "Mi entrenamiento personal")
       const myClients = (clientes || []).filter(c => c.nutriologo_id === profileId && c.objetivo !== "Mi entrenamiento personal");
       let firstClientDateObj = null;
       if (myClients.length > 0) {
@@ -161,11 +162,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
       if (!lastValid) {
         if (!firstClientDateObj) {
-          // Aún no registra a su primer paciente: periodo de prueba no ha iniciado (acceso total de cortesía)
+          // Aún no registra a su primer paciente: acceso total de cortesía garantizado sin fecha prematura
           isTrialPeriod = true;
-          const d = new Date();
-          d.setDate(d.getDate() + 7);
-          targetCutoff = d;
+          targetCutoff = null;
           expDate = null;
         } else {
           // El periodo de prueba vence 7 días después del primer paciente (+ 2 días de gracia)
@@ -215,7 +214,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       let remainingStr = null;
       if (isTrialPeriod) {
         if (!firstClientDateObj) {
-          remainingStr = "Prueba de bienvenida activa (7 días de cortesía a partir de tu 1er paciente)";
+          remainingStr = "Prueba de cortesía activa (7 días sin costo a partir de tu 1er paciente)";
         } else if (trialDaysRemainingCalc > 1) {
           remainingStr = `Prueba gratuita activa: ${trialDaysRemainingCalc} días restantes`;
         } else if (trialDaysRemainingCalc === 1) {
@@ -234,11 +233,20 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         if (days > 1) remainingStr = `Expira en ${days} días`;
         else if (days === 1) remainingStr = "Expira mañana";
         else if (days === 0) remainingStr = "Expira hoy";
-        else remainingStr = `En días de gracia (venció hace ${Math.abs(days)} días)`;
+        else if (days >= -2) remainingStr = `En días de gracia (venció hace ${Math.abs(days)} día${Math.abs(days) > 1 ? "s" : ""})`;
+        else remainingStr = "Suscripción vencida · Requiere renovación";
       }
 
-      const activePatientsCount = (clientes || []).filter(c => c.nutriologo_id === profileId && c.activo).length;
-      const strCorte = targetCutoff.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
+      const activePatientsCount = (clientes || []).filter(
+        c => c.nutriologo_id === profileId && c.activo && c.objetivo !== "Mi entrenamiento personal"
+      ).length;
+
+      const strCorte = targetCutoff
+        ? targetCutoff.toLocaleDateString("es-MX", { day: "numeric", month: "long" })
+        : "Al registrar 1er paciente";
+
+      const fallbackNextCutoff = new Date();
+      fallbackNextCutoff.setDate(fallbackNextCutoff.getDate() + 30);
 
       const isStudentPaid = isTrialPeriod || (expDate ? today <= new Date(new Date(expDate).setDate(expDate.getDate() + 2)) : false);
 
@@ -253,7 +261,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         nextTierThreshold: null,
         totalAmount: tarifaEstudiante,
         fechaCorteText: strCorte,
-        nextCutoff: targetCutoff,
+        nextCutoff: targetCutoff || fallbackNextCutoff,
         activeRates: ratesForStudent,
         expirationDate: expDate,
         diasRestantesText: remainingStr,
@@ -520,7 +528,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         <div className="my-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-              Total a Pagar
+              {isEstudiante && yaPagado && !hasPendingPayment ? "Tarifa Mensual" : "Total a Pagar"}
             </span>
             <span className="text-2xl font-black text-[#0B1929]">
               ${totalAmount.toFixed(2)}{" "}
@@ -529,10 +537,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           </div>
           <div className="text-right">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-              Corte Facturado
+              {isEstudiante ? (isTrial ? "Vigencia Estimada" : "Próxima Renovación") : "Corte Facturado"}
             </span>
             <span className="text-xs font-bold text-[var(--brand-primary)]">
-              {fechaCorteText}
+              {isEstudiante && isTrial && !firstClientDate ? "Al registrar 1er paciente" : fechaCorteText}
             </span>
           </div>
         </div>
@@ -632,7 +640,13 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
         >
           <Upload size={18} />
-          <span>{uploading ? "Subiendo Comprobante..." : "Subir Comprobante de Pago"}</span>
+          <span>
+            {uploading
+              ? "Subiendo Comprobante..."
+              : isEstudiante && yaPagado && !hasPendingPayment
+              ? "Subir Comprobante para Próximo Ciclo"
+              : "Subir Comprobante de Pago"}
+          </span>
         </button>
         <p className="text-[11px] text-center text-[#6B7A8D] mt-2.5 flex items-center justify-center gap-1.5">
           <CheckCircle2 size={13} className="text-emerald-600" />
@@ -666,7 +680,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               {hasPendingPayment
                 ? "Comprobante en Revisión"
                 : isEstudiante && isTrial
-                ? "Periodo de Prueba Gratuito Activo"
+                ? (firstClientDate ? "Periodo de Prueba Gratuito Activo" : "Bienvenido a FLUX · Acceso de Cortesía")
                 : isEstudiante
                 ? (yaPagado ? "Plan Estudiante Activo" : "Plan Estudiante — Pendiente de Renovación")
                 : (yaPagado ? "Servicio Profesional Activo" : "Corte de Facturación Pendiente")}
@@ -680,7 +694,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               ? "Hemos recibido tu comprobante. Nuestro equipo lo validará a la brevedad."
               : isEstudiante
               ? (diasRestantesText
-                  ? `${diasRestantesText} · ${expirationDate ? `Vencimiento: ${expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })}` : `Corte estimado: ${fechaCorteText}`}`
+                  ? `${diasRestantesText}${expirationDate ? ` · Vencimiento: ${expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })}` : ""}`
                   : "Mensualidad fija preferencial para estudiantes sin cobro por paciente.")
               : `Tienes ${activeCount} paciente${activeCount !== 1 ? "s" : ""} activo${activeCount !== 1 ? "s" : ""} en Nivel ${currentTier} ($${currentRate}/pac). Próximo corte: ${fechaCorteText}.`}
           </p>
@@ -758,15 +772,15 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               <span className="font-bold text-amber-300">
                 {expirationDate
                   ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })
-                  : fechaCorteText}
+                  : (isTrial && !firstClientDate ? "Al registrar 1er paciente" : fechaCorteText)}
               </span>
             </div>
           </div>
 
           {/* Columna Derecha: Método de Pago (7 cols) */}
-          <div className="md:col-span-7 space-y-4">
+          <div className="md:col-span-7 space-y-3 md:space-y-4">
             {isTrial && (
-              <div className="p-4 rounded-3xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-3 shadow-xs">
+              <div className="mx-4 my-3 md:mx-0 md:my-0 p-4 rounded-2xl md:rounded-3xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-3 shadow-xs">
                 <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
                   <Sparkles size={18} />
                 </div>
@@ -776,8 +790,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   </span>
                   {firstClientDate ? (
                     <span>
-                      Cuentas con 7 días de acceso total sin costo. Te quedan{" "}
-                      <strong>{trialDaysRemaining ?? 7} días de prueba</strong> antes de tu primera mensualidad de ${Number(currentRate).toFixed(2)} MXN.
+                      Cuentas con 7 días de acceso total sin costo. Te {trialDaysRemaining === 1 ? "queda" : "quedan"}{" "}
+                      <strong>{trialDaysRemaining === 1 ? "1 día de prueba" : `${trialDaysRemaining ?? 7} días de prueba`}</strong> antes de tu primera mensualidad de ${Number(currentRate).toFixed(2)} MXN.
                     </span>
                   ) : (
                     <span>
@@ -787,14 +801,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   <span className="block mt-1 text-amber-800/90">
                     {isPlayApp
                       ? "Puedes iniciar tu suscripción con antelación para que empiece a cobrarse al terminar tu periodo de prueba."
-                      : "No requieres subir ningún pago mientras tu prueba gratuita esté vigente."}
+                      : "No requieres realizar ningún pago mientras tu prueba gratuita esté vigente."}
                   </span>
                 </div>
               </div>
             )}
             {isPlayApp ? (
               /* Google Play Subscription (Android Oficial — Sin transferencias para cumplir políticas de Google) */
-              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] flex flex-col justify-between">
+              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-2">
                     <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -825,60 +839,85 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     </div>
                   </div>
 
+                  {yaPagado && !isTrial && (
+                    <div className="mb-4 p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <div>
+                          <span className="text-xs font-bold text-emerald-900 block">Suscripción Activa en Google Play</span>
+                          <span className="text-[11px] text-emerald-700">Se renueva automáticamente en tu cuenta Google</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-800 bg-emerald-100/70 px-2.5 py-0.5 rounded-lg shrink-0">Activa</span>
+                    </div>
+                  )}
+
                   <p className="text-xs text-[#6B7A8D] leading-relaxed">
                     Las suscripciones se procesan oficialmente mediante <strong>Google Play Billing</strong>. Puedes gestionar o cancelar tu suscripción desde la sección Pagos y Suscripciones de tu cuenta de Google Play.
                   </p>
                 </div>
 
                 <div className="mt-6 space-y-3 pt-5 border-t border-[#F0F4FA]">
-                  <button
-                    type="button"
-                    disabled={uploading || loading}
-                    onClick={async () => {
-                      setUploading(true);
-                      try {
-                        const res = await startGooglePlaySubscription(
-                          PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE,
-                          {
-                            role: "nutriologo_estudiante",
-                            nutriologoId: profileId,
-                            nombre: perfil?.nombre,
-                            monto: Number(currentRate) || 239
+                  {yaPagado && !isTrial ? (
+                    <button
+                      type="button"
+                      onClick={() => openPlayStoreSubscriptions(PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE)}
+                      className="w-full bg-[#0B1929] hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <CreditCard size={18} />
+                      <span>Administrar Suscripción en Google Play</span>
+                      <ExternalLink size={15} className="text-slate-400" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={uploading || loading}
+                      onClick={async () => {
+                        setUploading(true);
+                        try {
+                          const res = await startGooglePlaySubscription(
+                            PLAY_BILLING_PRODUCTS.NUTRI_ESTUDIANTE,
+                            {
+                              role: "nutriologo_estudiante",
+                              nutriologoId: profileId,
+                              nombre: perfil?.nombre,
+                              monto: Number(currentRate) || 239
+                            }
+                          );
+                          if (res.status === "purchased") {
+                            setMsg(
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                <span>¡Suscripción de estudiante activada con éxito en Google Play!</span>
+                              </div>
+                            );
+                            if (onPaymentUploaded) onPaymentUploaded();
+                            loadData();
+                          } else if (res.status === "unavailable_in_region_or_review") {
+                            setMsg(
+                              <div className="flex items-center gap-1.5">
+                                <Info className="w-4 h-4 text-blue-500" />
+                                <span>La suscripción en Google Play se activará al concluir la revisión en tienda.</span>
+                              </div>
+                            );
                           }
-                        );
-                        if (res.status === "purchased") {
+                        } catch (err) {
                           setMsg(
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                              <span>¡Suscripción de estudiante activada con éxito en Google Play!</span>
+                            <div className="flex items-center gap-1.5 text-red-500">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{err.message}</span>
                             </div>
                           );
-                          if (onPaymentUploaded) onPaymentUploaded();
-                          loadData();
-                        } else if (res.status === "unavailable_in_region_or_review") {
-                          setMsg(
-                            <div className="flex items-center gap-1.5">
-                              <Info className="w-4 h-4 text-blue-500" />
-                              <span>La suscripción en Google Play se activará al concluir la revisión en tienda.</span>
-                            </div>
-                          );
+                        } finally {
+                          setUploading(false);
                         }
-                      } catch (err) {
-                        setMsg(
-                          <div className="flex items-center gap-1.5 text-red-500">
-                            <AlertCircle className="w-4 h-4" />
-                            <span>{err.message}</span>
-                          </div>
-                        );
-                      } finally {
-                        setUploading(false);
-                      }
-                    }}
-                    className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <CreditCard size={18} />
-                    <span>{uploading ? "Conectando con Google Play..." : (isTrial ? "Activar Suscripción Anticipada" : "Suscribirme con Google Play")}</span>
-                  </button>
+                      }}
+                      className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <CreditCard size={18} />
+                      <span>{uploading ? "Conectando con Google Play..." : (isTrial ? "Activar Suscripción Anticipada" : "Suscribirme con Google Play")}</span>
+                    </button>
+                  )}
 
                   <div className="text-center pt-1">
                     <button
@@ -1210,12 +1249,18 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">Duración</span>
-              <p className="text-sm font-semibold text-[#0B1929]">30 días desde la fecha de pago.</p>
+              <p className="text-sm font-semibold text-[#0B1929]">
+                {isTrial ? "7 días cortesía + 30d/mes" : "30 días por renovación."}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">Vencimiento</span>
+              <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                {isTrial ? "Término de Cortesía" : "Vencimiento"}
+              </span>
               <p className="text-sm font-bold text-[var(--brand-primary)]">
-                {expirationDate ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" }) : "Pendiente"}
+                {expirationDate
+                  ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })
+                  : (isTrial && !firstClientDate ? "Al registrar 1er paciente" : "Pendiente")}
               </p>
             </div>
             <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
@@ -1266,61 +1311,114 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
-                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Mes Facturado</th>
+                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                    {isEstudiante ? "Periodo / Vencimiento" : "Mes Facturado"}
+                  </th>
+                  <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Método / Comprobante</th>
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
                   <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {historial.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3.5 px-4 text-xs text-[#0B1929] whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleDateString("es-MX")}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-[#6B7A8D] whitespace-nowrap">
-                      {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString("es-MX", { month: "long", year: "numeric" }) : "—"}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap text-sm">
-                      ${Number(r.monto).toFixed(2)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        r.estado === "aprobado"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : r.estado === "rechazado"
-                          ? "bg-red-50 text-red-600 border border-red-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}>
-                        {r.estado}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {historial.map(r => {
+                  const isGp = r.comprobante_url?.includes("Google Play");
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3.5 px-4 text-xs text-[#0B1929] whitespace-nowrap">
+                        {new Date(r.created_at).toLocaleDateString("es-MX")}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-[#6B7A8D] whitespace-nowrap">
+                        {r.fecha_corte_mes
+                          ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", isEstudiante ? { day: "2-digit", month: "short", year: "numeric" } : { month: "long", year: "numeric" })
+                          : "—"}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs whitespace-nowrap">
+                        {isGp ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            Google Play
+                          </span>
+                        ) : r.comprobante_url ? (
+                          <a
+                            href={r.comprobante_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--brand-primary)] hover:underline"
+                          >
+                            <span>Ver comprobante</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        ) : (
+                          <span className="text-[#6B7A8D] text-xs">SPEI</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap text-sm">
+                        ${Number(r.monto).toFixed(2)}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          r.estado === "aprobado"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : r.estado === "rechazado"
+                            ? "bg-red-50 text-red-600 border border-red-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}>
+                          {r.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
             {/* Mobile View */}
             <div className="md:hidden divide-y divide-slate-100">
-              {historial.map(r => (
-                <div key={r.id} className="py-3.5 space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-sm text-[#0B1929]">${Number(r.monto).toFixed(2)} MXN</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      r.estado === "aprobado"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : r.estado === "rechazado"
-                        ? "bg-red-50 text-red-600"
-                        : "bg-amber-50 text-amber-700"
-                    }`}>
-                      {r.estado}
-                    </span>
+              {historial.map(r => {
+                const isGp = r.comprobante_url?.includes("Google Play");
+                return (
+                  <div key={r.id} className="py-3.5 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-sm text-[#0B1929]">${Number(r.monto).toFixed(2)} MXN</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        r.estado === "aprobado"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : r.estado === "rechazado"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {r.estado}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                      <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
+                      <span>
+                        {r.fecha_corte_mes
+                          ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", isEstudiante ? { day: "2-digit", month: "short", year: "numeric" } : { month: "long", year: "numeric" })
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 text-xs">
+                      {isGp ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          Google Play Billing
+                        </span>
+                      ) : r.comprobante_url ? (
+                        <a
+                          href={r.comprobante_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--brand-primary)] hover:underline"
+                        >
+                          <span>Ver comprobante adjunto</span>
+                          <ExternalLink size={11} />
+                        </a>
+                      ) : (
+                        <span className="text-[#6B7A8D] text-[11px]">Pago SPEI</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                    <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
-                    <span>{r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString("es-MX", { month: "long", year: "numeric" }) : "—"}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

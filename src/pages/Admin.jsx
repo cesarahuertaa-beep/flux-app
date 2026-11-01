@@ -1600,7 +1600,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (tab === "membresia" || visitedTabs.has("membresia")) && (
         <div className={tab === "membresia" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mi Membresía" subtitle="Consulta el estado de tu suscripción y sube tus comprobantes de pago">
-            <MiMembresia clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
+            <MiMembresia role={role} clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
           </SubComponentWrapper>
         </div>
       )}
