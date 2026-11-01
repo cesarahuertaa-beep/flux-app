@@ -1127,7 +1127,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
         <div className={tab === "clientes" ? "flex-1 flex flex-col bg-[#F7F9FC] min-h-full" : "hidden"}>
           {/* Header */}
-          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-2.5 md:gap-4 pr-12 md:pr-8">
+          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-2.5 md:gap-4">
             {/* Cabecera superior: Título */}
             <div className="flex items-start justify-between">
               <div>
@@ -1168,7 +1168,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             </div>
 
             {/* Píldoras de filtro por Retención y Estado (scroll horizontal estilo agenda) */}
-            <div className="flex items-center gap-2 pt-1.5 border-t border-[#F0F4FA] overflow-x-auto scroll-hide pb-0.5 -mr-8 md:mr-0">
+            <div className="flex items-center gap-2 pt-1.5 border-t border-[#F0F4FA] overflow-x-auto scroll-hide pb-0.5 -mx-4 px-4 md:mx-0 md:px-0">
               <button
                 onClick={() => setFiltroRetencion("todos")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
