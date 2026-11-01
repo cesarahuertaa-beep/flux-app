@@ -1519,9 +1519,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {/* ── EVALUACIONES ── */}
       {activeSection === "evaluaciones" && (
         <div>
-          <div className="flex items-center justify-between gap-2.5 mb-3 px-3.5 md:px-0">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <span className="font-bold text-[#0B1929] text-sm sm:text-base">
+          <div className="flex items-center justify-between gap-2 mb-3 px-3.5 md:px-0 flex-nowrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink min-w-0">
+              <span className="font-bold text-[#0B1929] text-sm sm:text-base whitespace-nowrap">
                 {/* En móvil: Breve y limpio sin saturar la pantalla */}
                 <span className="inline sm:hidden">
                   Evaluaciones{" "}
@@ -1549,13 +1549,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
               </span>
 
               {Boolean(cycleInfo.dias && cycleInfo.semanas) && (
-                <span className="text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0">
+                <span className="text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-md sm:rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60 shrink-0 whitespace-nowrap">
                   {cycleInfo.dias}d • {cycleInfo.semanas}sem
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {displayedMetricas.length > 0 && (
                 <button
                   onClick={() => {
@@ -1573,25 +1573,29 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     }
                     generateProgresoPDF(selected, displayedMetricas, brand);
                   }}
-                  className="border border-[#E2E8F0] bg-white text-[#0B1929] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="w-8 h-8 sm:w-auto sm:px-3 sm:py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0B1929] hover:bg-gray-50 transition-colors flex items-center justify-center sm:gap-1.5 cursor-pointer shadow-2xs relative text-xs sm:text-sm font-bold"
+                  title="Descargar Reporte PDF"
                 >
-                  <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
-                  <span>PDF</span>
+                  <FileText className="w-4 h-4 text-[var(--brand-primary)] shrink-0" />
+                  <span className="hidden sm:inline">PDF</span>
                   {isFreemium && (
-                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold ml-0.5">
-                      PRO
-                    </span>
+                    <>
+                      <span className="sm:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 border border-white" />
+                      <span className="hidden sm:inline text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                        PRO
+                      </span>
+                    </>
                   )}
                 </button>
               )}
               {!isReadOnly && (
                 <button
                   onClick={openNewEvaluation}
-                  className={`${displayedMetricas.length === 0 ? "hidden sm:inline-flex" : "inline-flex"} bg-[var(--brand-primary)] text-white px-3 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold hover:opacity-90 transition-colors items-center gap-1.5 cursor-pointer shadow-sm`}
+                  className={`${displayedMetricas.length === 0 ? "hidden sm:inline-flex" : "inline-flex"} w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 transition-colors items-center justify-center sm:gap-1.5 cursor-pointer shadow-sm text-xs sm:text-sm font-bold`}
+                  title="Nueva evaluación"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4 shrink-0" />
                   <span className="hidden sm:inline">Nueva evaluación</span>
-                  <span className="sm:hidden">Nueva</span>
                 </button>
               )}
             </div>
@@ -1620,7 +1624,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             const isLocked = isFreemium && idx > 0;
             const cycleName = ciclos.find(c => String(c.id) === String(m.ciclo_id))?.nombre?.split("|")[0];
             return (
-              <div key={m.id} className="relative bg-white rounded-none md:rounded-[14px] border-y md:border border-[#E2E8F0] p-4 mb-3 shadow-none md:shadow-sm overflow-hidden">
+              <div key={m.id} className="relative bg-white rounded-none md:rounded-[14px] border-y md:border border-[#E2E8F0] p-3 sm:p-4 mb-2.5 sm:mb-3 shadow-none md:shadow-sm overflow-hidden">
                 {isLocked && (
                   <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 flex flex-col items-center justify-center gap-2 rounded-[14px]">
                     <Lock className="w-6 h-6 text-amber-500" />
@@ -1629,15 +1633,49 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </div>
                 )}
                 <div className={isLocked ?"blur-sm pointer-events-none select-none" :""}>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-[var(--brand-primary)] text-[15px] flex items-center gap-1.5 whitespace-nowrap"><Calendar className="w-4 h-4" /> {fmtDate(m.fecha)}</span>
-                    {idx===0&&<span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap">Más reciente</span>}
+                {/* ── Fila Superior de la Evaluación: Fecha, badges y acciones compactas ── */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <span className="font-bold text-[var(--brand-primary)] text-sm sm:text-[15px] flex items-center gap-1.5 whitespace-nowrap">
+                      <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {fmtDate(m.fecha)}
+                    </span>
+                    {idx===0 && (
+                      <span className="bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">
+                        Más reciente
+                      </span>
+                    )}
                     {m.metodo_evaluacion && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : m.metodo_evaluacion === 'basico' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                      <span className={`text-[9.5px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md font-bold uppercase tracking-wide whitespace-nowrap ${m.metodo_evaluacion === 'inbody' ? 'bg-purple-50 text-purple-600 border border-purple-100' : m.metodo_evaluacion === 'basico' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
                         {getMetodoLabel(m.metodo_evaluacion)}
                       </span>
                     )}
+                  </div>
+                  {/* Acciones en la esquina superior derecha */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={()=>startEdit(m)}
+                      className="border border-[#E2E8F0] text-[#6B7A8D] p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1 cursor-pointer"
+                      title={isReadOnly ? "Ver detalles" : "Editar evaluación"}
+                    >
+                      {isReadOnly ? <Eye className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline">{isReadOnly ? "Ver" : "Editar"}</span>
+                    </button>
+                    {!isReadOnly && (
+                      <button
+                        onClick={()=>deleteMetrica(m.id)}
+                        className="bg-red-50 text-red-600 p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Eliminar evaluación"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Borrar</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Fila de Metas / FAF / Calorías ── */}
+                {(m.eval_objetivo || m.eval_faf || m.prescribed_macros?.targetKcal || m.ai_audit_result?.targetKcal) && (
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                     {m.eval_objetivo && (() => {
                       const g = getGoalPresetInfo(m.eval_objetivo);
                       return g ? (
@@ -1678,18 +1716,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       );
                     })()}
                   </div>
-                  <div className="flex gap-1.5 self-start sm:self-auto">
-                    <button onClick={()=>startEdit(m)} className="border border-[#E2E8F0] text-[#6B7A8D] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1 cursor-pointer">
-                      {isReadOnly ? <Eye className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
-                      <span>{isReadOnly ? "Ver" : "Editar"}</span>
-                    </button>
-                    {!isReadOnly && (
-                      <button onClick={()=>deleteMetrica(m.id)} className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1 cursor-pointer">
-                        <Trash2 className="w-3.5 h-3.5" /> Borrar
-                      </button>
-                    )}
-                  </div>
-                </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 mb-0" style={{marginBottom:m.notas?12:0}}>
                   {DISPLAY_KEYS.filter(f=>m[f.key]!==null&&m[f.key]!==undefined&&m[f.key]!=="").map(f=>{
                     const d = (!isFreemium && prev) ? delta(m,prev,f.key) : null;
@@ -1716,12 +1743,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                 {/* Check-in de Seguimiento registrado con esta evaluación */}
                 {Boolean(m.checkin_energia || m.checkin_saciedad || m.checkin_digestion || m.checkin_descanso || m.nivel_estres || m.checkin_observaciones || m.checkin_ajustes) && (
-                  <div className="mt-3 bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-100 rounded-xl p-3 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="font-bold text-[#0B1929] flex items-center gap-1.5 text-xs">
-                        <Activity className="w-3.5 h-3.5 text-[var(--brand-primary)]" /> Check-in de Seguimiento
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                  <div className="mt-2.5 bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-100 rounded-xl p-2.5 sm:p-3 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-[#0B1929] text-xs">
+                      <Activity className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                      <span>Check-in de Seguimiento</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10.5px] sm:text-[11px]">
                         {m.checkin_energia && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[var(--brand-primary)] font-bold">
                             <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> Energía {m.checkin_energia}/5
@@ -1754,7 +1781,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </span>
                         )}
                       </div>
-                    </div>
                     {m.checkin_observaciones && (
                       <p className="text-[#0B1929] text-xs">
                         <span className="font-bold text-[#6B7A8D]">Sensaciones: </span>

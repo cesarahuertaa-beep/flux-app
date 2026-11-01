@@ -2956,7 +2956,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   return (
     <div className="w-full flex-1 flex flex-col pb-6">
       {/* ── Cabecera cliente / Mi Plan ── */}
-      <div className="mb-2 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3 sm:p-5 shadow-none md:shadow-sm">
+      <div className="mb-0 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3 sm:p-5 shadow-none md:shadow-sm">
         <div className="flex items-center justify-between gap-2.5 sm:gap-3">
           
           {/* Left: Info + Back button (solo si no es Mi Plan) */}
@@ -3062,20 +3062,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       )}
 
       {/* ── Selector de Ciclos ── */}
-      <div className="mb-3.5 md:mb-5 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] px-4 py-3.5 md:p-4 shadow-none md:shadow-sm">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">{isMiPlan ? "Mis Planes" : "Planes del Paciente"}</span>
-          <div className="flex items-center gap-2">
+      <div className="mb-3 md:mb-5 bg-white rounded-none md:rounded-xl border-b md:border border-[#E2E8F0] px-3.5 py-2.5 sm:px-4 sm:py-3.5 md:p-4 shadow-none md:shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+          <span className="text-xs sm:text-[13px] font-bold text-[#0B1929] uppercase tracking-[0.8px]">{isMiPlan ? "Mis Planes" : "Planes del Paciente"}</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {ciclos.filter(c => !c.activo).length > 0 && (
               <button
                 onClick={() => setShowPastCycles(p => !p)}
-                className="flex items-center justify-center p-2 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center p-1.5 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors"
                 title="Ver planes anteriores"
               >
-                <ChevronDown className={`w-4 h-4 transition-transform ${showPastCycles ?"rotate-180" :""}`} />
+                <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showPastCycles ?"rotate-180" :""}`} />
               </button>
             )}
-            <button className="text-xs flex items-center justify-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-medium cursor-pointer" onClick={openCreatePlan}>
+            <button className="text-xs flex items-center justify-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-colors font-semibold cursor-pointer" onClick={openCreatePlan}>
               <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{ciclos.length === 0 ?"Crear Primer Plan" :"Siguiente Plan"}</span>
             </button>
           </div>
