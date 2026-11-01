@@ -1466,7 +1466,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                           {role !== "administrativo" && (
                             <button 
                               onClick={() => { setSelected(c); setTab("programar"); }}
-                              className="flex-1 bg-[var(--brand-primary)] hover:opacity-90 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="flex-1 bg-[var(--brand-primary)] hover:opacity-90 text-white px-3 py-2.5 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
                               title="Programar nutrición y entrenamiento"
                             >
                               <CalendarDays size={14} />
@@ -1474,29 +1474,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                             </button>
                           )}
                           <button 
-                            onClick={() => setExpedienteClient(c)}
-                            className="flex-1 bg-white border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#0B1929] px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer relative"
-                            title="Abrir expediente clínico integral"
-                          >
-                            <ClipboardList size={14} className="text-[var(--brand-primary)]" />
-                            <span>Expediente</span>
-                            {clinRec?.solicitud_activa && (
-                              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Solicitud activa de llenado" />
-                            )}
-                          </button>
-                          <button 
                             onClick={() => {
                               setEditClient(c);
                               setEditClientForm({ nombre: c.nombre || "", telefono: c.telefono || "", objetivo: c.objetivo || "" });
                             }}
-                            className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-2 rounded-xl hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors cursor-pointer shrink-0"
+                            className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-2.5 rounded-xl hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors cursor-pointer shrink-0"
                             title="Editar datos básicos"
                           >
                             <Edit2 size={15} />
                           </button>
                           <button 
                             onClick={() => toggleActivo(c)}
-                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2 rounded-xl transition-colors cursor-pointer shrink-0 ${
+                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2.5 rounded-xl transition-colors cursor-pointer shrink-0 ${
                               c.activo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50'
                             }`}
                             title={c.activo ? "Desactivar paciente" : "Activar paciente"}
