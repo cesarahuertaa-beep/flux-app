@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { 
   Users, Folder, CalendarDays, UsersRound, Building2, 
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
-, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2,
+, UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2, Check,
   Clock, Sparkles, ChevronDown,
   Mail, Phone, Target, ClipboardList
 } from "lucide-react";
@@ -837,6 +837,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         telefono: editClient.telefono || "",
         objetivo: editClient.objetivo || ""
       });
+      setShowConfirmDelete(false);
+      setConfirmDeleteText("");
     }
   }, [editClient]);
 
@@ -1714,11 +1716,30 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {editClient && (
         <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-md h-full md:h-auto flex flex-col overflow-hidden animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#0B1929]">Editar Paciente</h2>
-              <button onClick={() => setEditClient(null)} className="text-[#6B7A8D] hover:text-[#0B1929]">
-                <X size={20} />
-              </button>
+            {/* Header con botón colapsado Guardar y X */}
+            <div className="px-5 sm:px-6 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
+              <h2 className="text-base sm:text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Editar Paciente</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={saveEditClient}
+                  disabled={saving}
+                  className="flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-9 px-3.5 rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                  title="Guardar cambios"
+                >
+                  <Check size={16} strokeWidth={2.5} className="shrink-0" />
+                  <span>{saving ? "Guardando..." : "Guardar"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditClient(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors cursor-pointer"
+                  title="Cerrar"
+                  aria-label="Cerrar modal"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
               {editClient.email && (
@@ -1734,7 +1755,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                     type="button"
                     onClick={() => resendClientAccess(editClient.email)}
                     disabled={saving}
-                    className="mt-2 w-full py-2 px-3 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    className="mt-2 w-full py-2 px-3 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     📧 Reenviar correo de acceso
                   </button>
@@ -1752,41 +1773,62 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Objetivo</label>
                 <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
               </div>
-            </div>
-            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex flex-col gap-3">
+
+              {/* Botón de eliminar paciente abajo del objetivo con el diseño de la pestaña perfil */}
+              <div className="pt-2">
                 {showConfirmDelete ? (
-                  <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+                  <div className="bg-red-50/90 border border-red-200 p-4 rounded-2xl animate-in fade-in">
                     <p className="text-red-700 text-xs font-bold mb-2">
                       Esta acción es irreversible. Se borrarán todas las fotos, planes, progreso y cuenta del paciente.
                       Escribe la palabra <strong>ELIMINAR</strong> para confirmar.
                     </p>
                     <input 
                       value={confirmDeleteText}
-                      onChange={e=>setConfirmDeleteText(e.target.value)}
+                      onChange={e => setConfirmDeleteText(e.target.value)}
                       placeholder="ELIMINAR"
-                      className="w-full bg-white border border-red-200 text-red-900 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-red-500 mb-2"
+                      className="w-full bg-white border border-red-200 text-red-900 rounded-xl px-3.5 py-2 text-sm outline-none focus:border-red-500 mb-2.5"
                     />
                     <div className="flex justify-end gap-2">
-                      <button onClick={()=>setShowConfirmDelete(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7A8D] hover:bg-white transition-colors">Cancelar</button>
-                      <button onClick={deleteClient} disabled={confirmDeleteText !=="ELIMINAR" || saving} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-                        {saving ?"Eliminando..." :"Eliminar Definitivamente"}
+                      <button 
+                        type="button"
+                        onClick={() => { setShowConfirmDelete(false); setConfirmDeleteText(""); }} 
+                        className="px-3.5 py-2 rounded-xl text-xs font-semibold text-[#6B7A8D] hover:bg-white transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={deleteClient} 
+                        disabled={confirmDeleteText !== "ELIMINAR" || saving} 
+                        className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer"
+                      >
+                        {saving ? "Eliminando..." : "Eliminar Definitivamente"}
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <button onClick={() => setShowConfirmDelete(true)} className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
-                      <Trash2 size={14} /> Borrar Paciente
-                    </button>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEditClient(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
-                      <button onClick={saveEditClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-                        {saving ?"Guardando..." :"Guardar cambios"}
-                      </button>
+                  <div className="bg-white rounded-2xl border border-red-100 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                        <Trash2 size={14} className="text-red-500 shrink-0" />
+                        Eliminar paciente y datos clínicos
+                      </h4>
+                      <p className="text-[11px] text-[#6B7A8D] leading-relaxed">
+                        Elimina el expediente, registros y cuenta de acceso de forma permanente.
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmDelete(true)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors shrink-0 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 size={13} />
+                      Eliminar paciente
+                    </button>
                   </div>
                 )}
               </div>
+            </div>
           </div>
         </div>
       )}
