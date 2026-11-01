@@ -2122,8 +2122,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           {nutriDias.length === 0 ? (
             <div className="text-center py-16 text-[#6B7A8D]">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><UtensilsCrossed className="w-12 h-12" /></div>
-              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin plan nutricional en este ciclo</div>
-              <div className="text-[13px]">Asigna días de dieta en la pestaña de Programar para visualizar el cumplimiento diario de agua y comidas.</div>
+              <div className="text-[15px] font-bold text-[#0B1929] mb-1.5">Sin dieta asignada</div>
             </div>
           ) : (() => {
             const semanasNutri = getSemanasConFecha(rutinas[0] || null, cicloSel);
