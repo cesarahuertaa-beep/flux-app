@@ -2486,7 +2486,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             {/* Top Sticky Header */}
             <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] shadow-2xs">
               <div className="px-4 md:px-8 py-3.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                   <button
                     type="button"
                     onClick={closeModal}
@@ -2496,7 +2496,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     <span>Volver</span>
                   </button>
                   <span className="text-[#CBD5E1] hidden sm:inline">|</span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
                       {isReadOnly ? "Consultar Evaluación Corporal" : editingId ? "Editar Evaluación Corporal" : "Nueva Evaluación Corporal"}
                     </h2>
@@ -2507,22 +2507,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    {isReadOnly ? "Cerrar" : "Cancelar"}
-                  </button>
                   {!isReadOnly && (
                     <button
                       type="button"
                       onClick={saveMetrica}
                       disabled={saving}
-                      className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      className="w-9 h-9 sm:w-auto px-0 sm:px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      title={saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}
                     >
-                      <Save className="w-4 h-4" />
-                      <span>{saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}</span>
+                      {saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <Save className="w-4 h-4 shrink-0" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar evaluación"}
+                      </span>
                     </button>
                   )}
                 </div>
