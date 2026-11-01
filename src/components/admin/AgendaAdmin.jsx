@@ -33,7 +33,7 @@ const Tag = ({ children, className ="" }) => (
   </span>
 );
 
-const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad }) => {
+const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad, className = "" }) => {
   let base ="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
   let size = small ?"px-3 py-1.5 text-xs" :"px-4 py-2 text-sm";
   
@@ -51,7 +51,7 @@ const Btn = ({ children, onClick, disabled, small, outline, color, danger, grad 
   }
 
   return (
-    <button className={`${base} ${size} ${variant}`} onClick={onClick} disabled={disabled}>
+    <button className={`${base} ${size} ${variant} ${className}`} onClick={onClick} disabled={disabled}>
       {children}
     </button>
   );
@@ -719,23 +719,29 @@ export function AgendaAdmin({ setMsg, profileId }) {
   // ── Render ──
   return (
     <div className="w-full">
-      {/* Top bar: status summary + Sub-tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0">
+      {/* Top bar: status summary + Sub-tabs + Botón Agendar Cita */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0">
         <div className="text-sm text-[#6B7A8D]">
           {pendientesCount > 0
             ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
             : "Todo al día — sin citas pendientes por confirmar"}
         </div>
-        {/* Sub-tabs */}
-        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl">
-          {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
-            <button key={k} onClick={() => setSubTab(k)} className={`
-              px-4 py-1.5 rounded-lg text-sm font-semibold transition-all
-              ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-[#6B7A8D] hover:text-[#0B1929]"}
-            `}>
-              {lb}
-            </button>
-          ))}
+        {/* Sub-tabs y botón Agendar Cita a la derecha de Horarios */}
+        <div className="flex items-center gap-2 overflow-x-auto scroll-hide pb-0.5">
+          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
+            {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
+              <button key={k} onClick={() => setSubTab(k)} className={`
+                px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap
+                ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-[#6B7A8D] hover:text-[#0B1929]"}
+              `}>
+                {lb}
+              </button>
+            ))}
+          </div>
+
+          <Btn small grad onClick={() => setShowNuevaCita(true)} className="shrink-0 whitespace-nowrap">
+            <Plus className="w-4 h-4" /> Agendar cita
+          </Btn>
         </div>
       </div>
 
@@ -744,9 +750,9 @@ export function AgendaAdmin({ setMsg, profileId }) {
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
-          {/* Barra de filtros y acción nueva cita */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 md:px-0">
-            <div className="flex flex-wrap gap-2">
+          {/* Barra de filtros horizontales sin apilarse, con scroll horizontal estilo días de nutrición/entrenamiento */}
+          <div className="px-4 md:px-0 mb-4">
+            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1">
               {[
                 ["todos", `Todas (${citas.length})`],
                 ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
@@ -757,20 +763,16 @@ export function AgendaAdmin({ setMsg, profileId }) {
                 <button
                   key={k}
                   onClick={() => setFiltro(k)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                     filtro === k
                       ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
-                      : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-slate-50"
+                      : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-[#E8F1FB]"
                   }`}
                 >
                   {lb}
                 </button>
               ))}
             </div>
-
-            <Btn small grad onClick={() => setShowNuevaCita(true)}>
-              <Plus className="w-4 h-4" /> Agendar cita
-            </Btn>
           </div>
 
           {citasFiltradas.length === 0 ? (
