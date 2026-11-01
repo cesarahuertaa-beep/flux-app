@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { dbPeek, dbGet, dbPost, dbPatch, dbDel, getProfileId } from"../../lib/supabase";
 import { useBrand } from"../BrandContext";
@@ -259,16 +259,36 @@ const ESTADO_COLOR = {
   cancelada:  { bg:"bg-slate-50",   border:"border-slate-200",   text:"text-slate-700", bar:"bg-slate-400", label:"Cancelada", Icon: Ban },
 };
 
+const getJwtEmail = () => {
+  try {
+    const tok = localStorage.getItem("flux_token");
+    if (!tok) return "";
+    const payload = JSON.parse(atob(tok.split(".")[1]));
+    return (payload.email || "").trim();
+  } catch {
+    return "";
+  }
+};
+
 // ── Componente principal ─────────────────────────────────────────────────────
-export function AgendaAdmin({ setMsg, profileId }) {
+export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
   const myId = profileId || getProfileId();
   const _peekCitas = myId ? dbPeek(`citas?nutriologo_id=eq.${myId}&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at`) : null;
   const _peekDisp = myId ? dbPeek(`disponibilidad?nutriologo_id=eq.${myId}&order=dia_semana.asc,hora_inicio.asc`) : null;
-  const _peekClis = myId ? (dbPeek(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono&order=nombre.asc`) || dbPeek(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc`)) : null;
+  const _peekClis = myId ? (dbPeek(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono,objetivo&order=nombre.asc`) || dbPeek(`clientes?nutriologo_id=eq.${myId}&order=created_at.asc`)) : null;
 
   const [citas, setCitas]                   = useState(() => Array.isArray(_peekCitas) ? _peekCitas : []);
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
-  const [clientes, setClientes]             = useState(() => Array.isArray(_peekClis) ? _peekClis : []);
+  const [clientes, setClientes]             = useState(() => {
+    if (Array.isArray(clientesProp) && clientesProp.length > 0) return clientesProp;
+    return Array.isArray(_peekClis) ? _peekClis : [];
+  });
+
+  useEffect(() => {
+    if (Array.isArray(clientesProp) && clientesProp.length > 0) {
+      setClientes(clientesProp);
+    }
+  }, [clientesProp]);
   const [loading, setLoading]               = useState(() => _peekCitas === null);
   const hasLoadedRef                        = useRef(_peekCitas !== null);
   const autoCompletedIdsRef                 = useRef(new Set());
@@ -313,7 +333,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
   const loadProfile = useCallback(async () => {
     try {
       const rows = await dbGet(
-        `profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url,duracion_cita`
+        `profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,duracion_cita`
       );
       if (rows && rows.length > 0) {
         setMyProfile(rows[0]);
@@ -324,7 +344,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
     } catch {
       try {
         const rows = await dbGet(
-          `profiles?id=eq.${myId}&select=id,nombre,nombre_marca,telefono,ubicacion_texto,mapa_url`
+          `profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`
         );
         if (rows && rows.length > 0) setMyProfile(rows[0]);
       } catch {}
@@ -367,8 +387,10 @@ export function AgendaAdmin({ setMsg, profileId }) {
 
   const loadClientes = useCallback(async () => {
     try {
-      const rows = await dbGet(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono&order=nombre.asc`);
-      setClientes(rows);
+      const rows = await dbGet(`clientes?nutriologo_id=eq.${myId}&select=id,auth_id,nombre,email,telefono,objetivo&order=nombre.asc`);
+      if (Array.isArray(rows)) {
+        setClientes(rows);
+      }
     } catch { }
   }, [myId]);
 
@@ -677,8 +699,22 @@ export function AgendaAdmin({ setMsg, profileId }) {
   };
 
   // ── Helpers de render ──
-  const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre ||"Cliente";
+  const clienteNombre = (id) => clientes.find(c => c.id === id)?.nombre || "Cliente";
   const clienteTelefono = (id) => clientes.find(c => c.id === id)?.telefono;
+
+  const pacientesList = useMemo(() => {
+    const list = Array.isArray(clientes) ? clientes : [];
+    const myEmailNorm = (myProfile?.email || getJwtEmail()).trim().toLowerCase();
+    return list.filter(c => {
+      if (!c) return false;
+      // Excluir al propio especialista / nutriólogo (atleta sombra o cuenta personal)
+      if (c.auth_id && c.auth_id === myId) return false;
+      if (c.id === myId) return false;
+      if (c.objetivo === "Mi entrenamiento personal") return false;
+      if (myEmailNorm && (c.email || "").trim().toLowerCase() === myEmailNorm) return false;
+      return true;
+    });
+  }, [clientes, myId, myProfile?.email]);
 
   const buildCitaWhatsAppMessage = useCallback((cita, tipo = "confirmacion") => {
     const cName = clienteNombre(cita.cliente_id);
@@ -1055,7 +1091,7 @@ export function AgendaAdmin({ setMsg, profileId }) {
             <CustomSelect
               value={nuevaCitaForm.cliente_id}
               onChange={val => setNuevaCitaForm(p => ({ ...p, cliente_id: val }))}
-              options={clientes.map(c => ({
+              options={pacientesList.map(c => ({
                 value: c.id,
                 label: `${c.nombre} (${c.email || c.telefono || "Sin contacto"})`
               }))}

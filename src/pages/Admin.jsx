@@ -1589,7 +1589,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {!isCivil && role !== "staff" && (tab === "agenda" || visitedTabs.has("agenda")) && (
         <div className={tab === "agenda" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
-            <AgendaAdmin setMsg={setMsg} profileId={myId}/>
+            <AgendaAdmin setMsg={setMsg} profileId={myId} clientes={clientes}/>
           </SubComponentWrapper>
         </div>
       )}
