@@ -24,12 +24,15 @@ export default function BrandColorPicker({
   disabled = false,
   logoSource = null,
   customPalette = null,
+  fullWidth = false,
+  className = "",
 }) {
   const brandCtx = useBrand();
   // El color oficial de FLUX dictaminado por el Superadmin
   const officialFluxColor = (brandCtx?.fluxBrandColor || getFluxOfficialColor()).toUpperCase();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [hexInput, setHexInput] = useState(value || officialFluxColor);
   const [extractedPalette, setExtractedPalette] = useState([]);
   const [extracting, setExtracting] = useState(false);
@@ -40,6 +43,16 @@ export default function BrandColorPicker({
   useEffect(() => {
     setHexInput(value || officialFluxColor);
   }, [value, officialFluxColor]);
+
+  // Detectar espacio disponible para abrir hacia arriba o hacia abajo
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenUpward(spaceBelow < 280 && spaceAbove > spaceBelow);
+    }
+  }, [isOpen]);
 
   // Extraer paleta en tiempo real cuando se proporcione un logo (File, Blob, DataURL o URL)
   useEffect(() => {
@@ -122,27 +135,33 @@ export default function BrandColorPicker({
   ];
 
   return (
-    <div className="relative inline-block text-left" ref={containerRef}>
+    <div className={`relative ${fullWidth ? "w-full" : "inline-block"} text-left ${className}`} ref={containerRef}>
       {/* Botón Trigger elegante e in-app */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-2 bg-[#F0F4FA] hover:bg-[#E2E8F0]/70 rounded-xl p-1.5 border border-[#E2E8F0] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50"
+        className={`${
+          fullWidth
+            ? "w-full min-w-0 flex items-center justify-between min-h-[42px] px-4 py-2 bg-[#F7F9FC] hover:bg-[#EEF2F6]"
+            : "inline-flex items-center gap-2 p-1.5 bg-[#F0F4FA] hover:bg-[#E2E8F0]/70"
+        } rounded-xl border border-[#E2E8F0] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:opacity-50 text-left`}
       >
-        <span
-          className="w-7 h-7 rounded-lg shadow-xs border border-black/10 shrink-0 transition-transform active:scale-95"
-          style={{ backgroundColor: currentColor }}
-        />
-        <span className="text-xs font-mono font-bold text-[#0B1929] px-1 select-none">
-          {currentColor}
-        </span>
-        <ChevronDown size={14} className={`text-[#6B7A8D] mr-1 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className={`${fullWidth ? "w-6 h-6" : "w-7 h-7"} rounded-lg shadow-xs border border-black/10 shrink-0 transition-transform active:scale-95`}
+            style={{ backgroundColor: currentColor }}
+          />
+          <span className={`${fullWidth ? "text-sm" : "text-xs"} font-mono font-bold text-[#0B1929] px-0.5 select-none`}>
+            {currentColor}
+          </span>
+        </div>
+        <ChevronDown size={fullWidth ? 16 : 14} className={`text-[#6B7A8D] shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {/* Popover desplegable flotante */}
       {isOpen && (
-        <div className="absolute right-0 bottom-full mb-2 sm:bottom-auto sm:top-full sm:mt-2 z-[150] w-64 bg-white rounded-2xl shadow-2xl border border-[#E2E8F0] p-3.5 animate-in fade-in zoom-in-95 duration-150">
+        <div className={`absolute ${fullWidth ? "left-0" : "right-0"} ${openUpward ? "bottom-full mb-2" : "top-full mt-2"} z-[150] w-64 bg-white rounded-2xl shadow-2xl border border-[#E2E8F0] p-3.5 animate-in fade-in zoom-in-95 duration-150`}>
           {/* Cabecera del selector */}
           {hasLogoPalette ? (
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#6B7A8D] mb-2 px-0.5">

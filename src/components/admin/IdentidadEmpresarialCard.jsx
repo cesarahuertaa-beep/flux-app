@@ -95,14 +95,12 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
         </div>
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Color de Marca</label>
-          <div className="flex items-center">
-            <BrandColorPicker
-              value={form.color_primario || "#1A6FD4"}
-              onChange={handleColorChange}
-              logoSource={currentLogo}
-            />
-          </div>
-          <p className="text-xs text-[#6B7A8D] mt-1">Este logo y color aparecerán en los PDFs de tus pacientes.</p>
+          <BrandColorPicker
+            value={form.color_primario || "#1A6FD4"}
+            onChange={handleColorChange}
+            logoSource={currentLogo}
+            fullWidth
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Especialidad</label>
