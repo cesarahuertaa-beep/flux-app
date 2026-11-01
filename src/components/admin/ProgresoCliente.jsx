@@ -604,7 +604,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       if (prev.diametro_rodilla) base.diametro_rodilla = String(prev.diametro_rodilla);
       if (prev.metodo_evaluacion) base.metodo_evaluacion = prev.metodo_evaluacion;
     } else if (isCivil) {
-      base.metodo_evaluacion = "basico";
+      base.metodo_evaluacion = (prev?.metodo_evaluacion === "inbody") ? "inbody" : "basico";
     } else {
       base.metodo_evaluacion = "plicometria_jp3";
     }
@@ -2558,9 +2558,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {/* ── EDITOR DE EVALUACIÓN CORPORAL A PANTALLA COMPLETA (Master-Detail) ── */}
       {showModal && (() => {
         const isPlicometria = ["plicometria_jp3", "plicometria_dw4", "manual", "plicometria_isak"].includes(form.metodo_evaluacion);
-        const activeGroups = isCivil
-          ? getGroupsForMethod("basico", evalSexo)
-          : getGroupsForMethod(form.metodo_evaluacion, evalSexo);
+        const effectiveMethod = isCivil
+          ? (form.metodo_evaluacion === "inbody" ? "inbody" : "basico")
+          : form.metodo_evaluacion;
+        const activeGroups = getGroupsForMethod(effectiveMethod, evalSexo);
         const hasLiveCalc = Boolean(
           liveCalculations.imc ||
           liveCalculations.grasa_pct ||
@@ -3189,16 +3190,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   <div className="flex flex-col gap-3.5 pt-1 border-t border-[#F0F4FA]">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      {!isCivil && (
-                        <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-auto">
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && updForm("metodo_evaluacion", "basico")}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                          >
-                            Básico
-                          </button>
+                      <div className="flex bg-[#F0F4FA] rounded-xl p-1 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => !isReadOnly && updForm("metodo_evaluacion", "basico")}
+                          className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "basico" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                        >
+                          Básico
+                        </button>
+                        {!isCivil && (
                           <button
                             type="button"
                             disabled={isReadOnly}
@@ -3209,16 +3210,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           >
                             Plicometría
                           </button>
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && updForm("metodo_evaluacion", "inbody")}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
-                          >
-                            Bioimpedancia
-                          </button>
-                        </div>
-                      )}
+                        )}
+                        <button
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => !isReadOnly && updForm("metodo_evaluacion", "inbody")}
+                          className={`flex-1 sm:flex-none px-3.5 py-2 rounded-[10px] text-xs sm:text-[13px] transition-colors font-bold ${isReadOnly ? "cursor-default" : "cursor-pointer"} ${form.metodo_evaluacion === "inbody" ? "bg-white shadow-sm text-[#0B1929]" : "text-[#6B7A8D] hover:text-[#0B1929]"}`}
+                        >
+                          Bioimpedancia
+                        </button>
+                      </div>
 
                       {/* Edad y Fecha */}
                       <div className="flex flex-wrap items-center gap-2">
