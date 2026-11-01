@@ -914,16 +914,16 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className="mt-auto flex items-center justify-between gap-2.5 px-4 py-3.5 sm:py-4 md:px-0 md:py-0 md:pt-2 bg-white md:bg-transparent border-t md:border-t-0 border-[#E2E8F0]/70 pb-24 md:pb-0">
-        <div>
+      <div className="mt-4 flex items-center gap-3 px-4 pb-4 sm:py-4 md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent">
+        <div className="w-2/5 sm:w-auto">
           {step === 2 ? (
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="w-full sm:w-auto h-12 px-4 rounded-2xl bg-[#F0F4FA] hover:bg-[#E2E8F0] active:scale-[0.98] text-[#0B1929] text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 border border-[#E2E8F0] shadow-2xs cursor-pointer"
               title="Regresar a datos personales"
             >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <ArrowLeft className="w-4 h-4 shrink-0 text-[#0B1929]" />
               <span className="hidden sm:inline">Anterior: Datos Personales</span>
               <span className="sm:hidden">Anterior</span>
             </button>
@@ -931,33 +931,33 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={onBackToList}
-              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="w-full sm:w-auto h-12 px-4 rounded-2xl bg-[#F0F4FA] hover:bg-[#E2E8F0] active:scale-[0.98] text-[#0B1929] text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 border border-[#E2E8F0] shadow-2xs cursor-pointer"
               title="Cerrar cuestionario"
             >
-              <X className="w-4 h-4 shrink-0" />
+              <X className="w-4 h-4 shrink-0 text-[#0B1929]" />
               <span>Cerrar</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="w-full sm:w-auto h-12 px-4 rounded-2xl bg-[#F0F4FA] hover:bg-[#E2E8F0] active:scale-[0.98] text-[#0B1929] text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 border border-[#E2E8F0] shadow-2xs cursor-pointer"
               title="Volver a Opciones"
             >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <ArrowLeft className="w-4 h-4 shrink-0 text-[#0B1929]" />
               <span className="hidden sm:inline">Volver a Opciones</span>
               <span className="sm:hidden">Volver</span>
             </button>
           )}
         </div>
 
-        <div>
+        <div className="flex-1 sm:flex-initial">
           {/* Siguiente o Finalizar */}
           {step === 1 ? (
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="h-10 px-5 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto sm:min-w-[180px] h-12 px-6 rounded-2xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/15 cursor-pointer whitespace-nowrap"
             >
               <span>Siguiente</span>
               <span className="hidden sm:inline">: Antecedentes Clínicos</span>
@@ -968,7 +968,7 @@ export function NuevoExpedienteForms({
               type="button"
               onClick={handleFinalizar}
               disabled={saving}
-              className="h-10 px-5 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto sm:min-w-[180px] h-12 px-6 rounded-2xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/15 disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               {isPatientMode ? <Send className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
               <span>

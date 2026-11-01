@@ -219,7 +219,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
             {children}
           </div>
           {/* Espaciador inferior para garantizar que la barra de navegación móvil (fixed z-50) nunca tape el contenido final */}
-          <div className="md:hidden h-28 shrink-0 pointer-events-none" aria-hidden="true" />
+          <div className="md:hidden h-16 shrink-0 pointer-events-none" aria-hidden="true" />
         </div>
       </main>
 
