@@ -237,56 +237,20 @@ export default function ExpedienteClinicoModal({
       <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-xl border-0 md:border md:border-[#E2E8F0] overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3.5 md:px-5 md:py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
               <ClipboardList className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
                 {mode === "paciente" ? "Ficha Clínica Permanente" : `Expediente · ${perfil.nombre || cliente.nombre}`}
               </h2>
               {anamnesis.updated_at && (
-                <p className="text-[11px] text-[#6B7A8D]">
+                <p className="text-[11px] text-[#6B7A8D] truncate">
                   Última actualización: {fmtDate(anamnesis.updated_at)}
                 </p>
               )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {mode === "nutriologo" && (
-              <button
-                type="button"
-                onClick={togglePatientRequest}
-                disabled={saving}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border ${
-                  isCurrentlyRequested
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
-                }`}
-                title="Solicitar al paciente que responda o actualice desde su app"
-              >
-                {isCurrentlyRequested ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Solicitado</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                    <span className="hidden sm:inline">Solicitar al paciente</span>
-                    <span className="sm:hidden">Solicitar</span>
-                  </>
-                )}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
 
@@ -547,35 +511,71 @@ export default function ExpedienteClinicoModal({
         {/* Footer del Modal */}
         <div className="px-4 py-3 md:px-5 md:py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
           {mode === "nutriologo" ? (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => setShowConfirmReset(true)}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Borra la historia inicial para volver a realizar el cuestionario clínico"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reiniciar Ficha</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setShowConfirmReset(true)}
+                className="h-9 px-2.5 sm:px-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer disabled:opacity-50 transition-colors"
+                title="Borra la historia inicial para volver a realizar el cuestionario clínico"
+              >
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Reiniciar Ficha</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={togglePatientRequest}
+                disabled={saving}
+                className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border ${
+                  isCurrentlyRequested
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
+                }`}
+                title="Solicitar al paciente que responda o actualice desde su app"
+              >
+                {isCurrentlyRequested ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="hidden sm:inline">Solicitado</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                    <span className="hidden sm:inline">Solicitar al paciente</span>
+                  </>
+                )}
+              </button>
+            </div>
           ) : (
             <div />
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-xs font-bold text-[#6B7A8D] hover:bg-gray-50 cursor-pointer"
+              className="h-9 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] text-xs font-bold text-[#6B7A8D] hover:bg-gray-50 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              title="Cerrar expediente"
             >
-              Cerrar
+              <X className="w-4 h-4 sm:hidden shrink-0" />
+              <span className="hidden sm:inline">Cerrar</span>
             </button>
             <button
               type="button"
               disabled={saving}
               onClick={handleSaveExpediente}
-              className="px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50 shadow-sm"
+              className="h-9 px-3.5 sm:px-4 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50 shadow-sm flex items-center justify-center gap-1.5"
             >
-              {saving ? "Guardando..." : "Guardar Cambios"}
+              {saving ? (
+                <span>Guardando...</span>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 sm:hidden shrink-0" />
+                  <span className="sm:hidden">Guardar</span>
+                  <span className="hidden sm:inline">Guardar Cambios</span>
+                </>
+              )}
             </button>
           </div>
         </div>
