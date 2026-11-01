@@ -33,12 +33,50 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'JetBrains Mono', monospace !important;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+/* Ocultar barra de scroll en móviles, tablets y apps nativas (Capacitor/PWA) */
+@media (max-width: 1024px), (pointer: coarse) {
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  ::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+  }
+}
 
-.scroll-hide::-webkit-scrollbar { display: none; }
+.mobile-app-view * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.mobile-app-view ::-webkit-scrollbar,
+.mobile-app-view *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Barra de scroll sutil exclusivamente para navegadores de escritorio con mouse */
+@media (min-width: 1025px) and (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+}
+
+.scroll-hide, .no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.scroll-hide::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 
 /* Desactivar pull-to-refresh en móvil — comportamiento de app nativa */
 html, body {

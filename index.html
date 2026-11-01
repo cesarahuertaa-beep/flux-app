@@ -13,6 +13,18 @@
       #boot i { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgba(26,111,212,.2); border-top-color: #1A6FD4; animation: boot-spin .8s linear infinite; }
       @keyframes boot-spin { to { transform: rotate(360deg); } }
     </style>
+    <script>
+      (function() {
+        if (
+          window.matchMedia('(pointer: coarse)').matches ||
+          window.innerWidth <= 1024 ||
+          window.location.protocol === 'file:' ||
+          window.location.protocol === 'app:'
+        ) {
+          document.documentElement.classList.add('mobile-app-view');
+        }
+      })();
+    </script>
   </head>
   <body>
     <!-- Pantalla de arranque instantánea: evita el pantallazo blanco mientras carga el JS -->

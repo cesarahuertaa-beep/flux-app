@@ -140,6 +140,9 @@ public class MainActivity extends BridgeActivity {
                 WebSettings ws = this.bridge.getWebView().getSettings();
                 ws.setTextZoom(100);
             } catch (Exception ignored) {}
+            this.bridge.getWebView().setVerticalScrollBarEnabled(false);
+            this.bridge.getWebView().setHorizontalScrollBarEnabled(false);
+            this.bridge.getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
             this.bridge.getWebView().addJavascriptInterface(new SystemBarBridge(), "FluxAndroidBars");
             this.bridge.getWebView().addJavascriptInterface(new PlayUpdateBridge(), "FluxPlayUpdate");
             this.bridge.getWebView().addJavascriptInterface(new FluxNativeSyncBridge(), "FluxNativeSync");
@@ -212,6 +215,8 @@ public class MainActivity extends BridgeActivity {
         if (this.bridge != null && this.bridge.getWebView() != null) {
             try {
                 this.bridge.getWebView().getSettings().setTextZoom(100);
+                this.bridge.getWebView().setVerticalScrollBarEnabled(false);
+                this.bridge.getWebView().setHorizontalScrollBarEnabled(false);
             } catch (Exception ignored) {}
         }
         hideFloatingTimerOverlay();
