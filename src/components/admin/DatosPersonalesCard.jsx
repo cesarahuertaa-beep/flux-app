@@ -65,9 +65,9 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
   }
 
   return (
-    <div className="bg-white px-4 py-5 sm:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] mb-0 md:mb-8">
+    <div className="bg-white px-4 pt-4 pb-2 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] mb-0 md:mb-8">
       {/* Foto de perfil arriba */}
-      <div className="flex flex-col items-center gap-2 mb-6">
+      <div className="flex flex-col items-center gap-1.5 mb-4">
         <PhotoUploadBox
           value={form.avatar_url}
           onChange={handleFileChange}
@@ -81,8 +81,8 @@ export default function DatosPersonalesCard({ form, setForm, loading, onSave, is
       </div>
 
       {/* Título Datos Personales abajo de la foto */}
-      <h2 className="text-lg md:text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-4">
-        <User size={20} className="text-[var(--brand-primary)]" />
+      <h2 className="text-lg md:text-xl font-bold text-[#0B1929] flex items-center gap-2 mb-3">
+        <User size={18} className="text-[var(--brand-primary)]" />
         Datos Personales
       </h2>
 
