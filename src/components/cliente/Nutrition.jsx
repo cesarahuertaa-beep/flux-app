@@ -214,13 +214,15 @@ export default function Nutrition({
 
   if (!dias || dias.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-          <Apple className="w-8 h-8 text-[#94A3B8]" />
+      <div className="h-full flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
+          <Apple size={32} className="text-[#6B7A8D]" />
         </div>
-        <h3 className="text-[#0B1929] font-bold text-lg mb-2">{isSelfManaged ?"Sin plan creado" :"Sin plan asignado"}</h3>
-        <p className="text-[#6B7A8D] text-sm max-w-[250px]">
-          {isSelfManaged ?"Aún no has creado tu plan de alimentación para este ciclo." :"Tu nutriólogo aún no ha asignado tu dieta para este ciclo."}
+        <h2 className="text-xl font-bold text-[#0B1929] mb-2" style={{ fontFamily: "DM Sans" }}>
+          Dieta en preparación
+        </h2>
+        <p className="text-sm text-[#6B7A8D] max-w-sm">
+          {isSelfManaged ? "Aún no has diseñado tu plan alimenticio." : "Tu nutriólogo está diseñando tu plan alimenticio."}
         </p>
       </div>
     );
