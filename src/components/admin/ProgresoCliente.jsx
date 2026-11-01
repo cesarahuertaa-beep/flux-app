@@ -1543,7 +1543,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   if (loading) return <ListSkeleton rows={4} />;
 
   return (
-    <div className="pb-2">
+    <div className="pb-20 sm:pb-6">
       {/* Sub-nav (solo si no se definió un modo fijo) */}
       {!mode && (
         <div className="flex gap-1 mb-5 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max overflow-x-auto scroll-hide">
