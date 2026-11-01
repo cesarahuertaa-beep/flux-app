@@ -593,9 +593,9 @@ export default function Nutrition({
                                   );
                                 })}
                               </div>
-                              <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] text-sm text-[#334155] leading-relaxed">
+                              <p className="text-sm text-[#6B7A8D] leading-relaxed whitespace-pre-line mt-1">
                                 {options[activeOptIdx] || options[0]}
-                              </div>
+                              </p>
                             </div>
                           );
                         })()}
