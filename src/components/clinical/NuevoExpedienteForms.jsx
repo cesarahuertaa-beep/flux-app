@@ -617,16 +617,10 @@ export function NuevoExpedienteForms({
       
       {/* ── Top Bar con Barra de Progreso ── */}
       <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-3.5 sm:p-5 shadow-none md:shadow-2xs">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)] bg-blue-50 px-2.5 py-1 rounded-lg">
-              Paso {step} de 2
-            </span>
-            <span className="text-sm font-bold text-[#0B1929] truncate">
-              {step === 1 && (isPatientMode ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
-              {step === 2 && (isPatientMode ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
-            </span>
-          </div>
+        <div className="flex items-center justify-between gap-3 mb-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)] bg-blue-50 px-2.5 py-1 rounded-lg">
+            Paso {step} de 2
+          </span>
 
           {/* Botón: Terminar más tarde */}
           <button
@@ -637,9 +631,14 @@ export function NuevoExpedienteForms({
             title="Guarda el borrador exacto y continúa después"
           >
             <Save className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Guardar borrador</span>
+            <span>Guardar borrador</span>
           </button>
         </div>
+
+        <h2 className="text-sm sm:text-base font-bold text-[#0B1929] mb-3">
+          {step === 1 && (isPatientMode ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
+          {step === 2 && (isPatientMode ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
+        </h2>
 
         {/* Barra de progreso visual */}
         <div className="w-full bg-[#F0F4FA] h-2 rounded-full overflow-hidden">
@@ -921,7 +920,7 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
               title="Regresar a datos personales"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" />
@@ -932,7 +931,7 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={onBackToList}
-              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
               title="Cerrar cuestionario"
             >
               <X className="w-4 h-4 shrink-0" />
@@ -942,7 +941,7 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              className="h-10 px-3.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
               title="Volver a Opciones"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" />
@@ -952,25 +951,13 @@ export function NuevoExpedienteForms({
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
-          {/* Terminar más tarde en el pie (colapsado en móvil como icono elegante) */}
-          <button
-            type="button"
-            onClick={handleTerminarMasTarde}
-            disabled={saving}
-            className="h-10 px-2.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
-            title="Guardar borrador"
-          >
-            <Save className="w-4 h-4 shrink-0 text-[#6B7A8D]" />
-            <span className="hidden sm:inline">Guardar borrador</span>
-          </button>
-
+        <div>
           {/* Siguiente o Finalizar */}
           {step === 1 ? (
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="h-10 flex-1 sm:flex-initial px-4 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
+              className="h-10 px-5 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
             >
               <span>Siguiente</span>
               <span className="hidden sm:inline">: Antecedentes Clínicos</span>
@@ -981,7 +968,7 @@ export function NuevoExpedienteForms({
               type="button"
               onClick={handleFinalizar}
               disabled={saving}
-              className="h-10 flex-1 sm:flex-initial px-4 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer whitespace-nowrap"
+              className="h-10 px-5 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               {isPatientMode ? <Send className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
               <span>
