@@ -3086,20 +3086,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   if (!isMiPlan && !isExpedienteCompletado) {
     return (
-      <NuevoExpedienteForms
-        cliente={selected}
-        onFinished={(savedRec, updatedClient) => {
-          setClinicalRec(savedRec);
-          if (updatedClient) {
-            setSelected((prev) => ({ ...prev, ...updatedClient }));
-          }
-        }}
-        onBackToList={() => {
-          if (onBackToList) onBackToList();
-          else setSelected(null);
-        }}
-        setMsg={setMsg}
-      />
+      <div className="w-full flex-1 flex flex-col min-h-full bg-white md:bg-transparent">
+        <NuevoExpedienteForms
+          cliente={selected}
+          onFinished={(savedRec, updatedClient) => {
+            setClinicalRec(savedRec);
+            if (updatedClient) {
+              setSelected((prev) => ({ ...prev, ...updatedClient }));
+            }
+          }}
+          onBackToList={() => {
+            if (onBackToList) onBackToList();
+            else setSelected(null);
+          }}
+          setMsg={setMsg}
+        />
+      </div>
     );
   }
 

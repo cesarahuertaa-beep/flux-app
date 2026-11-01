@@ -356,8 +356,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === 0) {
     return (
-      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden p-4 sm:p-6 md:p-10">
+      <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden p-4 sm:p-6 md:p-10 flex-1 flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
@@ -452,8 +452,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "solicitud_enviada") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center">
+      <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-200 shadow-2xs">
             <Send className="w-8 h-8" />
           </div>
@@ -514,8 +514,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "pending_patient") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center">
+      <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-2xs">
             <Clock className="w-8 h-8" />
           </div>
@@ -581,8 +581,8 @@ export function NuevoExpedienteForms({
   // ══════════════════════════════════════════════════════════════
   if (step === "patient_success") {
     return (
-      <div className="max-w-2xl mx-auto w-full py-4 md:py-12 px-0 md:px-4 animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-6 md:p-12 text-center">
+      <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-4 md:py-12 px-0 md:px-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-6 md:p-12 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-5 border border-emerald-200 shadow-2xs">
             <CheckCircle2 className="w-9 h-9" />
           </div>
@@ -613,7 +613,7 @@ export function NuevoExpedienteForms({
   const progressPct = step === 1 ? 50 : 100;
 
   return (
-    <div className="max-w-3xl mx-auto w-full py-0 md:py-10 px-0 md:px-4 flex flex-col gap-0 md:gap-6 animate-in fade-in duration-200">
+    <div className="max-w-3xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-10 px-0 md:px-4 gap-0 md:gap-6 animate-in fade-in duration-200">
       
       {/* ── Top Bar con Barra de Progreso ── */}
       <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-3.5 sm:p-5 shadow-none md:shadow-2xs">
@@ -669,7 +669,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Contenido de la Página Actual ── */}
-      <div className="bg-white rounded-none md:rounded-3xl border-b md:border border-[#E2E8F0] p-4 sm:p-6 md:p-8 shadow-none md:shadow-sm">
+      <div className="flex-1 bg-white rounded-none md:rounded-3xl border-b-0 md:border border-[#E2E8F0] p-4 sm:p-6 md:p-8 shadow-none md:shadow-sm flex flex-col justify-between">
         
         {/* ═══════════════════════════════════════════════════════
             PÁGINA 1: FICHA DE IDENTIFICACIÓN Y DATOS PERSONALES
@@ -915,47 +915,54 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-0 md:py-0 md:pt-2 bg-white md:bg-transparent">
+      <div className="mt-auto flex items-center justify-between gap-2.5 px-4 py-3.5 sm:py-4 md:px-0 md:py-0 md:pt-2 bg-white md:bg-transparent border-t md:border-t-0 border-[#E2E8F0]/70 pb-24 md:pb-0">
         <div>
           {step === 2 ? (
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              title="Regresar a datos personales"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Anterior: Datos Personales</span>
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Anterior: Datos Personales</span>
+              <span className="sm:hidden">Anterior</span>
             </button>
           ) : isPatientMode ? (
             <button
               type="button"
               onClick={onBackToList}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              title="Cerrar cuestionario"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 shrink-0" />
               <span>Cerrar</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-bold text-[#6B7A8D] hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="h-10 px-3 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              title="Volver a Opciones"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver a Opciones</span>
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Volver a Opciones</span>
+              <span className="sm:hidden">Volver</span>
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Terminar más tarde en el pie */}
+        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+          {/* Terminar más tarde en el pie (colapsado en móvil como icono elegante) */}
           <button
             type="button"
             onClick={handleTerminarMasTarde}
             disabled={saving}
-            className="px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
+            className="h-10 px-2.5 sm:px-4 rounded-xl border border-[#E2E8F0] bg-white hover:bg-gray-50 text-xs sm:text-sm font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
+            title="Guardar borrador"
           >
-            Guardar borrador
+            <Save className="w-4 h-4 shrink-0 text-[#6B7A8D]" />
+            <span className="hidden sm:inline">Guardar borrador</span>
           </button>
 
           {/* Siguiente o Finalizar */}
@@ -963,25 +970,29 @@ export function NuevoExpedienteForms({
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="px-5 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm cursor-pointer"
+              className="h-10 flex-1 sm:flex-initial px-4 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
             >
-              <span>Siguiente: Antecedentes Clínicos</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>Siguiente</span>
+              <span className="hidden sm:inline">: Antecedentes Clínicos</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </button>
           ) : (
             <button
               type="button"
               onClick={handleFinalizar}
               disabled={saving}
-              className="px-6 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md disabled:opacity-50 cursor-pointer"
+              className="h-10 flex-1 sm:flex-initial px-4 sm:px-6 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
-              {isPatientMode ? <Send className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              {isPatientMode ? <Send className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
               <span>
                 {saving
                   ? "Finalizando..."
                   : isPatientMode
-                  ? "Enviar a mi Especialista"
-                  : "Finalizar Expediente"}
+                  ? "Enviar"
+                  : "Finalizar"}
+              </span>
+              <span className="hidden sm:inline">
+                {!saving && (isPatientMode ? " a mi Especialista" : " Expediente")}
               </span>
             </button>
           )}

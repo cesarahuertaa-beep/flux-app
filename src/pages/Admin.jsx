@@ -48,7 +48,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 };
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
-  <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
+  <div className={`flex-1 flex flex-col w-full text-[#0B1929] min-h-full ${title ? "bg-[#F7F9FC]" : "bg-white md:bg-[#F7F9FC]"}`}>
     {title && (
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex items-center justify-between gap-2 md:gap-4 shrink-0">
         <div>
@@ -61,7 +61,7 @@ const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Ad
         {action}
       </div>
     )}
-    <div className="flex-1 w-full relative p-0 md:p-8">
+    <div className="flex-1 w-full relative p-0 md:p-8 flex flex-col">
       <Suspense fallback={<ListSkeleton rows={4} />}>
         {children}
       </Suspense>
@@ -1559,7 +1559,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (
-        <div className={tab === "programar" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "programar" ? `min-h-full flex-1 flex flex-col ${selected ? "bg-white md:bg-[#F7F9FC]" : "bg-[#F7F9FC]"}` : "hidden"}>
           <SubComponentWrapper
             title={selected ? null : "Asignador de Dietas y Rutinas"}
             subtitle={selected ? null : "Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente"}

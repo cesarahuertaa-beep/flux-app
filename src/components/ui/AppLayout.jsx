@@ -215,7 +215,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
 
         {/* Área de contenido que hace scroll */}
         <div className="flex-1 overflow-y-auto flex flex-col bg-[#F7F9FC]">
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-h-full">
             {children}
           </div>
           {/* Espaciador inferior para garantizar que la barra de navegación móvil (fixed z-50) nunca tape el contenido final */}
