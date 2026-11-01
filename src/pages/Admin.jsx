@@ -1164,11 +1164,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
             </div>
 
-            {/* Píldoras de filtro por Retención y Estado */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#F0F4FA]">
+            {/* Píldoras de filtro por Retención y Estado (scroll horizontal estilo agenda) */}
+            <div className="flex items-center gap-2 pt-1.5 border-t border-[#F0F4FA] overflow-x-auto scroll-hide pb-0.5 -mr-8 md:mr-0">
               <button
                 onClick={() => setFiltroRetencion("todos")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                   filtroRetencion === "todos"
                     ? "bg-[#0B1929] text-white shadow-sm"
                     : "bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-200"
@@ -1178,7 +1178,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
               <button
                 onClick={() => setFiltroRetencion("inactivos")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                   filtroRetencion === "inactivos"
                     ? "bg-rose-600 text-white shadow-sm"
                     : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
@@ -1189,7 +1189,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
               <button
                 onClick={() => setFiltroRetencion("venciendo")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                   filtroRetencion === "venciendo"
                     ? "bg-amber-600 text-white shadow-sm"
                     : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
@@ -1200,7 +1200,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
               <button
                 onClick={() => setFiltroRetencion("al_dia")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
                   filtroRetencion === "al_dia"
                     ? "bg-emerald-600 text-white shadow-sm"
                     : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
