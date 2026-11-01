@@ -186,7 +186,7 @@ export function getGroupsForMethod(metodo, sexo = "M") {
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split("T")[0],
-  metodo_evaluacion: "manual",
+  metodo_evaluacion: "basico",
   peso: "", estatura: "", imc: "",
 
   // Pliegues (mm)
@@ -596,23 +596,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     if (targetCiclo?.id) {
       base.ciclo_id = targetCiclo.id;
     }
-    const prev = activeMetricas[0];
-    if (prev) {
-      if (prev.estatura) base.estatura = String(prev.estatura);
-      if (prev.diametro_muneca) base.diametro_muneca = String(prev.diametro_muneca);
-      if (prev.diametro_codo) base.diametro_codo = String(prev.diametro_codo);
-      if (prev.diametro_rodilla) base.diametro_rodilla = String(prev.diametro_rodilla);
-      if (prev.metodo_evaluacion) base.metodo_evaluacion = prev.metodo_evaluacion;
-    } else if (isCivil) {
-      base.metodo_evaluacion = (prev?.metodo_evaluacion === "inbody") ? "inbody" : "basico";
-    } else {
-      base.metodo_evaluacion = "plicometria_jp3";
-    }
+    base.metodo_evaluacion = isCivil ? "basico" : "basico";
 
-    // Precargar objetivo de la etapa y factor de actividad física del ciclo (o inferir desde rutinas / expediente)
-    const fallbackGoal = inferGoalFromText(
-      clinicalRec?.anamnesis?.objetivo_principal || selected?.objetivo || targetCiclo?.nombre || ""
-    );
+    // Objetivo y FAF por defecto según datos actuales del cliente o rutinas asignadas
+    const fallbackGoal = inferGoalFromText(selected?.objetivo || targetCiclo?.nombre || "");
     let trainingDays = 0;
     if (Array.isArray(rutinas) && rutinas.length > 0) {
       const uDays = new Set();
@@ -630,36 +617,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       else if (trainingDays <= 5) calculatedFaf = 1.55;
       else calculatedFaf = 1.725;
     }
-    const fallbackFaf = inferFafFromAnamnesis(clinicalRec?.anamnesis);
-    base.eval_objetivo = prev?.eval_objetivo || fallbackGoal;
-    base.eval_faf = prev?.eval_faf ? String(prev.eval_faf) : String(calculatedFaf || fallbackFaf || 1.375);
-    base.eval_faf_notas = prev?.eval_faf_notas || "";
-
-    // Precargar preferencias y R24H (de la evaluación previa o fallback de anamnesis)
-    base.preferencias_alimentos = prev?.preferencias_alimentos || clinicalRec?.anamnesis?.preferencias_alimentos || "";
-    base.aversiones_alimentos = prev?.aversiones_alimentos || clinicalRec?.anamnesis?.aversiones_alimentos || "";
-    base.r24h_desayuno = prev?.r24h_desayuno || clinicalRec?.anamnesis?.r24h_desayuno || "";
-    base.r24h_colacion_m = prev?.r24h_colacion_m || clinicalRec?.anamnesis?.r24h_colacion_m || "";
-    base.r24h_comida = prev?.r24h_comida || clinicalRec?.anamnesis?.r24h_comida || "";
-    base.r24h_colacion_v = prev?.r24h_colacion_v || clinicalRec?.anamnesis?.r24h_colacion_v || "";
-    base.r24h_cena = prev?.r24h_cena || clinicalRec?.anamnesis?.r24h_cena || "";
-    base.r24h_picoteos = prev?.r24h_picoteos || clinicalRec?.anamnesis?.r24h_picoteos || "";
-    base.horas_sueno = prev?.horas_sueno || clinicalRec?.anamnesis?.horas_sueno || "";
-    base.consumo_agua_estimado = prev?.consumo_agua_estimado || clinicalRec?.anamnesis?.consumo_agua_estimado || "";
-    base.nivel_estres = prev?.nivel_estres || clinicalRec?.anamnesis?.nivel_estres || "3";
-    base.dias_ejercicio_actual = prev?.dias_ejercicio_actual || (trainingDays > 0 ? String(trainingDays) : "");
-    base.horario_ejercicio = prev?.horario_ejercicio || "";
-
-    // Precargar respuesta reciente del paciente o del expediente si existe
-    const latestCheckin = Array.isArray(clinicalRec?.checkins) && clinicalRec.checkins.length > 0 ? clinicalRec.checkins[0] : null;
-    if (latestCheckin) {
-      if (latestCheckin.energia) base.checkin_energia = String(latestCheckin.energia);
-      if (latestCheckin.saciedad) base.checkin_saciedad = String(latestCheckin.saciedad);
-      if (latestCheckin.digestion) base.checkin_digestion = String(latestCheckin.digestion);
-      if (latestCheckin.descanso) base.checkin_descanso = String(latestCheckin.descanso);
-      if (latestCheckin.observaciones) base.checkin_observaciones = String(latestCheckin.observaciones);
-      if (latestCheckin.ajustes_solicitados) base.checkin_ajustes = String(latestCheckin.ajustes_solicitados);
-    }
+    base.eval_objetivo = fallbackGoal || "recomposicion";
+    base.eval_faf = String(calculatedFaf || 1.375);
+    base.eval_faf_notas = "";
 
     const clin = clinicalRec || peekClinicalRecord(selected?.id);
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
@@ -676,7 +636,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setPendingFotos([]);
     setPreviewUrls([]);
     setShowModal(true);
-  }, [activeMetricas, isCivil, clinicalRec?.checkins, clinicalRec?.anamnesis, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, selected?.objetivo, cicloActivo, cicloSel, rutinas]);
+  }, [isCivil, cicloActivo, cicloSel, selected?.objetivo, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, clinicalRec, rutinas]);
 
   useEffect(() => {
     const handleOpen = (ev) => {
@@ -778,11 +738,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   );
 
   const liveSmartMacros = useMemo(() => {
+    const rawPeso = form.peso ? parseFloat(form.peso) : 0;
+    if (!rawPeso || rawPeso <= 0) return null;
     const enrichedDraft = {
       ...form,
       ...liveCalculations,
-      peso: form.peso || activeMetricas[0]?.peso || selected?.peso || "",
-      estatura: form.estatura || activeMetricas[0]?.estatura || selected?.estatura || "",
+      peso: form.peso,
+      estatura: form.estatura || selected?.estatura || "",
       grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
       masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
       sexo: evalSexo,
@@ -794,7 +756,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       clinicalRec,
       cicloNombre: currentCiclo?.nombre || "",
     });
-  }, [form, liveCalculations, activeMetricas, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
+  }, [form, liveCalculations, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
 
   const activePrescription = useMemo(() => {
     if (!liveSmartMacros) return null;
@@ -910,8 +872,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         metrica: {
           ...form,
           ...liveCalculations,
-          peso: form.peso || activeMetricas[0]?.peso || selected?.peso || "",
-          estatura: form.estatura || activeMetricas[0]?.estatura || selected?.estatura || "",
+          peso: form.peso || selected?.peso || "",
+          estatura: form.estatura || selected?.estatura || "",
           grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
           masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
           masa_muscular_kg: liveCalculations.masa_muscular_kg || form.calc_masa_muscular || "",
@@ -980,7 +942,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   };
 
   const handleSetGoalPreset = (pct) => {
-    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    const p = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
     const getNum = Number(liveSmartMacros?.matematico?.get || liveSmartMacros?.get) || 0;
     if (getNum <= 0) return;
     const newKcal = Math.round(getNum * (1 + pct / 100));
@@ -996,7 +958,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   };
 
   const handleAdjustProtGKg = (newGKg) => {
-    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    const p = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
     if (p <= 0) return;
     const newProtG = Math.round(p * newGKg);
     const kcal = Number(manualMacros.targetKcal) || Number(liveSmartMacros.targetKcal) || 0;
@@ -1011,7 +973,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   };
 
   const handleAdjustFatGKg = (newGKg) => {
-    const p = parseFloat(form.peso) || parseFloat(activeMetricas[0]?.peso) || parseFloat(selected?.peso) || 0;
+    const p = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
     if (p <= 0) return;
     const newFatG = Math.round(p * newGKg);
     const kcal = Number(manualMacros.targetKcal) || Number(liveSmartMacros.targetKcal) || 0;
