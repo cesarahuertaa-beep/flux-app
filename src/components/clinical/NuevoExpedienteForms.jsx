@@ -180,6 +180,17 @@ export function NuevoExpedienteForms({
   const updPerfil = (k, v) => setPerfil((p) => ({ ...p, [k]: v }));
   const updAnam = (k, v) => setAnamnesis((p) => ({ ...p, [k]: v }));
 
+  // Scroll arriba al cambiar de paso
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const scrollParent = document.querySelector(".overflow-y-auto");
+      if (scrollParent) {
+        scrollParent.scrollTo({ top: 0, behavior: "instant" });
+      }
+      window.scrollTo(0, 0);
+    }
+  }, [step]);
+
   // ── Opción: Solicitar al paciente previo a la cita ──
   const handleSolicitarPaciente = async () => {
     setSaving(true);
@@ -613,7 +624,7 @@ export function NuevoExpedienteForms({
   const progressPct = step === 1 ? 50 : 100;
 
   return (
-    <div className="max-w-3xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-10 px-0 md:px-4 gap-0 md:gap-6 animate-in fade-in duration-200">
+    <div className="max-w-3xl mx-auto w-full flex flex-col bg-white md:bg-transparent py-0 md:py-10 px-0 md:px-4 gap-0 md:gap-6 animate-in fade-in duration-200">
       
       {/* ── Top Bar con Barra de Progreso ── */}
       <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-2.5 sm:p-5 shadow-none md:shadow-2xs">
@@ -668,7 +679,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Contenido de la Página Actual ── */}
-      <div className="flex-1 bg-white rounded-none md:rounded-3xl border-b-0 md:border border-[#E2E8F0] px-4 py-3 sm:p-6 md:p-8 shadow-none md:shadow-sm flex flex-col justify-between">
+      <div className="bg-white rounded-none md:rounded-3xl border-b-0 md:border border-[#E2E8F0] px-4 py-3 sm:p-6 md:p-8 shadow-none md:shadow-sm flex flex-col">
         
         {/* ═══════════════════════════════════════════════════════
             PÁGINA 1: FICHA DE IDENTIFICACIÓN Y DATOS PERSONALES
@@ -914,7 +925,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className="mt-3 sm:mt-4 flex items-center gap-3 px-4 pb-4 sm:pb-4 md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent">
+      <div className={`mt-4 sm:mt-6 flex items-center gap-3 px-4 ${step === 2 ? "pb-24 sm:pb-4" : "pb-8 sm:pb-4"} md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent`}>
         <div className="w-2/5 sm:w-auto">
           {step === 2 ? (
             <button
