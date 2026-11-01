@@ -4343,10 +4343,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   type="button"
                   onClick={saveDia} 
                   disabled={saving}
-                  className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                  className="w-9 h-9 sm:w-auto px-0 sm:px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  title={saving ? "Guardando…" : "Guardar día"}
                 >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? "Guardando…" : "Guardar día"}</span>
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  ) : (
+                    <Save className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="hidden sm:inline">{saving ? "Guardando…" : "Guardar día"}</span>
                 </button>
               </div>
             </div>
@@ -5873,10 +5878,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 type="button"
                 onClick={saveRutina} 
                 disabled={saving}
-                className="px-3.5 sm:px-5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                className="w-9 h-9 sm:w-auto px-0 sm:px-4 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                title={saving ? "Guardando…" : "Guardar rutina"}
               >
-                <Save className="w-4 h-4" />
-                <span>{saving ? "Guardando…" : "Guardar rutina"}</span>
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <Save className="w-4 h-4 shrink-0" />
+                )}
+                <span className="hidden sm:inline">{saving ? "Guardando…" : "Guardar rutina"}</span>
               </button>
             </div>
           </div>
