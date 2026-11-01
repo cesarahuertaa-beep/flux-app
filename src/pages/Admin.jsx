@@ -1313,13 +1313,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
                             {/* Badges de Estado y Retención */}
                             <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                c.activo 
-                                  ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
-                                  : 'bg-slate-100 text-slate-500'
-                              }`}>
-                                {c.activo ? "Activo" : "Inactivo"}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {c.activo && ret.isNuevo && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                    <Sparkles size={10} />
+                                    Nuevo
+                                  </span>
+                                )}
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                  c.activo 
+                                    ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {c.activo ? "Activo" : "Inactivo"}
+                                </span>
+                              </div>
 
                               {c.activo && ret.isVenciendo && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
@@ -1344,13 +1352,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                                 </span>
                               )}
 
-                              {c.activo && ret.isNuevo && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
-                                  <Sparkles size={10} />
-                                  Nuevo
-                                </span>
-                              )}
-
                               {isIntakePending && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                                   <Clock size={10} />
@@ -1362,18 +1363,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
                           {/* Recuadro de Tratamiento Clínico y Plan Actual */}
                           <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] space-y-2 mb-3">
-                            <div className="flex items-start gap-2 text-xs">
-                              <Target size={14} className="text-[var(--brand-primary)] shrink-0 mt-0.5" />
-                              <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-xs truncate">
+                              <Target size={14} className="text-[var(--brand-primary)] shrink-0" />
+                              <div className="min-w-0 flex-1 truncate">
                                 <span className="text-[#6B7A8D] font-medium">Objetivo: </span>
-                                <span className="text-[#0B1929] font-bold truncate block sm:inline">
+                                <span className="text-[#0B1929] font-bold" title={c.objetivo || "General / Salud"}>
                                   {c.objetivo || "General / Salud"}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-start gap-2 text-xs">
-                              <UtensilsCrossed size={14} className="text-indigo-600 shrink-0 mt-0.5" />
+                            <div className="flex items-center gap-2 text-xs">
+                              <UtensilsCrossed size={14} className="text-indigo-600 shrink-0" />
                               <div className="min-w-0 flex-1 flex items-center justify-between gap-1">
                                 <div className="min-w-0 flex-1 truncate">
                                   <span className="text-[#6B7A8D] font-medium">Plan activo: </span>
