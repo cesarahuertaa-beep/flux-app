@@ -203,11 +203,22 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         setDias([]);
       }
 
-      const rsFull = (rs || []).map(r => ({ 
-        ...r, 
-        ejercicios: (r.ejercicios || []).sort((a, b) => a.orden - b.orden) 
-      }));
-      setRutinas(rsFull);
+      let rsFull = [];
+      setRutinas(prev => {
+        rsFull = (rs || []).map(r => {
+          const sorted = (r.ejercicios || []).sort((a, b) => a.orden - b.orden);
+          if (sorted.length === 0) {
+            const localMatch = prev.find(p => p.id === r.id || (p.nombre === r.nombre && (p.ejercicios || []).length > 0));
+            if (localMatch && (localMatch.ejercicios || []).length > 0) {
+              return { ...r, ejercicios: localMatch.ejercicios };
+            }
+          }
+          return { ...r, ejercicios: sorted };
+        });
+        const tempRutinas = prev.filter(p => String(p.id).startsWith("temp_") && !rsFull.some(m => m.nombre === p.nombre));
+        rsFull = [...rsFull, ...tempRutinas];
+        return rsFull;
+      });
 
       const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
       if (allIds.length) {

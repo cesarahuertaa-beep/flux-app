@@ -172,6 +172,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRutinaRef = useRef(false);
+  const savingDiaRef = useRef(false);
   const [macros, setMacros] = useState(() => ({
     calorias: _peekNutri?.calorias || "",
     proteina: _peekNutri?.proteina || "",
@@ -912,7 +914,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
 
       if (rs) {
-        setRutinas(rs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a,b) => a.orden - b.orden) })));
+        setRutinas(prev => {
+          const mapped = rs.map(r => {
+            const sortedEjercicios = (r.ejercicios || []).sort((a,b) => a.orden - b.orden);
+            // Si el servidor aún no tiene los ejercicios porque se están guardando en segundo plano,
+            // pero en el estado local ya los tenemos, preservarlos para que nunca se muestre "0 ejercicios"
+            if (sortedEjercicios.length === 0) {
+              const localMatch = prev.find(p => p.id === r.id || (p.nombre === r.nombre && (p.ejercicios || []).length > 0));
+              if (localMatch && (localMatch.ejercicios || []).length > 0) {
+                return { ...r, ejercicios: localMatch.ejercicios };
+              }
+            }
+            return { ...r, ejercicios: sortedEjercicios };
+          });
+          // Retener rutinas temporales que sigan guardándose en segundo plano y aún no hayan llegado en rs
+          const tempRutinas = prev.filter(p => String(p.id).startsWith("temp_") && !mapped.some(m => m.nombre === p.nombre));
+          return [...mapped, ...tempRutinas];
+        });
       }
 
       if (ns && ns.length) {
@@ -920,7 +938,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         setMacros({ calorias:ns[0].calorias||"", proteina:ns[0].proteina||"", carbohidratos:ns[0].carbohidratos||"", grasas:ns[0].grasas||"" });
         const ds = await fetchFn(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
         if (ds) {
-          setDias(ds.map(d => ({ ...d, comidas: (d.comidas || []).sort((a,b) => a.orden - b.orden) })));
+          setDias(prev => {
+            const mapped = ds.map(d => {
+              const sortedComidas = (d.comidas || []).sort((a,b) => a.orden - b.orden);
+              if (sortedComidas.length === 0) {
+                const localMatch = prev.find(p => p.id === d.id || (p.dia === d.dia && (p.comidas || []).length > 0));
+                if (localMatch && (localMatch.comidas || []).length > 0) {
+                  return { ...d, comidas: localMatch.comidas };
+                }
+              }
+              return { ...d, comidas: sortedComidas };
+            });
+            const tempDias = prev.filter(p => String(p.id).startsWith("temp_") && !mapped.some(m => m.dia === p.dia));
+            return [...mapped, ...tempDias];
+          });
         }
       } else { setNutri(null); setMacros({ calorias:"", proteina:"", carbohidratos:"", grasas:"" }); setDias([]); }
     } catch(e) { 
@@ -971,7 +1002,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   useEffect(() => { if (cicloSel !== undefined) loadData(); }, [loadData]);
 
   useEffect(() => {
-    if (!saving && !showDiaModal && !showRutinaModal && !showPlanModal && pendingCacheReloadRef.current) {
+    if (!saving && !showDiaModal && !showRutinaModal && !showPlanModal && !savingRutinaRef.current && !savingDiaRef.current && pendingCacheReloadRef.current) {
       pendingCacheReloadRef.current = false;
       loadCiclos();
       if (cicloSel !== undefined) loadData(cicloSel, { silent: true, forceFresh: true });
@@ -983,7 +1014,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
       if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "metricas_progreso", "clientes", "*"].includes(table)) return;
-      if (saving || showDiaModal || showRutinaModal || showPlanModal) {
+      if (saving || showDiaModal || showRutinaModal || showPlanModal || savingRutinaRef.current || savingDiaRef.current) {
         pendingCacheReloadRef.current = true;
         return;
       }
@@ -1425,33 +1456,40 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             // 2. Clonar Rutinas
             const oldRuts = await dbGet(`rutinas?ciclo_id=eq.${cicloAnterior.id}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
             if (Array.isArray(oldRuts) && oldRuts.length > 0) {
-              for (const r of oldRuts) {
-                const rRes = await dbPost("rutinas", {
-                  cliente_id: selected.id,
-                  ciclo_id: newCiclo.id,
-                  nombre: r.nombre,
-                  semanas: r.semanas || planForm.semanas,
-                  orden: r.orden || 0,
-                });
-                const newR = rRes && rRes[0];
-                if (newR && r.ejercicios && r.ejercicios.length > 0) {
-                  const ejsData = r.ejercicios.map((ej, ejIdx) => ({
-                    rutina_id: newR.id,
-                    ejercicio: ej.ejercicio || "",
-                    series: ej.series || "",
-                    repeticiones: ej.repeticiones || "",
-                    descanso: ej.descanso || "",
-                    rir_rpe: ej.rir_rpe || "",
-                    notas: ej.notas || "",
-                    superset_id: ej.superset_id || null,
-                    grupo_muscular: ej.grupo_muscular || "",
-                    tipo_ejercicio: ej.tipo_ejercicio || "",
-                    gif_url: ej.gif_url || "",
-                    foto_url: ej.foto_url || "",
-                    orden: ej.orden != null ? ej.orden : ejIdx,
-                  }));
-                  await dbPost("ejercicios", ejsData);
+              savingRutinaRef.current = true;
+              try {
+                for (const r of oldRuts) {
+                  const rRes = await dbPost("rutinas", {
+                    cliente_id: selected.id,
+                    ciclo_id: newCiclo.id,
+                    nombre: r.nombre,
+                    semanas: r.semanas || planForm.semanas,
+                    orden: r.orden || 0,
+                  });
+                  const newR = rRes && rRes[0];
+                  if (newR && r.ejercicios && r.ejercicios.length > 0) {
+                    const ejsData = r.ejercicios.map((ej, ejIdx) => ({
+                      rutina_id: newR.id,
+                      biblioteca_id: ej.biblioteca_id || null,
+                      nombre: ej.nombre || ej.ejercicio || "",
+                      gif_url: ej.gif_url || "",
+                      grupo_muscular: ej.grupo_muscular || "",
+                      tipo_movimiento: ej.tipo_movimiento || ej.tipo_ejercicio || "",
+                      num_series: +ej.num_series || +ej.series || 4,
+                      reps_sugeridas: +ej.reps_sugeridas || +ej.repeticiones || 10,
+                      peso_sugerido: (ej.peso_sugerido !== "" && ej.peso_sugerido !== null && ej.peso_sugerido !== undefined && !isNaN(ej.peso_sugerido)) ? Number(ej.peso_sugerido) : null,
+                      unidad: ej.unidad || "kg",
+                      alternativas: (ej.alternativas || []).map(alt => ({
+                        ...alt,
+                        peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null,
+                      })),
+                      orden: ej.orden != null ? ej.orden : ejIdx,
+                    }));
+                    await dbPost("ejercicios", ejsData, { headers: { Prefer: "return=minimal" } });
+                  }
                 }
+              } finally {
+                savingRutinaRef.current = false;
               }
             }
           } catch (cloneErr) {
@@ -1643,36 +1681,41 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
       const currentValidCount = rutinas.filter(r => (r.ejercicios || []).length > 0 && r.ciclo_id === activeCiclo.id).length;
 
-      for (let i = 0; i < (tpl.rutinas || []).length; i++) {
-        const r = tpl.rutinas[i];
-        const rRes = await dbPost("rutinas", {
-          cliente_id: selected.id,
-          ciclo_id: activeCiclo.id,
-          nombre: r.nombre || `Rutina ${currentValidCount + i + 1}`,
-          semanas: r.semanas || 4,
-          orden: currentValidCount + i
-        });
-        const newRutina = rRes[0];
-        if (newRutina && r.ejercicios?.length > 0) {
-          const ejsData = r.ejercicios.map((e, eIdx) => ({
-            rutina_id: newRutina.id,
-            biblioteca_id: e.biblioteca_id || null,
-            nombre: e.nombre,
-            gif_url: e.gif_url || "",
-            grupo_muscular: e.grupo_muscular || "",
-            tipo_movimiento: e.tipo_movimiento || "",
-            num_series: +e.num_series || 4,
-            reps_sugeridas: +e.reps_sugeridas || 10,
-            peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
-            unidad: e.unidad || "kg",
-            alternativas: (e.alternativas || []).map(alt => ({
-              ...alt,
-              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
-            })),
-            orden: eIdx
-          }));
-          await dbPost("ejercicios", ejsData);
+      savingRutinaRef.current = true;
+      try {
+        for (let i = 0; i < (tpl.rutinas || []).length; i++) {
+          const r = tpl.rutinas[i];
+          const rRes = await dbPost("rutinas", {
+            cliente_id: selected.id,
+            ciclo_id: activeCiclo.id,
+            nombre: r.nombre || `Rutina ${currentValidCount + i + 1}`,
+            semanas: r.semanas || 4,
+            orden: currentValidCount + i
+          });
+          const newRutina = rRes[0];
+          if (newRutina && r.ejercicios?.length > 0) {
+            const ejsData = r.ejercicios.map((e, eIdx) => ({
+              rutina_id: newRutina.id,
+              biblioteca_id: e.biblioteca_id || null,
+              nombre: e.nombre,
+              gif_url: e.gif_url || "",
+              grupo_muscular: e.grupo_muscular || "",
+              tipo_movimiento: e.tipo_movimiento || "",
+              num_series: +e.num_series || 4,
+              reps_sugeridas: +e.reps_sugeridas || 10,
+              peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
+              unidad: e.unidad || "kg",
+              alternativas: (e.alternativas || []).map(alt => ({
+                ...alt,
+                peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+              })),
+              orden: eIdx
+            }));
+            await dbPost("ejercicios", ejsData, { headers: { Prefer: "return=minimal" } });
+          }
         }
+      } finally {
+        savingRutinaRef.current = false;
       }
 
       setCicloSel(activeCiclo);
@@ -1896,12 +1939,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         return dObj;
       });
       setDias(prev => [...prev, ...optimisticNewDias]);
+      updateQueryCache("nutricion_dias", (list) =>
+        Array.isArray(list) ? [...list, ...optimisticNewDias] : list
+      );
     }
 
     setShowDiaModal(false);
     setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día guardado</div>);
 
     // 2. Persistencia asíncrona en segundo plano (sin bloquear la interfaz)
+    savingDiaRef.current = true;
     try {
       // Esperar subidas de fotos de comidas que sigan en curso
       const resolvedComidas = await Promise.all(
@@ -1998,13 +2045,27 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         const creados = await dbPost("nutricion_dias", diasData);
 
+        if (Array.isArray(creados) && creados.length > 0) {
+          setDias(prev => prev.map(d => {
+            const match = creados.find(c => c.dia === d.dia && String(d.id).startsWith("temp_"));
+            return match ? { ...d, id: match.id } : d;
+          }));
+          updateQueryCache("nutricion_dias", (cachedList) => {
+            if (!Array.isArray(cachedList)) return cachedList;
+            return cachedList.map(d => {
+              const match = creados.find(c => c.dia === d.dia && String(d.id).startsWith("temp_"));
+              return match ? { ...d, id: match.id } : d;
+            });
+          });
+        }
+
         const comidasData = [];
         (creados || []).forEach(nuevoDia => {
           resolvedComidas.forEach((c, i) => {
             comidasData.push({
               dia_id: nuevoDia.id,
               hora: c.hora || "",
-              nombre: c.nombre || `Comida ${i + 1}`,
+              nombre: c.nombre || "",
               opcion1: c.opcion1 || "",
               opcion2: c.opcion2 || "",
               calorias: +c.calorias || 0,
@@ -2024,7 +2085,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
 
-      loadData(cicloSel, { silent: true, forceFresh: true });
+      savingDiaRef.current = false;
+      await loadData(cicloSel, { silent: true, forceFresh: true });
       notifyPlanUpdate("nutricion_dias");
 
       if (!isMiPlan && selected?.auth_id) {
@@ -2042,6 +2104,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
     } catch (e) {
+      savingDiaRef.current = false;
       if (!isOfflineError(e)) {
         setDias(prevDias);
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
@@ -2544,7 +2607,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setRutinaForm({ 
       diasSeleccionados: dSel,
       tituloPersonalizado: tPers,
-      ejercicios: r.ejercicios.map(e => ({
+      ejercicios: (r.ejercicios || []).map(e => ({
         ...e,
         peso_sugerido: formatWeightForInput(e.peso_sugerido, e.unidad || "kg"),
         alternativas: (e.alternativas || []).map(alt => ({
@@ -2665,12 +2728,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         };
       });
       setRutinas(prev => [...prev, ...optimisticNewRutinas]);
+      updateQueryCache("rutinas", (cachedList) => {
+        if (!Array.isArray(cachedList)) return cachedList;
+        return [...cachedList, ...optimisticNewRutinas];
+      });
     }
 
     setShowRutinaModal(false);
     setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Rutina guardada</div>);
 
     // 2. Persistencia en segundo plano (con peticiones en paralelo)
+    savingRutinaRef.current = true;
     try {
       if (editRutinaSnap && !String(editRutinaSnap.id).startsWith("temp_")) {
         const finalName = dSeleccionados.length > 0 ? `${dSeleccionados[0]}|${formSnap.tituloPersonalizado}` : formSnap.tituloPersonalizado;
@@ -2746,6 +2814,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         const creadas = await dbPost("rutinas", rutinasData);
 
+        if (Array.isArray(creadas) && creadas.length > 0) {
+          setRutinas(prev => prev.map(r => {
+            const match = creadas.find(c => c.nombre === r.nombre && String(r.id).startsWith("temp_"));
+            return match ? { ...r, id: match.id } : r;
+          }));
+          updateQueryCache("rutinas", (cachedList) => {
+            if (!Array.isArray(cachedList)) return cachedList;
+            return cachedList.map(r => {
+              const match = creadas.find(c => c.nombre === r.nombre && String(r.id).startsWith("temp_"));
+              return match ? { ...r, id: match.id } : r;
+            });
+          });
+        }
+
         const ejerciciosData = [];
         (creadas || []).forEach(nuevaRutina => {
           formSnap.ejercicios.forEach((e, i) => {
@@ -2776,7 +2858,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
 
-      loadData(activeCiclo, { silent: true, forceFresh: true });
+      savingRutinaRef.current = false;
+      await loadData(activeCiclo, { silent: true, forceFresh: true });
       notifyPlanUpdate("rutinas");
 
       if (!isMiPlan && selected?.auth_id) {
@@ -2795,6 +2878,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
     } catch (e) {
+      savingRutinaRef.current = false;
       if (!isOfflineError(e)) {
         setRutinas(prevRutinas);
         setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>);
@@ -4018,7 +4102,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 )}
                                 <span className="font-semibold text-[14px] text-[#0B1929] break-words line-clamp-2">{title || "Sin título"}</span>
                               </div>
-                              <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{r.ejercicios.length} ejercicios • {r.semanas} sem</span>
+                              <span className="text-xs text-[#6B7A8D] mt-0.5 shrink-0">{(r.ejercicios || []).length} ejercicios • {r.semanas} sem</span>
                             </div>
                           </div>
                           {!isReadOnly && (
