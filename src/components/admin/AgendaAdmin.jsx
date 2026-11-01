@@ -802,9 +802,9 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
       ) : subTab === "citas" ? (
         // ── Vista de Citas ──────────────────────────────────────────────────
         <div>
-          {/* Barra de filtros horizontales sin apilarse, con scroll horizontal estilo días de nutrición/entrenamiento */}
-          <div className="px-4 md:px-0 mb-4">
-            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1">
+          {/* Barra de filtros horizontales con scroll de borde a borde en pantalla móvil */}
+          <div className="mb-4">
+            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1 px-4 md:px-0">
               {[
                 ["todos", `Todas (${citas.length})`],
                 ["pendiente", `Pendientes (${citas.filter(c => c.estado === "pendiente").length})`],
@@ -829,7 +829,7 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
           </div>
 
           {citasFiltradas.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="mx-4 md:mx-0 text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
               <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay citas en esta categoría</div>
             </div>
           ) : (
