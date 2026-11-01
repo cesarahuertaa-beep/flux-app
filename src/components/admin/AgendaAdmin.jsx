@@ -795,9 +795,15 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
             ))}
           </div>
 
-          <Btn small grad onClick={() => setShowNuevaCita(true)} className="shrink-0 whitespace-nowrap">
-            <Plus className="w-4 h-4" /> Agendar cita
-          </Btn>
+          {subTab === "citas" ? (
+            <Btn small grad onClick={() => setShowNuevaCita(true)} className="shrink-0 whitespace-nowrap">
+              <Plus className="w-4 h-4" /> Agendar cita
+            </Btn>
+          ) : (
+            <Btn small grad onClick={abrirNuevoHorario} className="shrink-0 whitespace-nowrap">
+              <Plus className="w-4 h-4" /> Agregar horario
+            </Btn>
+          )}
         </div>
       </div>
 
@@ -942,7 +948,7 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
                 Define los días y horas en que los clientes pueden solicitar una cita.
               </div>
             </div>
-            <Btn small grad onClick={abrirNuevoHorario}>
+            <Btn small grad onClick={abrirNuevoHorario} className="hidden md:inline-flex">
               <Plus className="w-4 h-4" /> Agregar horario
             </Btn>
           </div>
