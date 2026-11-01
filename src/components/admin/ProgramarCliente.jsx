@@ -249,6 +249,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
         if (dish.grasas) c.grasas = dish.grasas;
         c.modoEdicion = "platillo";
+        if (!c.nombre || /^Comida\s+\d+$/i.test(c.nombre)) {
+          c.nombre = dish.nombre || "";
+        }
       }
       c.opcionesModoEdicion = {
         ...(c.opcionesModoEdicion || {}),
@@ -5889,7 +5892,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               {CATALOGO_PLATILLOS_BASE.filter(item => {
                 const matchesCat = catalogCategory === "Todos" || item.categoria?.toLowerCase().includes(catalogCategory.toLowerCase());
                 const q = catalogSearch.toLowerCase().trim();
-                const matchesSearch = !q || item.titulo?.toLowerCase().includes(q) || (item.keywords || []).some(k => k.toLowerCase().includes(q));
+                const itemLabel = item.nombre || item.titulo || "";
+                const matchesSearch = !q || itemLabel.toLowerCase().includes(q) || (item.keywords || []).some(k => k.toLowerCase().includes(q));
                 return matchesCat && matchesSearch;
               }).map(item => (
                 <div 
@@ -5899,8 +5903,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     updComida(idx, "foto_url", item.foto_url);
                     // Si el nombre de la comida es genérico, sugerir el nombre del platillo
                     const curComida = diaForm.comidas[idx];
-                    if (!curComida?.nombre || curComida.nombre.startsWith("Comida ")) {
-                      updComida(idx, "nombre", item.titulo);
+                    if (!curComida?.nombre || /^Comida\s+\d+$/i.test(curComida.nombre)) {
+                      updComida(idx, "nombre", item.nombre || item.titulo || "");
                     }
                     setPhotoCatalogModal(null);
                     setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Foto asignada del catálogo</div>);
@@ -5910,17 +5914,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   <div className="aspect-4/3 relative overflow-hidden bg-gray-100">
                     <img 
                       src={item.foto_url} 
-                      alt={item.titulo} 
+                      alt={item.nombre || item.titulo || ""} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                       loading="lazy"
                     />
                     <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs">
-                      ~{item.caloriasAprox} kcal
+                      ~{item.calorias || item.caloriasAprox || 0} kcal
                     </div>
                   </div>
                   <div className="p-3">
                     <div className="text-xs font-bold text-[#0B1929] line-clamp-1 group-hover:text-[var(--brand-primary)] transition-colors">
-                      {item.titulo}
+                      {item.nombre || item.titulo}
                     </div>
                     <div className="text-[10px] text-[#6B7A8D] mt-0.5 uppercase tracking-wider font-semibold">
                       {item.categoria}
