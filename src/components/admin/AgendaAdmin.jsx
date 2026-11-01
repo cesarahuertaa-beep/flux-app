@@ -770,41 +770,31 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
 
   const citasFiltradas = filtro === "todos" ? citas : citas.filter(c => c.estado === filtro);
 
-  const pendientesCount = citas.filter(c => c.estado === "pendiente").length;
-
   // ── Render ──
   return (
     <div className="w-full">
-      {/* Top bar: status summary + Sub-tabs + Botón Agendar Cita */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0">
-        <div className="text-sm text-[#6B7A8D]">
-          {pendientesCount > 0
-            ? <span className="text-yellow-600 font-bold">{pendientesCount} cita{pendientesCount > 1 ? "s" : ""} pendiente{pendientesCount > 1 ? "s" : ""} de confirmar</span>
-            : "Todo al día — sin citas pendientes por confirmar"}
+      {/* Top bar: Sub-tabs + Botón de acción */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0 pb-0.5">
+        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
+          {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
+            <button key={k} onClick={() => setSubTab(k)} className={`
+              px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap
+              ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-[#6B7A8D] hover:text-[#0B1929]"}
+            `}>
+              {lb}
+            </button>
+          ))}
         </div>
-        {/* Sub-tabs y botón Agendar Cita a la derecha de Horarios */}
-        <div className="flex items-center gap-2 overflow-x-auto scroll-hide pb-0.5">
-          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
-            {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
-              <button key={k} onClick={() => setSubTab(k)} className={`
-                px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap
-                ${subTab === k ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-[#6B7A8D] hover:text-[#0B1929]"}
-              `}>
-                {lb}
-              </button>
-            ))}
-          </div>
 
-          {subTab === "citas" ? (
-            <Btn small grad onClick={() => setShowNuevaCita(true)} className="shrink-0 whitespace-nowrap">
-              <Plus className="w-4 h-4" /> Agendar cita
-            </Btn>
-          ) : (
-            <Btn small grad onClick={abrirNuevoHorario} className="shrink-0 whitespace-nowrap">
-              <Plus className="w-4 h-4" /> Agregar horario
-            </Btn>
-          )}
-        </div>
+        {subTab === "citas" ? (
+          <Btn small grad onClick={() => setShowNuevaCita(true)} className="shrink-0 whitespace-nowrap">
+            <Plus className="w-4 h-4" /> Agendar cita
+          </Btn>
+        ) : (
+          <Btn small grad onClick={abrirNuevoHorario} className="shrink-0 whitespace-nowrap">
+            <Plus className="w-4 h-4" /> Agregar horario
+          </Btn>
+        )}
       </div>
 
       {loading ? (
