@@ -3312,7 +3312,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-sm font-bold text-[#0B1929]">
-                                Meta Diaria Prescrita
+                                Resumen para dieta
                               </h4>
 
                               {smartPrescription.goalInfo?.title && (
@@ -3677,18 +3677,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   {/* Cabecera de la tarjeta (Colapsable) */}
                   <div
                     onClick={() => setMetaEntrenoCollapsed((prev) => !prev)}
-                    className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                    className={`p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none transition-colors ${
                       metaEntrenoCollapsed ? "hover:bg-[#F8FAFC]" : "pb-3 border-b border-[#F0F4FA] bg-[#F8FAFC]/40"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border bg-blue-50 text-[var(--brand-primary)] border-blue-200/60">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border bg-blue-50 text-[var(--brand-primary)] border-blue-200/60 mt-0.5 sm:mt-0">
                         <Dumbbell className="w-4 h-4 text-[var(--brand-primary)]" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-sm font-bold text-[#0B1929]">
-                            Directriz de Entrenamiento Prescrita
+                            Resumen para rutina
                           </h4>
 
                           {/* Badge de Objetivo */}
@@ -3722,7 +3722,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     </div>
 
                     {/* Control de Colapso */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] font-semibold text-[#6B7A8D] hidden sm:inline">
                         {metaEntrenoCollapsed ? "Ver directriz" : "Ocultar"}
                       </span>
