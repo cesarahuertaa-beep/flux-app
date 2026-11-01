@@ -50,7 +50,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full bg-[#F7F9FC] text-[#0B1929] min-h-full">
     {title && (
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 pr-12 md:pr-8 bg-white border-b border-[#F0F4FA] flex flex-wrap items-center justify-between gap-2 md:gap-4 shrink-0">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex items-center justify-between gap-2 md:gap-4 shrink-0">
         <div>
           <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}
@@ -1525,7 +1525,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       
       {!isCivil && (tab === "mi_entrenamiento" || visitedTabs.has("mi_entrenamiento")) && (
         <div className={tab === "mi_entrenamiento" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <SubComponentWrapper title="Mi Plan Personal" subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones">
+          <SubComponentWrapper
+            title="Mi Plan"
+            subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones"
+            action={
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente"))}
+                className="sm:hidden flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
+                title="Abrir Expediente Clínico Integral"
+              >
+                <ClipboardList size={14} className="text-[var(--brand-primary)]" />
+                <span>Expediente</span>
+              </button>
+            }
+          >
             {myShadowClient ? (
               <ProgramarCliente
                 key={`mi_plan_${myShadowClient.id}`}
@@ -1968,6 +1982,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             title="Mi Plan"
             subtitle="Configura tus propios ciclos de alimentación, rutinas y evaluaciones"
             eyebrow="Atleta Independiente"
+            action={
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente"))}
+                className="sm:hidden flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
+                title="Abrir Expediente Clínico Integral"
+              >
+                <ClipboardList size={14} className="text-[var(--brand-primary)]" />
+                <span>Expediente</span>
+              </button>
+            }
           >
             {clienteData ? (
               <ProgramarCliente

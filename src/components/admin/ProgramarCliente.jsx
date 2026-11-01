@@ -583,13 +583,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       }
     };
     const onOpenHistorico = () => setShowHistorico(true);
+    const onOpenExpediente = () => setShowExpediente(true);
     window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     window.addEventListener("flux:metricas-updated", onMetricasUpdated);
     window.addEventListener("flux:open-historico", onOpenHistorico);
+    window.addEventListener("flux:open-expediente", onOpenExpediente);
     return () => {
       window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
       window.removeEventListener("flux:metricas-updated", onMetricasUpdated);
       window.removeEventListener("flux:open-historico", onOpenHistorico);
+      window.removeEventListener("flux:open-expediente", onOpenExpediente);
     };
   }, [selected?.id]);
 
@@ -3037,7 +3040,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
 
           {/* Right: Acciones (Expediente e Histórico) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className={`${isMiPlan ? "hidden sm:flex" : "flex"} items-center gap-1.5 sm:gap-2 shrink-0`}>
             {!isMiPlan && (
               <button
                 type="button"
