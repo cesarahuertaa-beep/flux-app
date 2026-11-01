@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
-import { dbGet } from "../../lib/supabase";
+import { dbGet, storageUpload } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
+
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
 // Plantillas maestras predefinidas para Nutrición (vacío para usar solo plantillas creadas o clonadas por el profesional)
 const DEFAULT_NUTRI_TEMPLATES = [];
@@ -15,6 +17,8 @@ export default function TemplatesManagerModal({
   type = "nutri", // "nutri" | "rutina"
   currentData,    // { macros, dias } o { rutinas, semanas }
   clientes = [],
+  currentClienteId = null,
+  profileId = null,
   onApplyTemplate,
   onClose,
   setMsg
@@ -22,25 +26,98 @@ export default function TemplatesManagerModal({
   useBackButton(true, onClose, 60);
   const [tab, setTab] = useState("cargar"); // "cargar" | "guardar" | "clonar"
   const [confirmAction, setConfirmAction] = useState(null);
-  const storageKey = type === "nutri" ? "flux_plantillas_nutri" : "flux_plantillas_rutinas";
 
-  // Cargar plantillas de usuario
+  // Filtrar pacientes clonables (excluyendo el paciente actual)
+  const cloneableClientes = (clientes || []).filter(
+    (c) => c && c.id && String(c.id) !== String(currentClienteId)
+  );
+
+  // Asegurar que si no hay pacientes para clonar, no se quede en la pestaña clonar
+  useEffect(() => {
+    if (tab === "clonar" && cloneableClientes.length === 0) {
+      setTab("cargar");
+    }
+  }, [tab, cloneableClientes.length]);
+
+  // Resolver ID del creador/perfil para aislamiento estricto de plantillas
+  const creatorId = profileId ||
+    (typeof window !== "undefined" && (localStorage.getItem("flux_profileId") || localStorage.getItem("flux_client_id"))) ||
+    "default";
+
+  const storageKey = `flux_plantillas_${type}_${creatorId}`;
+  const cloudFileName = `plantillas_${type}_${creatorId}.json`;
+
+  // Cargar plantillas de usuario aisladas por perfil
   const [userTemplates, setUserTemplates] = useState(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      // Solo migrar claves legacy no-espaciadas si NO es un atleta civil,
+      // protegiendo a los atletas de ver plantillas del superadmin o pruebas.
+      const userRole = typeof window !== "undefined" ? localStorage.getItem("flux_role") : null;
+      if (userRole && userRole !== "civil") {
+        const legacyKey = type === "nutri" ? "flux_plantillas_nutri" : "flux_plantillas_rutinas";
+        const legacy = localStorage.getItem(legacyKey);
+        if (legacy) {
+          const parsedLegacy = JSON.parse(legacy);
+          if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+            localStorage.setItem(storageKey, JSON.stringify(parsedLegacy));
+            localStorage.removeItem(legacyKey);
+            return parsedLegacy;
+          }
+        }
+      }
+      return [];
     } catch {
       return [];
     }
   });
 
-  // Guardar en localStorage
+  // Sincronización en la nube (Supabase Storage) en segundo plano
+  useEffect(() => {
+    if (!SUPA_URL || !creatorId || creatorId === "default") return;
+    let isMounted = true;
+    const fetchCloudTemplates = async () => {
+      try {
+        const url = `${SUPA_URL}/storage/v1/object/public/logos/${cloudFileName}?t=${Date.now()}`;
+        const r = await fetch(url, { cache: "no-store" });
+        if (r.ok) {
+          const cloudData = await r.json();
+          if (Array.isArray(cloudData) && isMounted) {
+            setUserTemplates(cloudData);
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(cloudData));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        // Silencioso: mantiene las plantillas locales si no existe el archivo aún o está offline
+      }
+    };
+    fetchCloudTemplates();
+    return () => { isMounted = false; };
+  }, [cloudFileName, creatorId, storageKey]);
+
+  // Guardar en localStorage y respaldar en Supabase Storage
   const saveUserTemplates = (newList) => {
     setUserTemplates(newList);
     try {
       localStorage.setItem(storageKey, JSON.stringify(newList));
     } catch (e) {
       console.error(e);
+    }
+    if (SUPA_URL && creatorId && creatorId !== "default") {
+      try {
+        const blob = new Blob([JSON.stringify(newList)], { type: "application/json" });
+        storageUpload("logos", cloudFileName, blob, { upsert: true }).catch((err) => {
+          console.warn("Error respaldando plantillas en Supabase Storage:", err);
+        });
+      } catch (e) {
+        console.warn("Error creando blob de plantillas:", e);
+      }
     }
   };
 
@@ -270,7 +347,7 @@ export default function TemplatesManagerModal({
           {[
             { id: "cargar", icon: Bookmark, short: `Plantillas (${allTemplates.length})`, long: `Plantillas (${allTemplates.length})`, show: true },
             { id: "guardar", icon: Plus, short: "Guardar", long: "Guardar Actual como Plantilla", show: true },
-            { id: "clonar", icon: Users, short: "Clonar", long: "Clonar de Otro Paciente", show: clientes.length > 0 },
+            { id: "clonar", icon: Users, short: "Clonar", long: "Clonar de Otro Paciente", show: cloneableClientes.length > 0 },
           ].filter(t => t.show).map(t => {
             const Icon = t.icon;
             return (
@@ -313,7 +390,7 @@ export default function TemplatesManagerModal({
                       <Plus size={14} />
                       Guardar plan actual
                     </button>
-                    {clientes.length > 0 && (
+                    {cloneableClientes.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setTab("clonar")}
@@ -477,7 +554,7 @@ export default function TemplatesManagerModal({
                   placeholder="-- Elige un paciente del directorio --"
                   options={[
                     { value: "", label: "-- Elige un paciente del directorio --" },
-                    ...clientes.map((c) => ({
+                    ...cloneableClientes.map((c) => ({
                       value: c.id,
                       label: `${c.nombre} (${c.email || "Sin email"})`
                     }))

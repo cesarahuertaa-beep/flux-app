@@ -1529,12 +1529,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             {myShadowClient ? (
               <ProgramarCliente
                 key={`mi_plan_${myShadowClient.id}`}
-                clientes={[myShadowClient]}
+                clientes={clientes && clientes.length > 0 ? clientes : [myShadowClient]}
                 selected={myShadowClient}
                 setSelected={() => {}}
                 setMsg={setMsg}
                 biblioteca={biblioteca}
                 isMiPlan={true}
+                profileId={myId}
               />
             ) : (
               <ListSkeleton rows={4} />
@@ -1557,6 +1558,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               onBackToList={() => { setSelected(null); setTab("clientes"); }}
               setMsg={setMsg}
               biblioteca={biblioteca}
+              profileId={myId}
             />
           </SubComponentWrapper>
         </div>
@@ -1976,6 +1978,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 setMsg={setMsg}
                 biblioteca={biblioteca}
                 isMiPlan={true}
+                profileId={myId || clienteData?.auth_id || clienteData?.id}
               />
             ) : (
               <ListSkeleton rows={4} />

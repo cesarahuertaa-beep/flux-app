@@ -125,7 +125,7 @@ const parseCycleData = (cycle, fallbackServicios = { nutricion: true, entrenamie
   return { nombreBase, semanas, dias, servicios, enfoque };
 };
 
-export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan }) {
+export function ProgramarCliente({ clientes, selected, setSelected, onBackToList, setMsg, biblioteca, isMiPlan, profileId }) {
   const brand = useBrand();
   const catalogRef = useRef(null);
   const [subtab, setSubtab] = useState(() => {
@@ -6191,6 +6191,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 : { rutinas, semanas: planForm?.semanas || 4 }
             }
             clientes={clientes}
+            currentClienteId={selected?.id}
+            profileId={profileId || selected?.nutriologo_id || selected?.auth_id}
             onApplyTemplate={
               templateModal === "nutri"
                 ? handleApplyNutriTemplate
