@@ -3654,13 +3654,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             </div>
                           )}
 
-                          {/* Mensaje de Error (API Key o Red) */}
+                          {/* Mensaje de Servicio de IA Fuera de Servicio */}
                           {aiAuditError && !isAuditingAi && (
-                            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                               <div className="space-y-0.5">
-                                <strong className="block font-bold">No se pudo auditar con IA:</strong>
-                                <p className="text-[11px] leading-relaxed">{aiAuditError}</p>
+                                <strong className="block font-semibold">Servicio de IA:</strong>
+                                <p className="text-[11px] leading-relaxed text-amber-800">{aiAuditError}</p>
                               </div>
                             </div>
                           )}

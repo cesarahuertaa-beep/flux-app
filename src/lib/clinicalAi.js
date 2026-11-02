@@ -486,15 +486,7 @@ export async function auditMacroPrescriptionWithAi({
       };
     }
   } catch (edgeErr) {
-    if (
-      edgeErr?.message?.includes("rechazada") ||
-      edgeErr?.message?.includes("API Key") ||
-      edgeErr?.message?.includes("GEMINI_AUTH_ERROR") ||
-      edgeErr?.message?.includes("Google Gemini") ||
-      edgeErr?.message?.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
-    ) {
-      throw edgeErr;
-    }
+    console.warn("Edge function de IA no disponible o falló, intentando llamada directa a Gemini:", edgeErr?.message);
   }
 
   // 2. Intentar llamada directa a Google Gemini si hay API key en el cliente
@@ -600,7 +592,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
   "estrategiaMenu": "string con sugerencias directas y prácticas de menú integrando sus favoritos y reemplazando los malos hábitos de su R24H"
 }`;
 
-    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+    for (const model of ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash"]) {
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -635,18 +627,16 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
         } else {
           const errData = await res.json().catch(() => ({}));
           const msg = errData?.error?.message || `HTTP ${res.status}`;
-          if (res.status === 401 || res.status === 403) {
-            throw new Error(`La API Key de Gemini fue rechazada (${msg}). Verifica que sea una clave válida de Google AI Studio.`);
-          }
+          console.warn(`Llamada directa Gemini (${model}) devolvió ${res.status}:`, msg);
         }
       } catch (err) {
-        if (err.message?.includes("rechazada")) throw err;
+        console.warn(`Error llamando a Gemini directo (${model}):`, err?.message);
       }
     }
   }
 
   throw new Error(
-    "No se pudo conectar con Google Gemini. Asegúrate de configurar una API Key válida (GEMINI_API_KEY) de Google AI Studio (https://aistudio.google.com/app/apikey) en Supabase Secrets o en el archivo .env."
+    "El servicio de Inteligencia Artificial se encuentra temporalmente fuera de servicio. Por favor, intenta de nuevo más tarde."
   );
 }
 
