@@ -1543,7 +1543,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   if (loading) return <ListSkeleton rows={4} />;
 
   return (
-    <div className="pb-20 sm:pb-6">
+    <div className="pb-32 sm:pb-6">
       {/* Sub-nav (solo si no se definió un modo fijo) */}
       {!mode && (
         <div className="flex gap-1 mb-5 mx-3 md:mx-0 bg-[#F0F4FA] rounded-xl p-1 w-[calc(100%-1.5rem)] sm:w-max overflow-x-auto scroll-hide">
@@ -2610,7 +2610,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
 
             {/* Main Responsive Grid Container */}
-            <div className="max-w-7xl w-full mx-auto px-0 py-2 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6">
+            <div className="max-w-7xl w-full mx-auto px-0 py-2 pb-28 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-6">
               {/* Left Column: Protocol & Anthropometric Fields */}
               <div className="lg:col-span-8 flex flex-col gap-5">
                 {/* Paso 1: Check-in de Seguimiento */}

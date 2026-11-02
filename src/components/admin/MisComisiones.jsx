@@ -129,7 +129,7 @@ export default function MisComisiones({ myId, setMsg }) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-4 pt-2 md:pt-0">
+    <div className="w-full max-w-4xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-32 md:pb-4 pt-2 md:pt-0">
       
       {/* Encabezado */}
       <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col md:flex-row justify-between md:items-center gap-4">

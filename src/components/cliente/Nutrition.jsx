@@ -339,7 +339,7 @@ export default function Nutrition({
       </div>
 
       {/* ── Day Content (Habits & Adherence + Meals) — scrolls smoothly with page ── */}
-      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-32 md:pb-8 min-h-0">
         {/* Habits & Adherence Widget */}
         <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-3.5 sm:p-4 shadow-none md:shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
           {/* Hidratación (Agua) */}

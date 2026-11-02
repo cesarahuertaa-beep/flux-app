@@ -258,7 +258,7 @@ export default function ProgresoHistoricoModal({
 
       {/* ── Cuerpo a Pantalla Completa ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl w-full mx-auto px-0 py-3 md:p-8 space-y-3 md:space-y-6">
+        <div className="max-w-7xl w-full mx-auto px-0 py-3 pb-28 md:p-8 space-y-3 md:space-y-6">
         {/* Banner de Resumen Global KPIs */}
         {kpiStats && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 px-3 md:px-0">

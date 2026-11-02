@@ -426,7 +426,7 @@ export default function GestorTienda({ setMsg }) {
                 <p className="text-[#6B7A8D] text-xs sm:text-sm mt-1">No se encontraron productos que coincidan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6 px-3.5 md:px-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-32 md:pb-6 px-3.5 md:px-0">
                 {filtered.map(p => {
                   const extLink = config.external_links?.[p.id];
                   return (
