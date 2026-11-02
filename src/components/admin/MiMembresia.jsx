@@ -290,7 +290,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     );
 
     // Si no tiene pacientes o el primero entró después del último corte, no debe nada de ese corte
-    const myClients = clientes ? clientes.filter(c => c.nutriologo_id === profileId) : [];
+    const myClients = clientes ? clientes.filter(c => c.nutriologo_id === profileId && c.objetivo !== "Mi entrenamiento personal") : [];
     let firstClientDate = null;
     if (myClients.length > 0) {
       firstClientDate = new Date(myClients[0].created_at);
@@ -316,44 +316,47 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
     // Contadores y desglose
     let activePatientsCount = 0;
-    const dataList = (clientes || []).filter(c => c.nutriologo_id === profileId).map(c => {
-      const isActivo = c.activo;
-      const createdAt = new Date(c.created_at || today);
-      const deactivatedAt = c.deactivated_at ? new Date(c.deactivated_at) : null;
+    const dataList = (clientes || [])
+      .filter(c => c.nutriologo_id === profileId && c.objetivo !== "Mi entrenamiento personal")
+      .map(c => {
+        const isActivo = c.activo;
+        const createdAt = new Date(c.created_at || today);
+        const deactivatedAt = c.deactivated_at ? new Date(c.deactivated_at) : null;
 
-      let diasCobrar = 0;
-      let fechaInicioCobro = lastCutoffDate;
-      let fechaFinCobro = nextCutoffDate;
+        let diasCobrar = 0;
+        let fechaInicioCobro = lastCutoffDate;
+        let fechaFinCobro = nextCutoffDate;
 
-      if (isActivo) {
-        activePatientsCount++;
-        if (createdAt < lastCutoffDate) {
-          diasCobrar = 30;
-        } else {
-          const diffTime = Math.abs(nextCutoffDate - createdAt);
-          diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (diasCobrar > 30) diasCobrar = 30;
-          fechaInicioCobro = createdAt;
+        if (isActivo) {
+          activePatientsCount++;
+          if (createdAt < lastCutoffDate) {
+            diasCobrar = 30;
+          } else {
+            const diffTime = Math.abs(nextCutoffDate - createdAt);
+            diasCobrar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diasCobrar > 30) diasCobrar = 30;
+            fechaInicioCobro = createdAt;
+          }
+        } else if (deactivatedAt && deactivatedAt > lastCutoffDate) {
+          const start = createdAt > lastCutoffDate ? createdAt : lastCutoffDate;
+          const diffTime = Math.abs(deactivatedAt - start);
+          const diasActivo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // Si estuvo activo 20 días o más, se cobra el mes completo (30 días); si menos, solo sus días activos
+          if (diasActivo >= 20) {
+            diasCobrar = 30;
+            fechaFinCobro = nextCutoffDate;
+          } else {
+            diasCobrar = Math.max(1, Math.min(diasActivo, 30));
+            fechaInicioCobro = start;
+            fechaFinCobro = deactivatedAt;
+          }
         }
-      } else if (deactivatedAt && deactivatedAt > lastCutoffDate) {
-        const start = createdAt > lastCutoffDate ? createdAt : lastCutoffDate;
-        const diffTime = Math.abs(deactivatedAt - start);
-        const diasActivo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diasActivo < 20) {
-          diasCobrar = 30;
-          fechaFinCobro = nextCutoffDate;
-        } else {
-          diasCobrar = Math.min(diasActivo, 30);
-          fechaInicioCobro = start;
-          fechaFinCobro = deactivatedAt;
-        }
-      }
+        const periodoStr = `${fechaInicioCobro.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} al ${fechaFinCobro.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`;
 
-      const periodoStr = `${fechaInicioCobro.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} al ${fechaFinCobro.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`;
-
-      return { ...c, diasCobrar, periodoStr };
-    }).filter(c => c.diasCobrar > 0);
+        return { ...c, diasCobrar, periodoStr };
+      }).filter(c => c.diasCobrar > 0);
 
     // Tiers
     let tier = 1;
@@ -392,8 +395,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       } else if (hasta > lastCutoffDate) {
         const start = desde > lastCutoffDate ? desde : lastCutoffDate;
         const diasActivo = Math.ceil(Math.abs(hasta - start) / DAY);
-        if (diasActivo < 20) { dias = 30; }
-        else { dias = Math.min(diasActivo, 30); inicio = start; fin = hasta; }
+        if (diasActivo >= 20) { dias = 30; }
+        else { dias = Math.max(1, Math.min(diasActivo, 30)); inicio = start; fin = hasta; }
       }
       if (dias > 0) {
         const periodoStr = `${inicio.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} al ${fin.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`;
@@ -528,7 +531,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         <div className="my-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-              {isEstudiante && yaPagado && !hasPendingPayment ? "Tarifa Mensual" : "Total a Pagar"}
+              {isEstudiante
+                ? (yaPagado && !hasPendingPayment ? "Tarifa Mensual" : "Total a Pagar")
+                : (totalAmount === 0 && activeCount === 0
+                  ? "Total a Pagar"
+                  : (yaPagado && !hasPendingPayment ? "Acumulado Próximo Corte" : "Total a Pagar (Corte Pendiente)"))}
             </span>
             <span className="text-2xl font-black text-[#0B1929]">
               ${totalAmount.toFixed(2)}{" "}
@@ -537,7 +544,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           </div>
           <div className="text-right">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-              {isEstudiante ? (isTrial ? "Vigencia Estimada" : "Próxima Renovación") : "Corte Facturado"}
+              {isEstudiante
+                ? (isTrial ? "Vigencia Estimada" : "Próxima Renovación")
+                : (yaPagado ? "Próximo Corte" : "Corte Facturado")}
             </span>
             <span className="text-xs font-bold text-[var(--brand-primary)]">
               {isEstudiante && isTrial && !firstClientDate ? "Al registrar 1er paciente" : fechaCorteText}
@@ -635,7 +644,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       <div className="mt-6 pt-5 border-t border-[#F0F4FA]">
         <button
           type="button"
-          disabled={uploading || loading}
+          disabled={uploading || loading || (!isEstudiante && totalAmount === 0 && activeCount === 0)}
           onClick={handleUploadClick}
           className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
         >
@@ -643,8 +652,12 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           <span>
             {uploading
               ? "Subiendo Comprobante..."
+              : !isEstudiante && totalAmount === 0 && activeCount === 0
+              ? "No tienes pagos pendientes"
               : isEstudiante && yaPagado && !hasPendingPayment
               ? "Subir Comprobante para Próximo Ciclo"
+              : !isEstudiante && yaPagado && !hasPendingPayment
+              ? "Subir Comprobante Anticipado"
               : "Subir Comprobante de Pago"}
           </span>
         </button>
@@ -696,7 +709,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               ? (diasRestantesText
                   ? `${diasRestantesText}${expirationDate ? ` · Vencimiento: ${expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long" })}` : ""}`
                   : "Mensualidad fija preferencial para estudiantes sin cobro por paciente.")
-              : `Tienes ${activeCount} paciente${activeCount !== 1 ? "s" : ""} activo${activeCount !== 1 ? "s" : ""} en Nivel ${currentTier} ($${currentRate}/pac). Próximo corte: ${fechaCorteText}.`}
+              : `Tienes ${activeCount} paciente${activeCount !== 1 ? "s" : ""} activo${activeCount !== 1 ? "s" : ""} en Nivel ${currentTier} ($${currentRate}/pac). ${yaPagado ? "Próximo corte:" : "Corte pendiente de pago:"} ${fechaCorteText}.`}
           </p>
         </div>
 
@@ -1053,7 +1066,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
             {/* Desglose para Próximo Corte */}
             <div className="bg-white rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden">
-              <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
+              <div className="p-5 md:p-6 border-b border-[#E2E8F0] flex justify-between items-center">
                 <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
                   <FileText size={20} className="text-[var(--brand-primary)]" />
                   <span>Desglose para Próximo Corte</span>
@@ -1096,7 +1109,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                             {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
                           </td>
                           <td className="py-3.5 px-6 font-bold text-[var(--brand-primary)] text-right text-sm">
-                            ${c.costoPaciente.toFixed(2)}
+                            ${(c.costoPaciente || 0).toFixed(2)}
                           </td>
                         </tr>
                       ))
@@ -1115,7 +1128,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                       <div key={c.id || i} className="p-4 bg-white space-y-2">
                         <div className="flex justify-between items-start">
                           <span className="font-semibold text-sm text-[#0B1929]">{c.nombre}</span>
-                          <span className="font-bold text-sm text-[var(--brand-primary)]">${c.costoPaciente.toFixed(2)}</span>
+                          <span className="font-bold text-sm text-[var(--brand-primary)]">${(c.costoPaciente || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
                           <span>Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "Reciente"}</span>
@@ -1132,12 +1145,12 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 {/* Administrativos patrocinados */}
                 {adminLines.length > 0 && (
                   <div className="border-t border-[#E2E8F0]">
-                    <div className="px-6 py-2.5 bg-amber-50/60 text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                    <div className="px-4 py-2.5 md:px-6 bg-amber-50/60 text-[11px] font-bold text-amber-800 uppercase tracking-wider">
                       Administrativos Premium Patrocinados
                     </div>
                     <div className="divide-y divide-gray-100">
                       {adminLines.map(l => (
-                        <div key={l.id} className="px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+                        <div key={l.id} className="px-4 py-3 md:px-6 flex items-center justify-between gap-3 flex-wrap">
                           <div>
                             <p className="font-semibold text-sm text-[#0B1929]">
                               {l.nombre}
@@ -1145,7 +1158,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                             </p>
                             <p className="text-xs text-[#6B7A8D]">{l.periodoStr} · {l.diasCobrar}/30 días</p>
                           </div>
-                          <p className="font-bold text-sm text-[var(--brand-primary)]">${l.costo.toFixed(2)}</p>
+                          <p className="font-bold text-sm text-[var(--brand-primary)]">${(l.costo || 0).toFixed(2)}</p>
                         </div>
                       ))}
                     </div>
@@ -1154,7 +1167,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               </div>
 
               {/* Total Summary */}
-              <div className="p-6 bg-gray-50/60 border-t border-[#E2E8F0]">
+              <div className="p-5 md:p-6 bg-gray-50/60 border-t border-[#E2E8F0]">
                 <div className="space-y-2.5">
                   <div className="flex justify-between items-center text-xs md:text-sm">
                     <span className="text-[#6B7A8D]">Subtotal pacientes ({activeCount} pac. a ${currentRate} MXN)</span>
@@ -1183,7 +1196,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           */}
           <div className="lg:col-span-5 space-y-4">
             {isPlayApp ? (
-              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] flex flex-col justify-between">
+              <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
@@ -1209,11 +1222,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                       <span className="font-bold text-[#0B1929]">{activeCount} paciente{activeCount !== 1 ? "s" : ""}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#6B7A8D] font-medium">Corte de ciclo:</span>
+                      <span className="text-[#6B7A8D] font-medium">{yaPagado ? "Próximo corte:" : "Corte a facturar:"}</span>
                       <span className="font-bold text-[#0B1929]">{fechaCorteText}</span>
                     </div>
                     <div className="flex justify-between items-center pt-2.5 border-t border-gray-200">
-                      <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Total del Periodo:</span>
+                      <span className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">{yaPagado ? "Total Acumulado:" : "Total del Periodo:"}</span>
                       <span className="text-xl font-black text-[var(--brand-primary)]">
                         ${totalAmount.toFixed(2)} <span className="text-xs font-semibold text-[#6B7A8D]">MXN</span>
                       </span>
