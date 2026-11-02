@@ -80,37 +80,43 @@ public class FluxSyncWorker extends Worker {
             // Recargar token por si flushPendingMutations lo renovó tras un 401
             accessToken = prefs.getString("access_token", accessToken);
 
-            // 3. PULL: Descargar consultas clave según el rol del usuario
             JSONObject cacheMap = readExistingCacheFile(ctx);
 
-            // Marca global
-            fetchAndStore(cacheMap, supaUrl, supaKey, accessToken,
-                "profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
-
-            // Si tiene expediente de cliente o civil
-            if (!clientId.isEmpty()) {
-                pullClientData(cacheMap, supaUrl, supaKey, accessToken, clientId, nutriId, email);
-            }
-
-            // Si es nutriólogo, superadmin o staff
-            if ("superadmin".equals(role) || "nutriologo".equals(role) ||
-                "nutriologo_estudiante".equals(role) || "staff".equals(role) || "administrativo".equals(role)) {
-                if (!profileId.isEmpty()) {
-                    pullAdminData(cacheMap, supaUrl, supaKey, accessToken, profileId, role);
-                }
-            }
-
-            // 4. NOTIFICACIONES NATIVAS EN BARRA DE ESTADO:
-            // Consultar buzón de notificaciones no leídas para mostrarlas en la barra de tareas
+            // 3. NOTIFICACIONES NATIVAS EN BARRA DE ESTADO (Consulta ultraligera ~200 bytes):
+            boolean hasNewNotifs = false;
             if (!profileId.isEmpty()) {
-                pullAndShowUnreadNotifications(ctx, cacheMap, supaUrl, supaKey, accessToken, profileId);
+                hasNewNotifs = pullAndShowUnreadNotifications(ctx, cacheMap, supaUrl, supaKey, accessToken, profileId);
             }
 
-            writeCacheFile(ctx, cacheMap);
-            prefs.edit().putLong("last_native_sync", System.currentTimeMillis()).apply();
+            // 4. PULL INTELIGENTE ESTILO WHATSAPP:
+            // Solo descargar el plan completo en segundo plano si llegó una notificación nueva,
+            // si la caché nativa aún está vacía, o si pasaron más de 6 horas desde la última descarga completa.
+            long now = System.currentTimeMillis();
+            long lastFullPull = prefs.getLong("last_native_full_pull", 0L);
+            boolean shouldPullPlan = hasNewNotifs || cacheMap.length() == 0 || (now - lastFullPull > 6L * 3600L * 1000L);
 
-            // Notificar al WebView si la app está abierta en primer plano
-            MainActivity.notifyWebViewSyncComplete();
+            if (shouldPullPlan) {
+                fetchAndStore(cacheMap, supaUrl, supaKey, accessToken,
+                    "profiles?role=eq.superadmin&select=nombre_marca,color_primario,logo_url&limit=1");
+
+                if (!clientId.isEmpty()) {
+                    pullClientData(cacheMap, supaUrl, supaKey, accessToken, clientId, nutriId, email, hasNewNotifs);
+                }
+
+                if ("superadmin".equals(role) || "nutriologo".equals(role) ||
+                    "nutriologo_estudiante".equals(role) || "staff".equals(role) || "administrativo".equals(role)) {
+                    if (!profileId.isEmpty()) {
+                        pullAdminData(cacheMap, supaUrl, supaKey, accessToken, profileId, role);
+                    }
+                }
+                prefs.edit().putLong("last_native_full_pull", now).apply();
+            }
+
+            if (shouldPullPlan || hasNewNotifs) {
+                writeCacheFile(ctx, cacheMap);
+                prefs.edit().putLong("last_native_sync", now).apply();
+                MainActivity.notifyWebViewSyncComplete();
+            }
 
             return Result.success();
         } catch (Exception e) {
@@ -120,46 +126,30 @@ public class FluxSyncWorker extends Worker {
     }
 
     private void pullClientData(JSONObject cacheMap, String supaUrl, String supaKey, String token,
-                                String clientId, String nutriId, String email) throws Exception {
+                                String clientId, String nutriId, String email, boolean forceHistory) throws Exception {
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?id=eq." + clientId);
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?id=eq." + clientId + "&activo=eq.true");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?id=eq." + clientId + "&select=premium_origen");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago_civil?cliente_id=eq." + clientId + "&order=created_at.desc");
 
         if (email != null && !email.isEmpty()) {
             String encEmail = URLEncoder.encode(email, "UTF-8");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?email=ilike." + encEmail);
         }
 
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "configuracion_plataforma?id=eq.1");
-
         if (nutriId != null && !nutriId.isEmpty()) {
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=bloqueado");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=nombre_marca,color_primario,logo_url");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId);
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + nutriId + "&select=id,nombre,duracion_cita");
             fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?cliente_id=eq." + clientId + "&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?cliente_id=eq." + clientId + "&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "disponibilidad?nutriologo_id=eq." + nutriId + "&order=dia_semana.asc");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas_ratings?cliente_id=eq." + clientId + "&select=cita_id,puntuacion");
         }
 
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc&limit=1");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "rutinas?cliente_id=eq." + clientId + "&select=id,ciclo_id,ejercicios(id,grupo_muscular)");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "progreso?cliente_id=eq." + clientId + "&limit=3000");
-
-        pullClientPlan(cacheMap, supaUrl, supaKey, token, clientId, true);
+        pullClientPlan(cacheMap, supaUrl, supaKey, token, clientId, forceHistory);
     }
 
     private void pullClientPlan(JSONObject cacheMap, String supaUrl, String supaKey, String token,
-                                String clientId, boolean includeProgressByIds) throws Exception {
-        fetchAndStore(cacheMap, supaUrl, supaKey, token,
-            "nutricion_progreso?cliente_id=eq." + clientId + "&limit=1000");
+                                String clientId, boolean includeProgressHistory) throws Exception {
+        String npPath = "nutricion_progreso?cliente_id=eq." + clientId + "&limit=1000";
+        if (includeProgressHistory || !cacheMap.has(npPath)) {
+            fetchAndStore(cacheMap, supaUrl, supaKey, token, npPath);
+        }
         fetchAndStore(cacheMap, supaUrl, supaKey, token,
             "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc&limit=1");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token,
-            "metricas_progreso?cliente_id=eq." + clientId + "&order=fecha.desc");
         JSONArray csActive = fetchAndStore(cacheMap, supaUrl, supaKey, token,
             "ciclos?cliente_id=eq." + clientId + "&activo=eq.true&limit=1");
         JSONArray csAll = fetchAndStore(cacheMap, supaUrl, supaKey, token,
@@ -178,41 +168,39 @@ public class FluxSyncWorker extends Worker {
             }
         }
 
-        String[] filters = activeCycleId != null
-            ? new String[]{"ciclo_id=eq." + activeCycleId, "ciclo_id=is.null"}
-            : new String[]{"ciclo_id=is.null"};
+        String filter = activeCycleId != null ? ("ciclo_id=eq." + activeCycleId) : "ciclo_id=is.null";
 
-        for (String filter : filters) {
-            JSONArray ns = fetchAndStore(cacheMap, supaUrl, supaKey, token,
-                "nutricion?cliente_id=eq." + clientId + "&" + filter);
-            if (ns != null && ns.length() > 0) {
-                String nutriId = ns.optJSONObject(0).optString("id", "");
-                if (!nutriId.isEmpty()) {
-                    fetchAndStore(cacheMap, supaUrl, supaKey, token,
-                        "nutricion_dias?nutricion_id=eq." + nutriId + "&select=*,comidas(*)&order=orden.asc");
-                }
+        JSONArray ns = fetchAndStore(cacheMap, supaUrl, supaKey, token,
+            "nutricion?cliente_id=eq." + clientId + "&" + filter);
+        if (ns != null && ns.length() > 0) {
+            String nutriId = ns.optJSONObject(0).optString("id", "");
+            if (!nutriId.isEmpty()) {
+                fetchAndStore(cacheMap, supaUrl, supaKey, token,
+                    "nutricion_dias?nutricion_id=eq." + nutriId + "&select=*,comidas(*)&order=orden.asc");
             }
+        }
 
-            JSONArray rs = fetchAndStore(cacheMap, supaUrl, supaKey, token,
-                "rutinas?cliente_id=eq." + clientId + "&" + filter + "&select=*,ejercicios(*)&order=orden.asc");
-            if (includeProgressByIds && rs != null && rs.length() > 0) {
-                StringBuilder idsBuilder = new StringBuilder();
-                for (int r = 0; r < rs.length(); r++) {
-                    JSONObject rut = rs.optJSONObject(r);
-                    if (rut == null) continue;
-                    JSONArray ejs = rut.optJSONArray("ejercicios");
-                    if (ejs == null) continue;
-                    for (int e = 0; e < ejs.length(); e++) {
-                        JSONObject ej = ejs.optJSONObject(e);
-                        if (ej != null && ej.has("id")) {
-                            if (idsBuilder.length() > 0) idsBuilder.append(",");
-                            idsBuilder.append(ej.optString("id"));
-                        }
+        JSONArray rs = fetchAndStore(cacheMap, supaUrl, supaKey, token,
+            "rutinas?cliente_id=eq." + clientId + "&" + filter + "&select=*,ejercicios(*)&order=orden.asc");
+        if (rs != null && rs.length() > 0) {
+            StringBuilder idsBuilder = new StringBuilder();
+            for (int r = 0; r < rs.length(); r++) {
+                JSONObject rut = rs.optJSONObject(r);
+                if (rut == null) continue;
+                JSONArray ejs = rut.optJSONArray("ejercicios");
+                if (ejs == null) continue;
+                for (int e = 0; e < ejs.length(); e++) {
+                    JSONObject ej = ejs.optJSONObject(e);
+                    if (ej != null && ej.has("id")) {
+                        if (idsBuilder.length() > 0) idsBuilder.append(",");
+                        idsBuilder.append(ej.optString("id"));
                     }
                 }
-                if (idsBuilder.length() > 0) {
-                    fetchAndStore(cacheMap, supaUrl, supaKey, token,
-                        "progreso?cliente_id=eq." + clientId + "&ejercicio_id=in.(" + idsBuilder + ")&limit=3000");
+            }
+            if (idsBuilder.length() > 0) {
+                String progPath = "progreso?cliente_id=eq." + clientId + "&ejercicio_id=in.(" + idsBuilder + ")&limit=3000";
+                if (includeProgressHistory || !cacheMap.has(progPath)) {
+                    fetchAndStore(cacheMap, supaUrl, supaKey, token, progPath);
                 }
             }
         }
@@ -225,47 +213,15 @@ public class FluxSyncWorker extends Worker {
             ? "clientes?order=created_at.asc"
             : "clientes?nutriologo_id=eq." + profileId + "&order=created_at.asc";
 
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "configuracion_plataforma?id=eq.1");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId);
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId + "&select=nombre_marca,color_primario,logo_url");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?id=eq." + profileId + "&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?nutriologo_id=eq." + profileId + "&objetivo=neq.Mi%20entrenamiento%20personal&order=created_at.asc&limit=1");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago?nutriologo_id=eq." + profileId + "&order=created_at.desc");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "ciclos?activo=eq.true&select=id,cliente_id,nombre,fecha_inicio,activo");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "biblioteca_ejercicios?order=nombre.asc");
         fetchAndStore(cacheMap, supaUrl, supaKey, token, "citas?nutriologo_id=eq." + profileId + "&order=fecha_hora.desc&select=id,cliente_id,fecha_hora,modalidad,estado,motivo_rechazo,created_at");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "disponibilidad?nutriologo_id=eq." + profileId + "&order=dia_semana.asc,hora_inicio.asc");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "clientes?nutriologo_id=eq." + profileId + "&select=id,auth_id,nombre,email,telefono&order=nombre.asc");
-        fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id&order=nombre.asc");
-
-        if (isSuperOrStaff) {
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago?order=created_at.desc");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "recibos_pago_civil?order=created_at.desc");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "nomina_colaboradores");
-            fetchAndStore(cacheMap, supaUrl, supaKey, token, "productos?order=created_at.desc");
-        }
-
-        JSONArray clientes = fetchAndStore(cacheMap, supaUrl, supaKey, token, clientFilter);
-        if (clientes != null) {
-            int maxToSync = isSuperOrStaff ? Math.min(clientes.length(), 15) : Math.min(clientes.length(), 20);
-            for (int i = 0; i < maxToSync; i++) {
-                JSONObject c = clientes.optJSONObject(i);
-                if (c != null) {
-                    String cId = c.optString("id", "");
-                    if (!cId.isEmpty()) {
-                        pullClientPlan(cacheMap, supaUrl, supaKey, token, cId, false);
-                    }
-                }
-            }
-        }
+        fetchAndStore(cacheMap, supaUrl, supaKey, token, clientFilter);
     }
 
-    private void pullAndShowUnreadNotifications(Context ctx, JSONObject cacheMap, String supaUrl,
-                                                String supaKey, String token, String profileId) {
+    private boolean pullAndShowUnreadNotifications(Context ctx, JSONObject cacheMap, String supaUrl,
+                                                   String supaKey, String token, String profileId) {
+        boolean foundNew = false;
         try {
             JSONArray notifs = fetchAndStore(
                 cacheMap,
@@ -274,7 +230,7 @@ public class FluxSyncWorker extends Worker {
                 token,
                 "notificaciones?profile_id=eq." + profileId + "&leida=eq.false&order=created_at.asc&limit=15"
             );
-            if (notifs == null || notifs.length() == 0) return;
+            if (notifs == null || notifs.length() == 0) return false;
 
             for (int i = 0; i < notifs.length(); i++) {
                 JSONObject n = notifs.optJSONObject(i);
@@ -286,13 +242,14 @@ public class FluxSyncWorker extends Worker {
 
                 if (!id.isEmpty() && !FluxNotificationHelper.isAlreadyShown(ctx, id)) {
                     FluxNotificationHelper.showStatusBarNotification(ctx, id, titulo, mensaje, linkUrl);
-                    // Marcar como leída en Supabase para no volver a dispararla
                     sendMutationRequest(supaUrl, supaKey, token, "PATCH", "notificaciones?id=eq." + id, "{\"leida\":true}");
+                    foundNew = true;
                 }
             }
         } catch (Exception e) {
             Log.w(TAG, "Error checking unread notifications: " + e.getMessage());
         }
+        return foundNew;
     }
 
     private boolean flushPendingMutations(SharedPreferences prefs, String supaUrl, String supaKey,

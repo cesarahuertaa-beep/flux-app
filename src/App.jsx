@@ -131,7 +131,7 @@ export default function App() {
     if (typeof navigator !== "undefined" && !navigator.onLine) return true;
     if (isValidatingLivenessRef.current) return true;
     const now = Date.now();
-    if (!force && now - lastLivenessCheckRef.current < 15000) return true;
+    if (!force && now - lastLivenessCheckRef.current < 5 * 60 * 1000) return true;
 
     isValidatingLivenessRef.current = true;
     lastLivenessCheckRef.current = now;
@@ -399,7 +399,7 @@ export default function App() {
 
     const handleCacheSync = (ev) => {
       const tbl = ev?.detail?.table;
-      if (!tbl || tbl === "*" || tbl === "profiles" || tbl === "clientes") {
+      if (ev?.detail?.path === "*" && (tbl === "profiles" || tbl === "clientes")) {
         validateSessionLiveness();
       }
     };
@@ -421,7 +421,7 @@ export default function App() {
       if (typeof document === "undefined" || document.visibilityState === "visible") {
         validateSessionLiveness();
       }
-    }, 60000);
+    }, 5 * 60 * 1000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);

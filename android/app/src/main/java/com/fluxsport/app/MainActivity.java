@@ -250,9 +250,15 @@ public class MainActivity extends BridgeActivity {
         if (isTimerRunning && activeTimerEndMs > System.currentTimeMillis()) {
             showFloatingTimerOverlay();
         }
-        // Cuando el usuario sale de la app o apaga la pantalla, encolar un trabajo de sincronización
-        // sujeto a NetworkType.CONNECTED para subir cambios offline y mantener la caché fresca.
-        scheduleNativeSync(true);
+        // Cuando el usuario sale de la app, disparar sincronización inmediata SOLO si hay cambios hechos offline pendientes de subir
+        try {
+            SharedPreferences prefs = getSharedPreferences(FluxSyncWorker.PREFS_NAME, Context.MODE_PRIVATE);
+            String pending = prefs.getString("pending_mutations_json", "[]");
+            boolean hasPending = pending != null && !pending.isEmpty() && !"[]".equals(pending);
+            if (hasPending) {
+                scheduleNativeSync(true);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void scheduleNativeSync(boolean includeOneTimeWhenConnected) {
@@ -262,7 +268,7 @@ public class MainActivity extends BridgeActivity {
                 .build();
 
             PeriodicWorkRequest periodicSync = new PeriodicWorkRequest.Builder(
-                FluxSyncWorker.class, 15, TimeUnit.MINUTES
+                FluxSyncWorker.class, 30, TimeUnit.MINUTES
             )
                 .setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -271,7 +277,7 @@ public class MainActivity extends BridgeActivity {
             WorkManager wm = WorkManager.getInstance(getApplicationContext());
             wm.enqueueUniquePeriodicWork(
                 "FluxPeriodicSync",
-                ExistingPeriodicWorkPolicy.UPDATE,
+                ExistingPeriodicWorkPolicy.KEEP,
                 periodicSync
             );
 
@@ -364,8 +370,9 @@ public class MainActivity extends BridgeActivity {
                 SharedPreferences.Editor ed = prefs.edit();
                 if (obj.has("supaUrl")) ed.putString("supa_url", obj.optString("supaUrl", ""));
                 if (obj.has("supaKey")) ed.putString("supa_key", obj.optString("supaKey", ""));
-                if (obj.has("token") && !obj.optString("token", "").isEmpty()) {
-                    ed.putString("access_token", obj.optString("token", ""));
+                String tok = obj.optString("accessToken", obj.optString("token", ""));
+                if (!tok.isEmpty()) {
+                    ed.putString("access_token", tok);
                 }
                 if (obj.has("refreshToken") && !obj.optString("refreshToken", "").isEmpty()) {
                     ed.putString("refresh_token", obj.optString("refreshToken", ""));
@@ -373,7 +380,8 @@ public class MainActivity extends BridgeActivity {
                 if (obj.has("role")) ed.putString("role", obj.optString("role", ""));
                 if (obj.has("clientId")) ed.putString("client_id", obj.optString("clientId", ""));
                 if (obj.has("profileId")) ed.putString("profile_id", obj.optString("profileId", ""));
-                if (obj.has("nutriId")) ed.putString("nutri_id", obj.optString("nutriId", ""));
+                String nId = obj.optString("nutriologoId", obj.optString("nutriId", ""));
+                if (!nId.isEmpty()) ed.putString("nutri_id", nId);
                 if (obj.has("email")) ed.putString("email", obj.optString("email", ""));
                 ed.apply();
                 scheduleNativeSync(false);

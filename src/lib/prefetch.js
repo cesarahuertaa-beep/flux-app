@@ -1,14 +1,25 @@
-import { Capacitor } from "@capacitor/core";
-import { dbGetFresh, syncNativeCredentials } from "./supabase";
+import { dbGet, dbPeek, syncNativeCredentials } from "./supabase";
 import { precacheMediaList } from "./mediaCache";
 import { fetchClinicalRecord } from "./clinicalRecord";
 import { fetchCustomPlatillos, fetchCustomIngredientes } from "./customCatalogs";
 
 const KEY = "flux_last_prefetch";
-const MIN_INTERVAL = Capacitor.isNativePlatform() ? 20 * 1000 : 45 * 1000;
+// Precarga pasiva máximo cada 30 minutos (las actualizaciones en vivo llegan por WebSocket)
+const MIN_INTERVAL = 30 * 60 * 1000;
 
 const safe = async (p) => {
-  try { return await dbGetFresh(p); } catch { return null; }
+  try {
+    // Si es una tabla histórica masiva o catálogo estático y ya existe en la caché offline, no volver a descargarla en segundo plano
+    if (
+      (p.startsWith("progreso?") || p.startsWith("nutricion_progreso?") || p.startsWith("biblioteca_ejercicios")) &&
+      dbPeek(p) !== null
+    ) {
+      return dbPeek(p);
+    }
+    return await dbGet(p);
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -270,33 +281,14 @@ export const prefetchAdmin = async (profileId, role) => {
     if (c.avatar_url) mediaUrls.push(c.avatar_url);
   });
 
-  // 5. Precargar planes y rutinas de manera controlada (sin saturar la red)
+  // 5. Precargar únicamente el plan personal de atleta del nutriólogo (los expedientes de pacientes se cargan bajo demanda al abrirlos)
   const shadowCandidate = clientes.find((c) =>
     (c.nutriologo_id === profileId && c.objetivo === "Mi entrenamiento personal") ||
     (c.auth_id && c.auth_id === profileId)
   );
 
-  const activeClients = clientes.filter((c) => c.activo !== false);
-  const targets = isSuperadmin ? activeClients.slice(0, 12) : activeClients.slice(0, 15);
-  const toPrefetch = [];
-  if (shadowCandidate?.id) toPrefetch.push(shadowCandidate.id);
-  for (const c of targets) {
-    if (c.id && !toPrefetch.includes(c.id)) toPrefetch.push(c.id);
-  }
-
-  // Ejecutar en pequeños lotes de 3 clientes a la vez
-  for (let i = 0; i < toPrefetch.length; i += 3) {
-    const batch = toPrefetch.slice(i, i + 3);
-    await Promise.all(batch.map((clientId) => prefetchPlanCliente(clientId, mediaUrls)));
-  }
-
-  // Precargar historiales de rutinas y nutrición para los clientes seleccionados
-  const ids = toPrefetch.slice(0, 20).join(",");
-  if (ids) {
-    await Promise.all([
-      safe(`rutinas?cliente_id=in.(${ids})`),
-      safe(`nutricion?cliente_id=in.(${ids})`),
-    ]);
+  if (shadowCandidate?.id) {
+    await prefetchPlanCliente(shadowCandidate.id, mediaUrls);
   }
 
   // 6. Descargar catálogos globales personalizados (platillos e ingredientes) para uso offline

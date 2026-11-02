@@ -401,32 +401,36 @@ if (typeof window !== "undefined") {
 }
 
 const RELATED_TABLES = {
-  ejercicios: ["ejercicios", "rutinas", "ciclos"],
-  rutinas: ["rutinas", "ejercicios", "ciclos"],
-  comidas: ["comidas", "nutricion_dias", "nutricion", "ciclos"],
-  nutricion_dias: ["nutricion_dias", "comidas", "nutricion", "ciclos"],
-  nutricion: ["nutricion", "nutricion_dias", "ciclos"],
-  ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias", "ejercicios"],
-  disponibilidad: ["disponibilidad", "citas", "profiles"],
+  ejercicios: ["ejercicios", "rutinas"],
+  rutinas: ["rutinas", "ejercicios"],
+  comidas: ["comidas", "nutricion_dias"],
+  nutricion_dias: ["nutricion_dias", "comidas", "nutricion"],
+  nutricion: ["nutricion", "nutricion_dias"],
+  ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias"],
+  disponibilidad: ["disponibilidad", "citas"],
   citas: ["citas", "disponibilidad", "citas_ratings", "notificaciones"],
-  citas_ratings: ["citas_ratings", "citas", "directorio_nutriologos_publicos", "profiles"],
-  profiles: ["profiles", "directorio_nutriologos_publicos", "clientes", "disponibilidad"],
-  clientes: ["clientes", "profiles", "ciclos", "citas", "metricas_progreso"],
-  metricas_progreso: ["metricas_progreso", "clientes", "progreso"],
-  progreso: ["progreso", "rutinas", "ejercicios"],
-  nutricion_progreso: ["nutricion_progreso", "nutricion_dias", "nutricion"],
+  citas_ratings: ["citas_ratings", "citas", "directorio_nutriologos_publicos"],
+  profiles: ["profiles", "directorio_nutriologos_publicos"],
+  clientes: ["clientes"],
+  metricas_progreso: ["metricas_progreso"],
+  progreso: ["progreso"],
+  nutricion_progreso: ["nutricion_progreso"],
   pagos_manuales: ["pagos_manuales", "profiles", "clientes", "comisiones"],
   solicitudes_profesionales: ["solicitudes_profesionales", "profiles"],
   productos: ["productos"],
   notificaciones: ["notificaciones"],
 };
 
-/** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms para dbPeek pero se refresca de inmediato. */
+/** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms para dbPeek pero se refresca cuando se consulte. */
 export const invalidateCache = (table, extraDetail = null) => {
   const targets = table ? (RELATED_TABLES[table] || [table]) : null;
+  const targetClientId = extraDetail?.clienteId || extraDetail?.cliente_id || null;
   for (const [key, entry] of queryCache.entries()) {
     const keyTable = key.split("?")[0];
     if (!targets || targets.includes(keyTable)) {
+      if (targetClientId && key.includes("cliente_id=eq.") && !key.includes(`cliente_id=eq.${targetClientId}`)) {
+        continue;
+      }
       entry.invalidated = true;
       persistEntry(key);
     }
@@ -445,6 +449,18 @@ const _clientInstanceId = Math.random().toString(36).slice(2, 10);
 const handleRemoteTableChange = (table, payload = null) => {
   if (!table) return;
   if (payload?.sender === _clientInstanceId) return;
+
+  // Aislar eventos remotos por cliente cuando la sesión activa es de paciente/atleta
+  const rec = payload?.data?.record || payload?.record || payload?.new || payload;
+  const remoteClientId = rec?.clienteId || rec?.cliente_id || null;
+  if (remoteClientId && typeof window !== "undefined") {
+    const myRole = localStorage.getItem("flux_role");
+    const myClientId = localStorage.getItem("flux_client_id");
+    if ((myRole === "cliente" || myRole === "civil") && myClientId && String(remoteClientId) !== String(myClientId)) {
+      return;
+    }
+  }
+
   if (table === "expediente_clinico" && payload?.clienteId && typeof window !== "undefined") {
     try {
       window.dispatchEvent(
@@ -454,14 +470,14 @@ const handleRemoteTableChange = (table, payload = null) => {
       );
     } catch { /* ignore */ }
   }
-  invalidateCache(table, payload);
+  invalidateCache(table, rec);
 };
 
 export const broadcastTableChange = (table, extra = {}) => {
   if (!table || typeof window === "undefined" || !SUPA_URL || !SUPA_KEY) return;
   const payload = { table, sender: _clientInstanceId, ts: Date.now(), ...extra };
 
-  // 1. Envío inmediato por WebSocket si está conectado
+  // 1. Envío inmediato por WebSocket si está conectado (evita duplicar llamada HTTP REST)
   if (_rtSocket && _rtSocket.readyState === WebSocket.OPEN && _rtJoined) {
     try {
       _rtSocket.send(
@@ -476,10 +492,11 @@ export const broadcastTableChange = (table, extra = {}) => {
           ref: String(++_rtRef),
         })
       );
+      return;
     } catch { /* ignore */ }
   }
 
-  // 2. Respaldo por REST Broadcast de Supabase para garantizar entrega aún si el WS se está reconectando
+  // 2. Respaldo por REST Broadcast SOLO si el WebSocket no está abierto
   try {
     fetch(`${SUPA_URL}/realtime/v1/api/broadcast`, {
       method: "POST",
@@ -655,8 +672,12 @@ const queueMutation = async (method, path, body, prefer) => {
 
 // Deduplicación de peticiones GET simultáneas para evitar peticiones duplicadas al mismo endpoint
 const _inflightGets = new Map();
+// Ventana de frescura por defecto (5 minutos) mientras la tabla no haya sido invalidada por un cambio real
+const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000;
+// Antirrebote para lecturas forzadas repetidas en el mismo instante (2.5 segundos)
+const FORCE_DEDUP_MS = 2500;
 
-// ── Función base de petición (Network-First cuando hay internet + Fallback Offline instantáneo) ──
+// ── Función base de petición (Caché inteligente + Sincronización en vivo + Fallback Offline instantáneo) ──
 const q = async (path, opts = {}, onBackgroundUpdate = null) => {
   if (!_isHydrated) {
     await hydrateOfflineCache();
@@ -682,7 +703,6 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
     try {
       if (isOfflineNow() || (_netDown && !isGet && isQueueable(method, table))) throw new Error("OFFLINE");
       r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
-        ...(isGet ? { cache: "no-store" } : {}),
         headers,
         ...restOpts,
         signal: t.signal,
@@ -802,16 +822,31 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
   };
 
   if (isGet) {
-    const cached = opts.force ? null : queryCache.get(path);
+    const cached = queryCache.get(path);
     // Si estamos sin internet, responder de inmediato desde la base de datos local
     if (isOfflineNow() && cached) {
       return cached.data;
     }
-    // Con internet disponible: si hay callback de fondo y caché válida, entregar adelanto en 0ms
-    if (cached && !cached.invalidated && onBackgroundUpdate) {
+    const now = Date.now();
+    const ageMs = cached ? now - (cached.timestamp || 0) : Infinity;
+
+    // Si el dato en caché es válido (no fue invalidado por ningún cambio local o remoto)
+    // y está fresco dentro del TTL, devolverlo en 0 ms sin consumir Egress de Supabase
+    if (cached && !cached.invalidated) {
+      const ttl = opts.force ? FORCE_DEDUP_MS : DEFAULT_CACHE_TTL_MS;
+      if (ageMs < ttl) {
+        if (onBackgroundUpdate) {
+          try { onBackgroundUpdate(cached.data); } catch { /* ignore */ }
+        }
+        return cached.data;
+      }
+    }
+
+    // Con internet disponible: si hay callback de fondo y caché previa, entregar adelanto en 0ms mientras refresca
+    if (cached && !opts.force && onBackgroundUpdate) {
       try { onBackgroundUpdate(cached.data); } catch { /* ignore */ }
     }
-    // Siempre esperar el dato real y fresco de Supabase (deduplicando lecturas concurrentes al mismo path)
+    // Deduplicar lecturas concurrentes en vuelo al mismo endpoint
     if (_inflightGets.has(path)) {
       const p = _inflightGets.get(path);
       if (onBackgroundUpdate) {
@@ -1012,14 +1047,24 @@ export const flushMutations = async () => {
   return _flushingPromise;
 };
 
-/** Refresca en segundo plano las consultas guardadas que ya están viejas (mantiene el dato "al día"). */
-export const refreshStaleCache = async (maxAgeMs = 90000, limit = 30) => {
+/** Refresca en segundo plano únicamente las consultas marcadas como modificadas (invalidated) o muy antiguas. */
+export const refreshStaleCache = async (maxAgeMs = 15 * 60 * 1000, limit = 8) => {
   if (!_authToken || isOfflineNow()) return;
   if (_flushingPromise) await _flushingPromise;
+  const effectiveMaxAge = Math.max(maxAgeMs, 10 * 60 * 1000);
+  const now = Date.now();
   const stale = [...queryCache.entries()]
-    .filter(([k, v]) => !k.startsWith("rpc/") && (v.invalidated || Date.now() - v.timestamp > maxAgeMs))
-    .sort((a, b) => a[1].timestamp - b[1].timestamp)
-    .slice(0, limit);
+    .filter(([k, v]) => {
+      if (k.startsWith("rpc/")) return false;
+      if (v.invalidated) return true;
+      // No re-descargar historiales masivos por tiempo si no han sido invalidados por un cambio real
+      if (k.startsWith("progreso?") || k.startsWith("nutricion_progreso?") || k.startsWith("biblioteca_ejercicios")) {
+        return false;
+      }
+      return now - (v.timestamp || 0) > effectiveMaxAge;
+    })
+    .sort((a, b) => (a[1].invalidated === b[1].invalidated ? a[1].timestamp - b[1].timestamp : a[1].invalidated ? -1 : 1))
+    .slice(0, Math.min(limit, 10));
   for (const [path] of stale) {
     try {
       await q(path, { force: true });
@@ -1064,6 +1109,7 @@ export const storageUpload = async (bucket, path, file, opts = {}) => {
         apikey: SUPA_KEY,
         Authorization: `Bearer ${token || SUPA_KEY}`,
         "Content-Type": file.type || "image/jpeg",
+        "Cache-Control": "public, max-age=31536000",
       };
       if (useUpsert) {
         headers["x-upsert"] = "true";

@@ -175,11 +175,16 @@ export default function NotificationManager({ session }) {
   // Sondeo de notificaciones no leídas (en tiempo real mientras la app está abierta o al volver a ella)
   useEffect(() => {
     if (!profileId) return;
+    let lastCheckTs = 0;
 
-    const checkUnread = async () => {
+    const checkUnread = async (force = false) => {
       if (checkingRef.current) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (!force && now - lastCheckTs < 10000) return;
       checkingRef.current = true;
+      lastCheckTs = now;
       try {
         const rows = await dbGet(
           `notificaciones?profile_id=eq.${profileId}&leida=eq.false&order=created_at.asc&limit=15`
@@ -199,6 +204,8 @@ export default function NotificationManager({ session }) {
               await dbPatch(`notificaciones?id=eq.${n.id}`, { leida: true });
             } catch {}
           }
+          // Evitar auto-reconsulta inmediata provocada por nuestro propio dbPatch
+          lastCheckTs = Date.now();
         }
       } catch {
         // Silencioso en caso de desconexión temporal
@@ -207,19 +214,19 @@ export default function NotificationManager({ session }) {
       }
     };
 
-    checkUnread();
-    const interval = setInterval(checkUnread, 20000);
+    checkUnread(true);
+    const interval = setInterval(() => checkUnread(false), 60000);
 
     const onFocusOrSync = () => {
       if (typeof document === "undefined" || document.visibilityState === "visible") {
-        checkUnread();
+        checkUnread(false);
       }
     };
 
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (!table || table === "*" || table === "notificaciones" || table === "citas") {
-        checkUnread();
+      if (table === "notificaciones" || table === "citas") {
+        checkUnread(false);
       }
     };
 

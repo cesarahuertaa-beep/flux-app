@@ -247,12 +247,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     let cacheTimer = null;
 
     const onFocus = () => {
-      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: true });
+      if (document.visibilityState === 'visible') loadData({ silent: true, forceFresh: false });
     };
 
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "progreso", "nutricion_progreso", "metricas_progreso", "*"].includes(table)) return;
+      if (table && !["ciclos", "nutricion", "nutricion_dias", "comidas", "rutinas", "ejercicios", "progreso", "nutricion_progreso", "metricas_progreso"].includes(table)) return;
       if (cacheTimer) clearTimeout(cacheTimer);
       cacheTimer = setTimeout(() => {
         if (
@@ -298,10 +298,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   }, [cliente?.id]);
 
   // Si está embebido en el panel de Admin (nutriólogo viendo sus pestañas de atleta),
-  // recargar inmediatamente al alternar a Nutrición o Entrenamiento
+  // recargar al alternar a Nutrición o Entrenamiento usando la caché inteligente
   useEffect(() => {
     if (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) {
-      loadData({ silent: true, forceFresh: true });
+      loadData({ silent: true, forceFresh: false });
     }
   }, [isEmbedded, embeddedTab]);
 

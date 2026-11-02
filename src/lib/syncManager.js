@@ -6,8 +6,9 @@ import { prefetchSession } from "./prefetch";
 
 let started = false;
 let running = false;
+let lastFocusSync = 0;
 
-/** Envía lo pendiente y refresca datos viejos de forma pasiva en segundo plano. Seguro de llamar muchas veces. */
+/** Envía lo pendiente y refresca datos modificados de forma pasiva en segundo plano. */
 export const runSync = async () => {
   if (running || !navigator.onLine || !getAuthToken()) return;
   running = true;
@@ -15,8 +16,8 @@ export const runSync = async () => {
     initRealtimeSync();
     await syncQueue(dbUpsert);   // cola heredada (versiones anteriores)
     await flushMutations();      // escrituras hechas sin internet
-    await prefetchSession();     // precarga pasiva de rutinas, dietas, fotos y GIFs
-    await refreshStaleCache(15000, 35); // últimos datos siempre al día
+    await prefetchSession();     // precarga pasiva inteligente (usa caché local y respeta TTL)
+    await refreshStaleCache(15 * 60 * 1000, 8); // solo refresca entradas invalidadas o >15 min
   } catch (e) {
     console.warn("[FLUX sync]", e?.message);
   } finally {
@@ -24,37 +25,39 @@ export const runSync = async () => {
   }
 };
 
-/** Dispara la sincronización continua pasiva: al volver internet, cambiar estado o periódicamente. */
+/** Dispara la sincronización pasiva: al volver internet, recuperar foco o cada 5 minutos. */
 export const initSyncManager = () => {
   if (started) return;
   started = true;
 
   initRealtimeSync();
 
-  window.addEventListener("online", runSync);
-  document.addEventListener("visibilitychange", () => {
-    runSync();
-    // Al volver a la pestaña/app: pedir de nuevo todos los datos activos para mostrar siempre lo último
-    if (document.visibilityState === "visible") refreshStaleCache(0, 40).catch(() => {});
-  });
-  window.addEventListener("focus", () => {
+  const onResumeOrFocus = () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     initRealtimeSync();
-    refreshStaleCache(0, 40).catch(() => {});
-  });
+    const now = Date.now();
+    if (now - lastFocusSync < 15000) return;
+    lastFocusSync = now;
+    runSync();
+  };
+
+  window.addEventListener("online", runSync);
+  document.addEventListener("visibilitychange", onResumeOrFocus);
+  window.addEventListener("focus", onResumeOrFocus);
 
   if (Capacitor.isNativePlatform()) {
-    CapApp.addListener("appStateChange", () => runSync());
+    CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) onResumeOrFocus();
+      else flushMutations().catch(() => {});
+    });
   }
 
-  // Pulso rápido de sincronización cuando la pestaña está activa (respaldo ante firewalls que filtren WebSockets)
+  // Sincronización pasiva periódica cada 5 minutos (el tiempo real va por WebSocket con 0 consumo extra)
+  const syncIntervalMs = 5 * 60 * 1000;
   setInterval(() => {
-    if (typeof document !== "undefined" && document.visibilityState === "visible" && navigator.onLine) {
-      refreshStaleCache(8000, 25).catch(() => {});
+    if (typeof document === "undefined" || document.visibilityState === "visible") {
+      runSync();
     }
-  }, 10000);
-
-  // Ejecución pasiva periódica continua (priorizada cada 25s en la app nativa de Play Store para caché offline inmediata)
-  const syncIntervalMs = Capacitor.isNativePlatform() ? 25000 : 45000;
-  setInterval(() => runSync(), syncIntervalMs);
-  setTimeout(runSync, 1200);
+  }, syncIntervalMs);
+  setTimeout(runSync, 1500);
 };
