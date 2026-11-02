@@ -159,12 +159,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       // Consultas paralelas iniciales
       const [cs, met, npRows] = await Promise.all([
-        fetcher(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`).catch(() => []),
+        fetcher(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
         fetcher(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`).catch(() => []),
         fetcher(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`).catch(() => [])
       ]);
 
-      const ciclo = cs.length ? cs[0] : null;
+      const ciclo = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
       setCicloActivo(ciclo);
 
       if (met && met.length > 0 && met[0].peso) {
@@ -220,7 +220,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         return rsFull;
       });
 
-      const allIds = rsFull.flatMap(r => r.ejercicios.map(e => e.id));
+      const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
       if (allIds.length) {
         const ps = await fetcher(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
         if (ps && Array.isArray(ps)) {
@@ -297,13 +297,16 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     };
   }, [cliente?.id]);
 
-  // Si está embebido en el panel de Admin (nutriólogo viendo sus pestañas de atleta),
-  // recargar al alternar a Nutrición o Entrenamiento usando la caché inteligente
+  // Si está embebido en el panel de Admin (nutriólogo o atleta con Mi Plan)
+  // o el cliente navega a Nutrición, Entrenamiento o Progreso, recargar datos frescos para actualizar gráficas
   useEffect(() => {
-    if (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) {
-      loadData({ silent: true, forceFresh: false });
+    if (
+      (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) ||
+      (!isEmbedded && (tab === "nutricion" || tab === "deporte" || tab === "progreso"))
+    ) {
+      loadData({ silent: true, forceFresh: true });
     }
-  }, [isEmbedded, embeddedTab]);
+  }, [isEmbedded, embeddedTab, tab]);
 
   const pendingSavesRef = useRef({});
   const globalSaveTimerRef = useRef(null);

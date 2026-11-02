@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Model from "@phelian/react-body-highlighter";
-import { dbPeek, dbGet, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, storageUpload, storageListFolder, storageDelete } from "../../lib/supabase";
 import {
   Activity, Scale, Ruler, BicepsFlexed, TrendingUp, TrendingDown,
   Minus, Lock, Camera, Image as ImageIcon, UploadCloud, Trash2, X,
@@ -121,15 +121,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setLoading(true);
     }
     try {
-      // 1. Cargar métricas de composición
-      const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`);
+      // 1. Cargar métricas de composición frescas de la base de datos
+      const ms = await dbGetFresh(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`).catch(() => []);
       setMetricas(Array.isArray(ms) ? ms.map(enrichMetrica) : []);
 
-      // 2. Calcular progreso muscular
+      // 2. Calcular progreso muscular con datos de rutinas y progreso en vivo
       const [allCiclos, rutinas, progs] = await Promise.all([
-        dbGet(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`),
-        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`),
-        dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`)
+        dbGetFresh(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
+        dbGetFresh(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`).catch(() => []),
+        dbGetFresh(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => [])
       ]);
 
       const validCiclos = Array.isArray(allCiclos) ? allCiclos : [];

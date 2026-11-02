@@ -401,20 +401,20 @@ if (typeof window !== "undefined") {
 }
 
 const RELATED_TABLES = {
-  ejercicios: ["ejercicios", "rutinas"],
-  rutinas: ["rutinas", "ejercicios"],
-  comidas: ["comidas", "nutricion_dias"],
-  nutricion_dias: ["nutricion_dias", "comidas", "nutricion"],
-  nutricion: ["nutricion", "nutricion_dias"],
-  ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias"],
+  ejercicios: ["ejercicios", "rutinas", "progreso"],
+  rutinas: ["rutinas", "ejercicios", "progreso", "ciclos"],
+  comidas: ["comidas", "nutricion_dias", "nutricion"],
+  nutricion_dias: ["nutricion_dias", "comidas", "nutricion", "nutricion_progreso"],
+  nutricion: ["nutricion", "nutricion_dias", "nutricion_progreso", "ciclos"],
+  ciclos: ["ciclos", "rutinas", "nutricion", "nutricion_dias", "progreso", "nutricion_progreso", "metricas_progreso"],
   disponibilidad: ["disponibilidad", "citas"],
   citas: ["citas", "disponibilidad", "citas_ratings", "notificaciones"],
   citas_ratings: ["citas_ratings", "citas", "directorio_nutriologos_publicos"],
   profiles: ["profiles", "directorio_nutriologos_publicos"],
-  clientes: ["clientes"],
-  metricas_progreso: ["metricas_progreso"],
-  progreso: ["progreso"],
-  nutricion_progreso: ["nutricion_progreso"],
+  clientes: ["clientes", "ciclos", "metricas_progreso", "progreso", "nutricion_progreso"],
+  metricas_progreso: ["metricas_progreso", "clientes"],
+  progreso: ["progreso", "rutinas", "ejercicios"],
+  nutricion_progreso: ["nutricion_progreso", "nutricion_dias", "nutricion"],
   pagos_manuales: ["pagos_manuales", "profiles", "clientes", "comisiones"],
   solicitudes_profesionales: ["solicitudes_profesionales", "profiles"],
   productos: ["productos"],
@@ -830,9 +830,10 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
     const now = Date.now();
     const ageMs = cached ? now - (cached.timestamp || 0) : Infinity;
 
-    // Si el dato en caché es válido (no fue invalidado por ningún cambio local o remoto)
-    // y está fresco dentro del TTL, devolverlo en 0 ms sin consumir Egress de Supabase
-    if (cached && !cached.invalidated) {
+    // Si el dato en caché es válido (no fue invalidado por ningún cambio local o remoto),
+    // no está vacío (un array vacío nunca debe bloquear la consulta de red) y está fresco dentro del TTL
+    const isEmptyArray = Array.isArray(cached?.data) && cached.data.length === 0;
+    if (cached && !cached.invalidated && !isEmptyArray) {
       const ttl = opts.force ? FORCE_DEDUP_MS : DEFAULT_CACHE_TTL_MS;
       if (ageMs < ttl) {
         if (onBackgroundUpdate) {
@@ -1057,8 +1058,8 @@ export const refreshStaleCache = async (maxAgeMs = 15 * 60 * 1000, limit = 8) =>
     .filter(([k, v]) => {
       if (k.startsWith("rpc/")) return false;
       if (v.invalidated) return true;
-      // No re-descargar historiales masivos por tiempo si no han sido invalidados por un cambio real
-      if (k.startsWith("progreso?") || k.startsWith("nutricion_progreso?") || k.startsWith("biblioteca_ejercicios")) {
+      // Catálogos estáticos no necesitan refresco periódico por tiempo
+      if (k.startsWith("biblioteca_ejercicios")) {
         return false;
       }
       return now - (v.timestamp || 0) > effectiveMaxAge;

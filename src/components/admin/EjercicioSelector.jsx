@@ -1,17 +1,78 @@
-import { useState } from "react";
-import { GRUPOS } from "../../lib/constants";
+import { useState, useMemo } from "react";
+import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
 import { Search, Image as ImageIcon } from "lucide-react";
 import { CustomSelect } from "../ui/CustomSelect";
 
-export function EjercicioSelector({ biblioteca, onSelect, selected }) {
+export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState("Todos");
-  
-  const filtrados = biblioteca.filter(e => {
-    const yaEsta = selected.find(s => s.biblioteca_id === e.id);
-    if (yaEsta) return false;
-    const matchG = filtroGrupo === "Todos" || e.grupo_muscular === filtroGrupo;
-    const matchB = e.nombre.toLowerCase().includes(busqueda.toLowerCase());
+
+  // Opciones de grupos musculares con etiquetas legibles y grupos extra dinámicos
+  const opcionesGrupos = useMemo(() => {
+    const opts = [
+      { value: "Todos", label: "Todos los grupos" },
+      ...GRUPOS.map(g => ({
+        value: g,
+        label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
+      }))
+    ];
+
+    const knownNorms = new Set(GRUPOS.map(g => normalizeMuscleGroup(g)));
+    const extras = new Set();
+    (biblioteca || []).forEach(e => {
+      const raw = (e.grupo_muscular || "").trim();
+      if (raw) {
+        const norm = normalizeMuscleGroup(raw);
+        if (!knownNorms.has(norm) && !extras.has(norm)) {
+          extras.add(norm);
+          opts.push({
+            value: raw,
+            label: raw.charAt(0).toUpperCase() + raw.slice(1)
+          });
+        }
+      }
+    });
+
+    return opts;
+  }, [biblioteca]);
+
+  // Verificar si un ejercicio ya forma parte del plan (como principal o alternativa)
+  const isAlreadyInPlan = (e) => {
+    if (!selected || !Array.isArray(selected) || selected.length === 0) return false;
+    const targetId = String(e.id || e.biblioteca_id || "");
+    const targetName = (e.nombre || "").trim().toLowerCase();
+
+    return selected.some(s => {
+      const sId = String(s.biblioteca_id || s.id || "");
+      const sName = (s.nombre || "").trim().toLowerCase();
+      if (targetId && sId && sId === targetId) return true;
+      if (targetName && sName && sName === targetName) return true;
+
+      if (Array.isArray(s.alternativas)) {
+        return s.alternativas.some(alt => {
+          const altId = String(alt.biblioteca_id || alt.id || "");
+          const altName = (alt.nombre || "").trim().toLowerCase();
+          if (targetId && altId && altId === targetId) return true;
+          if (targetName && altName && altName === targetName) return true;
+          return false;
+        });
+      }
+      return false;
+    });
+  };
+
+  const normSearch = normalizeMuscleGroup(busqueda);
+
+  const filtrados = (biblioteca || []).filter(e => {
+    // 1. Descartar si ya forma parte de la sesión (como ejercicio principal o alternativa)
+    if (isAlreadyInPlan(e)) return false;
+
+    // 2. Filtro por grupo muscular (con soporte insensible a mayúsculas/minúsculas y acentos)
+    const matchG = matchMuscleGroup(e.grupo_muscular, filtroGrupo);
+
+    // 3. Filtro por nombre de búsqueda (insensible a acentos y mayúsculas)
+    const matchB = !normSearch || normalizeMuscleGroup(e.nombre).includes(normSearch);
+
     return matchG && matchB;
   });
 
@@ -30,11 +91,11 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
             className="w-full bg-white border border-[#E2E8F0] rounded-xl pl-9 pr-4 py-2 text-sm text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
           />
         </div>
-        <div className="min-w-[150px]">
+        <div className="min-w-[170px]">
           <CustomSelect 
             value={filtroGrupo} 
             onChange={setFiltroGrupo} 
-            options={["Todos", ...GRUPOS]}
+            options={opcionesGrupos}
           />
         </div>
       </div>
@@ -65,7 +126,7 @@ export function EjercicioSelector({ biblioteca, onSelect, selected }) {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-[#0B1929] truncate">{e.nombre}</div>
                 <div className="text-[10px] font-semibold tracking-wider text-[var(--brand-primary)] uppercase truncate">
-                  {e.grupo_muscular}
+                  {GRUPO_LABELS[e.grupo_muscular] || e.grupo_muscular}
                 </div>
               </div>
             </button>

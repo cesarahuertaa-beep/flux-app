@@ -9,11 +9,8 @@ const MIN_INTERVAL = 30 * 60 * 1000;
 
 const safe = async (p) => {
   try {
-    // Si es una tabla histórica masiva o catálogo estático y ya existe en la caché offline, no volver a descargarla en segundo plano
-    if (
-      (p.startsWith("progreso?") || p.startsWith("nutricion_progreso?") || p.startsWith("biblioteca_ejercicios")) &&
-      dbPeek(p) !== null
-    ) {
+    // Catálogos estáticos no necesitan re-descargarse si ya existen en la caché offline
+    if (p.startsWith("biblioteca_ejercicios") && dbPeek(p) !== null) {
       return dbPeek(p);
     }
     return await dbGet(p);

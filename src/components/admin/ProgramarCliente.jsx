@@ -2917,8 +2917,34 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     });
   };
   const addEj = (ej) => {
+    const targetId = String(ej.id || ej.biblioteca_id || "");
+    const targetName = (ej.nombre || "").trim().toLowerCase();
+
+    // Validar si el ejercicio ya forma parte del plan (como principal o alternativa)
+    const yaEstaEnRutina = (rutinaForm.ejercicios || []).some(s => {
+      const sId = String(s.biblioteca_id || s.id || "");
+      const sName = (s.nombre || "").trim().toLowerCase();
+      if (targetId && sId && sId === targetId) return true;
+      if (targetName && sName && sName === targetName) return true;
+
+      if (Array.isArray(s.alternativas)) {
+        return s.alternativas.some(a => {
+          const aId = String(a.biblioteca_id || a.id || "");
+          const aName = (a.nombre || "").trim().toLowerCase();
+          if (targetId && aId && aId === targetId) return true;
+          if (targetName && aName && aName === targetName) return true;
+          return false;
+        });
+      }
+      return false;
+    });
+
+    if (yaEstaEnRutina) {
+      setMsg?.(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-500" /> El ejercicio ya forma parte de esta rutina</div>);
+      return;
+    }
+
     if (activeAltSlot === null) {
-      if (rutinaForm.ejercicios.find(e=>e.biblioteca_id===ej.id)) return;
       setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
         _dndId: Math.random().toString(36).slice(2,9), 
         biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, 
@@ -2928,8 +2954,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setRutinaForm(p => {
         const es = [...p.ejercicios];
         const main = es[activeAltSlot];
+        if (!main) return p;
         if ((main.alternativas || []).length >= 2) return p;
-        if ((main.alternativas || []).find(a => a.biblioteca_id === ej.id)) return p;
         const newAlt = {
           biblioteca_id: ej.id, nombre: ej.nombre, gif_url: ej.gif_url||"",
           reps_sugeridas: main.reps_sugeridas || 10, peso_sugerido: main.peso_sugerido ||"", unidad: main.unidad ||"kg"
