@@ -134,6 +134,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   const [editClientForm, setEditClientForm] = useState({ nombre:"", telefono:"", objetivo:"" });
   const [saving, setSaving]                 = useState(false);
   const [msg, setMsg]                       = useState("");
+
+  useEffect(() => {
+    if (!msg) return;
+    const timer = setTimeout(() => {
+      setMsg("");
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [msg]);
+
   const [biblioteca, setBiblioteca]         = useState(() => Array.isArray(_peekBiblio) ? _peekBiblio : []);
   const [nutriologoMap, setNutrioMap]       = useState({});
   const [searchClientes, setSearchClientes] = useState("");
@@ -1101,12 +1110,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           <span>Tu suscripción vence pronto. Sube tu comprobante en "Mi Membresía" antes de 48 horas para evitar la suspensión.</span>
         </div>
       )}
-      {/* Toast Notification (z-[110] para que siempre esté arriba) */}
+      {/* Toast Notification (solo para escritorio md:, desaparece automáticamente) */}
       {msg && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] w-max max-w-[92vw] animate-in slide-in-from-top-4">
-          <div className="bg-white px-4 py-3 rounded-xl shadow-lg border border-[#E2E8F0] flex items-center gap-3">
+        <div className="hidden md:block fixed top-5 left-1/2 -translate-x-1/2 z-[110] w-max max-w-lg animate-in slide-in-from-top-4 duration-200">
+          <div className="bg-white px-4 py-3 rounded-2xl shadow-xl border border-[#E2E8F0] flex items-center gap-3">
             <span className="text-sm font-medium text-[#0B1929] break-words min-w-0">{msg}</span>
-            <button onClick={() => setMsg("")} className="text-[#6B7A8D] hover:text-[#0B1929] shrink-0">
+            <button 
+              type="button"
+              onClick={() => setMsg("")} 
+              className="text-[#6B7A8D] hover:text-[#0B1929] p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+              title="Cerrar notificación"
+            >
               <X size={16} />
             </button>
           </div>
