@@ -3116,84 +3116,87 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     <div className="w-full flex-1 flex flex-col pb-28 md:pb-8">
       {/* ── Cabecera cliente / Mi Plan ── */}
       <div className="mb-0 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3.5 sm:p-5 shadow-none md:shadow-sm">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           
-          {/* Fila 1: Botón Volver + Nombre del Paciente (espacio completo, sin truncar) */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            {!isMiPlan && (
-              <button
-                type="button"
-                onClick={() => (onBackToList ? onBackToList() : setSelected(null))}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                title="Volver a la lista de pacientes"
-                aria-label="Volver a la lista de pacientes"
-              >
-                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            )}
-            <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate" title={selected?.nombre}>
-              {selected?.nombre || (isMiPlan ? "Mi Plan Personal" : "Paciente")}
-            </h2>
-          </div>
-
-          {/* Fila 2: Metadatos demográficos (Edad, Sexo, Peso, Objetivo) */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {edadStr && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
-                {edadStr}
-              </span>
-            )}
-            {sexoStr && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
-                {sexoStr}
-              </span>
-            )}
-            {pesoStr && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                {pesoStr}
-              </span>
-            )}
-            {selected?.objetivo && (
-              <span className="hidden sm:inline-block text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-50/70 text-[var(--brand-primary)] truncate max-w-[200px]" title={selected.objetivo}>
-                {selected.objetivo}
-              </span>
-            )}
-          </div>
-
-          {/* Fila 3: Contacto (Email, WhatsApp) */}
-          <div className="text-xs text-[#6B7A8D] truncate flex items-center gap-2 flex-wrap">
-            {selected?.email && (
-              <span className="truncate max-w-[200px] sm:max-w-none text-[#9BA5B0]" title={selected.email}>
-                {selected.email}
-              </span>
-            )}
-            {!isMiPlan && selected?.telefono && (
-              <span className="flex items-center gap-1.5 shrink-0">
-                <span className="text-slate-300">•</span>
-                <a
-                  href={`https://wa.me/${sanitizeWhatsAppPhone(selected.telefono)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
-                  title="Abrir chat de WhatsApp con el paciente"
+          {/* Lado izquierdo: Información del paciente */}
+          <div className="flex flex-col gap-1.5 sm:gap-2 min-w-0 flex-1">
+            {/* Fila 1: Botón Volver + Nombre del Paciente (espacio completo, sin truncar) */}
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              {!isMiPlan && (
+                <button
+                  type="button"
+                  onClick={() => (onBackToList ? onBackToList() : setSelected(null))}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F0F4FA] hover:bg-[#E2E8F0] text-[#0B1929] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  title="Volver a la lista de pacientes"
+                  aria-label="Volver a la lista de pacientes"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                  <span>{selected.telefono}</span>
-                </a>
-              </span>
-            )}
-            {isMiPlan && (
-              <span className="hidden md:inline text-[#9BA5B0] font-medium">Gestión de objetivos y planificación personal</span>
-            )}
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              )}
+              <h2 className="text-base sm:text-lg font-bold text-[#0B1929] truncate" title={selected?.nombre}>
+                {selected?.nombre || (isMiPlan ? "Mi Plan Personal" : "Paciente")}
+              </h2>
+            </div>
+
+            {/* Fila 2: Metadatos demográficos (Edad, Sexo, Peso, Objetivo) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {edadStr && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
+                  {edadStr}
+                </span>
+              )}
+              {sexoStr && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#F0F4FA] text-[#6B7A8D] whitespace-nowrap">
+                  {sexoStr}
+                </span>
+              )}
+              {pesoStr && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                  {pesoStr}
+                </span>
+              )}
+              {selected?.objetivo && (
+                <span className="hidden sm:inline-block text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-50/70 text-[var(--brand-primary)] truncate max-w-[200px]" title={selected.objetivo}>
+                  {selected.objetivo}
+                </span>
+              )}
+            </div>
+
+            {/* Fila 3: Contacto (Email, WhatsApp) */}
+            <div className="text-xs text-[#6B7A8D] truncate flex items-center gap-2 flex-wrap">
+              {selected?.email && (
+                <span className="truncate max-w-[200px] sm:max-w-none text-[#9BA5B0]" title={selected.email}>
+                  {selected.email}
+                </span>
+              )}
+              {!isMiPlan && selected?.telefono && (
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-slate-300">•</span>
+                  <a
+                    href={`https://wa.me/${sanitizeWhatsAppPhone(selected.telefono)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
+                    title="Abrir chat de WhatsApp con el paciente"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>{selected.telefono}</span>
+                  </a>
+                </span>
+              )}
+              {isMiPlan && (
+                <span className="hidden md:inline text-[#9BA5B0] font-medium">Gestión de objetivos y planificación personal</span>
+              )}
+            </div>
           </div>
 
-          {/* Fila 4: Acciones (Histórico y Expediente) abajo de donde está el correo */}
-          <div className={`${isMiPlan ? "hidden sm:flex" : "flex"} items-center gap-2 pt-1`}>
+          {/* Acciones (Histórico y Expediente): En móvil abajo del correo, en computadora a la derecha de la cabecera */}
+          <div className={`${isMiPlan ? "hidden sm:flex" : "flex"} items-center gap-2 pt-1 md:pt-0 shrink-0`}>
             {!isMiPlan && (
               <button
                 type="button"
                 onClick={() => setShowHistorico(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer"
+                className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer"
                 title="Abrir progreso histórico plan a plan en pantalla completa"
               >
                 <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
@@ -3204,7 +3207,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             <button
               type="button"
               onClick={() => setShowExpediente(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer"
               title="Abrir Expediente Clínico Integral"
             >
               <ClipboardList className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
