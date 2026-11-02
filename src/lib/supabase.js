@@ -1334,7 +1334,7 @@ export const invokeEdgeFunction = async (functionName, body = {}) => {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    throw new Error(data.error || data.message || `Error en función ${functionName} (${r.status})`);
+    throw new Error(data.message || data.error || `Error en función ${functionName} (${r.status})`);
   }
   return data;
 };

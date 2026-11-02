@@ -486,7 +486,13 @@ export async function auditMacroPrescriptionWithAi({
       };
     }
   } catch (edgeErr) {
-    if (edgeErr?.message?.includes("rechazada") || edgeErr?.message?.includes("API Key")) {
+    if (
+      edgeErr?.message?.includes("rechazada") ||
+      edgeErr?.message?.includes("API Key") ||
+      edgeErr?.message?.includes("GEMINI_AUTH_ERROR") ||
+      edgeErr?.message?.includes("Google Gemini") ||
+      edgeErr?.message?.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+    ) {
       throw edgeErr;
     }
   }
@@ -640,7 +646,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
   }
 
   throw new Error(
-    "No se pudo conectar con Google Gemini. Asegúrate de configurar una API Key válida (GEMINI_API_KEY) en Supabase Secrets o en el archivo .env."
+    "No se pudo conectar con Google Gemini. Asegúrate de configurar una API Key válida (GEMINI_API_KEY) de Google AI Studio (https://aistudio.google.com/app/apikey) en Supabase Secrets o en el archivo .env."
   );
 }
 

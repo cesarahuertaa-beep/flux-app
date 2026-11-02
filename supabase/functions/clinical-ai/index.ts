@@ -62,11 +62,8 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const action = body.action || "clinical-synopsis";
-    const geminiKey =
-      body.geminiKey ||
-      Deno.env.get("GEMINI_API_KEY") ||
-      Deno.env.get("VITE_GEMINI_API_KEY") ||
-      "";
+    const envKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("VITE_GEMINI_API_KEY") || "";
+    const geminiKey = envKey || body.geminiKey || "";
 
     // =========================================================================
     // ACCIÓN 1: AUDITORÍA DE PRESCRIPCIÓN DE MACROS CON GOOGLE GEMINI (REAL)
