@@ -450,6 +450,7 @@ export default function Training({
   isLocked = false,
   ultimoPeso = null,
   isSelfManaged = false,
+  ciclo = null,
 }) {
   // Semana actual (índice 0-based para leer de progreso)
   const wi = Math.max(0, semanaActualCiclo - 1);
@@ -501,7 +502,9 @@ export default function Training({
     return { obj: (ex.alternativas || [])[altIdx] || ex, variantId };
   };
 
-  const totalSemanas = rutinaActiva?.semanas || 4;
+  const totalSemanas = parseInt(rutinaActiva?.semanas) ||
+    (ciclo?.nombre?.includes("|") ? parseInt(ciclo.nombre.split("|")[1]) : 0) ||
+    Math.max(semanaActualCiclo, 4);
 
   const calcular1RMForGraph = (peso, reps) => {
     const p = parseFloat(peso), r = parseFloat(reps);
@@ -538,13 +541,21 @@ export default function Training({
 
   const getPrevVal = (exId, variantId, exObj, si, tipo) => {
     if (wi === 0) {
-      if (tipo ==="reps") return exObj.reps_sugeridas ||"10";
-      if (tipo ==="peso") return exObj.peso_sugerido ||"-";
-      return"";
+      if (tipo === "reps") return exObj.reps_sugeridas || "10";
+      if (tipo === "peso") return exObj.peso_sugerido || "-";
+      return "";
     }
-    const key = `${exId}-${wi - 1}-${si}-${tipo}-${variantId}`;
-    const val = progresoSemanaAnterior[key] || progreso[key];
-    return val ||"N/A";
+    // Buscar en semanas anteriores desde wi - 1 hacia atrás hasta encontrar el último registro real
+    for (let prevW = wi - 1; prevW >= 0; prevW--) {
+      const key = `${exId}-${prevW}-${si}-${tipo}-${variantId}`;
+      const val = (prevW === wi - 1 ? progresoSemanaAnterior[key] : null) || progreso[key];
+      if (val && val !== "-" && val !== "N/A" && val !== "Falta") {
+        return val;
+      }
+    }
+    if (tipo === "reps") return exObj.reps_sugeridas || "10";
+    if (tipo === "peso") return exObj.peso_sugerido || "-";
+    return "N/A";
   };
 
   const parseDisplayWeight = (dbVal, unit) => {
@@ -1138,7 +1149,7 @@ export default function Training({
                                   strokeWidth={2}
                                   dot={{ fill: seriesColors[s % seriesColors.length], r: 3 }}
                                   name={`Serie ${s + 1}`}
-                                  connectNulls={false}
+                                  connectNulls={true}
                                 />
                               ))}
                             </LineChart>

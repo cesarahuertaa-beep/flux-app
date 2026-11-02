@@ -111,7 +111,21 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       ? _peekRs.map(r => ({ ...r, ejercicios: (r.ejercicios || []).sort((a, b) => a.orden - b.orden) }))
       : []
   );
-  const [progreso, setProgreso] = useState({});
+  const [progreso, setProgreso] = useState(() => {
+    if (!cliente?.id) return {};
+    const rs = Array.isArray(_peekRs) ? _peekRs : [];
+    const allIds = rs.flatMap(r => (r.ejercicios || []).map(e => e.id));
+    const peeked = (allIds.length > 0 ? dbPeek(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`) : null) ||
+                   dbPeek(`progreso?cliente_id=eq.${cliente.id}&limit=3000`);
+    if (Array.isArray(peeked) && peeked.length > 0) {
+      const pm = {};
+      peeked.forEach(p => {
+        pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor;
+      });
+      return pm;
+    }
+    return {};
+  });
   const [nutriProgreso, setNutriProgreso] = useState(() => {
     const npRows = cliente?.id ? dbPeek(`nutricion_progreso?cliente_id=eq.${cliente.id}&limit=1000`) : null;
     if (!Array.isArray(npRows)) return {};
@@ -203,37 +217,47 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
         setDias([]);
       }
 
-      let rsFull = [];
-      setRutinas(prev => {
-        rsFull = (rs || []).map(r => {
-          const sorted = (r.ejercicios || []).sort((a, b) => a.orden - b.orden);
-          if (sorted.length === 0) {
-            const localMatch = prev.find(p => p.id === r.id || (p.nombre === r.nombre && (p.ejercicios || []).length > 0));
-            if (localMatch && (localMatch.ejercicios || []).length > 0) {
-              return { ...r, ejercicios: localMatch.ejercicios };
-            }
+      const rawRs = Array.isArray(rs) ? rs : [];
+      const rsFull = await Promise.all(rawRs.map(async (r) => {
+        let ejs = (r.ejercicios || []).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        if (ejs.length === 0) {
+          const directEjs = await fetcher(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
+          if (Array.isArray(directEjs) && directEjs.length > 0) {
+            ejs = directEjs.sort((a, b) => (a.orden || 0) - (b.orden || 0));
           }
-          return { ...r, ejercicios: sorted };
-        });
+        }
+        return { ...r, ejercicios: ejs };
+      }));
+
+      setRutinas(prev => {
         const tempRutinas = prev.filter(p => String(p.id).startsWith("temp_") && !rsFull.some(m => m.nombre === p.nombre));
-        rsFull = [...rsFull, ...tempRutinas];
-        return rsFull;
+        return [...rsFull, ...tempRutinas];
       });
 
       const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
-      if (allIds.length) {
-        const ps = await fetcher(`progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
-        if (ps && Array.isArray(ps)) {
-          const pm = {};
-          ps.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-          
-          try {
-            const pending = await getAll();
-            pending.forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
-          } catch(err){}
-          
-          setProgreso(pm);
-        }
+      const progPath = allIds.length > 0
+        ? `progreso?cliente_id=eq.${cliente.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`
+        : `progreso?cliente_id=eq.${cliente.id}&limit=3000`;
+
+      let ps = await fetcher(progPath).catch(() => []);
+      if (!Array.isArray(ps) || ps.length === 0) {
+        ps = await fetcher(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => []);
+      }
+
+      if (ps && Array.isArray(ps)) {
+        const pm = {};
+        ps.forEach(p => {
+          pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor;
+        });
+
+        try {
+          const pending = await getAll();
+          pending.forEach(p => {
+            pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor;
+          });
+        } catch (err) {}
+
+        setProgreso(pm);
       }
     } catch (e) {
       console.error("Error cargando datos del cliente:", e);
@@ -298,13 +322,13 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   }, [cliente?.id]);
 
   // Si está embebido en el panel de Admin (nutriólogo o atleta con Mi Plan)
-  // o el cliente navega a Nutrición, Entrenamiento o Progreso, recargar datos frescos para actualizar gráficas
+  // o el cliente navega a Nutrición, Entrenamiento o Progreso, mantener sincronizados los datos con la caché inteligente
   useEffect(() => {
     if (
       (isEmbedded && (embeddedTab === "nutricion" || embeddedTab === "deporte" || embeddedTab === "progreso")) ||
       (!isEmbedded && (tab === "nutricion" || tab === "deporte" || tab === "progreso"))
     ) {
-      loadData({ silent: true, forceFresh: true });
+      loadData({ silent: true, forceFresh: false });
     }
   }, [isEmbedded, embeddedTab, tab]);
 
@@ -540,6 +564,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                     isLocked={isFuture}
                     ultimoPeso={ultimoPeso}
                     isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded}
+                    ciclo={cicloActivo}
                   />
                 </div>
               )}
