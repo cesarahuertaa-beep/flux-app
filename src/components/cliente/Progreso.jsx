@@ -721,7 +721,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
       </div>
 
-      <div className="px-0 md:px-8 py-3 md:py-8 pb-32 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
+      <div className="px-0 md:px-8 py-3 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
         {view === 'metricas' && (
           <>
           {/* ── RESUMEN DE TRANSFORMACIÓN TOTAL ACUMULADA ── */}

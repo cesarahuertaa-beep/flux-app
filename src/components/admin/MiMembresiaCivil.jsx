@@ -233,7 +233,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   // ── CASO: Premium Incluido (Staff o Patrocinado por Nutriólogo) ──
   if (origen === "staff" || origen === "patrocinado") {
     return (
-      <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-24 md:pb-6 pt-0 md:pt-0">
+      <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-6 md:pb-0 pt-0 md:pt-0">
         <div className="bg-white p-5 md:p-8 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#F0F4FA]">
             <div>
@@ -276,7 +276,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-24 md:pb-6 pt-0 md:pt-0">
+    <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-6 md:pb-0 pt-0 md:pt-0">
       <input
         type="file"
         id="comprobanteUploadCivil"

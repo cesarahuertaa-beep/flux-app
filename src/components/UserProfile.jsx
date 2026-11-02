@@ -247,7 +247,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-32 md:pb-8 px-0 md:px-8 pt-0 md:pt-6">
+      <div className="max-w-4xl mx-auto w-full pb-6 md:pb-8 px-0 md:px-8 pt-0 md:pt-6">
 
       <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={currentMultiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 

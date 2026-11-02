@@ -326,7 +326,7 @@ export default function GestorTienda({ setMsg }) {
   });
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex-1 flex flex-col pb-6 md:pb-0">
       {/* ── BARRA SUPERIOR CON SUB-PESTAÑAS ── */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4 md:mb-6 px-4 pt-3 md:px-0 md:pt-0">
         <div>
@@ -416,7 +416,7 @@ export default function GestorTienda({ setMsg }) {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1">
             {loading ? (
               <div className="flex justify-center py-12 text-[#6B7A8D]">Cargando catálogo...</div>
             ) : filtered.length === 0 ? (
@@ -426,7 +426,7 @@ export default function GestorTienda({ setMsg }) {
                 <p className="text-[#6B7A8D] text-xs sm:text-sm mt-1">No se encontraron productos que coincidan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-32 md:pb-6 px-3.5 md:px-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-0 px-3.5 md:px-0">
                 {filtered.map(p => {
                   const extLink = config.external_links?.[p.id];
                   return (
@@ -510,7 +510,7 @@ export default function GestorTienda({ setMsg }) {
       {/* ── SUB-PESTAÑA 2: AJUSTES DE TIENDA Y REDES ── */}
       {/* ═══════════════════════════════════════════════════════════ */}
       {activeTab === "ajustes" && (
-        <div className="flex-1 overflow-y-auto space-y-6 pb-12">
+        <div className="flex-1 space-y-6 pb-0">
           {/* Tarjeta 1: Canal de Ventas WhatsApp (Múltiples Números y Rotación) */}
           <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#F0F4FA]">

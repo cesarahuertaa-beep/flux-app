@@ -679,7 +679,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       </div>
 
       {/* Directorio List */}
-      <div className="flex-1 px-0 py-3 md:p-8">
+      <div className="flex-1 px-0 py-3 pb-6 md:p-8">
         {loading ? (
           <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
         ) : (

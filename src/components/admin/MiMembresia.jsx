@@ -670,7 +670,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-0 md:space-y-6 animate-fade-in pb-24 md:pb-6 pt-0 md:pt-0">
+    <div className="w-full max-w-5xl mx-auto space-y-0 md:space-y-6 animate-fade-in pb-6 md:pb-0 pt-0 md:pt-0">
       {/* Input de archivo: SOLO en Web para no infringir normas de Google Play en Android */}
       {!isPlayApp && (
         <input

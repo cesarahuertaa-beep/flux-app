@@ -1218,7 +1218,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           </div>
 
           {/* Lista de Clientes */}
-          <div className="flex-1 px-0 py-0 md:p-8">
+          <div className="flex-1 px-0 py-0 pb-6 md:p-8">
             {loading ? (
               <CardGridSkeleton count={6} />
             ) : filteredClientes.length === 0 ? (
