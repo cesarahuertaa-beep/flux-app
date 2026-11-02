@@ -644,7 +644,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const InputClass = "w-full bg-[#F0F4FA] border border-transparent rounded-xl px-3.5 py-2.5 text-sm text-[#0B1929] outline-none focus:bg-white focus:border-[var(--brand-primary)] transition-all";
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+    <div className="flex-1 flex flex-col bg-[#F7F9FC]">
       {/* Header */}
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3 md:gap-4 pr-12 md:pr-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -679,7 +679,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       </div>
 
       {/* Directorio List */}
-      <div className="flex-1 px-0 py-3 pb-6 md:p-8">
+      <div className="flex-1 px-0 py-3 pb-28 md:p-8">
         {loading ? (
           <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
         ) : (

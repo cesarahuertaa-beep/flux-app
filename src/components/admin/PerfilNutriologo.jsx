@@ -227,7 +227,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   }, [configPago.clabe, configPago.banco, configPago.beneficiario]);
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+    <div className="w-full flex-1 flex flex-col bg-[#F7F9FC]">
       {/* Header estandarizado */}
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -241,7 +241,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-6 md:pb-8 px-0 md:px-8 pt-0 md:pt-6 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto w-full pb-28 md:pb-8 px-0 md:px-8 pt-0 md:pt-6 overflow-x-hidden">
       {err && <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">{err}</div>}
       {msg && <div className="mb-4 bg-green-50 text-green-600 p-4 rounded-xl border border-green-200">{msg}</div>}
 
@@ -337,7 +337,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         )}
       </IdentidadEmpresarialCard>
 
-      <div className="bg-white md:bg-transparent px-4 pt-3 pb-4 md:p-0 border-t md:border-0 border-[#E2E8F0] flex flex-col sm:flex-row gap-3 md:gap-4 mt-0 md:mt-8">
+      <div className="bg-white md:bg-transparent px-4 pt-3 pb-0 md:p-0 border-t md:border-0 border-[#E2E8F0] flex flex-col sm:flex-row gap-3 md:gap-4 mt-0 md:mt-8">
         {!(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) && !(window.Capacitor && window.Capacitor.isNativePlatform()) && (
           <button onClick={() => window.location.href = "/"} className="sm:w-auto w-full py-3.5 px-6 rounded-xl font-bold text-[#0B1929] bg-white hover:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center gap-2 transition-all shadow-sm">
             <ShoppingBag size={18} /> Ir a la tienda FLUX

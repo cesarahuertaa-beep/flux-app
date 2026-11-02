@@ -178,7 +178,7 @@ export default function Aprobaciones({ setMsg }) {
   }
 
   return (
-    <div className="px-0 py-4 pb-6 md:py-0 md:pb-0 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
+    <div className="px-0 py-4 pb-28 md:py-0 md:pb-8 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap px-4 md:px-0">
         <div>
           <h2 className="text-lg md:text-2xl font-bold text-[#0B1929]">Aprobaciones Profesionales</h2>

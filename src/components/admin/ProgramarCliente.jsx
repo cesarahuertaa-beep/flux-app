@@ -3113,7 +3113,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const pesoStr = latestMetrica?.peso ? `${latestMetrica.peso} kg` : (selected?.peso ? `${selected.peso} kg` : null);
 
   return (
-    <div className="w-full flex-1 flex flex-col pb-6 md:pb-0">
+    <div className="w-full flex-1 flex flex-col pb-28 md:pb-8">
       {/* ── Cabecera cliente / Mi Plan ── */}
       <div className="mb-0 md:mb-4 bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] p-3.5 sm:p-5 shadow-none md:shadow-sm">
         <div className="flex flex-col gap-2">

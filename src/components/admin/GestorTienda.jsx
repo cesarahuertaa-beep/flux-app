@@ -326,7 +326,7 @@ export default function GestorTienda({ setMsg }) {
   });
 
   return (
-    <div className="flex-1 flex flex-col pb-6 md:pb-0">
+    <div className="flex-1 flex flex-col pb-28 md:pb-8">
       {/* ── BARRA SUPERIOR CON SUB-PESTAÑAS ── */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4 md:mb-6 px-4 pt-3 md:px-0 md:pt-0">
         <div>

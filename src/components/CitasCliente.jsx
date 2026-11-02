@@ -298,7 +298,7 @@ export function CitasCliente({ cliente }) {
   const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada","rechazada","completada"].includes(c.estado));
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+    <div className="flex-1 flex flex-col bg-[#F7F9FC]">
       {/* ── Header ── */}
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-3 md:mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -345,7 +345,7 @@ export function CitasCliente({ cliente }) {
       )}
 
       {/* ── Main Content ── */}
-      <div className="px-0 md:px-8 flex-1 pb-6 md:pb-8">
+      <div className="px-0 md:px-8 flex-1 pb-28 md:pb-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-[#6B7A8D]">
             <div className="w-10 h-10 border-4 border-[#F0F4FA] border-t-[var(--brand-primary)] rounded-full animate-spin mb-4" />

@@ -303,7 +303,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   };
 
   return (
-    <div className="pb-6 md:pb-0">
+    <div className="pb-28 md:pb-8">
       {/* Top action bar */}
       <div className="flex justify-between items-center mb-4 md:mb-5 flex-wrap gap-3 px-4 pt-3 md:px-0 md:pt-0">
         <div className="text-sm text-[#6B7A8D] font-medium">

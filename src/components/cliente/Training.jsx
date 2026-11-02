@@ -705,7 +705,7 @@ export default function Training({
     totalSetsDay > 0 ? Math.min(100, Math.round((completedSetsDay / totalSetsDay) * 100)) : 0;
 
   return (
-    <div className="flex-1 flex flex-col relative bg-[#F7F9FC] min-h-full">
+    <div className="flex-1 flex flex-col relative bg-[#F7F9FC]">
       {isLocked && (
         <div className="bg-amber-100 text-amber-800 px-4 py-2 text-center text-[11px] md:text-xs font-semibold">
           Este plan arranca en el futuro. Puedes ver tu rutina, pero aún no puedes registrar progreso.
@@ -789,7 +789,7 @@ export default function Training({
       </div>
 
       {/* ── Lista de ejercicios ── */}
-      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-6 md:pb-8 min-h-0">
+      <div className="px-0 md:px-8 flex-1 space-y-0 md:space-y-3 pb-28 md:pb-8 min-h-0">
 
         {/* Barra de Progreso de la Sesión del Día */}
         <div className="bg-white border-b md:border border-[#E2E8F0] shadow-none md:shadow-sm rounded-none md:rounded-xl px-4 py-3.5 flex flex-col gap-2">

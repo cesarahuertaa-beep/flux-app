@@ -424,7 +424,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   return (
-    <div className="space-y-4 md:space-y-5 pt-2 md:pt-0 pb-6 md:pb-0">
+    <div className="space-y-4 md:space-y-5 pt-2 md:pt-0 pb-28 md:pb-8">
       {/* ── Sub-tabs Superiores: Selector de Colección (Multi-Módulo) ── */}
       <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] px-3.5 py-2.5 md:p-1.5 shadow-none md:shadow-sm flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-1.5 overflow-x-auto scroll-hide w-full sm:w-auto">

@@ -234,7 +234,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-white md:bg-[#F7F9FC] min-h-full">
+    <div className="w-full flex-1 flex flex-col bg-white md:bg-[#F7F9FC]">
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
         <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
           Mi Cuenta
@@ -247,7 +247,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full pb-6 md:pb-8 px-0 md:px-8 pt-0 md:pt-6">
+      <div className="max-w-4xl mx-auto w-full pb-28 md:pb-8 px-0 md:px-8 pt-0 md:pt-6">
 
       <RoleSwitcher currentRole={session?.role} currentData={user} multiRoles={currentMultiRoles} onChangeRole={onChangeRole} activeNutriologo={miNutriologo} />
 

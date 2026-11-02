@@ -48,7 +48,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 };
 
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
-  <div className={`flex-1 flex flex-col w-full text-[#0B1929] min-h-full ${title ? "bg-[#F7F9FC]" : "bg-white md:bg-[#F7F9FC]"}`}>
+  <div className={`flex-1 flex flex-col w-full text-[#0B1929] ${title ? "bg-[#F7F9FC]" : "bg-white md:bg-[#F7F9FC]"}`}>
     {title && (
       <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex items-center justify-between gap-2 md:gap-4 shrink-0">
         <div>
@@ -1127,7 +1127,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           />
         </Suspense>
       ) : (tab === "clientes" || visitedTabs.has("clientes")) && (
-        <div className={tab === "clientes" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC] min-h-full" : "hidden"}>
+        <div className={tab === "clientes" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
           {/* Header */}
           <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex flex-col gap-2.5 md:gap-4">
             {/* Cabecera superior: Título */}
@@ -1218,7 +1218,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           </div>
 
           {/* Lista de Clientes */}
-          <div className="flex-1 px-0 py-0 pb-6 md:p-8">
+          <div className="flex-1 px-0 py-0 pb-28 md:p-8">
             {loading ? (
               <CardGridSkeleton count={6} />
             ) : filteredClientes.length === 0 ? (
@@ -1511,7 +1511,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {/* Sub-Components */}
       {(role === "superadmin" || role === "staff") && (tab === "biblioteca" || visitedTabs.has("biblioteca")) && (
-        <div className={tab === "biblioteca" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "biblioteca" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Biblioteca de Ejercicios" subtitle="Colección global de ejercicios con demostración visual">
             <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
           </SubComponentWrapper>
@@ -1519,7 +1519,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
       
       {!isCivil && (tab === "mi_entrenamiento" || visitedTabs.has("mi_entrenamiento")) && (
-        <div className={tab === "mi_entrenamiento" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "mi_entrenamiento" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper
             title="Mi Plan"
             subtitle="Gestiona tu propio plan de alimentación, rutinas y evaluaciones"
@@ -1554,7 +1554,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && (tab === "programar" || visitedTabs.has("programar")) && (
-        <div className={tab === "programar" ? `min-h-full flex-1 flex flex-col ${selected ? "bg-white md:bg-[#F7F9FC]" : "bg-[#F7F9FC]"}` : "hidden"}>
+        <div className={tab === "programar" ? `flex-1 flex flex-col ${selected ? "bg-white md:bg-[#F7F9FC]" : "bg-[#F7F9FC]"}` : "hidden"}>
           <SubComponentWrapper
             title={selected ? null : "Asignador de Dietas y Rutinas"}
             subtitle={selected ? null : "Configura los ciclos de nutrición, entrenamiento y evaluaciones del paciente"}
@@ -1574,7 +1574,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "administrativo" && role !== "staff" && (tab === "equipo" || visitedTabs.has("equipo")) && (
-        <div className={tab === "equipo" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "equipo" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
             <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin} role={role}/>
           </SubComponentWrapper>
@@ -1582,7 +1582,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && role !== "staff" && (tab === "agenda" || visitedTabs.has("agenda")) && (
-        <div className={tab === "agenda" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "agenda" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
             <AgendaAdmin setMsg={setMsg} profileId={myId} clientes={clientes}/>
           </SubComponentWrapper>
@@ -1590,7 +1590,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(isSuperadmin || role === "staff") && (tab === "aprobaciones" || visitedTabs.has("aprobaciones")) && (
-        <div className={tab === "aprobaciones" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "aprobaciones" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Aprobaciones" subtitle="Solicitudes de registro y verificación de especialistas">
             <Aprobaciones setMsg={setMsg} />
           </SubComponentWrapper>
@@ -1598,7 +1598,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && (role === "nutriologo" || role === "nutriologo_estudiante") && (tab === "membresia" || visitedTabs.has("membresia")) && (
-        <div className={tab === "membresia" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "membresia" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mi Membresía" subtitle="Consulta el estado de tu suscripción y sube tus comprobantes de pago">
             <MiMembresia role={role} clientes={clientes} profileId={myId} setMsg={setMsg} onPaymentUploaded={handlePaymentUploaded} />
           </SubComponentWrapper>
@@ -1606,7 +1606,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {isSuperadmin && (tab === "pagos" || visitedTabs.has("pagos")) && (
-        <div className={tab === "pagos" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "pagos" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Auditoría Financiera" subtitle="Control de pagos, tarifas vigentes y comisiones de colaboradores">
             <ControlPagos setMsg={setMsg} />
           </SubComponentWrapper>
@@ -1614,7 +1614,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(role === "staff" || role === "administrativo") && (tab === "comisiones" || visitedTabs.has("comisiones")) && (
-        <div className={tab === "comisiones" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "comisiones" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Mis Comisiones" subtitle="Resumen de tus comisiones generadas y estado de pago">
             <MisComisiones myId={myId} setMsg={setMsg} />
           </SubComponentWrapper>
@@ -1995,7 +1995,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {!isCivil && (tab === "perfil" || visitedTabs.has("perfil")) && (
-        <div className={tab === "perfil" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "perfil" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
             <PerfilNutriologo profileId={myId} onLogout={onLogout} role={role} onChangeRole={onChangeRole} onRolesUpdated={onRolesUpdated} multiRoles={multiRoles} />
           </Suspense>
@@ -2003,7 +2003,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(isSuperadmin || role === "staff") && (tab === "tienda" || visitedTabs.has("tienda")) && (
-        <div className={tab === "tienda" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "tienda" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Gestor de Tienda FLUX" subtitle="Administra el catálogo de productos y suplementos de la tienda">
             <GestorTienda setMsg={setMsg}/>
           </SubComponentWrapper>
@@ -2012,7 +2012,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     
       {/* ════════════ CIVIL PREMIUM TABS ════════════ */}
       {isCivil && (tab === "mi_plan" || visitedTabs.has("mi_plan")) && (
-        <div className={tab === "mi_plan" ? "min-h-full flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "mi_plan" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper
             title="Mi Plan"
             subtitle="Configura tus propios ciclos de alimentación, rutinas y evaluaciones"
@@ -2077,7 +2077,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     
       {((tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ||
         visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('progreso_atleta')) && (
-        <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ? "flex-1 flex flex-col min-h-full" : "hidden"}>
+        <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ? "flex-1 flex flex-col" : "hidden"}>
           {(isCivil ? clienteData : myShadowClient) ? (
             <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
               <ClienteView 

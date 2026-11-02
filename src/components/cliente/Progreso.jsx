@@ -532,7 +532,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col bg-[#F7F9FC] min-h-full">
+      <div className="flex-1 flex flex-col bg-[#F7F9FC]">
         <div className="px-6 md:px-8 pt-6 md:pt-8 pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8">
           <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">Mi Seguimiento</p>
           <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Mis Resultados</h1>
@@ -721,7 +721,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
         </div>
       </div>
 
-      <div className="px-0 md:px-8 py-3 md:py-8 pb-6 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
+      <div className="px-0 md:px-8 py-3 md:py-8 pb-28 md:pb-8 max-w-5xl w-full mx-auto space-y-4 md:space-y-8">
         {view === 'metricas' && (
           <>
           {/* ── RESUMEN DE TRANSFORMACIÓN TOTAL ACUMULADA ── */}
