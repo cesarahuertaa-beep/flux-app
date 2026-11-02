@@ -1066,25 +1066,41 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
             {/* Desglose para Próximo Corte */}
             <div className="bg-white rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden">
-              <div className="p-5 md:p-6 border-b border-[#E2E8F0] flex justify-between items-center">
-                <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
-                  <FileText size={20} className="text-[var(--brand-primary)]" />
-                  <span>Desglose para Próximo Corte</span>
-                </h2>
-                <span className="text-xs font-bold text-[#6B7A8D] bg-slate-100 px-3 py-1 rounded-full">
-                  {fechaCorteText}
-                </span>
+              <div className="p-4 md:p-6 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-100/70 shadow-2xs">
+                    <FileText size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base md:text-lg font-bold text-[#0B1929] leading-tight truncate">
+                      Desglose para Próximo Corte
+                    </h2>
+                    <p className="text-xs text-[#6B7A8D] mt-0.5">
+                      {desglose.length === 0
+                        ? "Sin pacientes en este ciclo"
+                        : `${desglose.length} paciente${desglose.length !== 1 ? "s" : ""} a facturar en este ciclo`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                    Fecha de Corte
+                  </span>
+                  <span className="text-xs font-bold text-[#0B1929] bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80 inline-block mt-0.5">
+                    {fechaCorteText}
+                  </span>
+                </div>
               </div>
 
               {/* Tabla Desktop */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse hidden md:table">
+              <div className="overflow-x-auto hidden md:block">
+                <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50/80 border-b border-[#E2E8F0]">
+                    <tr className="bg-slate-50/70 border-b border-[#E2E8F0]">
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Paciente</th>
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Alta</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Periodo</th>
-                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Periodo Computado</th>
+                      <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Días Facturados</th>
                       <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Costo</th>
                     </tr>
                   </thead>
@@ -1097,93 +1113,187 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                       </tr>
                     ) : (
                       desglose.map((c, i) => (
-                        <tr key={c.id || i} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="py-3.5 px-6 font-semibold text-[#0B1929] text-sm">{c.nombre}</td>
+                        <tr key={c.id || i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-6">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-100/60">
+                                {c.nombre ? c.nombre.slice(0, 2).toUpperCase() : <Users size={14} />}
+                              </div>
+                              <span className="font-semibold text-[#0B1929] text-sm">{c.nombre}</span>
+                            </div>
+                          </td>
                           <td className="py-3.5 px-6 text-xs text-[#6B7A8D] text-center">
                             {c.created_at ? new Date(c.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "Reciente"}
                           </td>
-                          <td className="py-3.5 px-6 text-xs text-[#6B7A8D] text-center font-medium">
+                          <td className="py-3.5 px-6 text-xs text-[#475569] text-center font-medium">
                             {c.periodoStr}
                           </td>
-                          <td className="py-3.5 px-6 text-xs font-medium text-center text-[#0B1929]">
-                            {c.diasCobrar} <span className="text-gray-400 font-normal">/ 30</span>
+                          <td className="py-3.5 px-6 text-center">
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-lg border ${
+                              c.diasCobrar === 30
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                : "bg-blue-50 text-[var(--brand-primary)] border-blue-200/60"
+                            }`}>
+                              {c.diasCobrar === 30 ? "30 días (Mes completo)" : `${c.diasCobrar} de 30 días`}
+                            </span>
                           </td>
-                          <td className="py-3.5 px-6 font-bold text-[var(--brand-primary)] text-right text-sm">
-                            ${(c.costoPaciente || 0).toFixed(2)}
+                          <td className="py-3.5 px-6 font-black text-[var(--brand-primary)] text-right text-sm">
+                            ${(c.costoPaciente || 0).toFixed(2)}{" "}
+                            <span className="text-[10px] text-[#6B7A8D] font-normal">MXN</span>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
+              </div>
 
-                {/* Mobile Cards */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {desglose.length === 0 ? (
-                    <div className="py-8 text-center text-[#6B7A8D] text-xs">
-                      No tienes pacientes a facturar en este ciclo.
-                    </div>
-                  ) : (
-                    desglose.map((c, i) => (
-                      <div key={c.id || i} className="p-4 bg-white space-y-2">
-                        <div className="flex justify-between items-start">
-                          <span className="font-semibold text-sm text-[#0B1929]">{c.nombre}</span>
-                          <span className="font-bold text-sm text-[var(--brand-primary)]">${(c.costoPaciente || 0).toFixed(2)}</span>
+              {/* Mobile Cards (Discretizadas y Ordenadas) */}
+              <div className="md:hidden p-4 space-y-3 bg-[#F8FAFC]/50">
+                {desglose.length === 0 ? (
+                  <div className="py-8 text-center text-[#6B7A8D] text-xs bg-white rounded-2xl border border-dashed border-[#E2E8F0] p-6">
+                    No tienes pacientes a facturar en este ciclo.
+                  </div>
+                ) : (
+                  desglose.map((c, i) => {
+                    const isFullMonth = c.diasCobrar === 30;
+                    return (
+                      <div
+                        key={c.id || i}
+                        className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs space-y-3 transition-shadow"
+                      >
+                        {/* Fila 1: Paciente y Costo */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100">
+                              {c.nombre ? c.nombre.slice(0, 2).toUpperCase() : <Users size={14} />}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm text-[#0B1929] truncate leading-tight">
+                                {c.nombre}
+                              </h4>
+                              <p className="text-[11px] text-[#6B7A8D] mt-0.5 flex items-center gap-1">
+                                <span>Alta:</span>
+                                <span className="font-medium text-[#475569]">
+                                  {c.created_at ? new Date(c.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "Reciente"}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-base font-black text-[var(--brand-primary)]">
+                              ${(c.costoPaciente || 0).toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-[#6B7A8D] block font-semibold">MXN</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                          <span>Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "Reciente"}</span>
-                          <span>Días: {c.diasCobrar}/30</span>
-                        </div>
-                        <div className="text-[11px] text-[#6B7A8D] bg-gray-50 p-2 rounded-xl text-center">
-                          {c.periodoStr}
+
+                        {/* Fila 2: Periodo facturado y proporción de días */}
+                        <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100 text-xs">
+                          <div className="flex items-center gap-1.5 text-[#475569] font-medium text-[11px] min-w-0">
+                            <Clock size={13} className="text-[#6B7A8D] shrink-0" />
+                            <span className="truncate">{c.periodoStr}</span>
+                          </div>
+
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border shrink-0 ${
+                            isFullMonth
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                              : "bg-blue-50 text-[var(--brand-primary)] border-blue-200/60"
+                          }`}>
+                            {isFullMonth ? "30/30 días (Mes)" : `${c.diasCobrar}/30 días`}
+                          </span>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Administrativos patrocinados */}
-                {adminLines.length > 0 && (
-                  <div className="border-t border-[#E2E8F0]">
-                    <div className="px-4 py-2.5 md:px-6 bg-amber-50/60 text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                      Administrativos Premium Patrocinados
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {adminLines.map(l => (
-                        <div key={l.id} className="px-4 py-3 md:px-6 flex items-center justify-between gap-3 flex-wrap">
-                          <div>
-                            <p className="font-semibold text-sm text-[#0B1929]">
-                              {l.nombre}
-                              {!l.activo && <span className="ml-2 text-[11px] font-medium text-[#6B7A8D]">(dado de baja)</span>}
-                            </p>
-                            <p className="text-xs text-[#6B7A8D]">{l.periodoStr} · {l.diasCobrar}/30 días</p>
-                          </div>
-                          <p className="font-bold text-sm text-[var(--brand-primary)]">${(l.costo || 0).toFixed(2)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                    );
+                  })
                 )}
               </div>
 
-              {/* Total Summary */}
-              <div className="p-5 md:p-6 bg-gray-50/60 border-t border-[#E2E8F0]">
-                <div className="space-y-2.5">
-                  <div className="flex justify-between items-center text-xs md:text-sm">
-                    <span className="text-[#6B7A8D]">Subtotal pacientes ({activeCount} pac. a ${currentRate} MXN)</span>
-                    <span className="font-bold text-[#0B1929]">${patientSubtotal.toFixed(2)}</span>
-                  </div>
-                  {adminLines.length > 0 && (
-                    <div className="flex justify-between items-center text-xs md:text-sm">
-                      <span className="text-[#6B7A8D]">Administrativos Premium ({adminLines.length})</span>
-                      <span className="font-bold text-[#0B1929]">${adminTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                    <span className="text-base md:text-lg font-black text-[#0B1929]">Total del Corte</span>
-                    <span className="text-xl md:text-2xl font-black text-[var(--brand-primary)]">
-                      ${totalAmount.toFixed(2)} <span className="text-xs font-semibold text-[#6B7A8D]">MXN</span>
+              {/* Administrativos patrocinados */}
+              {adminLines.length > 0 && (
+                <div className="border-t border-[#E2E8F0] bg-amber-50/20 p-4 md:p-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                      Administrativos Premium Patrocinados ({adminLines.length})
                     </span>
+                    <span className="text-xs font-bold text-amber-800">
+                      ${adminTotal.toFixed(2)} MXN
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {adminLines.map(l => (
+                      <div key={l.id} className="bg-white rounded-xl p-3 border border-amber-200/70 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-[#0B1929] truncate">
+                            {l.nombre}
+                            {!l.activo && (
+                              <span className="ml-2 text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                                Dado de baja
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-[#6B7A8D] mt-0.5 flex items-center gap-1.5">
+                            <span>{l.periodoStr}</span>
+                            <span>·</span>
+                            <span className="font-semibold text-amber-800">{l.diasCobrar}/30 días</span>
+                          </p>
+                        </div>
+                        <p className="font-black text-sm text-[var(--brand-primary)] shrink-0">
+                          ${(l.costo || 0).toFixed(2)}{" "}
+                          <span className="text-[10px] text-[#6B7A8D] font-normal">MXN</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total Summary / Ticket de liquidación con Continuidad Visual */}
+              <div className="p-4 md:p-6 bg-slate-50 border-t border-[#E2E8F0]">
+                <div className="space-y-3">
+                  <div className="space-y-2 text-xs md:text-sm">
+                    <div className="flex justify-between items-center text-[#475569]">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-[#6B7A8D]" />
+                        <span>Subtotal pacientes ({activeCount} pac. a ${Number(currentRate).toFixed(2)} MXN)</span>
+                      </div>
+                      <span className="font-bold text-[#0B1929]">
+                        ${patientSubtotal.toFixed(2)}{" "}
+                        <span className="text-[10px] text-[#6B7A8D] font-normal">MXN</span>
+                      </span>
+                    </div>
+
+                    {adminLines.length > 0 && (
+                      <div className="flex justify-between items-center text-[#475569]">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck size={14} className="text-amber-600" />
+                          <span>Administrativos patrocinados ({adminLines.length})</span>
+                        </div>
+                        <span className="font-bold text-[#0B1929]">
+                          ${adminTotal.toFixed(2)}{" "}
+                          <span className="text-[10px] text-[#6B7A8D] font-normal">MXN</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tarjeta destacada de Total del Corte */}
+                  <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                        Total del Corte
+                      </span>
+                      <span className="text-xs text-[#475569] mt-0.5 block">
+                        Fecha límite: <strong className="text-[#0B1929]">{fechaCorteText}</strong>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl md:text-2xl font-black text-[var(--brand-primary)]">
+                        ${totalAmount.toFixed(2)}
+                      </span>
+                      <span className="text-xs font-bold text-[#6B7A8D] ml-1">MXN</span>
+                    </div>
                   </div>
                 </div>
               </div>
