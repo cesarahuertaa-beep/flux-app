@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { GRUPOS } from "../../lib/constants";
+import { useState, useEffect, useMemo } from "react";
+import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import {
   Plus,
@@ -382,9 +382,39 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ─────────────────────────────────────────────────────────────────────────────
   // FILTRADO DE DATOS
   // ─────────────────────────────────────────────────────────────────────────────
-  const ejerciciosFiltrados = biblioteca.filter(e => {
-    const matchG = filtroGrupoEj === "Todos" || e.grupo_muscular === filtroGrupoEj;
-    const matchB = (e.nombre || "").toLowerCase().includes(busquedaEj.toLowerCase());
+  const opcionesGrupos = useMemo(() => {
+    const opts = [
+      { value: "Todos", label: "Todos los grupos" },
+      ...GRUPOS.map(g => ({
+        value: g,
+        label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
+      }))
+    ];
+
+    const knownNorms = new Set(GRUPOS.map(g => normalizeMuscleGroup(g)));
+    const extras = new Set();
+    (biblioteca || []).forEach(e => {
+      const raw = (e.grupo_muscular || "").trim();
+      if (raw) {
+        const norm = normalizeMuscleGroup(raw);
+        if (!knownNorms.has(norm) && !extras.has(norm)) {
+          extras.add(norm);
+          opts.push({
+            value: raw,
+            label: raw.charAt(0).toUpperCase() + raw.slice(1)
+          });
+        }
+      }
+    });
+
+    return opts;
+  }, [biblioteca]);
+
+  const normBusquedaEj = normalizeMuscleGroup(busquedaEj);
+
+  const ejerciciosFiltrados = (biblioteca || []).filter(e => {
+    const matchG = matchMuscleGroup(e.grupo_muscular, filtroGrupoEj);
+    const matchB = !normBusquedaEj || normalizeMuscleGroup(e.nombre).includes(normBusquedaEj);
     return matchG && matchB;
   });
 
@@ -539,7 +569,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             <CustomSelect
               value={filtroGrupoEj}
               onChange={setFiltroGrupoEj}
-              options={["Todos", ...GRUPOS]}
+              options={opcionesGrupos}
               className="min-w-[140px]"
             />
             {(filtroGrupoEj !== "Todos" || busquedaEj) && (
