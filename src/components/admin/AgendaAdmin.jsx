@@ -833,13 +833,13 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
               <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay citas en esta categoría</div>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0 md:gap-3">
               {citasFiltradas.map((cita, i) => {
                 const estado = ESTADO_COLOR[cita.estado] || ESTADO_COLOR.cancelada;
                 const StateIcon = estado.Icon;
                 const tel = clienteTelefono(cita.cliente_id);
                 return (
-                  <div key={cita.id} className="animate-in bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 relative overflow-hidden shadow-none md:shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
+                  <div key={cita.id} className="animate-in bg-white rounded-none md:rounded-xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 relative overflow-hidden shadow-none md:shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.04}s` }}>
                     {/* Barra lateral estado */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${estado.bar}`} />
 
@@ -939,7 +939,7 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
           </div>
 
           {disponibilidad.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="mx-4 md:mx-0 text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
               <div className="text-[15px] font-semibold text-[#0B1929] mb-2">Sin horarios configurados</div>
               <div className="text-sm text-[#6B7A8D] mb-5">Agrega tu disponibilidad para que los clientes puedan solicitar citas</div>
               <Btn small grad onClick={abrirNuevoHorario}>
@@ -947,9 +947,9 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
               </Btn>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-3">
               {disponibilidad.map(h => (
-                <div key={h.id} className="bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-none md:shadow-sm hover:shadow-md transition-shadow">
+                <div key={h.id} className="bg-white rounded-none md:rounded-xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 flex items-center justify-between gap-3 shadow-none md:shadow-sm hover:shadow-md transition-shadow">
                   <div>
                     <div className="font-bold text-sm text-[#0B1929] mb-1 flex items-center gap-2">
                       <span>{DIAS_FULL[h.dia_semana]}</span>

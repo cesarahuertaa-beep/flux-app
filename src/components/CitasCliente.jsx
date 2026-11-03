@@ -298,9 +298,9 @@ export function CitasCliente({ cliente }) {
   const citasPasadas  = citas.filter(c => new Date(c.fecha_hora) <  new Date() || ["cancelada","rechazada","completada"].includes(c.estado));
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+    <div className="flex-1 flex flex-col bg-white md:bg-[#F7F9FC]">
       {/* ── Header ── */}
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] pr-12 md:pr-8 mb-3 md:mb-6">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] pr-12 md:pr-8 mb-3 md:mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
@@ -371,13 +371,13 @@ export function CitasCliente({ cliente }) {
                 <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-3 md:mb-4 px-4 md:px-0">
                   Citas Próximas
                 </p>
-                <div className="space-y-4">
+                <div className="space-y-0 md:space-y-4">
                   {citasProximas.map(cita => {
                     const estado = ESTADOS[cita.estado] || ESTADOS.pendiente;
                     const { dia, hora } = fmtFechaHora(cita.fecha_hora);
                     const barColor = cita.estado === "confirmada" ? "bg-emerald-500" : cita.estado === "pendiente" ? "bg-amber-400" : "bg-red-500";
                     return (
-                      <div key={cita.id} className="bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden flex relative">
+                      <div key={cita.id} className="bg-white rounded-none md:rounded-xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden flex relative">
                         {/* Status color bar */}
                         <div className={`w-1.5 flex-shrink-0 ${barColor}`} />
                         
@@ -422,12 +422,12 @@ export function CitasCliente({ cliente }) {
                 <p className="text-[10px] font-bold tracking-widest text-[#9BA5B0] uppercase mb-3 md:mb-4 px-4 md:px-0">
                   Historial de Citas
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-0 md:space-y-3">
                     {citasPasadas.map(cita => {
                       const estado = ESTADOS[cita.estado] || ESTADOS.cancelada;
                       const yaCalificado = ratedCitas[cita.id];
                       return (
-                        <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-none md:rounded-xl border-y md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
+                        <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-none md:rounded-xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-[#0B1929] capitalize">
                               {fmtFechaCorta(cita.fecha_hora)}
