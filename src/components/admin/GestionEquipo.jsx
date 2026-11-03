@@ -217,6 +217,39 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     };
   }, [load]);
 
+  const getRoleInfo = (roleKey) => {
+    return allStaffRoles.find(r => r.id === roleKey) || allStaffRoles[0] || DEFAULT_STAFF_ROLES[0];
+  };
+
+  // Opciones de filtro por rol (homologado con Agenda)
+  const roleFilters = useMemo(() => {
+    if (!isSuperadmin) {
+      return [
+        ["todos", `Todos (${equipo.length})`],
+        ["activos", `Activos (${equipo.filter(c => c.activo !== false).length})`],
+        ["suspendidos", `Suspendidos (${equipo.filter(c => c.activo === false).length})`]
+      ];
+    }
+    return [
+      ["todos", `Todos (${equipo.length})`],
+      ...allStaffRoles.map(r => {
+        const cleanName = r.nombre.replace(" (General)", "");
+        const count = equipo.filter(c => (c.especialidad || "staff_general") === r.id).length;
+        return [r.id, `${cleanName} (${count})`];
+      })
+    ];
+  }, [isSuperadmin, equipo, allStaffRoles]);
+
+  const filteredEquipo = useMemo(() => {
+    if (roleFilter === "todos") return equipo;
+    if (isSuperadmin) {
+      return equipo.filter(c => (c.especialidad || "staff_general") === roleFilter);
+    }
+    if (roleFilter === "activos") return equipo.filter(c => c.activo !== false);
+    if (roleFilter === "suspendidos") return equipo.filter(c => c.activo === false);
+    return equipo;
+  }, [equipo, roleFilter, isSuperadmin]);
+
   // Abrir vista completa de edición al interactuar con la tarjeta del colaborador
   const openEdit = (collaborator) => {
     setEditUser(collaborator);
@@ -538,10 +571,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     setNewRoleForm({ nombre: "", departamento: "", descripcion: "", modulos: ["clientes", "tienda", "biblioteca"] });
   };
 
-  const getRoleInfo = (roleKey) => {
-    return allStaffRoles.find(r => r.id === roleKey) || allStaffRoles[0] || DEFAULT_STAFF_ROLES[0];
-  };
-
   // ═══════════════════════════════════════════════════════════════════════════
   // VISTA SUB-PÁGINA COMPLETA: EDITAR COLABORADOR (REEMPLAZA TODA LA PESTAÑA)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -849,35 +878,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       </div>
     );
   }
-
-  // Opciones de filtro por rol (homologado con Agenda)
-  const roleFilters = useMemo(() => {
-    if (!isSuperadmin) {
-      return [
-        ["todos", `Todos (${equipo.length})`],
-        ["activos", `Activos (${equipo.filter(c => c.activo !== false).length})`],
-        ["suspendidos", `Suspendidos (${equipo.filter(c => c.activo === false).length})`]
-      ];
-    }
-    return [
-      ["todos", `Todos (${equipo.length})`],
-      ...allStaffRoles.map(r => {
-        const cleanName = r.nombre.replace(" (General)", "");
-        const count = equipo.filter(c => (c.especialidad || "staff_general") === r.id).length;
-        return [r.id, `${cleanName} (${count})`];
-      })
-    ];
-  }, [isSuperadmin, equipo, allStaffRoles]);
-
-  const filteredEquipo = useMemo(() => {
-    if (roleFilter === "todos") return equipo;
-    if (isSuperadmin) {
-      return equipo.filter(c => (c.especialidad || "staff_general") === roleFilter);
-    }
-    if (roleFilter === "activos") return equipo.filter(c => c.activo !== false);
-    if (roleFilter === "suspendidos") return equipo.filter(c => c.activo === false);
-    return equipo;
-  }, [equipo, roleFilter, isSuperadmin]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // VISTA PRINCIPAL: LISTA DE COLABORADORES O GENERADOR DE ROLES
