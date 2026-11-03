@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
+import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup, getCanonicalMuscleGroup } from "../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import {
   Plus,
@@ -396,8 +396,9 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     (biblioteca || []).forEach(e => {
       const raw = (e.grupo_muscular || "").trim();
       if (raw) {
+        const canonical = getCanonicalMuscleGroup(raw);
         const norm = normalizeMuscleGroup(raw);
-        if (!knownNorms.has(norm) && !extras.has(norm)) {
+        if (!canonical && !knownNorms.has(norm) && !extras.has(norm)) {
           extras.add(norm);
           opts.push({
             value: raw,
@@ -435,6 +436,25 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   // Colores por grupo muscular
   const groupColors = {
+    pecho: "#38bdf8",
+    dorsal: "#818cf8",
+    lumbar: "#6366f1",
+    trapecio: "#a855f7",
+    cuadriceps: "#34d399",
+    isquiotibial: "#10b981",
+    gluteo: "#059669",
+    pantorrilla: "#14b8a6",
+    soleo: "#0d9488",
+    deltoide_anterior: "#f472b6",
+    deltoide_posterior: "#ec4899",
+    biceps: "#fb923c",
+    triceps: "#a78bfa",
+    antebrazo: "#f97316",
+    abdomen: "#fbbf24",
+    oblicuos: "#f59e0b",
+    aductor: "#06b6d4",
+    abductor: "#0284c7",
+    cuello: "#94a3b8",
     Pecho: "#38bdf8",
     Espalda: "#818cf8",
     Piernas: "#34d399",
@@ -714,7 +734,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         <div className="absolute top-2.5 left-2.5">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                            <span>{e.grupo_muscular}</span>
+                            <span>{GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
                           </span>
                         </div>
                         <div className="absolute top-2.5 right-2.5">
@@ -736,7 +756,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                           <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
                             <div className="bg-sky-50/70 border border-sky-100 rounded-lg p-1.5">
                               <span className="text-[10px] text-sky-600 block font-semibold">Grupo Muscular</span>
-                              <span className="text-xs font-bold text-sky-950 truncate block">{e.grupo_muscular}</span>
+                              <span className="text-xs font-bold text-sky-950 truncate block">{GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
                             </div>
                             <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
                               <span className="text-[10px] text-slate-500 block font-semibold">Multimedia</span>
@@ -1065,7 +1085,10 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 <CustomSelect
                   value={formEj.grupo_muscular}
                   onChange={v => setFormEj(p => ({ ...p, grupo_muscular: v }))}
-                  options={GRUPOS}
+                  options={GRUPOS.map(g => ({
+                    value: g,
+                    label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
+                  }))}
                 />
               </div>
 
@@ -1504,8 +1527,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               {previewEj.nombre}
             </div>
             <div className="flex gap-1.5 justify-center mb-4">
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor: `${groupColors[previewEj.grupo_muscular] || "#38bdf8"}20`, color: groupColors[previewEj.grupo_muscular] || "#38bdf8" }}>
-                {previewEj.grupo_muscular}
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor: `${groupColors[previewEj.grupo_muscular] || groupColors[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8"}20`, color: groupColors[previewEj.grupo_muscular] || groupColors[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8" }}>
+                {GRUPO_LABELS[previewEj.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || previewEj.grupo_muscular}
               </span>
             </div>
             <button

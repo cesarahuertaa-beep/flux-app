@@ -23,6 +23,7 @@ import {
   getGoalPresetInfo,
   getActivityFactorInfo
 } from "../../lib/bodyComposition";
+import { getCanonicalMuscleGroup } from "../../lib/constants";
 import { generateProgresoPDF } from "../../utils/pdf";
 
 const EXACT_GROUPS = [
@@ -54,19 +55,8 @@ const calcular1RM = (peso, reps) => {
 
 const normalizeGroup = (g) => {
   if (!g) return "otro";
-  const str = g.toLowerCase().trim();
-  if (EXACT_GROUPS.includes(str)) return str;
-  if (str.includes("pecho") || str.includes("pectoral")) return "pecho";
-  if (str.includes("espalda") || str.includes("dorsal")) return "dorsal";
-  if (str.includes("pierna") || str.includes("cuádriceps") || str.includes("cuadriceps")) return "cuadriceps";
-  if (str.includes("glúteo") || str.includes("gluteo")) return "gluteo";
-  if (str.includes("isquio")) return "isquiotibial";
-  if (str.includes("pantorrilla")) return "pantorrilla";
-  if (str.includes("bíceps") || str.includes("biceps") || str.includes("brazo")) return "biceps";
-  if (str.includes("tríceps") || str.includes("triceps")) return "triceps";
-  if (str.includes("antebrazo")) return "antebrazo";
-  if (str.includes("hombro") || str.includes("deltoide")) return "deltoide_anterior";
-  if (str.includes("abdomen") || str.includes("core")) return "abdomen";
+  const canonical = getCanonicalMuscleGroup(g);
+  if (canonical && EXACT_GROUPS.includes(canonical)) return canonical;
   return "otro";
 };
 

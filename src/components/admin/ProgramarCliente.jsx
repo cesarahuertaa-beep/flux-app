@@ -19,6 +19,7 @@ import {
 import { SortableItem } from "../SortableItem";
 import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
+import { GRUPO_LABELS, getCanonicalMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { generateNutriPDF } from "../../utils/pdf";
@@ -6280,7 +6281,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   </div>
                                   <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
                                     <div className="truncate">{e.nombre}</div>
-                                    <span className="text-[10px] text-[#6B7A8D] font-normal">{e.grupo_muscular}</span>
+                                    <span className="text-[10px] text-[#6B7A8D] font-normal">{GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
                                   </div>
                                   
                                   <div className="col-span-4 sm:col-span-3 sm:col-start-4 sm:row-start-1 grid grid-cols-3 gap-2 sm:grid-cols-[65px_65px_80px] sm:gap-1.5 mt-1.5 sm:mt-0 pt-2 sm:pt-0 border-t border-[#E2E8F0] sm:border-none">

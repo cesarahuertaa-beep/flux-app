@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
+import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup, getCanonicalMuscleGroup } from "../../lib/constants";
 import { Search, Image as ImageIcon } from "lucide-react";
 import { CustomSelect } from "../ui/CustomSelect";
 
@@ -22,8 +22,9 @@ export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) 
     (biblioteca || []).forEach(e => {
       const raw = (e.grupo_muscular || "").trim();
       if (raw) {
+        const canonical = getCanonicalMuscleGroup(raw);
         const norm = normalizeMuscleGroup(raw);
-        if (!knownNorms.has(norm) && !extras.has(norm)) {
+        if (!canonical && !knownNorms.has(norm) && !extras.has(norm)) {
           extras.add(norm);
           opts.push({
             value: raw,
@@ -126,7 +127,7 @@ export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) 
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-[#0B1929] truncate">{e.nombre}</div>
                 <div className="text-[10px] font-semibold tracking-wider text-[var(--brand-primary)] uppercase truncate">
-                  {GRUPO_LABELS[e.grupo_muscular] || e.grupo_muscular}
+                  {GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}
                 </div>
               </div>
             </button>
