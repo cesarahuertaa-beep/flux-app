@@ -740,7 +740,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
       <div 
         key={n.id} 
         onClick={() => setSelectedNutri(n)}
-        className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
+        className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
       >
         <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -837,11 +837,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+    <div className="flex-1 flex flex-col bg-white md:bg-[#F7F9FC]">
       {selectedNutri ? (
-        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+        <div className="flex-1 flex flex-col bg-white md:bg-[#F7F9FC]">
           {/* Header Vista Nutriólogo */}
-          <div className="px-4 md:px-8 pt-4 pb-3 md:pt-6 md:pb-5 bg-white border-b border-[#E2E8F0] flex flex-col gap-3">
+          <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-6 md:pb-5 bg-white border-b border-[#E2E8F0] flex flex-col gap-2.5 md:gap-3">
             <div className="flex items-center justify-between">
               <button 
                 type="button"
@@ -851,18 +851,6 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
                 <span>Volver al Directorio</span>
               </button>
-
-              {isSuperadminProfile && (
-                <button
-                  type="button"
-                  onClick={() => setShowNewClient(true)}
-                  className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--brand-primary)] text-white shadow-sm active:scale-95 transition-all cursor-pointer"
-                  title="Nuevo Paciente"
-                  aria-label="Nuevo Paciente"
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                </button>
-              )}
             </div>
 
             <div className="flex items-start md:items-center justify-between gap-4">
@@ -902,30 +890,32 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                   </p>
                 </div>
               </div>
+            </div>
 
+            {/* Controles de búsqueda y acción */}
+            <div className="flex items-center gap-2 sm:gap-3 w-full mt-1">
+              <div className="relative flex-1 min-w-0">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o email..."
+                  value={patientSearch}
+                  onChange={(e) => setPatientSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:border-[var(--brand-primary)] placeholder:text-[#9BA5B0]"
+                />
+              </div>
               {isSuperadminProfile && (
                 <button
                   type="button"
                   onClick={() => setShowNewClient(true)}
-                  className="hidden md:inline-flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-[42px] px-3 sm:px-4 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
                   title="Nuevo Paciente"
+                  aria-label="Nuevo Paciente"
                 >
-                  <Plus size={16} strokeWidth={2.5} />
-                  <span>Nuevo Paciente</span>
+                  <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+                  <span className="hidden sm:inline">Nuevo Paciente</span>
                 </button>
               )}
-            </div>
-
-            {/* Buscador */}
-            <div className="relative mt-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre o email..."
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-                className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
-              />
             </div>
 
             {/* Píldoras de retención */}
@@ -981,7 +971,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </div>
 
           {/* Grilla de Pacientes */}
-          <div className="flex-1 px-0 py-3 pb-28 md:p-8">
+          <div className="flex-1 px-0 py-0 pb-28 md:p-8">
             {filteredPatients.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center opacity-60">
                 <div className="w-16 h-16 bg-[#E2E8F0] rounded-full flex items-center justify-center mb-4">
@@ -1237,10 +1227,10 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+        <div className="flex-1 flex flex-col bg-white md:bg-[#F7F9FC]">
           {/* Header */}
-          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3 md:gap-4 pr-12 md:pr-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex flex-col gap-2.5 md:gap-4">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
                   {myRole === "staff" ? "Panel de Staff FLUX" : "Panel de Super Administrador"}
@@ -1248,36 +1238,39 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Directorio</h1>
                 <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">{clientes.length} pacientes y {nutriologos.length} nutriólogos en la plataforma</p>
               </div>
-              
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button 
-                  type="button"
-                  onClick={() => setShowInviteNutri(true)} 
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-                >
-                  <Plus size={16} /> Nutriólogo
-                </button>
-              </div>
             </div>
 
-            <div className="relative mt-2">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
-              <input
-                type="text"
-                placeholder="Buscar por nutriólogo o marca..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
-              />
+            {/* Controles de búsqueda y acción */}
+            <div className="flex items-center gap-2 sm:gap-3 w-full">
+              <div className="relative flex-1 min-w-0">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nutriólogo o marca..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:border-[var(--brand-primary)] placeholder:text-[#9BA5B0]"
+                />
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowInviteNutri(true)} 
+                className="flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-[42px] px-3 sm:px-4 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
+                title="Nuevo Nutriólogo"
+                aria-label="Nuevo Nutriólogo"
+              >
+                <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+                <span className="hidden sm:inline">Nutriólogo</span>
+              </button>
             </div>
           </div>
 
           {/* Directorio List */}
-          <div className="flex-1 px-0 py-3 pb-28 md:p-8">
+          <div className="flex-1 px-0 py-0 pb-28 md:p-8">
             {loading ? (
               <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
             ) : (
-              <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+              <div className="flex flex-col gap-0 md:gap-4 max-w-5xl mx-auto">
                 {filteredNutris.filter(n => n.isSuperadmin).map(n => renderNutri(n))}
 
                 {(() => {
@@ -1286,7 +1279,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                     <div 
                       key="__atletas__" 
                       onClick={() => setSelectedNutri({ id: "__atletas__", nombre: "Atletas Independientes", nombre_marca: "Atletas Independientes", isAtletas: true })}
-                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
+                      className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
                     >
                       <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                         <div className="flex items-center gap-3.5 min-w-0">
