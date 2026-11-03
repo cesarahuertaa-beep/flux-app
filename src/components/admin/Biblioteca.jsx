@@ -505,41 +505,39 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   return (
     <div className="w-full flex-1 flex flex-col">
       {/* ── Cabecera Principal con Barra de Búsqueda Integrada ── */}
-      <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0]">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
-              Panel de Administración
-            </p>
-            <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
-              Biblioteca de Ejercicios
-            </h1>
-            <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
-              Colección global de ejercicios con demostración visual, platillos y recetas culinarias
-            </p>
-          </div>
+      <div className="px-4 md:px-8 pt-3 pb-3 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex flex-col gap-3 md:gap-4">
+        <div>
+          <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            Panel de Administración
+          </p>
+          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            Biblioteca de Ejercicios
+          </h1>
+          <p className="text-xs md:text-sm text-[#6B7A8D] mt-1">
+            Colección global de ejercicios con demostración visual, platillos y recetas culinarias
+          </p>
+        </div>
 
-          {/* Barra de Búsqueda en la Cabecera */}
-          <div className="relative w-full md:w-80 shrink-0">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
-            <input
-              type="text"
-              placeholder={searchPlaceholder}
-              value={searchVal}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-[#F7F9FC] md:bg-white border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
-            />
-            {searchVal && (
-              <button
-                type="button"
-                onClick={() => handleSearchChange("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
-                title="Limpiar búsqueda"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+        {/* Barra de Búsqueda debajo de "Colección global..." */}
+        <div className="relative w-full max-w-md">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+          <input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={searchVal}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 md:py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
+          />
+          {searchVal && (
+            <button
+              type="button"
+              onClick={() => handleSearchChange("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
+              title="Limpiar búsqueda"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 
