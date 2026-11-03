@@ -34,9 +34,20 @@ const isProtectedKey = (key) => {
   return PROTECTED_TABLES.has(table);
 };
 
+// Helper de seguridad: evita que un bloqueo de IndexedDB en el navegador congele la aplicación
+const withIdbTimeout = (promise, ms = 1200, fallback = undefined) =>
+  Promise.race([
+    Promise.resolve(promise).catch(() => fallback),
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+
 // ── Caché ──────────────────────────────────────────────────────────────────
 export const loadAllCache = async () => {
-  try { return await odb.cache.toArray(); } catch { return []; }
+  try {
+    return await withIdbTimeout(odb.cache.toArray(), 1200, []);
+  } catch {
+    return [];
+  }
 };
 
 let _dirty = new Map();   // key -> entry | null (null = borrar)
@@ -105,7 +116,7 @@ if (typeof document !== "undefined") {
 const mirrorMutationsToNative = async () => {
   try {
     if (typeof window === "undefined" || !window.FluxNativeSync?.setPendingMutations) return;
-    const all = await odb.mutations.orderBy("id").toArray();
+    const all = await withIdbTimeout(odb.mutations.orderBy("id").toArray(), 1000, []);
     window.FluxNativeSync.setPendingMutations(JSON.stringify(all));
   } catch { /* ignore */ }
 };
@@ -118,7 +129,7 @@ export const syncNativeFlushedMutations = async () => {
     if (!raw) return 0;
     const ids = JSON.parse(raw);
     if (Array.isArray(ids) && ids.length > 0) {
-      await odb.mutations.bulkDelete(ids);
+      await withIdbTimeout(odb.mutations.bulkDelete(ids), 1000);
       await mirrorMutationsToNative();
       return ids.length;
     }
@@ -128,27 +139,27 @@ export const syncNativeFlushedMutations = async () => {
 
 // ── Cola de mutaciones ─────────────────────────────────────────────────────
 export const addMutation = async (m) => {
-  const id = await odb.mutations.add({ ...m, created_at: Date.now() });
+  const id = await withIdbTimeout(odb.mutations.add({ ...m, created_at: Date.now() }), 1200, null);
   await mirrorMutationsToNative();
   return id;
 };
 
 export const getMutations = async () => {
   await syncNativeFlushedMutations();
-  try { return await odb.mutations.orderBy("id").toArray(); } catch { return []; }
+  try { return await withIdbTimeout(odb.mutations.orderBy("id").toArray(), 1000, []); } catch { return []; }
 };
 
 export const removeMutation = async (id) => {
-  await odb.mutations.delete(id);
+  await withIdbTimeout(odb.mutations.delete(id), 1000);
   await mirrorMutationsToNative();
 };
 
 export const countMutations = async () => {
   await syncNativeFlushedMutations();
-  try { return await odb.mutations.count(); } catch { return 0; }
+  try { return await withIdbTimeout(odb.mutations.count(), 1000, 0); } catch { return 0; }
 };
 
 export const clearMutations = async () => {
-  try { await odb.mutations.clear(); } catch { /* ignore */ }
+  try { await withIdbTimeout(odb.mutations.clear(), 1000); } catch { /* ignore */ }
   await mirrorMutationsToNative();
 };

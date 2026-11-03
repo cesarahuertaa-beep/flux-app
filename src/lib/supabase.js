@@ -332,7 +332,7 @@ const mergeNativeSyncedCache = async () => {
 /** Cargar la caché persistida (se garantiza su resolución antes de cualquier dbGet) */
 export const hydrateOfflineCache = () => {
   if (_hydrationPromise) return _hydrationPromise;
-  _hydrationPromise = (async () => {
+  const doHydrate = (async () => {
     try {
       // Limpieza del antiguo caché en localStorage (límite 5MB)
       Object.keys(localStorage).forEach((key) => {
@@ -367,6 +367,16 @@ export const hydrateOfflineCache = () => {
       _isHydrated = true;
     }
   })();
+
+  _hydrationPromise = Promise.race([
+    doHydrate,
+    new Promise((resolve) =>
+      setTimeout(() => {
+        _isHydrated = true;
+        resolve();
+      }, 1500)
+    ),
+  ]);
   return _hydrationPromise;
 };
 

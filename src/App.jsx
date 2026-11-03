@@ -50,11 +50,33 @@ import ClienteView from "./pages/Cliente";
 import Privacidad from "./pages/Privacidad";
 import Terminos from "./pages/Terminos";
 
-const FullScreenLoader = () => (
-  <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
-    <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
-  </div>
-);
+const FullScreenLoader = () => {
+  const [showRecover, setShowRecover] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowRecover(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="min-h-screen bg-[#F7F9FC] flex flex-col items-center justify-center gap-4">
+      <div className="w-11 h-11 rounded-full border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] animate-spin" />
+      {showRecover && (
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+              if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
+            } catch {}
+            window.location.replace(window.location.pathname + "?_cb=" + Date.now());
+          }}
+          className="px-4 py-2.5 bg-white border border-[#E2E8F0] shadow-md rounded-xl text-xs font-bold text-[#1A6FD4] hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          Actualizar versión ↻
+        </button>
+      )}
+    </div>
+  );
+};
 
 const saveSessionMeta = (s) => {
   localStorage.setItem("flux_role", s.role);
@@ -223,7 +245,7 @@ export default function App() {
     const safetyTimer = setTimeout(() => {
       console.warn("[Restore] Timeout de seguridad alcanzado: forzando fin de restoring.");
       setRestoring(false);
-    }, 3500);
+    }, 1800);
 
     const restore = async () => {
       try {

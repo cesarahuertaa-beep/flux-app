@@ -53,6 +53,25 @@
       setTimeout(function() {
         var bootEl = document.getElementById('boot');
         if (bootEl && bootEl.parentNode) {
+          try {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+              });
+            }
+            if (window.caches) {
+              caches.keys().then(function(ks) {
+                ks.forEach(function(k) { caches.delete(k); });
+              });
+            }
+          } catch(e) {}
+          var autoReload = sessionStorage.getItem('flux_boot_auto_cb');
+          var now = Date.now();
+          if (!autoReload || (now - Number(autoReload)) > 15000) {
+            sessionStorage.setItem('flux_boot_auto_cb', String(now));
+            window.location.replace(window.location.pathname + '?_cb=' + now);
+            return;
+          }
           var rec = document.getElementById('boot-rec');
           if (!rec) {
             var btn = document.createElement('button');
@@ -66,14 +85,19 @@
                     regs.forEach(function(r) { r.unregister(); });
                   });
                 }
+                if (window.caches) {
+                  caches.keys().then(function(ks) {
+                    ks.forEach(function(k) { caches.delete(k); });
+                  });
+                }
                 sessionStorage.clear();
               } catch(e) {}
-              window.location.reload();
+              window.location.replace(window.location.pathname + '?_cb=' + Date.now());
             };
             document.body.appendChild(btn);
           }
         }
-      }, 6500);
+      }, 3500);
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
