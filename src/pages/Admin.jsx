@@ -1503,15 +1503,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                           >
                             <Edit2 size={15} />
                           </button>
-                          <button 
-                            onClick={() => toggleActivo(c)}
-                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2.5 rounded-xl transition-colors cursor-pointer shrink-0 ${
-                              c.activo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50'
-                            }`}
-                            title={c.activo ? "Desactivar paciente" : "Activar paciente"}
-                          >
-                            {c.activo ? <X size={15} /> : <CheckCircle2 size={15} />}
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -1787,6 +1778,38 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               <div>
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Objetivo</label>
                 <input value={editClientForm.objetivo} onChange={e=>setEditClientForm(p=>({...p,objetivo:e.target.value}))} className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
+              </div>
+
+              {/* Estado del paciente: Suspender / Activar */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-[#0B1929] flex items-center gap-2">
+                    <span>Estado de la cuenta:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${editClient.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {editClient.activo ? "Activo" : "Suspendido"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#6B7A8D] leading-relaxed">
+                    {editClient.activo 
+                      ? "El paciente puede ingresar a su app y registrar avances." 
+                      : "El acceso del paciente se encuentra suspendido temporalmente."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await toggleActivo(editClient);
+                    setEditClient(prev => prev ? { ...prev, activo: !prev.activo } : null);
+                  }}
+                  disabled={saving}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors shrink-0 cursor-pointer ${
+                    editClient.activo
+                      ? "border-red-200 bg-white text-red-600 hover:bg-red-50"
+                      : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                  }`}
+                >
+                  {editClient.activo ? "Suspender paciente" : "Activar paciente"}
+                </button>
               </div>
 
               {/* Botón de eliminar paciente abajo del objetivo con el diseño de la pestaña perfil */}

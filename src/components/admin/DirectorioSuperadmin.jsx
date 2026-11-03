@@ -1227,16 +1227,6 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                           >
                             <Edit2 size={15} />
                           </button>
-                          <button 
-                            type="button"
-                            onClick={() => toggleActivo(c)}
-                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2.5 rounded-xl transition-colors cursor-pointer shrink-0 ${
-                              c.activo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50'
-                            }`}
-                            title={c.activo ? "Desactivar paciente" : "Activar paciente"}
-                          >
-                            {c.activo ? <X size={15} /> : <CheckCircle2 size={15} />}
-                          </button>
                         </div>
                       </div>
                     </div>
