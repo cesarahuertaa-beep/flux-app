@@ -762,9 +762,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
       >
         {/* ── VISTA MÓVIL (Formato estructurado de 5 filas) ── */}
-        <div className="p-4 md:hidden flex items-start gap-3.5">
-          {/* Foto (posición y tamaño intactos) */}
-          <div className="w-11 h-11 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative mt-0.5">
+        <div className="p-4 md:hidden flex items-center gap-3.5">
+          {/* Foto (posición y tamaño intactos, centrada verticalmente) */}
+          <div className="w-11 h-11 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
             {n.logo_url ? (
               <CachedImage 
                 src={n.logo_url} 
@@ -1400,8 +1400,8 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
                     >
                       {/* Vista Móvil (Estructurada y con contador colapsado en fila 1) */}
-                      <div className="p-4 md:hidden flex items-start gap-3.5">
-                        <div className="w-11 h-11 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10 mt-0.5">
+                      <div className="p-4 md:hidden flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
                           <Dumbbell className="text-[var(--brand-primary)]" size={20} />
                         </div>
 
