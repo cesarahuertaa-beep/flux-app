@@ -142,6 +142,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
   // Modal para editar permisos/pestañas de un rol existente
   const [editingRole, setEditingRole] = useState(null);
+  const [confirmDeleteRole, setConfirmDeleteRole] = useState(false);
   const [editingRoleForm, setEditingRoleForm] = useState({
     nombre: "",
     departamento: "",
@@ -159,8 +160,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   });
 
   // Manejador de botón atrás (Capacitor y navegador)
-  useBackButton(!!showConfirmDelete, () => { setShowConfirmDelete(false); setConfirmDeleteText(""); }, 45);
-  useBackButton(!!editingRole, () => setEditingRole(null), 40);
+  useBackButton(!!showConfirmDelete, () => { setShowConfirmDelete(false); setConfirmDeleteText(""); }, 50);
+  useBackButton(!!confirmDeleteRole, () => setConfirmDeleteRole(false), 45);
+  useBackButton(!!editingRole, () => { setEditingRole(null); setConfirmDeleteRole(false); }, 40);
   useBackButton(!!showNewRoleModal, () => setShowNewRoleModal(false), 35);
   useBackButton(!!conflictUser, () => setConflictUser(null), 30);
   useBackButton(!!confirmPremium, () => setConfirmPremium(null), 25);
@@ -457,6 +459,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   // ─── GESTIÓN DE ROLES: EDITAR PESTAÑAS Y CREAR NUEVO ROL ───────────────────
   const openEditRoleModal = (roleItem) => {
     setEditingRole(roleItem);
+    setConfirmDeleteRole(false);
     setEditingRoleForm({
       nombre: roleItem.nombre || "",
       departamento: roleItem.departamento || "",
@@ -467,14 +470,19 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
   const saveRoleEdit = () => {
     if (!editingRole) return;
+    const cleanNombre = (editingRoleForm.nombre || "").trim();
+    if (!cleanNombre) {
+      setMsg("⚠️ El nombre del rol no puede quedar vacío");
+      return;
+    }
     const roleId = editingRole.id;
     const updatedList = allStaffRoles.map(r => {
       if (r.id === roleId) {
         return {
           ...r,
-          nombre: editingRoleForm.nombre.trim() || r.nombre,
-          departamento: editingRoleForm.departamento.trim() || r.departamento,
-          descripcion: editingRoleForm.descripcion.trim() || r.descripcion,
+          nombre: cleanNombre,
+          departamento: editingRoleForm.departamento.trim() || r.departamento || "Corporativo",
+          descripcion: editingRoleForm.descripcion.trim() || r.descripcion || "",
           modulos: editingRoleForm.modulos
         };
       }
@@ -486,8 +494,20 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updatedList));
     } catch {}
 
-    setMsg(`✅ Pestañas asignadas al rol "${editingRoleForm.nombre || editingRole.nombre}" guardadas con éxito.`);
+    setMsg(`✅ Rol "${cleanNombre}" actualizado con éxito.`);
     setEditingRole(null);
+    setConfirmDeleteRole(false);
+  };
+
+  const handleDeleteRole = (roleId) => {
+    const updated = allStaffRoles.filter(r => r.id !== roleId);
+    setAllStaffRoles(updated);
+    try {
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+    setMsg("✓ Rol eliminado del catálogo corporativo.");
+    setEditingRole(null);
+    setConfirmDeleteRole(false);
   };
 
   const handleCreateCustomRole = () => {
@@ -515,15 +535,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     setMsg(`✅ Rol "${cleanNombre}" creado con éxito.`);
     setShowNewRoleModal(false);
     setNewRoleForm({ nombre: "", departamento: "", descripcion: "", modulos: ["clientes", "tienda", "biblioteca"] });
-  };
-
-  const handleDeleteCustomRole = (roleId) => {
-    const updated = allStaffRoles.filter(r => r.id !== roleId);
-    setAllStaffRoles(updated);
-    try {
-      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
-    setMsg("✓ Rol eliminado.");
   };
 
   const getRoleInfo = (roleKey) => {
@@ -916,16 +927,14 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                       <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${r.colorBadge || 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                         {r.departamento || "Corporativo"}
                       </span>
-                      {isCustom && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCustomRole(r.id)}
-                          className="text-[#94A3B8] hover:text-red-600 transition-colors cursor-pointer p-1"
-                          title="Eliminar rol personalizado"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRole(r.id)}
+                        className="text-[#94A3B8] hover:text-red-600 transition-colors cursor-pointer p-1"
+                        title="Eliminar este rol"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                     <h4 className="text-base font-bold text-[#0B1929] mb-1.5">{r.nombre}</h4>
                     <p className="text-xs text-[#6B7A8D] leading-relaxed mb-4">{r.descripcion}</p>
@@ -962,7 +971,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                       className="px-3.5 py-1.5 rounded-xl bg-[var(--brand-primary)]/10 hover:bg-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
                       <Sliders size={13} />
-                      Editar Pestañas
+                      Editar Rol y Pestañas
                     </button>
                   </div>
                 </div>
@@ -1096,29 +1105,67 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════ */}
-      {/* MODAL CONFIGURAR PESTAÑAS DE UN ROL EXISTENTE                         */}
+      {/* MODAL CONFIGURAR Y EDITAR ROL EXISTENTE                              */}
       {/* ═════════════════════════════════════════════════════════════════════ */}
       {editingRole && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-5 md:p-6 animate-in zoom-in-95 max-h-[92vh] flex flex-col">
             <div className="flex justify-between items-center pb-3 border-b border-[#E2E8F0] shrink-0">
               <div>
-                <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Permisos de Acceso</span>
+                <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Configuración de Rol</span>
                 <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
                   <Sliders size={18} className="text-[var(--brand-primary)]" />
-                  {editingRole.nombre}
+                  Editar Rol: {editingRole.nombre}
                 </h3>
               </div>
               <button 
                 type="button" 
-                onClick={() => setEditingRole(null)}
-                className="text-[#94A3B8] hover:text-[#0B1929] transition-colors p-1"
+                onClick={() => { setEditingRole(null); setConfirmDeleteRole(false); }}
+                className="text-[#94A3B8] hover:text-[#0B1929] transition-colors p-1 cursor-pointer"
               >
                 <XCircle size={22} />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              {/* Campos editables: Nombre y Departamento */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Nombre del Rol</label>
+                  <input
+                    type="text"
+                    value={editingRoleForm.nombre}
+                    onChange={e => setEditingRoleForm(p => ({ ...p, nombre: e.target.value }))}
+                    placeholder="Ej. Líder de Afiliaciones"
+                    className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Departamento / Área</label>
+                  <input
+                    type="text"
+                    value={editingRoleForm.departamento}
+                    onChange={e => setEditingRoleForm(p => ({ ...p, departamento: e.target.value }))}
+                    placeholder="Ej. Comercial o Administración"
+                    className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              </div>
+
+              {/* Campo editable: Descripción */}
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Descripción Breve</label>
+                <textarea
+                  rows={2}
+                  value={editingRoleForm.descripcion}
+                  onChange={e => setEditingRoleForm(p => ({ ...p, descripcion: e.target.value }))}
+                  placeholder="Explica qué funciones desempeña este perfil..."
+                  className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
+                />
+              </div>
+
+              {/* Checklist de Pestañas */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
@@ -1190,21 +1237,53 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-[#E2E8F0] shrink-0">
-              <button
-                type="button"
-                onClick={() => setEditingRole(null)}
-                className="px-4 py-2 text-xs font-semibold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={saveRoleEdit}
-                className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Check size={14} strokeWidth={2.5} /> Guardar Pestañas
-              </button>
+            {/* Footer con Eliminar Rol a la izquierda y Guardar a la derecha */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#E2E8F0] shrink-0">
+              {confirmDeleteRole ? (
+                <div className="flex items-center gap-2 bg-red-50 p-2 rounded-xl border border-red-200">
+                  <span className="text-xs text-red-700 font-bold">¿Borrar este rol?</span>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRole(editingRole.id)}
+                    className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer shadow-2xs"
+                  >
+                    Sí, eliminar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteRole(false)}
+                    className="px-2.5 py-1.5 text-xs text-[#6B7A8D] hover:bg-white rounded-lg cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteRole(true)}
+                  className="px-3 py-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                >
+                  <Trash2 size={14} />
+                  Eliminar Rol
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => { setEditingRole(null); setConfirmDeleteRole(false); }}
+                  className="px-4 py-2 text-xs font-semibold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={saveRoleEdit}
+                  className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check size={14} strokeWidth={2.5} /> Guardar Cambios
+                </button>
+              </div>
             </div>
           </div>
         </div>
