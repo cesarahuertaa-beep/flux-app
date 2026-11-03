@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { dbPeek, dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import {
   Plus, Search, Trash2, Edit2, Image as ImageIcon, Filter, Tag, X,
@@ -319,6 +319,12 @@ export default function GestorTienda({ setMsg }) {
     setMsg("Imagen personalizada eliminada. Se usará el QR dinámico.");
   };
 
+  const prodPills = useMemo(() => [
+    { key: "Todas", label: `Todas (${productos.length})` },
+    { key: "suplemento", label: `Suplementos (${productos.filter(p => p.categoria === "suplemento").length})` },
+    { key: "ropa", label: `Ropa (${productos.filter(p => p.categoria === "ropa").length})` }
+  ], [productos]);
+
   const filtered = productos.filter(p => {
     if (filtroCat !== "Todas" && p.categoria !== filtroCat) return false;
     if (busqueda && !p.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false;
@@ -326,39 +332,94 @@ export default function GestorTienda({ setMsg }) {
   });
 
   return (
-    <div className="flex-1 flex flex-col pb-28 md:pb-8">
-      {/* ── BARRA SUPERIOR CON SUB-PESTAÑAS ── */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4 md:mb-6 px-4 pt-3 md:px-0 md:pt-0">
+    <div className="w-full flex-1 flex flex-col">
+      {/* ── Cabecera Principal con Barra de Búsqueda Integrada ── */}
+      <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex flex-col gap-3 md:gap-4">
         <div>
-          <h2 className="text-lg md:text-xl font-bold text-[#0B1929]">Gestor de Tienda y Landing</h2>
-          <p className="hidden md:block text-sm text-[#6B7A8D] mt-0.5">
-            Administra los productos, números de venta por WhatsApp, redes sociales y capturas de la App.
+          <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            Panel de Administración
+          </p>
+          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            Gestor de Tienda
+          </h1>
+          <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
+            Administra el catálogo de productos, suplementos y ajustes de la tienda
           </p>
         </div>
 
-        {/* Pestañas de Navegación */}
-        <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-[#E2E8F0] shadow-xs">
+        {/* Fila de Búsqueda de ancho completo + Botón de Acción a la derecha (solo visible en catálogo) */}
+        {activeTab === "catalogo" && (
+          <div className="flex items-center gap-2 sm:gap-3 w-full">
+            <div className="relative flex-1 min-w-0">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+              <input
+                type="text"
+                placeholder="Buscar producto por nombre..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 md:py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
+              />
+              {busqueda && (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
+                  title="Limpiar búsqueda"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEditProd(null);
+                setForm({
+                  nombre: "", subtitulo: "", precio: "", categoria: "suplemento",
+                  variantes: "", badge: "", imagen_url: "", enlace_externo: ""
+                });
+                setShowModal(true);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-[38px] md:h-[42px] px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
+              title="Nuevo Producto"
+              aria-label="Nuevo Producto"
+            >
+              <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+              <span className="hidden sm:inline">Nuevo Producto</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fila 1: Sub-tabs Switch Homologado ── */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-2 md:pt-4 pb-1">
+        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
           <button
+            type="button"
             onClick={() => setActiveTab("catalogo")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "catalogo"
-                ? "bg-[var(--brand-primary)] text-white shadow-xs"
-                : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
             }`}
           >
             <ShoppingBag size={16} />
             <span>Catálogo</span>
-            <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === 'catalogo' ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#6B7A8D]'}`}>
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === "catalogo" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
+            }`}>
               {productos.length}
             </span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab("ajustes")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "ajustes"
-                ? "bg-[var(--brand-primary)] text-white shadow-xs"
-                : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
             }`}
           >
             <Settings size={16} />
@@ -372,78 +433,118 @@ export default function GestorTienda({ setMsg }) {
       {/* ═══════════════════════════════════════════════════════════ */}
       {activeTab === "catalogo" && (
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center mb-4 md:mb-6 px-3.5 md:px-0">
-            <div className="flex flex-col md:flex-row gap-3 flex-1 w-full bg-white p-2.5 rounded-2xl border border-[#E2E8F0] shadow-xs">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0] w-4 h-4" />
-                <input
-                  className="w-full bg-[#F0F4FA] rounded-xl pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
-                  placeholder="Buscar producto por nombre..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-                <Filter className="w-4 h-4 text-[#6B7A8D] ml-1 shrink-0" />
-                {["Todas", "suplemento", "ropa"].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setFiltroCat(c)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
-                      filtroCat === c
-                        ? 'bg-[var(--brand-primary)] text-white'
-                        : 'bg-[#F0F4FA] text-[#6B7A8D] hover:bg-[#E2E8F0]'
-                    }`}
-                  >
-                    <span className="capitalize">{c}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setEditProd(null);
-                setForm({
-                  nombre: "", subtitulo: "", precio: "", categoria: "suplemento",
-                  variantes: "", badge: "", imagen_url: "", enlace_externo: ""
-                });
-                setShowModal(true);
-              }}
-              className="flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm hover:opacity-90 transition-opacity shrink-0 cursor-pointer"
-            >
-              <Plus size={18} /> Nuevo Producto
-            </button>
+          {/* ── Fila 2: Filtros en Píldoras Horizontales con Conteo ── */}
+          <div className="flex gap-2 overflow-x-auto scroll-hide px-4 md:px-8 py-2.5">
+            {prodPills.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setFiltroCat(p.key)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  filtroCat === p.key
+                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                    : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-[#E8F1FB]"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 pt-1">
             {loading ? (
               <div className="flex justify-center py-12 text-[#6B7A8D]">Cargando catálogo...</div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-3xl border border-[#E2E8F0] p-8 shadow-xs">
+              <div className="mx-4 md:mx-8 text-center py-16 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-8">
                 <ShoppingBag className="w-12 h-12 text-[#E2E8F0] mx-auto mb-3" />
                 <h3 className="text-[#0B1929] font-bold text-base">Sin resultados</h3>
                 <p className="text-[#6B7A8D] text-xs sm:text-sm mt-1">No se encontraron productos que coincidan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-0 px-3.5 md:px-0">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 px-4 md:px-8 pb-28 md:pb-8">
                 {filtered.map(p => {
                   const extLink = config.external_links?.[p.id];
                   return (
-                    <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-3xl overflow-hidden shadow-xs hover:border-[var(--brand-primary)] transition-all flex flex-col group">
-                      <div className="h-44 bg-[#F0F4FA] relative flex items-center justify-center overflow-hidden">
+                    <div
+                      key={p.id}
+                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
+                    >
+                      {/* Media Area */}
+                      <div className="h-[145px] bg-[#F8FAFC] relative overflow-hidden flex items-center justify-center border-b border-[#F0F4FA]">
                         {p.imagen_url ? (
-                          <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <img
+                            src={p.imagen_url}
+                            alt={p.nombre}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
                         ) : (
-                          <ImageIcon className="w-10 h-10 text-[#C1C9D2]" />
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1 bg-[#F8FAFC]">
+                            <ShoppingBag size={36} />
+                            <span className="text-[11px] font-semibold">Sin imagen</span>
+                          </div>
                         )}
-                        {p.badge && (
-                          <span className="absolute top-2.5 left-2.5 bg-[#0B1929] text-white text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wide shadow-xs">
-                            {p.badge}
-                          </span>
-                        )}
-                        <div className="absolute top-2.5 right-2.5 flex gap-1.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+
+                        {/* Badges superiores sobre el media */}
+                        <div className="absolute top-2.5 left-2.5">
+                          {p.badge ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-[#0B1929] text-white border-transparent">
+                              {p.badge}
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5 capitalize">
+                              <Tag size={10} className="text-[var(--brand-primary)]" />
+                              <span>{p.categoria}</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="absolute top-2.5 right-2.5">
+                          {extLink ? (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
+                              <ExternalLink size={11} className="text-blue-400" />
+                              <span>Link</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
+                              <MessageCircle size={11} className="text-emerald-400" />
+                              <span>WhatsApp</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-bold text-[14px] text-[#0B1929] leading-snug line-clamp-2 mb-1">
+                            {p.nombre}
+                          </h4>
+                          <p className="text-xs text-[#6B7A8D] line-clamp-2 leading-relaxed mb-3">
+                            {p.subtitulo || "Producto de alta calidad disponible en la tienda FLUX."}
+                          </p>
+
+                          {/* Especificaciones / Info pills homologadas */}
+                          <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
+                            <div className="bg-sky-50/70 border border-sky-100 rounded-lg p-1.5">
+                              <span className="text-[10px] text-sky-600 block font-semibold">Precio</span>
+                              <span className="text-xs font-bold text-sky-950 truncate block">${p.precio} MXN</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
+                              <span className="text-[10px] text-slate-500 block font-semibold">Variantes</span>
+                              <span className="text-xs font-bold text-slate-800 flex items-center justify-center gap-1">
+                                {p.variantes && p.variantes.length > 0 ? (
+                                  <span className="text-slate-700 font-semibold">{p.variantes.length} opc</span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal">Estándar</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botones de acción homologados */}
+                        <div className="flex gap-1.5 pt-2 border-t border-[#F0F4FA]">
                           <button
+                            type="button"
                             onClick={() => {
                               setEditProd(p);
                               setForm({
@@ -458,43 +559,18 @@ export default function GestorTienda({ setMsg }) {
                               });
                               setShowModal(true);
                             }}
-                            className="bg-white/95 text-blue-600 p-2 rounded-xl shadow-xs hover:bg-white cursor-pointer"
-                            title="Editar producto"
+                            className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={12} /> Editar
                           </button>
                           <button
+                            type="button"
                             onClick={() => deleteProd(p)}
-                            className="bg-white/95 text-red-600 p-2 rounded-xl shadow-xs hover:bg-white cursor-pointer"
+                            className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                             title="Eliminar producto"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={12} />
                           </button>
-                        </div>
-                      </div>
-
-                      <div className="p-4 flex flex-col flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] uppercase font-bold text-[#6B7A8D] tracking-wider">{p.categoria}</span>
-                          {extLink ? (
-                            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <ExternalLink size={10} /> Link externo
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <MessageCircle size={10} /> Vía WhatsApp
-                            </span>
-                          )}
-                        </div>
-                        <h3 className="font-bold text-[#0B1929] text-sm leading-tight mb-1">{p.nombre}</h3>
-                        <p className="text-xs text-[#6B7A8D] line-clamp-2 mb-3 flex-1">{p.subtitulo}</p>
-                        <div className="flex justify-between items-center mt-auto pt-2 border-t border-[#F0F4FA]">
-                          <span className="font-bold text-base text-[var(--brand-primary)]">${p.precio} <span className="text-[11px] font-normal text-[#9BA5B0]">MXN</span></span>
-                          {p.variantes && p.variantes.length > 0 && (
-                            <span className="bg-[#F0F4FA] text-[#6B7A8D] text-[10px] font-semibold px-2 py-1 rounded-md">
-                              {p.variantes.length} opc
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -510,7 +586,7 @@ export default function GestorTienda({ setMsg }) {
       {/* ── SUB-PESTAÑA 2: AJUSTES DE TIENDA Y REDES ── */}
       {/* ═══════════════════════════════════════════════════════════ */}
       {activeTab === "ajustes" && (
-        <div className="flex-1 space-y-6 pb-0">
+        <div className="flex-1 space-y-6 px-4 md:px-8 pb-28 md:pb-8 pt-2">
           {/* Tarjeta 1: Canal de Ventas WhatsApp (Múltiples Números y Rotación) */}
           <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#F0F4FA]">

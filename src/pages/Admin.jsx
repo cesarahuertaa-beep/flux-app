@@ -2038,10 +2038,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(isSuperadmin || role === "staff") && (tab === "tienda" || visitedTabs.has("tienda")) && (
-        <div className={tab === "tienda" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <SubComponentWrapper title="Gestor de Tienda FLUX" subtitle="Administra el catálogo de productos y suplementos de la tienda">
-            <GestorTienda setMsg={setMsg}/>
-          </SubComponentWrapper>
+        <div className={tab === "tienda" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
+          <GestorTienda setMsg={setMsg}/>
         </div>
       )}
     
