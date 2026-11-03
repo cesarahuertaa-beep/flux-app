@@ -23,15 +23,10 @@ import {
   getGoalPresetInfo,
   getActivityFactorInfo
 } from "../../lib/bodyComposition";
-import { getCanonicalMuscleGroup } from "../../lib/constants";
+import { GRUPOS, normalizeMuscleGroup } from "../../lib/constants";
 import { generateProgresoPDF } from "../../utils/pdf";
 
-const EXACT_GROUPS = [
-  "pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior",
-  "trapecio", "dorsal", "lumbar", "biceps", "triceps", "antebrazo",
-  "gluteo", "cuadriceps", "isquiotibial", "pantorrilla", "aductor",
-  "abductor", "soleo", "cuello"
-];
+const EXACT_GROUPS = GRUPOS;
 
 // ── Helpers ──
 const fmtDate = (d) => {
@@ -55,9 +50,8 @@ const calcular1RM = (peso, reps) => {
 
 const normalizeGroup = (g) => {
   if (!g) return "otro";
-  const canonical = getCanonicalMuscleGroup(g);
-  if (canonical && EXACT_GROUPS.includes(canonical)) return canonical;
-  return "otro";
+  const norm = normalizeMuscleGroup(g);
+  return EXACT_GROUPS.includes(norm) ? norm : "otro";
 };
 
 const RANKS = [

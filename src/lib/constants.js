@@ -57,30 +57,34 @@ export const ESTADOS_MEXICO = [
   "Zacatecas"
 ];
   
-export const GRUPOS = ["pecho", "abdomen", "oblicuos", "deltoide_anterior", "deltoide_posterior", "trapecio", "dorsal", "lumbar", "biceps", "triceps", "antebrazo", "gluteo", "cuadriceps", "isquiotibial", "pantorrilla", "aductor", "abductor", "soleo", "cuello"];
+export const GRUPOS_MUSCULARES = [
+  { id: "pecho",              nombre: "Pecho" },
+  { id: "dorsal",             nombre: "Dorsal (Espalda)" },
+  { id: "deltoide_anterior",  nombre: "Deltoide anterior (Hombro)" },
+  { id: "deltoide_posterior", nombre: "Deltoide posterior (Hombro)" },
+  { id: "biceps",             nombre: "Bíceps" },
+  { id: "triceps",            nombre: "Tríceps" },
+  { id: "antebrazo",          nombre: "Antebrazo" },
+  { id: "cuadriceps",         nombre: "Cuádriceps" },
+  { id: "isquiotibial",       nombre: "Isquiotibial" },
+  { id: "gluteo",             nombre: "Glúteo" },
+  { id: "pantorrilla",        nombre: "Pantorrilla" },
+  { id: "soleo",              nombre: "Sóleo" },
+  { id: "aductor",            nombre: "Aductor" },
+  { id: "abductor",           nombre: "Abductor" },
+  { id: "trapecio",           nombre: "Trapecio" },
+  { id: "lumbar",             nombre: "Lumbar" },
+  { id: "abdomen",            nombre: "Abdomen" },
+  { id: "oblicuos",           nombre: "Oblicuos" },
+  { id: "cuello",             nombre: "Cuello" }
+];
+
+export const GRUPOS = GRUPOS_MUSCULARES.map(g => g.id);
 export const TIPOS = ["fuerza", "hipertrofia", "resistencia", "potencia", "flexibilidad", "cardio"];
 
-export const GRUPO_LABELS = {
-  pecho: "Pecho",
-  abdomen: "Abdomen",
-  oblicuos: "Oblicuos",
-  deltoide_anterior: "Deltoide anterior (Hombro)",
-  deltoide_posterior: "Deltoide posterior (Hombro)",
-  trapecio: "Trapecio",
-  dorsal: "Dorsal (Espalda)",
-  lumbar: "Lumbar",
-  biceps: "Bíceps",
-  triceps: "Tríceps",
-  antebrazo: "Antebrazo",
-  gluteo: "Glúteo",
-  cuadriceps: "Cuádriceps",
-  isquiotibial: "Isquiotibial",
-  pantorrilla: "Pantorrilla",
-  aductor: "Aductor",
-  abductor: "Abductor",
-  soleo: "Sóleo",
-  cuello: "Cuello"
-};
+export const GRUPO_LABELS = Object.fromEntries(
+  GRUPOS_MUSCULARES.map(g => [g.id, g.nombre])
+);
 
 export const normalizeMuscleGroup = (g) => {
   if (!g) return "";
@@ -88,7 +92,7 @@ export const normalizeMuscleGroup = (g) => {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_\s-]+/g, " ")
+    .replace(/[_\s-]+/g, "_")
     .trim();
 };
 
@@ -96,136 +100,14 @@ export const getCanonicalMuscleGroup = (input) => {
   if (!input) return null;
   const norm = normalizeMuscleGroup(input);
   if (!norm) return null;
-
-  // 1. Coincidencia directa con claves estándar de GRUPOS o con sus etiquetas legibles
-  for (const g of GRUPOS) {
-    if (norm === normalizeMuscleGroup(g)) return g;
-    if (norm === normalizeMuscleGroup(GRUPO_LABELS[g])) return g;
-  }
-
-  // 2. Evaluaciones específicas ordenadas estratégicamente para evitar falsos positivos
-
-  // Deltoide Posterior (debe evaluarse ANTES de cualquier deltoide o hombro genérico)
-  if (norm.includes("posterior") && (norm.includes("deltoid") || norm.includes("hombro"))) {
-    return "deltoide_posterior";
-  }
-  if (norm === "deltoide posterior" || norm === "deltoides posterior" || norm === "hombro posterior") {
-    return "deltoide_posterior";
-  }
-
-  // Deltoide Anterior / Frontal / Lateral / Medio
-  if ((norm.includes("anterior") || norm.includes("frontal") || norm.includes("lateral") || norm.includes("medio")) && 
-      (norm.includes("deltoid") || norm.includes("hombro"))) {
-    return "deltoide_anterior";
-  }
-  if (norm === "deltoide anterior" || norm === "deltoides anterior" || norm === "hombro anterior") {
-    return "deltoide_anterior";
-  }
-
-  // Hombro / Deltoides genérico (por defecto al no ser posterior)
-  if (norm.includes("deltoid") || norm === "hombro" || norm === "hombros" || norm === "shoulder" || norm === "shoulders") {
-    return norm.includes("posterior") ? "deltoide_posterior" : "deltoide_anterior";
-  }
-
-  // Antebrazo (debe evaluarse ANTES de bíceps para evitar que "brazo" capture "antebrazo")
-  if (norm.includes("antebrazo") || norm.includes("forearm")) {
-    return "antebrazo";
-  }
-
-  // Bíceps
-  if (norm.includes("bicep") || norm === "brazo" || norm === "brazos") {
-    return "biceps";
-  }
-
-  // Tríceps
-  if (norm.includes("tricep")) {
-    return "triceps";
-  }
-
-  // Lumbar / Espalda baja (debe evaluarse ANTES de dorsal para que "espalda baja" no sea dorsal)
-  if (norm.includes("lumbar") || norm.includes("lower back") || norm.includes("espalda baja")) {
-    return "lumbar";
-  }
-
-  // Dorsal / Espalda
-  if (norm.includes("dorsal") || norm.includes("espalda") || norm.includes("lat") || norm.includes("back")) {
-    return "dorsal";
-  }
-
-  // Oblicuos (debe evaluarse ANTES de abdomen)
-  if (norm.includes("oblicu")) {
-    return "oblicuos";
-  }
-
-  // Abdomen / Core
-  if (norm.includes("abdomen") || norm.includes("abdomin") || norm.includes("core") || norm === "abs") {
-    return "abdomen";
-  }
-
-  // Aductor vs Abductor (evitar colisiones de prefijo)
-  if (norm.includes("adductor") || norm.includes("aductor")) {
-    return "aductor";
-  }
-  if (norm.includes("abductor") || norm.includes("abduct")) {
-    return "abductor";
-  }
-
-  // Isquiotibial / Femoral
-  if (norm.includes("isquio") || norm.includes("femoral") || norm.includes("hamstring")) {
-    return "isquiotibial";
-  }
-
-  // Cuádriceps / Pierna
-  if (norm.includes("cuadricep") || norm.includes("quad") || norm.includes("pierna") || norm.includes("leg")) {
-    return "cuadriceps";
-  }
-
-  // Glúteo
-  if (norm.includes("glute") || norm.includes("nalga")) {
-    return "gluteo";
-  }
-
-  // Sóleo (debe evaluarse ANTES de pantorrilla)
-  if (norm.includes("soleo")) {
-    return "soleo";
-  }
-
-  // Pantorrilla / Gemelos
-  if (norm.includes("pantorrill") || norm.includes("gemel") || norm.includes("calf") || norm.includes("calves")) {
-    return "pantorrilla";
-  }
-
-  // Trapecio
-  if (norm.includes("trapeci") || norm.includes("trap")) {
-    return "trapecio";
-  }
-
-  // Pecho
-  if (norm.includes("pecho") || norm.includes("pectoral") || norm.includes("chest")) {
-    return "pecho";
-  }
-
-  // Cuello
-  if (norm.includes("cuello") || norm.includes("neck")) {
-    return "cuello";
-  }
-
-  return null;
+  const found = GRUPOS_MUSCULARES.find(
+    g => g.id === norm || normalizeMuscleGroup(g.nombre) === norm
+  );
+  return found ? found.id : null;
 };
 
 export const matchMuscleGroup = (exerciseGroup, filterGroup) => {
   if (!filterGroup || filterGroup === "Todos" || filterGroup === "todos") return true;
   if (!exerciseGroup) return false;
-
-  const egCanonical = getCanonicalMuscleGroup(exerciseGroup);
-  const fgCanonical = getCanonicalMuscleGroup(filterGroup);
-
-  if (egCanonical && fgCanonical) {
-    return egCanonical === fgCanonical;
-  }
-
-  const eg = normalizeMuscleGroup(exerciseGroup);
-  const fg = normalizeMuscleGroup(filterGroup);
-
-  return eg === fg;
+  return normalizeMuscleGroup(exerciseGroup) === normalizeMuscleGroup(filterGroup);
 };

@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { timerStore } from "../../lib/timerStore";
-import { GRUPO_LABELS, getCanonicalMuscleGroup } from "../../lib/constants";
+import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 
 function TimerCard({ brandColor }) {
   const [tState, setTState] = useState(() => timerStore.getState());
@@ -882,7 +882,7 @@ export default function Training({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0B1929]">{activeObj.nombre}</p>
-                  <p className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[activeObj.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(activeObj.grupo_muscular)] || activeObj.grupo_muscular || activeObj.musculo || "General"}</p>
+                  <p className="text-xs text-[#6B7A8D]">{GRUPO_LABELS[normalizeMuscleGroup(activeObj.grupo_muscular)] || activeObj.grupo_muscular || activeObj.musculo || "General"}</p>
                 </div>
                 {exPR.isPR && (
                   <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold border border-amber-200 shadow-sm">
@@ -1355,7 +1355,7 @@ export default function Training({
             </div>
             <div className="flex gap-1.5 justify-center mb-4">
               <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
-                {GRUPO_LABELS[previewEx.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(previewEx.grupo_muscular)] || previewEx.grupo_muscular}
+                {GRUPO_LABELS[normalizeMuscleGroup(previewEx.grupo_muscular)] || previewEx.grupo_muscular}
               </span>
             </div>
             <button

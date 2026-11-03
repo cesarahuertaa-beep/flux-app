@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup, getCanonicalMuscleGroup } from "../../lib/constants";
+import { GRUPOS_MUSCULARES, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
 import { Search, Image as ImageIcon } from "lucide-react";
 import { CustomSelect } from "../ui/CustomSelect";
 
@@ -7,35 +7,11 @@ export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) 
   const [busqueda, setBusqueda] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState("Todos");
 
-  // Opciones de grupos musculares con etiquetas legibles y grupos extra dinámicos
-  const opcionesGrupos = useMemo(() => {
-    const opts = [
-      { value: "Todos", label: "Todos los grupos" },
-      ...GRUPOS.map(g => ({
-        value: g,
-        label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
-      }))
-    ];
-
-    const knownNorms = new Set(GRUPOS.map(g => normalizeMuscleGroup(g)));
-    const extras = new Set();
-    (biblioteca || []).forEach(e => {
-      const raw = (e.grupo_muscular || "").trim();
-      if (raw) {
-        const canonical = getCanonicalMuscleGroup(raw);
-        const norm = normalizeMuscleGroup(raw);
-        if (!canonical && !knownNorms.has(norm) && !extras.has(norm)) {
-          extras.add(norm);
-          opts.push({
-            value: raw,
-            label: raw.charAt(0).toUpperCase() + raw.slice(1)
-          });
-        }
-      }
-    });
-
-    return opts;
-  }, [biblioteca]);
+  // Opciones de grupos musculares basadas en el catálogo único oficial
+  const opcionesGrupos = useMemo(() => [
+    { value: "Todos", label: "Todos los grupos" },
+    ...GRUPOS_MUSCULARES.map(g => ({ value: g.id, label: g.nombre }))
+  ], []);
 
   // Verificar si un ejercicio ya forma parte del plan (como principal o alternativa)
   const isAlreadyInPlan = (e) => {
@@ -127,7 +103,7 @@ export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) 
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-[#0B1929] truncate">{e.nombre}</div>
                 <div className="text-[10px] font-semibold tracking-wider text-[var(--brand-primary)] uppercase truncate">
-                  {GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}
+                  {GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}
                 </div>
               </div>
             </button>

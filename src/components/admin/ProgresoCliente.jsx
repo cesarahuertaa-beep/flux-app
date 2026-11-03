@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
-import { GRUPO_LABELS, getCanonicalMuscleGroup } from "../../lib/constants";
+import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
@@ -2048,7 +2048,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                       <span className="text-[#0B1929]">{exObj.nombre}</span>
                                       {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold">ALT</span>}
                                     </div>
-                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5">{GRUPO_LABELS[exObj.grupo_muscular || ej.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
+                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
                                   </td>
                                 )}
                                 <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>

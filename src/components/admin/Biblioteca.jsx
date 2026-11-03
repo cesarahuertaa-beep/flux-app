@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { GRUPOS, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup, getCanonicalMuscleGroup } from "../../lib/constants";
+import { GRUPOS_MUSCULARES, GRUPO_LABELS, matchMuscleGroup, normalizeMuscleGroup } from "../../lib/constants";
 import { dbGet, dbPost, dbPatch, dbDel, storageUpload } from "../../lib/supabase";
 import {
   Plus,
@@ -48,7 +48,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showEjModal, setShowEjModal]     = useState(false);
   const [editEj, setEditEj]               = useState(null);
   const [deleteEjModal, setDeleteEjModal] = useState(null);
-  const [formEj, setFormEj]               = useState({ nombre: "", grupo_muscular: "Pecho", gif_url: "" });
+  const [formEj, setFormEj]               = useState({ nombre: "", grupo_muscular: "pecho", gif_url: "" });
   const [savingEj, setSavingEj]           = useState(false);
   const [uploadingEj, setUploadingEj]     = useState(false);
   const [filtroGrupoEj, setFiltroGrupoEj] = useState("Todos");
@@ -382,34 +382,10 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ─────────────────────────────────────────────────────────────────────────────
   // FILTRADO DE DATOS
   // ─────────────────────────────────────────────────────────────────────────────
-  const opcionesGrupos = useMemo(() => {
-    const opts = [
-      { value: "Todos", label: "Todos los grupos" },
-      ...GRUPOS.map(g => ({
-        value: g,
-        label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
-      }))
-    ];
-
-    const knownNorms = new Set(GRUPOS.map(g => normalizeMuscleGroup(g)));
-    const extras = new Set();
-    (biblioteca || []).forEach(e => {
-      const raw = (e.grupo_muscular || "").trim();
-      if (raw) {
-        const canonical = getCanonicalMuscleGroup(raw);
-        const norm = normalizeMuscleGroup(raw);
-        if (!canonical && !knownNorms.has(norm) && !extras.has(norm)) {
-          extras.add(norm);
-          opts.push({
-            value: raw,
-            label: raw.charAt(0).toUpperCase() + raw.slice(1)
-          });
-        }
-      }
-    });
-
-    return opts;
-  }, [biblioteca]);
+  const opcionesGrupos = useMemo(() => [
+    { value: "Todos", label: "Todos los grupos" },
+    ...GRUPOS_MUSCULARES.map(g => ({ value: g.id, label: g.nombre }))
+  ], []);
 
   const normBusquedaEj = normalizeMuscleGroup(busquedaEj);
 
@@ -734,7 +710,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         <div className="absolute top-2.5 left-2.5">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                            <span>{GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
+                            <span>{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
                           </span>
                         </div>
                         <div className="absolute top-2.5 right-2.5">
@@ -756,7 +732,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                           <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
                             <div className="bg-sky-50/70 border border-sky-100 rounded-lg p-1.5">
                               <span className="text-[10px] text-sky-600 block font-semibold">Grupo Muscular</span>
-                              <span className="text-xs font-bold text-sky-950 truncate block">{GRUPO_LABELS[e.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
+                              <span className="text-xs font-bold text-sky-950 truncate block">{GRUPO_LABELS[normalizeMuscleGroup(e.grupo_muscular)] || e.grupo_muscular}</span>
                             </div>
                             <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
                               <span className="text-[10px] text-slate-500 block font-semibold">Multimedia</span>
@@ -1085,10 +1061,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 <CustomSelect
                   value={formEj.grupo_muscular}
                   onChange={v => setFormEj(p => ({ ...p, grupo_muscular: v }))}
-                  options={GRUPOS.map(g => ({
-                    value: g,
-                    label: GRUPO_LABELS[g] || (g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, " "))
-                  }))}
+                  options={GRUPOS_MUSCULARES.map(g => ({ value: g.id, label: g.nombre }))}
                 />
               </div>
 
@@ -1527,8 +1500,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               {previewEj.nombre}
             </div>
             <div className="flex gap-1.5 justify-center mb-4">
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor: `${groupColors[previewEj.grupo_muscular] || groupColors[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8"}20`, color: groupColors[previewEj.grupo_muscular] || groupColors[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8" }}>
-                {GRUPO_LABELS[previewEj.grupo_muscular] || GRUPO_LABELS[getCanonicalMuscleGroup(previewEj.grupo_muscular)] || previewEj.grupo_muscular}
+              <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor: `${groupColors[normalizeMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8"}20`, color: groupColors[normalizeMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8" }}>
+                {GRUPO_LABELS[normalizeMuscleGroup(previewEj.grupo_muscular)] || previewEj.grupo_muscular}
               </span>
             </div>
             <button
