@@ -1595,7 +1595,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {(isSuperadmin || role === "staff") && (tab === "aprobaciones" || visitedTabs.has("aprobaciones")) && (
-        <div className={tab === "aprobaciones" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
+        <div className={tab === "aprobaciones" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Aprobaciones" subtitle="Solicitudes de registro y verificación de especialistas">
             <Aprobaciones setMsg={setMsg} />
           </SubComponentWrapper>

@@ -1,20 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2, RotateCcw } from "lucide-react";
 import { dbPeek, dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 
 export default function Aprobaciones({ setMsg }) {
-  const [filtroEstado, setFiltroEstado] = useState("pendiente"); // "pendiente" | "rechazada"
-  const _peekSols = dbPeek("solicitudes_profesionales?estado=eq.pendiente&order=created_at.desc");
+  const [filtroEstado, setFiltroEstado] = useState("pendiente"); // "todos" | "pendiente" | "rechazada"
+  const _peekSols = dbPeek("solicitudes_profesionales?order=created_at.desc");
   const [solicitudes, setSolicitudes] = useState(() => Array.isArray(_peekSols) ? _peekSols : []);
   const [loading, setLoading] = useState(() => _peekSols === null);
   const hasLoadedRef = useRef(_peekSols !== null);
   const [confirmAction, setConfirmAction] = useState(null);
 
-  const loadData = async (targetEstado = filtroEstado) => {
+  const loadData = async () => {
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const data = await dbGet(`solicitudes_profesionales?estado=eq.${targetEstado}&order=created_at.desc`);
+      const data = await dbGet(`solicitudes_profesionales?order=created_at.desc`);
       setSolicitudes(data || []);
     } catch (e) {
       setMsg("❌ Error al cargar solicitudes.");
@@ -24,13 +24,13 @@ export default function Aprobaciones({ setMsg }) {
   };
 
   useEffect(() => {
-    loadData(filtroEstado);
+    loadData();
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
       if (table && !["solicitudes_profesionales", "profiles", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => loadData(filtroEstado), 250);
+      timer = setTimeout(() => loadData(), 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
@@ -39,7 +39,7 @@ export default function Aprobaciones({ setMsg }) {
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
     };
-  }, [filtroEstado]);
+  }, []);
 
   const handleApprove = (sol) => {
     setConfirmAction({
@@ -111,7 +111,7 @@ export default function Aprobaciones({ setMsg }) {
           setMsg("✅ Solicitud aprobada y correo de acceso enviado.");
         } catch (e) {
           setMsg("❌ Error al aprobar: " + e.message);
-          loadData(filtroEstado);
+          loadData();
         }
       }
     });
@@ -120,12 +120,12 @@ export default function Aprobaciones({ setMsg }) {
   const handleReject = (sol) => {
     setConfirmAction({
       title: `¿Rechazar a ${sol.nombre}?`,
-      description: "Esta solicitud se marcará como rechazada. Podrás verla en la pestaña 'Rechazadas' y eliminarla o reactivarla cuando gustes.",
+      description: "Esta solicitud se marcará como rechazada. Podrás verla en el filtro 'Rechazadas' y eliminarla o reactivarla cuando gustes.",
       confirmText: "Rechazar",
       danger: true,
       icon: "alert",
       onConfirm: async () => {
-        setSolicitudes(prev => prev.filter(s => s.id !== sol.id));
+        setSolicitudes(prev => prev.map(s => s.id === sol.id ? { ...s, estado: 'rechazada' } : s));
         setConfirmAction(null);
         try {
           await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'rechazada' });
@@ -133,21 +133,21 @@ export default function Aprobaciones({ setMsg }) {
           setMsg("⚠️ Solicitud rechazada.");
         } catch (e) {
           setMsg("❌ Error al rechazar: " + e.message);
-          loadData(filtroEstado);
+          loadData();
         }
       }
     });
   };
 
   const handleReactivate = async (sol) => {
-    setSolicitudes(prev => prev.filter(s => s.id !== sol.id));
+    setSolicitudes(prev => prev.map(s => s.id === sol.id ? { ...s, estado: 'pendiente' } : s));
     try {
       await dbPatch(`solicitudes_profesionales?id=eq.${sol.id}`, { estado: 'pendiente' });
       invalidateCache("solicitudes_profesionales");
       setMsg("✓ Solicitud reactivada a pendiente.");
     } catch (e) {
       setMsg("❌ Error al reactivar: " + e.message);
-      loadData(filtroEstado);
+      loadData();
     }
   };
 
@@ -167,57 +167,66 @@ export default function Aprobaciones({ setMsg }) {
           setMsg("✅ Registro eliminado y correo liberado.");
         } catch (e) {
           setMsg("❌ Error al eliminar: " + e.message);
-          loadData(filtroEstado);
+          loadData();
         }
       }
     });
   };
+
+  const countPendientes = useMemo(() => solicitudes.filter(s => s.estado === "pendiente").length, [solicitudes]);
+  const countRechazadas = useMemo(() => solicitudes.filter(s => s.estado === "rechazada").length, [solicitudes]);
+
+  const filterOptions = useMemo(() => [
+    ["todos", `Todas (${solicitudes.length})`],
+    ["pendiente", `Pendientes (${countPendientes})`],
+    ["rechazada", `Rechazadas (${countRechazadas})`],
+  ], [solicitudes.length, countPendientes, countRechazadas]);
+
+  const filteredSolicitudes = useMemo(() => {
+    if (filtroEstado === "todos") return solicitudes;
+    return solicitudes.filter(s => s.estado === filtroEstado);
+  }, [solicitudes, filtroEstado]);
 
   if (loading) {
     return <div className="p-8 text-center text-[#6B7A8D]">Cargando solicitudes...</div>;
   }
 
   return (
-    <div className="px-0 py-4 pb-28 md:py-0 md:pb-8 md:p-8 max-w-5xl mx-auto space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap px-4 md:px-0">
-        <div>
-          <h2 className="text-lg md:text-2xl font-bold text-[#0B1929]">Aprobaciones Profesionales</h2>
-          <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">Revisa, autoriza o gestiona las solicitudes de acceso.</p>
-        </div>
-        <div className="flex bg-[#F0F4FA] p-1 rounded-xl">
-          <button
-            onClick={() => setFiltroEstado("pendiente")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              filtroEstado === "pendiente" ? "bg-white text-[var(--brand-primary)] shadow-xs" : "text-[#6B7A8D] hover:text-[#0B1929]"
-            }`}
-          >
-            Pendientes
-          </button>
-          <button
-            onClick={() => setFiltroEstado("rechazada")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              filtroEstado === "rechazada" ? "bg-white text-red-600 shadow-xs" : "text-[#6B7A8D] hover:text-[#0B1929]"
-            }`}
-          >
-            Rechazadas
-          </button>
+    <div className="w-full pb-28 md:pb-8">
+      {/* Barra de filtros horizontales (homologada con Agenda y Mi Equipo) */}
+      <div className="mb-4">
+        <div className="flex gap-2 overflow-x-auto scroll-hide pb-1 px-4 md:px-0">
+          {filterOptions.map(([k, lb]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setFiltroEstado(k)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                filtroEstado === k
+                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                  : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-[#E8F1FB]"
+              }`}
+            >
+              {lb}
+            </button>
+          ))}
         </div>
       </div>
 
-      {solicitudes.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-[#E2E8F0] flex flex-col items-center">
-          <UserCheck size={48} className="text-[#9BA5B0] mb-4" />
-          <h3 className="text-lg font-bold text-[#0B1929]">
-            {filtroEstado === "pendiente" ? "No hay solicitudes pendientes" : "No hay solicitudes rechazadas"}
-          </h3>
-          <p className="text-sm text-[#6B7A8D] mt-2">
-            {filtroEstado === "pendiente" ? "Todas las solicitudes han sido gestionadas." : "No tienes registros en el historial de rechazadas."}
-          </p>
+      {filteredSolicitudes.length === 0 ? (
+        <div className="mx-4 md:mx-0 text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="text-[15px] font-semibold text-[#6B7A8D]">
+            {filtroEstado === "pendiente"
+              ? "No hay solicitudes pendientes"
+              : filtroEstado === "rechazada"
+              ? "No hay solicitudes rechazadas"
+              : "No hay solicitudes registradas"}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {solicitudes.map(s => (
-            <div key={s.id} className="bg-white rounded-none md:rounded-2xl p-4 sm:p-5 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 md:gap-4">
+          {filteredSolicitudes.map(s => (
+            <div key={s.id} className="bg-white rounded-none md:rounded-2xl p-4 sm:p-5 shadow-none md:shadow-sm border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-[#0B1929]">{s.nombre}</h3>
@@ -254,7 +263,7 @@ export default function Aprobaciones({ setMsg }) {
                 )}
               </div>
 
-              {filtroEstado === "rechazada" ? (
+              {s.estado === "rechazada" ? (
                 <div className="flex items-center gap-2 mt-2">
                   <button onClick={() => handleReactivate(s)} className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer">
                     <RotateCcw size={16} /> Reactivar a Pendiente
