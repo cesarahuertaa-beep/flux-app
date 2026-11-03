@@ -1073,7 +1073,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
             { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
             { id:"tienda", label:"Tienda", icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
-            { id:"pagos", label:"Control Pagos", icon: <Banknote size={18} strokeWidth={1.5} /> }
+            { id:"pagos", label:"Control de Ingresos", icon: <Banknote size={18} strokeWidth={1.5} /> }
           ] : []),
           { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
           { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },

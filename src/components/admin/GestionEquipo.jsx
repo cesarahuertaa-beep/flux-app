@@ -23,7 +23,7 @@ export const SUPERADMIN_TABS = [
   { id: "aprobaciones",     nombre: "Aprobaciones",        desc: "Solicitudes de registro profesional", icon: "UserCheck" },
   { id: "biblioteca",       nombre: "Biblioteca",          desc: "Catálogo de ejercicios y movimientos", icon: "Folder" },
   { id: "tienda",           nombre: "Tienda Oficial",      desc: "Productos, ropa y suplementos", icon: "ShoppingBag" },
-  { id: "pagos",            nombre: "Control Pagos",       desc: "Auditoría financiera y comisiones", icon: "Banknote" },
+  { id: "pagos",            nombre: "Control de Ingresos", desc: "Auditoría financiera y suscripciones", icon: "Banknote" },
   { id: "mi_entrenamiento", nombre: "Mi Plan",             desc: "Plan personal de salud y bienestar", icon: "Activity" },
   { id: "nutricion",        nombre: "Nutrición",           desc: "Prescripción y comidas", icon: "UtensilsCrossed" },
   { id: "entrenamiento",    nombre: "Entrenamiento",       desc: "Rutinas y series de ejercicios", icon: "Dumbbell" },

@@ -918,7 +918,7 @@ export default function ControlPagos({ setMsg }) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* 1. Perfil Nutriólogo */}
                 <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5">
                   <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
@@ -1041,35 +1041,6 @@ export default function ControlPagos({ setMsg }) {
                   <p className="text-[11px] text-[#6B7A8D] bg-white p-3 rounded-lg border border-[#E2E8F0] leading-relaxed">
                     Los atletas independientes pagan su suscripción mensual directamente a la cuenta del Superadmin.
                   </p>
-                </div>
-
-                {/* 3. Parámetro Referencial de Staff */}
-                <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">3. Staff Referencial</span>
-                      <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">Base General</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <label className="text-xs font-semibold text-[#475569]">Comisión sugerida general</label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={ratesForm.comision_pct}
-                          onChange={e => setRatesForm(p => ({ ...p, comision_pct: e.target.value }))}
-                          className="w-20 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                        />
-                        <span className="text-xs font-bold text-[#6B7A8D]">%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] text-[#6B7A8D] bg-white p-3 rounded-lg border border-[#E2E8F0] leading-relaxed space-y-1">
-                    <p className="font-semibold text-[#0B1929]">ℹ️ Nuevo Motor de Nóminas en Mi Equipo</p>
-                    <p>Ahora puedes personalizar sueldos base, bonos y porcentajes individuales por colaborador directamente en la pestaña <strong>Mi Equipo &gt; Nóminas y Pagos</strong>.</p>
-                  </div>
                 </div>
               </div>
 

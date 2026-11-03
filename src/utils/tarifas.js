@@ -67,7 +67,7 @@ export function parseTarifasHistory(cfgRow) {
 
 /**
  * Devuelve la configuración de tarifas más reciente programada por el Superadmin
- * (para mostrar/editar en el panel de Control Pagos).
+ * (para mostrar/editar en el panel de Control de Ingresos).
  */
 export function getLatestConfiguredRates(cfgRow) {
   const history = parseTarifasHistory(cfgRow);
