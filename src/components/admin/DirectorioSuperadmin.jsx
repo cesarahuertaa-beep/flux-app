@@ -1399,9 +1399,45 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       onClick={() => setSelectedNutri({ id: "__atletas__", nombre: "Atletas Independientes", nombre_marca: "Atletas Independientes", isAtletas: true })}
                       className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
                     >
-                      <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                      {/* Vista Móvil (Estructurada y con contador colapsado en fila 1) */}
+                      <div className="p-4 md:hidden flex items-start gap-3.5">
+                        <div className="w-11 h-11 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10 mt-0.5">
+                          <Dumbbell className="text-[var(--brand-primary)]" size={20} />
+                        </div>
+
+                        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                          {/* Fila 1: Título y contador colapsado a la derecha */}
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-bold text-[#0B1929] text-base leading-tight truncate group-hover:text-[var(--brand-primary)] transition-colors">
+                              Atletas Independientes
+                            </h3>
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F0F4FA] text-[#0B1929] text-[11px] font-bold border border-[#E2E8F0]/80 shrink-0"
+                              title={`${atletasIndependientes.length} ${atletasIndependientes.length !== 1 ? 'atletas' : 'atleta'}`}
+                            >
+                              <Users size={12} className="text-[#6B7A8D]" />
+                              <span>{atletasIndependientes.length}</span>
+                            </div>
+                          </div>
+
+                          {/* Fila 2: Banner */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#E8F1FB] text-[var(--brand-primary)] shrink-0">
+                              AUTODIRIGIDOS
+                            </span>
+                          </div>
+
+                          {/* Fila 3: Descripción */}
+                          <p className="text-xs text-[#6B7A8D] leading-tight">
+                            Usuarios que gestionan su propio plan · Sin nutriólogo asignado
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Vista Escritorio */}
+                      <div className="hidden md:flex p-4.5 items-center justify-between gap-4">
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
+                          <div className="w-12 h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
                             <Dumbbell className="text-[var(--brand-primary)]" size={20} />
                           </div>
                           <div className="min-w-0">
@@ -1415,7 +1451,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F4FA] text-[#0B1929] text-xs font-bold border border-[#E2E8F0]/80">
                             <Users size={14} className="text-[#6B7A8D]" />
                             <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
