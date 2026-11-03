@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Mail, 
   Loader2, Circle, CircleDashed, Trash2, Crown, ChevronRight, ArrowLeft, 
-  Check, Shield, Plus, Sparkles, Building2, Briefcase, Lock, UserCheck
+  Check, Shield, Plus, Briefcase, Lock, UserCheck, Sliders, Edit2,
+  CalendarDays, ShoppingBag, Banknote, Activity, UtensilsCrossed, Dumbbell, Camera, UsersRound
 } from "lucide-react";
 import { 
   authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, 
@@ -12,6 +13,21 @@ import {
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
 
+// ─── TODAS LAS PESTAÑAS DISPONIBLES DE SUPERADMIN ────────────────────────────
+export const SUPERADMIN_TABS = [
+  { id: "clientes",         nombre: "Directorio",          desc: "Especialistas, atletas y pacientes", icon: "Users" },
+  { id: "agenda",           nombre: "Agenda",              desc: "Citas y disponibilidad médica", icon: "CalendarDays" },
+  { id: "equipo",           nombre: "Mi Equipo",           desc: "Gestión de colaboradores y roles", icon: "UsersRound" },
+  { id: "aprobaciones",     nombre: "Aprobaciones",        desc: "Solicitudes de registro profesional", icon: "UserCheck" },
+  { id: "biblioteca",       nombre: "Biblioteca",          desc: "Catálogo de ejercicios y movimientos", icon: "Folder" },
+  { id: "tienda",           nombre: "Tienda Oficial",      desc: "Productos, ropa y suplementos", icon: "ShoppingBag" },
+  { id: "pagos",            nombre: "Control Pagos",       desc: "Auditoría financiera y comisiones", icon: "Banknote" },
+  { id: "mi_entrenamiento", nombre: "Mi Plan",             desc: "Plan personal de salud y bienestar", icon: "Activity" },
+  { id: "nutricion",        nombre: "Nutrición",           desc: "Prescripción y comidas", icon: "UtensilsCrossed" },
+  { id: "entrenamiento",    nombre: "Entrenamiento",       desc: "Rutinas y series de ejercicios", icon: "Dumbbell" },
+  { id: "progreso_atleta",  nombre: "Progreso",            desc: "Fotografías corporales y evolución", icon: "Camera" },
+];
+
 // ─── ROLES PREDETERMINADOS CORPORATIVOS (FLUX STAFF) ─────────────────────────
 export const DEFAULT_STAFF_ROLES = [
   {
@@ -19,7 +35,7 @@ export const DEFAULT_STAFF_ROLES = [
     nombre: "Staff Corporativo (General)",
     departamento: "Operaciones",
     descripcion: "Acceso estándar a operaciones diarias, directorio general, biblioteca y tienda.",
-    modulos: ["directorio", "biblioteca", "tienda"],
+    modulos: ["clientes", "biblioteca", "tienda"],
     colorBadge: "bg-blue-50 text-blue-700 border-blue-200"
   },
   {
@@ -27,7 +43,7 @@ export const DEFAULT_STAFF_ROLES = [
     nombre: "Ventas y Afiliaciones",
     departamento: "Comercial",
     descripcion: "Prospección, validación de solicitudes profesionales de especialistas y tienda.",
-    modulos: ["directorio", "aprobaciones", "tienda"],
+    modulos: ["clientes", "aprobaciones", "tienda"],
     colorBadge: "bg-emerald-50 text-emerald-700 border-emerald-200"
   },
   {
@@ -35,7 +51,7 @@ export const DEFAULT_STAFF_ROLES = [
     nombre: "Finanzas y Liquidaciones",
     departamento: "Administración",
     descripcion: "Auditoría financiera, control de recibos, tarifas vigentes y comisiones.",
-    modulos: ["pagos", "directorio"],
+    modulos: ["pagos", "clientes"],
     colorBadge: "bg-purple-50 text-purple-700 border-purple-200"
   },
   {
@@ -51,20 +67,32 @@ export const DEFAULT_STAFF_ROLES = [
     nombre: "Soporte y Operaciones",
     departamento: "Atención a Usuarios",
     descripcion: "Resolución de incidencias, altas asistidas y validación de especialistas.",
-    modulos: ["directorio", "aprobaciones"],
+    modulos: ["clientes", "aprobaciones"],
     colorBadge: "bg-cyan-50 text-cyan-700 border-cyan-200"
   }
 ];
 
-export const MODULOS_DISPONIBLES = [
-  { id: "directorio",   nombre: "Directorio General",  desc: "Especialistas y atletas" },
-  { id: "aprobaciones", nombre: "Aprobaciones",        desc: "Solicitudes de registro" },
-  { id: "pagos",        nombre: "Auditoría Financiera", desc: "Pagos y comisiones" },
-  { id: "tienda",       nombre: "Tienda Oficial",      desc: "Productos y suplementos" },
-  { id: "biblioteca",   nombre: "Biblioteca Ejercicios", desc: "Catálogo de movimientos" }
-];
+const ROLES_STORAGE_KEY = "flux_staff_roles_v4";
 
-// ─── GestionEquipo ──────────────────────────────────────────────────────────
+// Renderizador visual del icono de cada pestaña
+function TabIcon({ id, size = 15, className = "" }) {
+  switch (id) {
+    case "clientes": return <Users size={size} className={className} />;
+    case "agenda": return <CalendarDays size={size} className={className} />;
+    case "equipo": return <UsersRound size={size} className={className} />;
+    case "aprobaciones": return <UserCheck size={size} className={className} />;
+    case "biblioteca": return <Folder size={size} className={className} />;
+    case "tienda": return <ShoppingBag size={size} className={className} />;
+    case "pagos": return <Banknote size={size} className={className} />;
+    case "mi_entrenamiento": return <Activity size={size} className={className} />;
+    case "nutricion": return <UtensilsCrossed size={size} className={className} />;
+    case "entrenamiento": return <Dumbbell size={size} className={className} />;
+    case "progreso_atleta": return <Camera size={size} className={className} />;
+    default: return <Circle size={size} className={className} />;
+  }
+}
+
+// ─── Componente Principal GestionEquipo ──────────────────────────────────────
 export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   const myId = profileId || getProfileId();
   const _peekRows = dbPeek("profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id,especialidad&order=nombre.asc");
@@ -76,7 +104,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   const [loading, setLoading]       = useState(() => _peekRows === null);
   const hasLoadedRef                = useRef(_peekRows !== null);
 
-  // Subpestañas principales (solo visibles para Superadmin): 'colaboradores' | 'roles'
+  // Subpestañas principales (Superadmin): 'colaboradores' | 'roles'
   const [activeSubTab, setActiveSubTab] = useState("colaboradores");
 
   // Edición Inline de Colaborador (Al hacer clic en la tarjeta)
@@ -100,32 +128,44 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   const [tarifaAdmin, setTarifaAdmin] = useState(50);
   const [confirmPremium, setConfirmPremium] = useState(null); // { miembro, activar }
 
-  // Generador de Roles (Superadmin)
-  const [customRoles, setCustomRoles] = useState(() => {
+  // ─── ROLES Y PERMISOS EDITABLES Y GENERADOR ────────────────────────────────
+  const [allStaffRoles, setAllStaffRoles] = useState(() => {
     try {
-      const saved = localStorage.getItem("flux_staff_custom_roles");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      const saved = localStorage.getItem(ROLES_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_STAFF_ROLES;
   });
+
+  // Modal para editar permisos/pestañas de un rol existente
+  const [editingRole, setEditingRole] = useState(null);
+  const [editingRoleForm, setEditingRoleForm] = useState({
+    nombre: "",
+    departamento: "",
+    descripcion: "",
+    modulos: []
+  });
+
+  // Modal para crear un nuevo rol
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
   const [newRoleForm, setNewRoleForm] = useState({
     nombre: "",
     departamento: "",
     descripcion: "",
-    modulos: ["directorio"]
+    modulos: ["clientes", "tienda", "biblioteca"]
   });
 
-  const allStaffRoles = [...DEFAULT_STAFF_ROLES, ...customRoles];
-
   // Manejador de botón atrás (Capacitor y navegador)
-  useBackButton(!!showConfirmDelete, () => { setShowConfirmDelete(false); setConfirmDeleteText(""); }, 40);
-  useBackButton(!!conflictUser, () => setConflictUser(null), 35);
-  useBackButton(!!confirmPremium, () => setConfirmPremium(null), 30);
-  useBackButton(showInvite, () => setShowInvite(false), 25);
-  useBackButton(showNewRoleModal, () => setShowNewRoleModal(false), 25);
-  useBackButton(!!editUser, () => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }, 20);
+  useBackButton(!!showConfirmDelete, () => { setShowConfirmDelete(false); setConfirmDeleteText(""); }, 45);
+  useBackButton(!!editingRole, () => setEditingRole(null), 40);
+  useBackButton(!!showNewRoleModal, () => setShowNewRoleModal(false), 35);
+  useBackButton(!!conflictUser, () => setConflictUser(null), 30);
+  useBackButton(!!confirmPremium, () => setConfirmPremium(null), 25);
+  useBackButton(showInvite, () => setShowInvite(false), 20);
+  useBackButton(!!editUser, () => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }, 15);
 
   const load = useCallback(async ({ forceFresh = false } = {}) => {
     if (!hasLoadedRef.current) setLoading(true);
@@ -399,7 +439,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       try {
         await dbPost("rpc/eliminar_colaborador_definitivo", { p_profile_id: targetId });
       } catch {
-        // Fallback: revocar rol y desvincular sin borrar cuenta de atleta/civil
         await dbPatch(`profiles?id=eq.${targetId}`, {
           role: "cliente",
           nutriologo_id: null,
@@ -415,7 +454,42 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     setSaving(false);
   };
 
-  // Crear un rol personalizado (Superadmin)
+  // ─── GESTIÓN DE ROLES: EDITAR PESTAÑAS Y CREAR NUEVO ROL ───────────────────
+  const openEditRoleModal = (roleItem) => {
+    setEditingRole(roleItem);
+    setEditingRoleForm({
+      nombre: roleItem.nombre || "",
+      departamento: roleItem.departamento || "",
+      descripcion: roleItem.descripcion || "",
+      modulos: Array.isArray(roleItem.modulos) ? [...roleItem.modulos] : []
+    });
+  };
+
+  const saveRoleEdit = () => {
+    if (!editingRole) return;
+    const roleId = editingRole.id;
+    const updatedList = allStaffRoles.map(r => {
+      if (r.id === roleId) {
+        return {
+          ...r,
+          nombre: editingRoleForm.nombre.trim() || r.nombre,
+          departamento: editingRoleForm.departamento.trim() || r.departamento,
+          descripcion: editingRoleForm.descripcion.trim() || r.descripcion,
+          modulos: editingRoleForm.modulos
+        };
+      }
+      return r;
+    });
+
+    setAllStaffRoles(updatedList);
+    try {
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updatedList));
+    } catch {}
+
+    setMsg(`✅ Pestañas asignadas al rol "${editingRoleForm.nombre || editingRole.nombre}" guardadas con éxito.`);
+    setEditingRole(null);
+  };
+
   const handleCreateCustomRole = () => {
     const cleanNombre = (newRoleForm.nombre || "").trim();
     if (!cleanNombre) {
@@ -428,32 +502,32 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       nombre: cleanNombre,
       departamento: newRoleForm.departamento.trim() || "Corporativo",
       descripcion: newRoleForm.descripcion.trim() || "Rol personalizado creado por Superadmin",
-      modulos: newRoleForm.modulos.length > 0 ? newRoleForm.modulos : ["directorio"],
+      modulos: newRoleForm.modulos.length > 0 ? newRoleForm.modulos : ["clientes"],
       colorBadge: "bg-indigo-50 text-indigo-700 border-indigo-200"
     };
 
-    const updated = [...customRoles, newRole];
-    setCustomRoles(updated);
+    const updated = [...allStaffRoles, newRole];
+    setAllStaffRoles(updated);
     try {
-      localStorage.setItem("flux_staff_custom_roles", JSON.stringify(updated));
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
     } catch {}
 
-    setMsg(`✅ Rol "${cleanNombre}" creado y disponible para asignación`);
+    setMsg(`✅ Rol "${cleanNombre}" creado con éxito.`);
     setShowNewRoleModal(false);
-    setNewRoleForm({ nombre: "", departamento: "", descripcion: "", modulos: ["directorio"] });
+    setNewRoleForm({ nombre: "", departamento: "", descripcion: "", modulos: ["clientes", "tienda", "biblioteca"] });
   };
 
   const handleDeleteCustomRole = (roleId) => {
-    const updated = customRoles.filter(r => r.id !== roleId);
-    setCustomRoles(updated);
+    const updated = allStaffRoles.filter(r => r.id !== roleId);
+    setAllStaffRoles(updated);
     try {
-      localStorage.setItem("flux_staff_custom_roles", JSON.stringify(updated));
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
     } catch {}
-    setMsg("✓ Rol personalizado eliminado.");
+    setMsg("✓ Rol eliminado.");
   };
 
   const getRoleInfo = (roleKey) => {
-    return allStaffRoles.find(r => r.id === roleKey) || DEFAULT_STAFF_ROLES[0];
+    return allStaffRoles.find(r => r.id === roleKey) || allStaffRoles[0] || DEFAULT_STAFF_ROLES[0];
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -579,7 +653,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
             </h3>
             <p className="text-xs text-[#6B7A8D] mb-4">
               {isSuperadmin 
-                ? "Elige las responsabilidades específicas de este colaborador para limitar a qué módulos corporativos tiene acceso."
+                ? "Selecciona el rol asignado a este colaborador para definir qué pestañas corporativas tiene autorizadas."
                 : "Como nutriólogo, tu colaborador adquiere el perfil de Administrativo de Clínica para gestionar tus pacientes y agenda."
               }
             </p>
@@ -613,11 +687,12 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                         </div>
 
                         <div className="pt-2 border-t border-[#E2E8F0]/70 flex flex-wrap gap-1">
-                          {(r.modulos || []).map(mod => {
-                            const modInfo = MODULOS_DISPONIBLES.find(m => m.id === mod);
+                          {(r.modulos || []).map(tabId => {
+                            const tabInfo = SUPERADMIN_TABS.find(t => t.id === tabId);
                             return (
-                              <span key={mod} className="text-[10px] font-semibold bg-[#F0F4FA] text-[#475569] px-1.5 py-0.5 rounded">
-                                {modInfo?.nombre || mod}
+                              <span key={tabId} className="text-[10px] font-semibold bg-[#F0F4FA] text-[#475569] px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <TabIcon id={tabId} size={10} />
+                                {tabInfo?.nombre || tabId}
                               </span>
                             );
                           })}
@@ -633,7 +708,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 <div>
                   <strong className="text-[#0B1929] block text-sm mb-1">Administrativo de Clínica</strong>
                   Tu colaborador tiene acceso exclusivo a la lista de pacientes y a la gestión de citas en tu agenda.
-                  Por privacidad médica y confidencialidad, <strong>no tiene acceso</strong> a los expedientes clínicos, dietas, rutinas ni métricas privadas.
+                  Por confidencialidad médica, <strong>no tiene acceso</strong> a los expedientes clínicos, dietas, rutinas ni métricas privadas.
                 </div>
               </div>
             )}
@@ -656,8 +731,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 </div>
                 <p className="text-xs text-[#6B7A8D] leading-relaxed max-w-xl">
                   {editUser.activo !== false
-                    ? "El colaborador puede iniciar sesión, ver sus módulos asignados y colaborar activamente. Si suspendes el acceso, su sesión se bloqueará de inmediato."
-                    : "El colaborador no puede ingresar a la plataforma hasta que reactives su acceso. Su información y registros se mantienen intactos."
+                    ? "El colaborador puede iniciar sesión y acceder a las pestañas asignadas. Si suspendes el acceso, su sesión se bloqueará de inmediato."
+                    : "El colaborador no puede ingresar a la plataforma hasta que reactives su acceso. Su información se mantiene intacta."
                   }
                 </p>
               </div>
@@ -828,20 +903,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       {/* Subpestaña: GENERADOR Y CATÁLOGO DE ROLES (Superadmin) */}
       {isSuperadmin && activeSubTab === "roles" ? (
         <div className="space-y-4 px-4 md:px-0">
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 shadow-2xs">
-            <h3 className="text-sm font-bold text-[#0B1929] mb-1 flex items-center gap-2">
-              <Sparkles size={16} className="text-[var(--brand-primary)]" />
-              Estructura Departamental de FLUX
-            </h3>
-            <p className="text-xs text-[#6B7A8D] leading-relaxed">
-              Configura los perfiles de acceso para que cada equipo corporativo (ventas, finanzas, marketing u operaciones) acceda únicamente a sus herramientas designadas.
-            </p>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allStaffRoles.map(r => {
               const colaboradoresEnRol = equipo.filter(c => (c.especialidad || 'staff_general') === r.id);
               const isCustom = r.id.startsWith("custom_");
+              const activeCount = (r.modulos || []).length;
 
               return (
                 <div key={r.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-2xs flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -854,7 +920,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                         <button
                           type="button"
                           onClick={() => handleDeleteCustomRole(r.id)}
-                          className="text-[#94A3B8] hover:text-red-600 transition-colors cursor-pointer"
+                          className="text-[#94A3B8] hover:text-red-600 transition-colors cursor-pointer p-1"
                           title="Eliminar rol personalizado"
                         >
                           <Trash2 size={14} />
@@ -865,30 +931,38 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                     <p className="text-xs text-[#6B7A8D] leading-relaxed mb-4">{r.descripcion}</p>
 
                     <div className="mb-4">
-                      <div className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Módulos Activos:</div>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>Pestañas Habilitadas:</span>
+                        <span className="text-[var(--brand-primary)] font-bold">{activeCount} de {SUPERADMIN_TABS.length}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                         {(r.modulos || []).map(mId => {
-                          const mInfo = MODULOS_DISPONIBLES.find(m => m.id === mId);
+                          const tabInfo = SUPERADMIN_TABS.find(t => t.id === mId);
                           return (
-                            <span key={mId} className="text-[11px] font-semibold bg-[#F0F4FA] text-[#0B1929] px-2 py-0.5 rounded-md border border-[#E2E8F0]">
-                              {mInfo?.nombre || mId}
+                            <span key={mId} className="text-[11px] font-semibold bg-[#F0F4FA] text-[#0B1929] px-2 py-1 rounded-md border border-[#E2E8F0] flex items-center gap-1.5">
+                              <TabIcon id={mId} size={12} className="text-[var(--brand-primary)]" />
+                              {tabInfo?.nombre || mId}
                             </span>
                           );
                         })}
+                        {activeCount === 0 && (
+                          <span className="text-xs text-[#94A3B8] italic">Sin pestañas habilitadas</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-[#6B7A8D]">
-                    <span>{colaboradoresEnRol.length} colaborador{colaboradoresEnRol.length !== 1 ? 'es' : ''} asignado{colaboradoresEnRol.length !== 1 ? 's' : ''}</span>
+                  <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between gap-2 mt-2">
+                    <span className="text-xs text-[#6B7A8D] font-medium">
+                      {colaboradoresEnRol.length} miembro{colaboradoresEnRol.length !== 1 ? 's' : ''}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveSubTab("colaboradores");
-                      }}
-                      className="text-[var(--brand-primary)] font-bold hover:underline cursor-pointer"
+                      onClick={() => openEditRoleModal(r)}
+                      className="px-3.5 py-1.5 rounded-xl bg-[var(--brand-primary)]/10 hover:bg-[var(--brand-primary)]/20 text-[var(--brand-primary)] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      Ver miembros
+                      <Sliders size={13} />
+                      Editar Pestañas
                     </button>
                   </div>
                 </div>
@@ -903,7 +977,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
           <div className="hidden md:block bg-[#F8FAFC] border-y md:border border-[#BFDBFE] rounded-none md:rounded-xl px-4 md:px-5 py-3.5 text-sm text-[#6B7A8D] mb-4 md:mb-6 leading-relaxed">
             <strong className="text-[#0B1929]">Gestión de Colaboradores:</strong><br />
             {isSuperadmin 
-              ? "Haz clic sobre cualquier tarjeta de empleado para editar sus datos, ajustar su rol departamental o suspender su acceso al sistema." 
+              ? "Haz clic sobre cualquier tarjeta de empleado para editar sus datos, ajustar su rol corporativo o suspender su acceso al sistema." 
               : "Haz clic sobre la tarjeta de tu administrativo para editar sus datos de contacto o gestionar su acceso."
             }
           </div>
@@ -1022,12 +1096,127 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════ */}
+      {/* MODAL CONFIGURAR PESTAÑAS DE UN ROL EXISTENTE                         */}
+      {/* ═════════════════════════════════════════════════════════════════════ */}
+      {editingRole && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-5 md:p-6 animate-in zoom-in-95 max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E8F0] shrink-0">
+              <div>
+                <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Permisos de Acceso</span>
+                <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
+                  <Sliders size={18} className="text-[var(--brand-primary)]" />
+                  {editingRole.nombre}
+                </h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setEditingRole(null)}
+                className="text-[#94A3B8] hover:text-[#0B1929] transition-colors p-1"
+              >
+                <XCircle size={22} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Pestañas Autorizadas ({editingRoleForm.modulos.length} de {SUPERADMIN_TABS.length})
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingRoleForm(p => ({ ...p, modulos: SUPERADMIN_TABS.map(t => t.id) }))}
+                      className="text-xs font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                    >
+                      Marcar Todas
+                    </button>
+                    <span className="text-xs text-[#CBD5E1]">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRoleForm(p => ({ ...p, modulos: [] }))}
+                      className="text-xs font-bold text-[#6B7A8D] hover:underline cursor-pointer"
+                    >
+                      Desmarcar Todas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SUPERADMIN_TABS.map(tab => {
+                    const isChecked = editingRoleForm.modulos.includes(tab.id);
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setEditingRoleForm(p => ({
+                            ...p,
+                            modulos: isChecked 
+                              ? p.modulos.filter(id => id !== tab.id)
+                              : [...p.modulos, tab.id]
+                          }));
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isChecked 
+                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 ring-1 ring-[var(--brand-primary)]/30' 
+                            : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isChecked ? 'bg-[var(--brand-primary)] text-white' : 'bg-[#F0F4FA] text-[#6B7A8D]'}`}>
+                            <TabIcon id={tab.id} size={15} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className={`text-xs font-bold truncate ${isChecked ? 'text-[#0B1929]' : 'text-[#475569]'}`}>
+                              {tab.nombre}
+                            </div>
+                            <div className="text-[11px] text-[#6B7A8D] truncate">
+                              {tab.desc}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                          isChecked ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white' : 'border-[#CBD5E1] bg-white'
+                        }`}>
+                          {isChecked && <Check size={12} strokeWidth={3} />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[#E2E8F0] shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingRole(null)}
+                className="px-4 py-2 text-xs font-semibold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveRoleEdit}
+                className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check size={14} strokeWidth={2.5} /> Guardar Pestañas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════════════ */}
       {/* MODAL CREAR NUEVO ROL (SUPERADMIN)                                   */}
       {/* ═════════════════════════════════════════════════════════════════════ */}
       {showNewRoleModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 md:p-6 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-5 md:p-6 animate-in zoom-in-95 max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E8F0] shrink-0">
               <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
                 <Shield size={18} className="text-[var(--brand-primary)]" />
                 Generador de Rol Corporativo
@@ -1035,33 +1224,35 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
               <button 
                 type="button" 
                 onClick={() => setShowNewRoleModal(false)}
-                className="text-[#94A3B8] hover:text-[#0B1929] transition-colors"
+                className="text-[#94A3B8] hover:text-[#0B1929] transition-colors p-1"
               >
-                <XCircle size={20} />
+                <XCircle size={22} />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Nombre del Rol</label>
-                <input
-                  type="text"
-                  value={newRoleForm.nombre}
-                  onChange={e => setNewRoleForm(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej. Líder de Afiliaciones"
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
-              </div>
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Nombre del Rol</label>
+                  <input
+                    type="text"
+                    value={newRoleForm.nombre}
+                    onChange={e => setNewRoleForm(p => ({ ...p, nombre: e.target.value }))}
+                    placeholder="Ej. Líder de Afiliaciones"
+                    className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Departamento / Área</label>
-                <input
-                  type="text"
-                  value={newRoleForm.departamento}
-                  onChange={e => setNewRoleForm(p => ({ ...p, departamento: e.target.value }))}
-                  placeholder="Ej. Comercial o Clínico"
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1">Departamento / Área</label>
+                  <input
+                    type="text"
+                    value={newRoleForm.departamento}
+                    onChange={e => setNewRoleForm(p => ({ ...p, departamento: e.target.value }))}
+                    placeholder="Ej. Comercial o Expansión"
+                    className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1076,56 +1267,91 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">Módulos Habilitados</label>
-                <div className="space-y-2">
-                  {MODULOS_DISPONIBLES.map(mod => {
-                    const isChecked = newRoleForm.modulos.includes(mod.id);
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Pestañas Autorizadas ({newRoleForm.modulos.length} de {SUPERADMIN_TABS.length})
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewRoleForm(p => ({ ...p, modulos: SUPERADMIN_TABS.map(t => t.id) }))}
+                      className="text-xs font-bold text-[var(--brand-primary)] hover:underline cursor-pointer"
+                    >
+                      Marcar Todas
+                    </button>
+                    <span className="text-xs text-[#CBD5E1]">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewRoleForm(p => ({ ...p, modulos: [] }))}
+                      className="text-xs font-bold text-[#6B7A8D] hover:underline cursor-pointer"
+                    >
+                      Desmarcar Todas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SUPERADMIN_TABS.map(tab => {
+                    const isChecked = newRoleForm.modulos.includes(tab.id);
                     return (
-                      <div
-                        key={mod.id}
+                      <button
+                        key={tab.id}
+                        type="button"
                         onClick={() => {
                           setNewRoleForm(p => ({
                             ...p,
                             modulos: isChecked 
-                              ? p.modulos.filter(m => m !== mod.id)
-                              : [...p.modulos, mod.id]
+                              ? p.modulos.filter(id => id !== tab.id)
+                              : [...p.modulos, tab.id]
                           }));
                         }}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
                           isChecked 
-                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5' 
+                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 ring-1 ring-[var(--brand-primary)]/30' 
                             : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'
                         }`}
                       >
-                        <div>
-                          <div className="text-xs font-bold text-[#0B1929]">{mod.nombre}</div>
-                          <div className="text-[11px] text-[#6B7A8D]">{mod.desc}</div>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isChecked ? 'bg-[var(--brand-primary)] text-white' : 'bg-[#F0F4FA] text-[#6B7A8D]'}`}>
+                            <TabIcon id={tab.id} size={15} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className={`text-xs font-bold truncate ${isChecked ? 'text-[#0B1929]' : 'text-[#475569]'}`}>
+                              {tab.nombre}
+                            </div>
+                            <div className="text-[11px] text-[#6B7A8D] truncate">
+                              {tab.desc}
+                            </div>
+                          </div>
                         </div>
-                        <div className={`w-4 h-4 rounded-md border flex items-center justify-center ${isChecked ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white' : 'border-[#CBD5E1]'}`}>
-                          {isChecked && <Check size={11} strokeWidth={3} />}
+
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                          isChecked ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white' : 'border-[#CBD5E1] bg-white'
+                        }`}>
+                          {isChecked && <Check size={12} strokeWidth={3} />}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#E2E8F0]">
-                <button
-                  type="button"
-                  onClick={() => setShowNewRoleModal(false)}
-                  className="px-4 py-2 text-xs font-semibold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateCustomRole}
-                  className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs"
-                >
-                  Guardar Rol
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-[#E2E8F0] shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowNewRoleModal(false)}
+                className="px-4 py-2 text-xs font-semibold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCustomRole}
+                className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check size={14} strokeWidth={2.5} /> Guardar Rol
+              </button>
             </div>
           </div>
         </div>
