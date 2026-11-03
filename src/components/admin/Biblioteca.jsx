@@ -518,31 +518,60 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           </p>
         </div>
 
-        {/* Barra de Búsqueda debajo de "Colección global..." */}
-        <div className="relative w-full max-w-md">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
-          <input
-            type="text"
-            placeholder={searchPlaceholder}
-            value={searchVal}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 md:py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
-          />
-          {searchVal && (
+        {/* Fila de Búsqueda de ancho completo + Botón de Acción a la derecha */}
+        <div className="flex items-center gap-2 sm:gap-3 w-full">
+          <div className="relative flex-1 min-w-0">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={searchVal}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 md:py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
+            />
+            {searchVal && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {isSuperadmin && (
             <button
               type="button"
-              onClick={() => handleSearchChange("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
-              title="Limpiar búsqueda"
+              onClick={
+                subtab === "ejercicios" ? openNewEj :
+                subtab === "platillos" ? openNewPlatillo :
+                openNewIng
+              }
+              className="inline-flex items-center justify-center gap-1.5 bg-[var(--brand-primary)] text-white h-[38px] md:h-[42px] px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
+              title={
+                subtab === "ejercicios" ? "Nuevo ejercicio" :
+                subtab === "platillos" ? "Nuevo platillo" :
+                "Nuevo ingrediente"
+              }
+              aria-label={
+                subtab === "ejercicios" ? "Nuevo ejercicio" :
+                subtab === "platillos" ? "Nuevo platillo" :
+                "Nuevo ingrediente"
+              }
             >
-              <X size={14} />
+              <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+              <span className="hidden sm:inline">
+                {subtab === "ejercicios" ? "Nuevo ejercicio" : subtab === "platillos" ? "Nuevo platillo" : "Nuevo ingrediente"}
+              </span>
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Fila 1: Sub-tabs Switch Homologado + Botón de Acción ── */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-2 md:pt-4 pb-1">
+      {/* ── Fila 1: Sub-tabs Switch Homologado ── */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-2 md:pt-4 pb-1">
         <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
           <button
             type="button"
@@ -572,7 +601,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             }`}
           >
             <Utensils className="w-4 h-4 shrink-0" />
-            <span>Platillos y Recetas</span>
+            <span>Platillos</span>
             <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
               subtab === "platillos" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
@@ -590,7 +619,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             }`}
           >
             <Apple className="w-4 h-4 shrink-0" />
-            <span>Ingredientes Culinarios</span>
+            <span>Ingredientes</span>
             <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
               subtab === "ingredientes" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
@@ -598,25 +627,6 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             </span>
           </button>
         </div>
-
-        {/* Botón de Creación Dinámico */}
-        {isSuperadmin && (
-          <button
-            type="button"
-            onClick={
-              subtab === "ejercicios" ? openNewEj :
-              subtab === "platillos" ? openNewPlatillo :
-              openNewIng
-            }
-            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
-          >
-            <Plus size={16} strokeWidth={2.5} className="shrink-0" />
-            <span className="hidden sm:inline">
-              {subtab === "ejercicios" ? "Nuevo ejercicio" : subtab === "platillos" ? "Nuevo platillo" : "Nuevo ingrediente"}
-            </span>
-            <span className="inline sm:hidden">Nuevo</span>
-          </button>
-        )}
       </div>
 
       {/* ── Fila 2: Filtros en Píldoras Horizontales con Conteo ── */}
