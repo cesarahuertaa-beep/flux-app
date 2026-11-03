@@ -884,8 +884,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className="pb-28 md:pb-8">
-      {/* Top action bar (homologado con Agenda) */}
-      <div className="flex items-center gap-2 overflow-x-auto scroll-hide mb-4 md:mb-5 px-4 pt-1 md:px-0 md:pt-0 pb-0.5">
+      {/* Top action bar: Fijo en móvil sin scroll lateral, botón colapsado */}
+      <div className="flex items-center justify-between sm:justify-start gap-2 mb-3 md:mb-5 px-4 pt-1 md:px-0 md:pt-0">
         {isSuperadmin ? (
           <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
             {[["colaboradores", "Colaboradores"], ["roles", "Roles y Permisos"]].map(([k, lb]) => (
@@ -893,7 +893,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 key={k}
                 type="button"
                 onClick={() => setActiveSubTab(k)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeSubTab === k
                     ? "bg-white text-[var(--brand-primary)] shadow-sm"
                     : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -909,17 +909,23 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
           <button 
             type="button"
             onClick={() => setShowNewRoleModal(true)}
-            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-1.5 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 h-8 sm:h-auto px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm shrink-0 cursor-pointer"
+            title="Crear Nuevo Rol"
+            aria-label="Crear Nuevo Rol"
           >
-            <Plus size={16} /> Crear Nuevo Rol
+            <Plus size={16} strokeWidth={2.5} className="shrink-0" />
+            <span className="hidden sm:inline">Crear Nuevo Rol</span>
           </button>
         ) : (
           <button 
             type="button"
             onClick={() => setShowInvite(true)}
-            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-1.5 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 h-8 sm:h-auto px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm shrink-0 cursor-pointer"
+            title="Invitar colaborador"
+            aria-label="Invitar colaborador"
           >
-            <Plus size={16} /> Invitar colaborador
+            <Plus size={16} strokeWidth={2.5} className="shrink-0" />
+            <span className="hidden sm:inline">Invitar colaborador</span>
           </button>
         )}
       </div>
