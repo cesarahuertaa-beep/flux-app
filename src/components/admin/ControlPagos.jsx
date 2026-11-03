@@ -1,20 +1,44 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dbPeek, dbGet, dbPatch, dbPost, invalidateCache } from "../../lib/supabase";
-import { CheckCircle2, XCircle, Eye, Banknote, X, Clock, UserCheck, ChevronDown, ChevronRight, Calendar, Send, Dumbbell, Settings, Save, Zap } from "lucide-react";
-import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getRatesForCutoff, getNextCutoffDateStr } from"../../utils/tarifas";
-import { ListSkeleton } from"../ui/Skeleton";
+import { 
+  CheckCircle2, XCircle, Eye, Banknote, X, Clock, Calendar, 
+  Dumbbell, Settings, Save, Zap, Search, ChevronRight, UserCheck, ShieldCheck
+} from "lucide-react";
+import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getNextCutoffDateStr } from "../../utils/tarifas";
+import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
-import { useBackButton } from"../../lib/backButtonHandler";
+import { useBackButton } from "../../lib/backButtonHandler";
 
 // ── Shared StatusBadge ──────────────────────────────────────────────────────
 const StatusBadge = ({ s }) => {
-  if (s ==="pendiente") return <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><Clock size={12}/> Pendiente</span>;
-  if (s ==="aprobado")  return <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><CheckCircle2 size={12}/> Aprobado</span>;
-  if (s ==="rechazado") return <span className="px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-max"><XCircle size={12}/> Rechazado</span>;
+  if (s === "pendiente") {
+    return (
+      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/60 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 w-max">
+        <Clock size={12} className="text-amber-600" /> Pendiente
+      </span>
+    );
+  }
+  if (s === "aprobado") {
+    return (
+      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 w-max">
+        <CheckCircle2 size={12} className="text-emerald-600" /> Aprobado
+      </span>
+    );
+  }
+  if (s === "rechazado") {
+    return (
+      <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200/60 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 w-max">
+        <XCircle size={12} className="text-red-600" /> Rechazado
+      </span>
+    );
+  }
   return null;
 };
 
 export default function ControlPagos({ setMsg }) {
+  // ── Switch principal: 'nutriologos' | 'atletas' | 'tarifas' ────────────────
+  const [activeTab, setActiveTab] = useState("nutriologos");
+
   const _peekRecibos = dbPeek("recibos_pago?order=created_at.desc");
   const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
   const _peekRecibosCivil = dbPeek("recibos_pago_civil?order=created_at.desc");
@@ -28,21 +52,20 @@ export default function ControlPagos({ setMsg }) {
 
   useBackButton(!!modalImg, () => setModalImg(null), 50);
 
-  const [filtroEstado, setFiltroEstado] = useState("pendiente");
+  const [filtroEstado, setFiltroEstado] = useState("todos");
   const [filtroMes, setFiltroMes] = useState("todos");
-  const [expandedColab, setExpandedColab] = useState(null);
-  const [nominasEstado, setNominasEstado] = useState({});
+  const [busquedaNutri, setBusquedaNutri] = useState("");
 
   // ── Estado atletas independientes ───────────────────────────────────────
   const [recibosCivil, setRecibosCivil] = useState(() => Array.isArray(_peekRecibosCivil) ? _peekRecibosCivil : []);
   const [clientesCivil, setClientesCivil] = useState({});
   const [loadingCivil, setLoadingCivil] = useState(() => _peekRecibosCivil === null);
   const hasLoadedCivilRef = useRef(_peekRecibosCivil !== null);
-  const [filtroEstadoCivil, setFiltroEstadoCivil] = useState("pendiente");
+  const [filtroEstadoCivil, setFiltroEstadoCivil] = useState("todos");
+  const [busquedaCivil, setBusquedaCivil] = useState("");
 
-  // ── Estado Configuración de Tarifas y Planes (Opción A) ─────────────────
+  // ── Estado Configuración de Tarifas y Planes ────────────────────────────
   const [rawCfg, setRawCfg] = useState(() => Array.isArray(_peekCfg) && _peekCfg.length > 0 ? _peekCfg[0] : null);
-  const [showRatesPanel, setShowRatesPanel] = useState(false);
   const [savingRates, setSavingRates] = useState(false);
   const [ratesForm, setRatesForm] = useState({
     nutri_tier1: DEFAULT_RATES.nutri_tier1,
@@ -57,10 +80,9 @@ export default function ControlPagos({ setMsg }) {
   const loadData = async () => {
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const [dataRecibos, profiles, dataNominas, cfg] = await Promise.all([
+      const [dataRecibos, profiles, cfg] = await Promise.all([
         dbGet("recibos_pago?order=created_at.desc"),
-        dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre,role,creado_por_nombre"),
-        dbGet("nomina_colaboradores"),
+        dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre,role,creado_por_nombre,email"),
         dbGet("configuracion_plataforma?id=eq.1")
       ]);
       if (cfg && cfg.length > 0) {
@@ -77,17 +99,14 @@ export default function ControlPagos({ setMsg }) {
         });
       }
       const map = {};
-      profiles.forEach(p => { map[p.id] = { nombre: p.nombre, role: p.role, creado_por: p.creado_por_nombre || null }; });
-      const mapNominas = {};
-      if(dataNominas && dataNominas.length > 0) {
-        dataNominas.forEach(n => { mapNominas[`${n.colaborador_nombre}|${n.mes_facturacion}`] = n; });
-      }
+      (profiles || []).forEach(p => { 
+        map[p.id] = { nombre: p.nombre, role: p.role, creado_por: p.creado_por_nombre || null, email: p.email || "" }; 
+      });
       setNutriologos(map);
-      setNominasEstado(mapNominas);
-      setRecibos(dataRecibos);
+      setRecibos(dataRecibos || []);
     } catch (e) {
       console.error(e);
-      setMsg("❌ Error cargando pagos:" + e.message);
+      setMsg("❌ Error cargando pagos: " + e.message);
     }
     hasLoadedRef.current = true;
     setLoading(false);
@@ -112,7 +131,6 @@ export default function ControlPagos({ setMsg }) {
 
       let updatedHistory;
       if (applyNow) {
-        // Al aplicar de inmediato, actualizamos la tarifa base desde 2020-01-01 y limpiamos overrides futuros redundantes
         updatedHistory = [newEntry];
       } else {
         const filteredHistory = history.filter(h => h.effective_from !== nextCutoffStr);
@@ -134,7 +152,6 @@ export default function ControlPagos({ setMsg }) {
         ? "✓ Tarifas aplicadas de inmediato como tarifa base vigente hoy."
         : `✓ Tarifas guardadas. Entrarán en vigor en el próximo corte (${nextCutoffStr}) respetando adeudos anteriores.`
       );
-      setShowRatesPanel(false);
     } catch (e) {
       setMsg("❌ Error guardando tarifas: " + e.message);
     }
@@ -146,15 +163,16 @@ export default function ControlPagos({ setMsg }) {
     try {
       const [dataRec, clientes] = await Promise.all([
         dbGet("recibos_pago_civil?order=created_at.desc"),
-        dbGet("clientes?nutriologo_id=is.null&select=id,nombre,email")
+        dbGet("clientes?nutriologo_id=is.null&select=id,nombre,email,telefono")
       ]);
       const map = {};
-      (clientes || []).forEach(c => { map[c.id] = c.nombre || c.email || c.id; });
+      (clientes || []).forEach(c => { 
+        map[c.id] = { nombre: c.nombre || "Atleta Independiente", email: c.email || "", telefono: c.telefono || "" }; 
+      });
       setClientesCivil(map);
       setRecibosCivil(dataRec || []);
     } catch (e) {
       console.error("Error cargando pagos civil:", e);
-      // No mostrar error si la tabla aún no existe
     }
     hasLoadedCivilRef.current = true;
     setLoadingCivil(false);
@@ -166,7 +184,7 @@ export default function ControlPagos({ setMsg }) {
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["recibos_pago", "recibos_pago_civil", "pagos_manuales", "profiles", "clientes", "configuracion_app", "*"].includes(table)) return;
+      if (table && !["recibos_pago", "recibos_pago_civil", "profiles", "clientes", "configuracion_plataforma", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { loadData(); loadDataCivil(); }, 250);
     };
@@ -195,57 +213,63 @@ export default function ControlPagos({ setMsg }) {
     }
   }, [mesesDisponibles]);
 
-  const filtrados = useMemo(() => recibos.filter(r => {
-    const matchEstado = filtroEstado ==="todos" ? true : r.estado === filtroEstado;
-    const matchMes = filtroMes ==="todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
-    return matchEstado && matchMes;
-  }), [recibos, filtroEstado, filtroMes]);
+  const formatMes = (yyyyMm) => {
+    if (yyyyMm === 'todos') return 'Todos los meses';
+    const [y, m] = yyyyMm.split('-');
+    return new Date(y, m - 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  };
+
+  const filtradosNutri = useMemo(() => {
+    return recibos.filter(r => {
+      const matchEstado = filtroEstado === "todos" ? true : r.estado === filtroEstado;
+      const matchMes = filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
+      const nutri = nutriologos[r.nutriologo_id];
+      const matchQuery = !busquedaNutri.trim() ? true : (
+        (nutri?.nombre || "").toLowerCase().includes(busquedaNutri.toLowerCase()) ||
+        (nutri?.email || "").toLowerCase().includes(busquedaNutri.toLowerCase()) ||
+        (nutri?.creado_por || "").toLowerCase().includes(busquedaNutri.toLowerCase())
+      );
+      return matchEstado && matchMes && matchQuery;
+    });
+  }, [recibos, filtroEstado, filtroMes, busquedaNutri, nutriologos]);
+
+  // Contadores Nutriólogos
+  const nutriCounts = useMemo(() => {
+    const base = recibos.filter(r => filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes)));
+    return {
+      todos: base.length,
+      pendiente: base.filter(r => r.estado === "pendiente").length,
+      aprobado: base.filter(r => r.estado === "aprobado").length,
+      rechazado: base.filter(r => r.estado === "rechazado").length
+    };
+  }, [recibos, filtroMes]);
 
   // ── Filtros Civil ───────────────────────────────────────────────────────
-  const filtradosCivil = useMemo(() =>
-    recibosCivil.filter(r => filtroEstadoCivil ==="todos" ? true : r.estado === filtroEstadoCivil),
-  [recibosCivil, filtroEstadoCivil]);
-
-  // ── Comisiones colaboradores (Evaluadas por fecha de corte o nómina congelada) ──
-  const comisiones = useMemo(() => {
-    const map = {};
-    filtrados.forEach(r => {
-      const nutri = nutriologos[r.nutriologo_id];
-      if (!nutri || !nutri.creado_por) return;
-      const colab = nutri.creado_por;
-      if (!map[colab]) map[colab] = { totalGenerado: 0, comisionAcumulada: 0, nutriologos: new Set(), recibosCount: 0 };
-      // Los administrativos premium patrocinados NO generan comisión para el staff
-      const montoRecibo = Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0));
-      const ratesForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
-      const pct = (Number(ratesForCut.comision_pct) || 35) / 100;
-      map[colab].totalGenerado += montoRecibo;
-      map[colab].comisionAcumulada += montoRecibo * pct;
-      map[colab].nutriologos.add(nutri.nombre ||"Desconocido");
-      map[colab].recibosCount++;
+  const filtradosCivil = useMemo(() => {
+    return recibosCivil.filter(r => {
+      const matchEstado = filtroEstadoCivil === "todos" ? true : r.estado === filtroEstadoCivil;
+      const cliente = clientesCivil[r.cliente_id];
+      const matchQuery = !busquedaCivil.trim() ? true : (
+        (cliente?.nombre || "").toLowerCase().includes(busquedaCivil.toLowerCase()) ||
+        (cliente?.email || "").toLowerCase().includes(busquedaCivil.toLowerCase())
+      );
+      return matchEstado && matchQuery;
     });
-    return Object.entries(map)
-      .map(([nombre, data]) => {
-        const nominaKey = `${nombre}|${filtroMes}`;
-        const existingNomina = filtroMes !== "todos" ? nominasEstado[nominaKey] : null;
-        const comisionFinal = (existingNomina?.transferido_por_admin && existingNomina?.monto != null)
-          ? Number(existingNomina.monto)
-          : data.comisionAcumulada;
-        return {
-          nombre,
-          totalGenerado: data.totalGenerado,
-          comision: comisionFinal,
-          nutriologos: [...data.nutriologos],
-          recibosCount: data.recibosCount
-        };
-      })
-      .sort((a, b) => b.comision - a.comision);
-  }, [filtrados, nutriologos, rawCfg, filtroMes, nominasEstado]);
+  }, [recibosCivil, filtroEstadoCivil, busquedaCivil, clientesCivil]);
 
-  // ── Acciones ────────────────────────────────────────────────────────────
+  // Contadores Atletas
+  const civilCounts = useMemo(() => ({
+    todos: recibosCivil.length,
+    pendiente: recibosCivil.filter(r => r.estado === "pendiente").length,
+    aprobado: recibosCivil.filter(r => r.estado === "aprobado").length,
+    rechazado: recibosCivil.filter(r => r.estado === "rechazado").length
+  }), [recibosCivil]);
+
+  // ── Acciones de validación ──────────────────────────────────────────────
   const updateEstado = async (id, nuevoEstado, nutriologoId) => {
     try {
       await dbPatch(`recibos_pago?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado ==="aprobado" && nutriologoId) {
+      if (nuevoEstado === "aprobado" && nutriologoId) {
         await dbPatch(`profiles?id=eq.${nutriologoId}`, { bloqueado: false });
       }
 
@@ -253,10 +277,10 @@ export default function ControlPagos({ setMsg }) {
         try {
           await dbPost("notificaciones", {
             profile_id: nutriologoId,
-            titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
-            mensaje: nuevoEstado ==="aprobado" ?"Tu pago ha sido validado exitosamente. Ya tienes acceso." :"Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
-            tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
-            link_url:"membresia",
+            titulo: nuevoEstado === "aprobado" ? "Pago Aprobado" : "Pago Rechazado",
+            mensaje: nuevoEstado === "aprobado" ? "Tu pago ha sido validado exitosamente. Ya tienes acceso total." : "Hubo un problema validando tu pago. Por favor revisa y vuelve a subirlo.",
+            tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
+            link_url: "membresia",
             entidad_id: id
           }, { headers: { Prefer: "return=minimal" } });
         } catch (notifErr) {
@@ -264,22 +288,23 @@ export default function ControlPagos({ setMsg }) {
         }
       }
 
-      setMsg("✓ Recibo " + nuevoEstado);
+      setMsg("✓ Recibo de nutriólogo " + nuevoEstado);
       loadData();
-    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
+    } catch (e) { 
+      setMsg("❌ Error al actualizar: " + e.message); 
+    }
   };
 
   const updateEstadoCivil = async (id, nuevoEstado, clienteId) => {
     try {
       await dbPatch(`recibos_pago_civil?id=eq.${id}`, { estado: nuevoEstado });
-      if (nuevoEstado ==="aprobado" && clienteId) {
+      if (nuevoEstado === "aprobado" && clienteId) {
         await dbPatch(`clientes?id=eq.${clienteId}`, { 
           activo: true, 
-          deactivated_at: null,
-          plan_tipo: 'premium'
+          deactivated_at: null, 
+          plan_tipo: 'premium' 
         });
-      } else if (nuevoEstado ==="rechazado" && clienteId) {
-        // Re-evaluar si tiene derecho a ser premium por algún otro recibo anterior
+      } else if (nuevoEstado === "rechazado" && clienteId) {
         const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteId}&order=created_at.desc`);
         const lastAprobado = recibos?.find(r => r.estado === 'aprobado');
         let downgrade = false;
@@ -287,7 +312,7 @@ export default function ControlPagos({ setMsg }) {
           downgrade = true;
         } else {
           const today = new Date();
-          const expirationDate = new Date(lastAprobado.fecha_corte_mes +"T23:59:59");
+          const expirationDate = new Date(lastAprobado.fecha_corte_mes + "T23:59:59");
           const blockDate = new Date(expirationDate);
           blockDate.setDate(blockDate.getDate() + 2);
           if (today > blockDate) downgrade = true;
@@ -304,10 +329,10 @@ export default function ControlPagos({ setMsg }) {
           if (cliente && cliente.length > 0 && cliente[0].auth_id) {
             await dbPost("notificaciones", {
               profile_id: cliente[0].auth_id,
-              titulo: nuevoEstado ==="aprobado" ?"Pago Aprobado" :"Pago Rechazado",
-              mensaje: nuevoEstado ==="aprobado" ?"Tu membresía premium ha sido activada." :"Hubo un problema validando tu pago. Revísalo en tu membresía.",
-              tipo: nuevoEstado ==="aprobado" ?"pago" :"alerta",
-              link_url:"membresia",
+              titulo: nuevoEstado === "aprobado" ? "Membresía Activada" : "Comprobante Rechazado",
+              mensaje: nuevoEstado === "aprobado" ? "Tu suscripción Premium ha sido activada exitosamente." : "Hubo un problema validando tu pago. Revísalo en tu membresía.",
+              tipo: nuevoEstado === "aprobado" ? "pago" : "alerta",
+              link_url: "membresia",
               entidad_id: id
             }, { headers: { Prefer: "return=minimal" } });
           }
@@ -318,564 +343,797 @@ export default function ControlPagos({ setMsg }) {
 
       setMsg("✓ Pago de atleta " + nuevoEstado);
       loadDataCivil();
-    } catch (e) { setMsg("❌ Error al actualizar: " + e.message); }
+    } catch (e) { 
+      setMsg("❌ Error al actualizar: " + e.message); 
+    }
   };
 
-  const handleMarcarTransferido = async (colaboradorNombre, monto) => {
-    if (filtroMes === 'todos') { setMsg("⚠️ Selecciona un mes específico."); return; }
-    try {
-      setMsg("Guardando...");
-      const key = `${colaboradorNombre}|${filtroMes}`;
-      const existing = nominasEstado[key];
-      if (existing) {
-        await dbPatch(`nomina_colaboradores?id=eq.${existing.id}`, { transferido_por_admin: true, monto });
-      } else {
-        await dbPost("nomina_colaboradores", { colaborador_nombre: colaboradorNombre, mes_facturacion: filtroMes, monto, transferido_por_admin: true });
-      }
-      setMsg("✓ Marcado como transferido");
-      loadData();
-    } catch (e) { setMsg("❌ Error: " + e.message); }
-  };
+  // Totales
+  const totalNutriCobrado = useMemo(() => {
+    return filtradosNutri
+      .filter(r => r.estado === "aprobado")
+      .reduce((sum, r) => sum + (Number(r.monto) || 0), 0);
+  }, [filtradosNutri]);
 
-  const formatMes = (yyyyMm) => {
-    if (yyyyMm === 'todos') return 'Todos los meses';
-    const [y, m] = yyyyMm.split('-');
-    return new Date(y, m - 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
-  };
+  const totalCivilCobrado = useMemo(() => {
+    return filtradosCivil
+      .filter(r => r.estado === "aprobado")
+      .reduce((sum, r) => sum + (Number(r.monto) || 0), 0);
+  }, [filtradosCivil]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-4 md:space-y-6 animate-fade-in pb-28 md:pb-8 pt-2 md:pt-0">
-
-      {/* ── PANEL DE CONFIGURACIÓN DE TARIFAS Y PLANES (OPCIÓN A) ────────── */}
-      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
-        <div className="p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
-              <Settings size={20} className="text-[var(--brand-primary)]" />
-              Costos por Perfil, Planes y Comisiones
-            </h2>
-            <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5">
-              Define los precios de suscripción para Nutriólogos, Atletas Independientes y el porcentaje de comisión de Staff.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowRatesPanel(prev => !prev)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-[#E2E8F0] text-[#0B1929] hover:bg-[#F8FAFC] transition-colors shrink-0"
-          >
-            <Settings size={15} className="text-[var(--brand-primary)]" />
-            {showRatesPanel ? "Ocultar Configuración" : "Configurar Tarifas y Planes"}
-          </button>
+    <div className="w-full flex-1 flex flex-col">
+      {/* ── Cabecera Principal Homologada ── */}
+      <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex flex-col gap-3 md:gap-4">
+        <div>
+          <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+            Panel de Administración
+          </p>
+          <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+            Control de Ingresos
+          </h1>
+          <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
+            Auditoría financiera y conciliación de suscripciones de nutriólogos y atletas independientes
+          </p>
         </div>
 
-        {showRatesPanel && (
-          <div className="px-5 md:px-6 pb-6 pt-4 border-t border-[#E2E8F0] bg-[#F8FAFC] space-y-6 animate-in fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              
-              {/* 1. Perfil Nutriólogo */}
-              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">1. Perfil Nutriólogo</span>
-                  <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Costo / paciente</span>
+        {/* Barra de Búsqueda de Ancho Completo + Selector de Mes Integrado */}
+        {activeTab !== "tarifas" && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full">
+            <div className="relative flex-1 min-w-0">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+              <input
+                type="text"
+                placeholder={activeTab === "nutriologos" ? "Buscar por nutriólogo o staff que invitó..." : "Buscar por atleta o email..."}
+                value={activeTab === "nutriologos" ? busquedaNutri : busquedaCivil}
+                onChange={(e) => activeTab === "nutriologos" ? setBusquedaNutri(e.target.value) : setBusquedaCivil(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 md:py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
+              />
+              {(activeTab === "nutriologos" ? busquedaNutri : busquedaCivil) && (
+                <button
+                  type="button"
+                  onClick={() => activeTab === "nutriologos" ? setBusquedaNutri("") : setBusquedaCivil("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
+                  title="Limpiar búsqueda"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Selector de Mes para Nutriólogos */}
+            {activeTab === "nutriologos" && (
+              <div className="flex items-center gap-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-3 py-2 md:py-2.5 shrink-0 shadow-2xs">
+                <Calendar size={15} className="text-[#6B7A8D] shrink-0" />
+                <CustomSelect
+                  title="Filtrar por mes de corte"
+                  value={filtroMes}
+                  onChange={(v) => setFiltroMes(v)}
+                  className="bg-transparent text-xs sm:text-[13px] font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize border-none p-0 shadow-none"
+                  options={[
+                    { value: "todos", label: "Todos los meses" },
+                    ...mesesDisponibles.map((m) => ({ value: m, label: formatMes(m) })),
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Switch Principal de Pestañas Homologado ── */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-2 md:pt-4 pb-1">
+        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("nutriologos")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "nutriologos"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
+            }`}
+          >
+            <Banknote size={15} />
+            <span>Nutriólogos</span>
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === "nutriologos" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
+            }`}>
+              {recibos.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("atletas")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "atletas"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
+            }`}
+          >
+            <Dumbbell size={15} />
+            <span>Atletas Independientes</span>
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === "atletas" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
+            }`}>
+              {recibosCivil.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("tarifas")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "tarifas"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
+            }`}
+          >
+            <Settings size={15} />
+            <span>Tarifas y Planes</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Pills de Filtro por Estado (solo para listas de recibos) ── */}
+      {activeTab === "nutriologos" && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide px-4 md:px-8 py-2 md:py-3">
+          {[
+            { key: "todos", label: `Todos (${nutriCounts.todos})` },
+            { key: "pendiente", label: `Pendientes (${nutriCounts.pendiente})` },
+            { key: "aprobado", label: `Aprobados (${nutriCounts.aprobado})` },
+            { key: "rechazado", label: `Rechazados (${nutriCounts.rechazado})` },
+          ].map(p => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setFiltroEstado(p.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                filtroEstado === p.key
+                  ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                  : "bg-white border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-[#F8FAFC]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeTab === "atletas" && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide px-4 md:px-8 py-2 md:py-3">
+          {[
+            { key: "todos", label: `Todos (${civilCounts.todos})` },
+            { key: "pendiente", label: `Pendientes (${civilCounts.pendiente})` },
+            { key: "aprobado", label: `Aprobados (${civilCounts.aprobado})` },
+            { key: "rechazado", label: `Rechazados (${civilCounts.rechazado})` },
+          ].map(p => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setFiltroEstadoCivil(p.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                filtroEstadoCivil === p.key
+                  ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                  : "bg-white border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-[#F8FAFC]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── CUERPO PRINCIPAL SEGÚN PESTAÑA ACTIVA ── */}
+      <div className="px-4 md:px-8 pb-28 md:pb-12 pt-1 md:pt-2">
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PESTAÑA 1: NUTRIÓLOGOS                                                 */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "nutriologos" && (
+          <div className="space-y-4">
+            {/* Banner de Total Conciliado del Mes */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                  <Banknote size={20} />
                 </div>
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 1 (1 – 20 pac.)</label>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ratesForm.nutri_tier1}
-                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier1: e.target.value }))}
-                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                    </div>
+                <div>
+                  <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                    Total Facturado Nutriólogos {filtroMes !== "todos" ? `(${formatMes(filtroMes)})` : "(Histórico)"}
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 2 (21 – 50 pac.)</label>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ratesForm.nutri_tier2}
-                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier2: e.target.value }))}
-                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-medium text-[#6B7A8D]">Nivel 3 (51+ pac.)</label>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ratesForm.nutri_tier3}
-                        onChange={e => setRatesForm(p => ({ ...p, nutri_tier3: e.target.value }))}
-                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                    </div>
-                  </div>
-                  <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center justify-between gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-amber-600">Nutriólogo Estudiante</label>
-                      <span className="text-[10px] text-[#6B7A8D]">Mensualidad fija (30 días)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ratesForm.nutri_estudiante}
-                        onChange={e => setRatesForm(p => ({ ...p, nutri_estudiante: e.target.value }))}
-                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                    </div>
-                  </div>
-                  <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center justify-between gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-indigo-600">Administrativo Premium</label>
-                      <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado / mes</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ratesForm.admin_premium}
-                        onChange={e => setRatesForm(p => ({ ...p, admin_premium: e.target.value }))}
-                        className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                    </div>
+                  <div className="text-xl md:text-2xl font-black text-[#0B1929]">
+                    ${totalNutriCobrado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN
                   </div>
                 </div>
               </div>
 
-              {/* 2. Perfil Atleta Independiente */}
-              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">2. Atleta Independiente</span>
-                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Planes</span>
+              <div className="flex items-center gap-3 text-xs text-[#6B7A8D] self-end sm:self-auto">
+                <span className="font-semibold">{filtradosNutri.length} comprobante{filtradosNutri.length !== 1 ? 's' : ''} filtrados</span>
+              </div>
+            </div>
+
+            {/* Tabla Desktop y Tarjetas Móviles */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-2xs overflow-hidden">
+              {loading ? (
+                <div className="p-6"><ListSkeleton rows={4} /></div>
+              ) : (
+                <>
+                  {/* Vista Desktop (Tabla) */}
+                  <div className="overflow-x-auto hidden md:block">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Especialista</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes de Corte</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filtradosNutri.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="py-12 text-center text-[#6B7A8D] text-sm">
+                              No se encontraron recibos de nutriólogos en esta vista.
+                            </td>
+                          </tr>
+                        ) : filtradosNutri.map((r) => {
+                          const nutri = nutriologos[r.nutriologo_id];
+                          return (
+                            <tr key={r.id} className="hover:bg-[#F8FAFC]/70 transition-colors">
+                              <td className="py-3.5 px-6 text-sm text-[#0B1929]">
+                                <span className="font-semibold block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                                <span className="text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </td>
+                              <td className="py-3.5 px-6">
+                                <div className="font-bold text-[#0B1929]">{nutri?.nombre || "Nutriólogo"}</div>
+                                <div className="text-xs text-[#6B7A8D] flex items-center gap-1.5">
+                                  {nutri?.email && <span>{nutri.email}</span>}
+                                  {nutri?.creado_por && (
+                                    <span className="text-[11px] text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded font-medium">
+                                      Por: {nutri.creado_por}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                              </td>
+                              <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
+                                ${Number(r.monto || 0).toFixed(2)}
+                              </td>
+                              <td className="py-3.5 px-6 text-center">
+                                <div className="flex justify-center">
+                                  <StatusBadge s={r.estado} />
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-6 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => setModalImg(r.comprobante_url)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                                    title="Ver comprobante"
+                                  >
+                                    <Eye size={17} />
+                                  </button>
+                                  {r.estado === "pendiente" && (
+                                    <>
+                                      <button
+                                        onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)}
+                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
+                                        title="Aprobar pago"
+                                      >
+                                        <CheckCircle2 size={17} />
+                                      </button>
+                                      <button
+                                        onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)}
+                                        className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                                        title="Rechazar pago"
+                                      >
+                                        <XCircle size={17} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="space-y-2.5">
+
+                  {/* Vista Móvil (Tarjetas Homologadas) */}
+                  <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                    {filtradosNutri.length === 0 ? (
+                      <div className="py-10 text-center text-[#6B7A8D] text-sm">
+                        No se encontraron recibos de nutriólogos.
+                      </div>
+                    ) : filtradosNutri.map((r) => {
+                      const nutri = nutriologos[r.nutriologo_id];
+                      return (
+                        <div key={r.id} className="p-4 flex flex-col gap-2.5 hover:bg-[#F8FAFC]/50 transition-colors">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="font-bold text-[#0B1929] text-sm">
+                                {nutri?.nombre || "Nutriólogo"}
+                              </div>
+                              {nutri?.creado_por && (
+                                <div className="text-[11px] text-indigo-600 font-medium">
+                                  Invitado por: {nutri.creado_por}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-black text-emerald-600 text-sm">
+                                ${Number(r.monto || 0).toFixed(2)}
+                              </span>
+                              <StatusBadge s={r.estado} />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-xs text-[#6B7A8D] pt-1">
+                            <div>
+                              <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <div className="font-medium text-[#475569] capitalize">
+                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+                            <button
+                              onClick={() => setModalImg(r.comprobante_url)}
+                              className="px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye size={14} /> Ver Comprobante
+                            </button>
+                            {r.estado === "pendiente" && (
+                              <>
+                                <button
+                                  onClick={() => updateEstado(r.id, "aprobado", r.nutriologo_id)}
+                                  className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 size={14} /> Aprobar
+                                </button>
+                                <button
+                                  onClick={() => updateEstado(r.id, "rechazado", r.nutriologo_id)}
+                                  className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <XCircle size={14} /> Rechazar
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PESTAÑA 2: ATLETAS INDEPENDIENTES                                     */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "atletas" && (
+          <div className="space-y-4">
+            {/* Banner de Total Conciliado Atletas */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-100">
+                  <Dumbbell size={20} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
+                    Total Cobrado Atletas Independientes Premium (100% Superadmin)
+                  </div>
+                  <div className="text-xl md:text-2xl font-black text-[#0B1929]">
+                    ${totalCivilCobrado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-[#6B7A8D] self-end sm:self-auto">
+                <span className="font-semibold">{filtradosCivil.length} comprobante{filtradosCivil.length !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+
+            {/* Tabla Desktop y Tarjetas Móviles */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-2xs overflow-hidden">
+              {loadingCivil ? (
+                <div className="p-6"><ListSkeleton rows={4} /></div>
+              ) : (
+                <>
+                  {/* Vista Desktop (Tabla) */}
+                  <div className="overflow-x-auto hidden md:block">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Atleta</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes Facturado</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filtradosCivil.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="py-12 text-center text-[#6B7A8D] text-sm">
+                              {recibosCivil.length === 0 ? "Aún no hay comprobantes de atletas independientes." : "No hay recibos en esta categoría."}
+                            </td>
+                          </tr>
+                        ) : filtradosCivil.map((r) => {
+                          const cli = clientesCivil[r.cliente_id];
+                          return (
+                            <tr key={r.id} className="hover:bg-[#F8FAFC]/70 transition-colors">
+                              <td className="py-3.5 px-6 text-sm text-[#0B1929]">
+                                <span className="font-semibold block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
+                                <span className="text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </td>
+                              <td className="py-3.5 px-6">
+                                <div className="font-bold text-[#0B1929]">{cli?.nombre || "Atleta Independiente"}</div>
+                                <div className="text-xs text-[#6B7A8D]">{cli?.email || "Sin email"}</div>
+                              </td>
+                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                              </td>
+                              <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
+                                ${Number(r.monto || 0).toFixed(2)}
+                              </td>
+                              <td className="py-3.5 px-6 text-center">
+                                <div className="flex justify-center">
+                                  <StatusBadge s={r.estado} />
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-6 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {r.comprobante_url && (
+                                    <button
+                                      onClick={() => setModalImg(r.comprobante_url)}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                                      title="Ver comprobante"
+                                    >
+                                      <Eye size={17} />
+                                    </button>
+                                  )}
+                                  {r.estado === "pendiente" && (
+                                    <>
+                                      <button
+                                        onClick={() => updateEstadoCivil(r.id, "aprobado", r.cliente_id)}
+                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
+                                        title="Aprobar pago"
+                                      >
+                                        <CheckCircle2 size={17} />
+                                      </button>
+                                      <button
+                                        onClick={() => updateEstadoCivil(r.id, "rechazado", r.cliente_id)}
+                                        className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                                        title="Rechazar pago"
+                                      >
+                                        <XCircle size={17} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Vista Móvil (Tarjetas Homologadas) */}
+                  <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                    {filtradosCivil.length === 0 ? (
+                      <div className="py-10 text-center text-[#6B7A8D] text-sm">
+                        {recibosCivil.length === 0 ? "Aún no hay comprobantes de atletas independientes." : "No hay recibos en esta categoría."}
+                      </div>
+                    ) : filtradosCivil.map((r) => {
+                      const cli = clientesCivil[r.cliente_id];
+                      return (
+                        <div key={r.id} className="p-4 flex flex-col gap-2.5 hover:bg-[#F8FAFC]/50 transition-colors">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="font-bold text-[#0B1929] text-sm">
+                                {cli?.nombre || "Atleta Independiente"}
+                              </div>
+                              <div className="text-[11px] text-[var(--brand-primary)] font-medium">
+                                Plan Premium Independiente
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-black text-emerald-600 text-sm">
+                                ${Number(r.monto || 0).toFixed(2)}
+                              </span>
+                              <StatusBadge s={r.estado} />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-xs text-[#6B7A8D] pt-1">
+                            <div>
+                              <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <div className="font-medium text-[#475569] capitalize">
+                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+                            {r.comprobante_url && (
+                              <button
+                                onClick={() => setModalImg(r.comprobante_url)}
+                                className="px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Eye size={14} /> Ver Comprobante
+                              </button>
+                            )}
+                            {r.estado === "pendiente" && (
+                              <>
+                                <button
+                                  onClick={() => updateEstadoCivil(r.id, "aprobado", r.cliente_id)}
+                                  className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 size={14} /> Aprobar
+                                </button>
+                                <button
+                                  onClick={() => updateEstadoCivil(r.id, "rechazado", r.cliente_id)}
+                                  className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <XCircle size={14} /> Rechazar
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PESTAÑA 3: CONFIGURACIÓN DE TARIFAS Y PLANES                          */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "tarifas" && (
+          <div className="space-y-5 animate-in fade-in">
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 md:p-6 shadow-2xs space-y-6">
+              <div>
+                <h2 className="text-base md:text-lg font-bold text-[#0B1929] flex items-center gap-2">
+                  <Settings size={20} className="text-[var(--brand-primary)]" />
+                  Costos por Perfil, Planes y Tarifas de Suscripción
+                </h2>
+                <p className="text-xs md:text-sm text-[#6B7A8D] mt-1">
+                  Define los precios oficiales para Nutriólogos por nivel de pacientes, estudiantes y atletas independientes.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* 1. Perfil Nutriólogo */}
+                <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">1. Nutriólogos</span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">Por paciente</span>
+                  </div>
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-medium text-[#6B7A8D]">Plan Estándar (Freemium)</label>
-                      <span className="text-xs font-bold text-[#6B7A8D] bg-gray-100 px-2.5 py-1 rounded-lg">$0 MXN (Gratis)</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-medium text-[#6B7A8D]">Plan Premium (30 días)</label>
+                      <label className="text-xs font-semibold text-[#475569]">Nivel 1 (1 – 20 pac.)</label>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
                         <input
                           type="number"
                           min="0"
-                          value={ratesForm.civil_premium}
-                          onChange={e => setRatesForm(p => ({ ...p, civil_premium: e.target.value }))}
-                          className="w-24 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                          value={ratesForm.nutri_tier1}
+                          onChange={e => setRatesForm(p => ({ ...p, nutri_tier1: e.target.value }))}
+                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-semibold text-[#475569]">Nivel 2 (21 – 50 pac.)</label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ratesForm.nutri_tier2}
+                          onChange={e => setRatesForm(p => ({ ...p, nutri_tier2: e.target.value }))}
+                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-semibold text-[#475569]">Nivel 3 (51+ pac.)</label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ratesForm.nutri_tier3}
+                          onChange={e => setRatesForm(p => ({ ...p, nutri_tier3: e.target.value }))}
+                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200/70 flex items-center justify-between gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-amber-700">Nutriólogo Estudiante</label>
+                        <span className="text-[10px] text-[#6B7A8D]">Mensualidad fija (30 días)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ratesForm.nutri_estudiante}
+                          onChange={e => setRatesForm(p => ({ ...p, nutri_estudiante: e.target.value }))}
+                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-gray-200/70 flex items-center justify-between gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-indigo-700">Administrativo Extra</label>
+                        <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ratesForm.admin_premium}
+                          onChange={e => setRatesForm(p => ({ ...p, admin_premium: e.target.value }))}
+                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
                         />
                         <span className="text-[11px] text-[#6B7A8D]">MXN</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 3. Comisiones de Staff */}
-              <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">3. Staff Corporativo</span>
-                    <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Comisión</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <label className="text-xs font-medium text-[#6B7A8D]">Comisión por nutriólogo invitado</label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={ratesForm.comision_pct}
-                        onChange={e => setRatesForm(p => ({ ...p, comision_pct: e.target.value }))}
-                        className="w-20 bg-[#F0F4FA] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                      />
-                      <span className="text-xs font-bold text-[#6B7A8D]">%</span>
+                {/* 2. Perfil Atleta Independiente */}
+                <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">2. Atleta Independiente</span>
+                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">Planes</span>
                     </div>
-                  </div>
-                </div>
-                <p className="text-[11px] text-[#6B7A8D] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  Las nóminas ya transferidas o de cortes anteriores mantienen su porcentaje original congelado.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 pt-3 border-t border-[#E2E8F0]">
-              <div className="text-xs text-[#6B7A8D] space-y-1">
-                <p>
-                  🔒 <strong>Programar ({getNextCutoffDateStr()}):</strong> Entrará en vigor el próximo día 10, protegiendo adeudos pendientes.
-                </p>
-                <p>
-                  ⚡ <strong>Aplicar Inmediatamente Hoy:</strong> Actualiza la tarifa base desde hoy mismo (para ajustes iniciales como $239 MXN en estudiantes).
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => handleSaveRates(false)}
-                  disabled={savingRates}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E2E8F0] hover:bg-gray-50 text-[#0B1929] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
-                >
-                  <Save size={14} />
-                  <span>{savingRates ? "Guardando..." : `Programar (${getNextCutoffDateStr()})`}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSaveRates(true)}
-                  disabled={savingRates}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm cursor-pointer"
-                >
-                  <Zap size={14} />
-                  <span>{savingRates ? "Aplicando..." : "Aplicar Inmediatamente Hoy"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── SECCIÓN NUTRIÓLOGOS ─────────────────────────────────────────── */}
-      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-4 md:gap-6">
-        <div className="flex-1">
-          <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
-            <Banknote className="text-green-500" />
-            Auditoría de Pagos — Nutriólogos
-          </h2>
-          <p className="hidden md:block text-[#6B7A8D] mt-1 text-sm">Revisa y valida las transferencias mensuales de los nutriólogos.</p>
-        </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-1.5 shadow-sm">
-            <Calendar size={16} className="text-[#6B7A8D] shrink-0" />
-            <CustomSelect
-              title="Filtrar por mes"
-              value={filtroMes}
-              onChange={(v) => setFiltroMes(v)}
-              className="bg-transparent text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize border-none p-0 shadow-none"
-              options={[
-                { value: "todos", label: "Todos los meses" },
-                ...mesesDisponibles.map((m) => ({ value: m, label: formatMes(m) })),
-              ]}
-            />
-          </div>
-          <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full">
-            {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
-              <button key={st} onClick={() => setFiltroEstado(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstado === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>{st}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
-        {loading ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px] hidden md:table">
-              <thead>
-                <tr className="bg-gray-50 border-b border-[#E2E8F0]">
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Nutriólogo</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes Facturado</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtrados.length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-[#6B7A8D]">No hay recibos en esta categoría.</td></tr>
-                ) : filtrados.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-6 text-sm text-[#0B1929]">
-                      {new Date(r.created_at).toLocaleDateString('es-MX')}
-                      <span className="block text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </td>
-                    <td className="py-3 px-6 font-semibold text-[#0B1929]">
-                      {nutriologos[r.nutriologo_id]?.nombre ||"Desconocido"}
-                      {nutriologos[r.nutriologo_id]?.creado_por && <span className="block text-[11px] text-[#6B7A8D] font-normal">Inv. por: {nutriologos[r.nutriologo_id].creado_por}</span>}
-                    </td>
-                    <td className="py-3 px-6 text-sm text-center text-[#6B7A8D]">
-                      {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}
-                    </td>
-                    <td className="py-3 px-6 font-bold text-green-600 text-right">${Number(r.monto).toFixed(2)}</td>
-                    <td className="py-3 px-6"><div className="flex justify-center"><StatusBadge s={r.estado} /></div></td>
-                    <td className="py-3 px-6 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
-                        {r.estado ==="pendiente" && <>
-                          <button onClick={() => updateEstado(r.id,"aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                          <button onClick={() => updateEstado(r.id,"rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
-                        </>}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-xs font-semibold text-[#475569]">Plan Estándar (Freemium)</label>
+                        <span className="text-xs font-bold text-[#475569] bg-white border border-[#E2E8F0] px-3 py-1.5 rounded-lg">$0 MXN (Gratis)</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Mobile Cards */}
-            <div className="md:hidden flex flex-col divide-y divide-gray-100">
-              {filtrados.length === 0 ? (
-                <div className="py-8 text-center text-[#6B7A8D]">No hay recibos en esta categoría.</div>
-              ) : filtrados.map((r) => (
-                <div key={r.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <div className="font-semibold text-[#0B1929]">
-                        {nutriologos[r.nutriologo_id]?.nombre ||"Desconocido"}
-                      </div>
-                      {nutriologos[r.nutriologo_id]?.creado_por && (
-                        <div className="text-[11px] text-[#6B7A8D] font-normal">
-                          Inv. por: {nutriologos[r.nutriologo_id].creado_por}
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-xs font-semibold text-[#475569]">Plan Premium (30 días)</label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-[#6B7A8D]">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={ratesForm.civil_premium}
+                            onChange={e => setRatesForm(p => ({ ...p, civil_premium: e.target.value }))}
+                            className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                          />
+                          <span className="text-[11px] text-[#6B7A8D]">MXN</span>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="font-bold text-green-600">${Number(r.monto).toFixed(2)}</div>
-                      <StatusBadge s={r.estado} />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                    <div>
-                      <span className="block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
-                      <span className="block">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block uppercase tracking-wider font-bold text-[10px]">Mes Facturado</span>
-                      <span>{r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
-                    <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver foto"><Eye size={18} /></button>
-                    {r.estado ==="pendiente" && <>
-                      <button onClick={() => updateEstado(r.id,"aprobado", r.nutriologo_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                      <button onClick={() => updateEstado(r.id,"rechazado", r.nutriologo_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
-                    </>}
+                  <p className="text-[11px] text-[#6B7A8D] bg-white p-3 rounded-lg border border-[#E2E8F0] leading-relaxed">
+                    Los atletas independientes pagan su suscripción mensual directamente a la cuenta del Superadmin.
+                  </p>
+                </div>
+
+                {/* 3. Parámetro Referencial de Staff */}
+                <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">3. Staff Referencial</span>
+                      <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">Base General</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <label className="text-xs font-semibold text-[#475569]">Comisión sugerida general</label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={ratesForm.comision_pct}
+                          onChange={e => setRatesForm(p => ({ ...p, comision_pct: e.target.value }))}
+                          className="w-20 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
+                        />
+                        <span className="text-xs font-bold text-[#6B7A8D]">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-[#6B7A8D] bg-white p-3 rounded-lg border border-[#E2E8F0] leading-relaxed space-y-1">
+                    <p className="font-semibold text-[#0B1929]">ℹ️ Nuevo Motor de Nóminas en Mi Equipo</p>
+                    <p>Ahora puedes personalizar sueldos base, bonos y porcentajes individuales por colaborador directamente en la pestaña <strong>Mi Equipo &gt; Nóminas y Pagos</strong>.</p>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Acciones de Guardado */}
+              <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 pt-4 border-t border-[#E2E8F0]">
+                <div className="text-xs text-[#6B7A8D] space-y-1">
+                  <p>
+                    🔒 <strong>Programar ({getNextCutoffDateStr()}):</strong> Entrará en vigor el próximo día de corte, protegiendo adeudos en proceso.
+                  </p>
+                  <p>
+                    ⚡ <strong>Aplicar Inmediatamente Hoy:</strong> Actualiza la tarifa base desde hoy mismo para nuevos cobros y validaciones.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveRates(false)}
+                    disabled={savingRates}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#CBD5E1] hover:bg-gray-50 text-[#0B1929] transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                  >
+                    <Save size={14} />
+                    <span>{savingRates ? "Guardando..." : `Programar (${getNextCutoffDateStr()})`}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveRates(true)}
+                    disabled={savingRates}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm cursor-pointer"
+                  >
+                    <Zap size={14} />
+                    <span>{savingRates ? "Aplicando..." : "Aplicar Inmediatamente Hoy"}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
       </div>
 
-      {/* ── COMISIONES POR COLABORADOR ──────────────────────────────────── */}
-      {!loading && comisiones.length > 0 && (
-        <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
-          <div className="p-6 border-b border-[#E2E8F0] flex items-center gap-3">
-            <UserCheck className="text-indigo-500" size={22} />
-            <div>
-              <h3 className="text-lg font-bold text-[#0B1929]">Comisiones de Colaboradores</h3>
-              <p className="text-[#6B7A8D] text-sm mt-0.5">{ratesForm.comision_pct}% del total generado · <strong>{filtroMes === 'todos' ? 'Acumulado histórico' : <span className="capitalize">{formatMes(filtroMes)}</span>}</strong></p>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {comisiones.map((c, i) => {
-              const nom = nominasEstado[`${c.nombre}|${filtroMes}`];
-              const isTransferido = nom?.transferido_por_admin;
-              const isConfirmado = nom?.confirmado_por_colaborador;
-              return (
-                <div key={i}>
-                  <div className="w-full flex flex-col md:flex-row md:items-center justify-between px-6 py-4 hover:bg-gray-50/60 transition-colors">
-                    <button onClick={() => setExpandedColab(expandedColab === c.nombre ? null : c.nombre)} className="flex items-center gap-3 text-left flex-1">
-                      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
-                        <span className="text-indigo-600 font-bold text-sm">{c.nombre.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#0B1929] flex items-center gap-2">
-                          {c.nombre}
-                          {isConfirmado && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] uppercase tracking-wider font-bold">FIRMADO</span>}
-                        </p>
-                        <p className="text-xs text-[#6B7A8D]">{c.nutriologos.length} nutriólogo{c.nutriologos.length !== 1 ? 's' : ''} · {c.recibosCount} recibo{c.recibosCount !== 1 ? 's' : ''}</p>
-                      </div>
-                      {expandedColab === c.nombre ? <ChevronDown size={18} className="text-[#6B7A8D] shrink-0 ml-2" /> : <ChevronRight size={18} className="text-[#6B7A8D] shrink-0 ml-2" />}
-                    </button>
-                    <div className="flex items-center justify-end gap-6 mt-4 md:mt-0 pl-12 md:pl-0">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-xs text-[#6B7A8D]">Total generado</p>
-                        <p className="font-semibold text-[#0B1929] text-sm">${c.totalGenerado.toFixed(2)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Tu pago ({ratesForm.comision_pct}%)</p>
-                        <p className="font-black text-indigo-600 text-lg">${c.comision.toFixed(2)}</p>
-                      </div>
-                      {filtroMes !== 'todos' && (
-                        <div className="border-l border-gray-200 pl-4">
-                          {isConfirmado ? (
-                            <div className="flex flex-col items-center text-green-600"><CheckCircle2 size={20} /><span className="text-[10px] font-bold mt-1">PAGADO</span></div>
-                          ) : isTransferido ? (
-                            <div className="flex flex-col items-center text-amber-500"><Clock size={20} /><span className="text-[10px] font-bold mt-1 text-center leading-tight">ESPERANDO<br/>FIRMA</span></div>
-                          ) : (
-                            <button onClick={(e) => { e.stopPropagation(); handleMarcarTransferido(c.nombre, c.comision); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors">
-                              <Send size={14} /> Transferir
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {expandedColab === c.nombre && (
-                    <div className="px-6 pb-4 bg-indigo-50/40 border-t border-indigo-100/50 pt-3">
-                      <p className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-2">Nutriólogos a su cargo:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {c.nutriologos.map((n, j) => <span key={j} className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-semibold text-indigo-700">{n}</span>)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="px-6 py-4 bg-gray-50 border-t border-[#E2E8F0] flex justify-between items-center">
-            <span className="text-sm font-bold text-[#6B7A8D] uppercase tracking-wider">Total nómina de colaboradores</span>
-            <span className="text-xl font-black text-[#0B1929]">${comisiones.reduce((acc, c) => acc + c.comision, 0).toFixed(2)} MXN</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── SECCIÓN ATLETAS INDEPENDIENTES ──────────────────────────────── */}
-      <div className="bg-white p-5 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] flex flex-col xl:flex-row justify-between xl:items-center gap-4 md:gap-6">
-        <div className="flex-1">
-          <h2 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
-            <Dumbbell className="text-[var(--brand-primary)]" size={22} />
-            Pagos — Atletas Independientes
-          </h2>
-          <p className="hidden md:block text-[#6B7A8D] mt-1 text-sm">Comprobantes del plan Premium (${ratesForm.civil_premium} MXN/mes). El 100% va directo al superadmin, sin comisiones.</p>
-        </div>
-        <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full shrink-0">
-          {['pendiente', 'aprobado', 'rechazado', 'todos'].map(st => (
-            <button key={st} onClick={() => setFiltroEstadoCivil(st)} className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all shrink-0 ${filtroEstadoCivil === st ? 'bg-white text-[#0B1929] shadow-sm' : 'text-[#6B7A8D] hover:text-[#0B1929]'}`}>{st}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-none md:rounded-2xl shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden">
-        {loadingCivil ? <div className="p-4"><ListSkeleton rows={3} /></div> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px] hidden md:table">
-              <thead>
-                <tr className="bg-gray-50 border-b border-[#E2E8F0]">
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Atleta</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes Facturado</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
-                  <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtradosCivil.length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-[#6B7A8D]">{recibosCivil.length === 0 ?"Aún no hay comprobantes de atletas independientes." :"No hay recibos en esta categoría."}</td></tr>
-                ) : filtradosCivil.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-6 text-sm text-[#0B1929]">
-                      {new Date(r.created_at).toLocaleDateString('es-MX')}
-                      <span className="block text-xs text-[#6B7A8D]">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </td>
-                    <td className="py-3 px-6 font-semibold text-[#0B1929]">
-                      {clientesCivil[r.cliente_id] ||"Atleta Independiente"}
-                      <span className="block text-[11px] text-[var(--brand-primary)] font-normal">Atleta Independiente Premium</span>
-                    </td>
-                    <td className="py-3 px-6 text-sm text-center text-[#6B7A8D]">
-                      {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}
-                    </td>
-                    <td className="py-3 px-6 font-bold text-green-600 text-right">${Number(r.monto).toFixed(2)}</td>
-                    <td className="py-3 px-6"><div className="flex justify-center"><StatusBadge s={r.estado} /></div></td>
-                    <td className="py-3 px-6 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {r.comprobante_url && <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver comprobante"><Eye size={18} /></button>}
-                        {r.estado ==="pendiente" && <>
-                          <button onClick={() => updateEstadoCivil(r.id,"aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                          <button onClick={() => updateEstadoCivil(r.id,"rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
-                        </>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Mobile Cards */}
-            <div className="md:hidden flex flex-col divide-y divide-gray-100">
-              {filtradosCivil.length === 0 ? (
-                <div className="py-8 text-center text-[#6B7A8D]">
-                  {recibosCivil.length === 0 ?"Aún no hay comprobantes de atletas independientes." :"No hay recibos en esta categoría."}
-                </div>
-              ) : filtradosCivil.map((r) => (
-                <div key={r.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-colors">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <div className="font-semibold text-[#0B1929]">
-                        {clientesCivil[r.cliente_id] ||"Atleta Independiente"}
-                      </div>
-                      <div className="text-[11px] text-[var(--brand-primary)] font-normal">
-                        Atleta Independiente Premium
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="font-bold text-green-600">${Number(r.monto).toFixed(2)}</div>
-                      <StatusBadge s={r.estado} />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                    <div>
-                      <span className="block">{new Date(r.created_at).toLocaleDateString('es-MX')}</span>
-                      <span className="block">{new Date(r.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block uppercase tracking-wider font-bold text-[10px]">Mes Facturado</span>
-                      <span>{r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', {month:'long', year:'numeric'}) : 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
-                    {r.comprobante_url && <button onClick={() => setModalImg(r.comprobante_url)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver comprobante"><Eye size={18} /></button>}
-                    {r.estado ==="pendiente" && <>
-                      <button onClick={() => updateEstadoCivil(r.id,"aprobado", r.cliente_id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors" title="Aprobar"><CheckCircle2 size={18} /></button>
-                      <button onClick={() => updateEstadoCivil(r.id,"rechazado", r.cliente_id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Rechazar"><XCircle size={18} /></button>
-                    </>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {!loadingCivil && filtradosCivil.filter(r => r.estado === 'aprobado').length > 0 && (
-          <div className="px-6 py-4 bg-gray-50 border-t border-[#E2E8F0] flex justify-between items-center">
-            <span className="text-sm font-bold text-[#6B7A8D] uppercase tracking-wider">Total cobrado (atletas independientes)</span>
-            <span className="text-xl font-black text-green-600">
-              ${filtradosCivil.filter(r => r.estado === 'aprobado').reduce((acc, r) => acc + Number(r.monto), 0).toFixed(2)} MXN
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── MODAL COMPROBANTE ───────────────────────────────────────────── */}
+      {/* ── MODAL COMPROBANTE DE PAGO ── */}
       {modalImg && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-[#E2E8F0] flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-[#0B1929]">Comprobante de Pago</h3>
-              <button onClick={() => setModalImg(null)} className="text-[#6B7A8D] hover:bg-gray-200 p-1 rounded-lg transition-colors"><X size={20} /></button>
+        <div className="fixed inset-0 z-[100] bg-[#0B1929]/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
+              <h3 className="font-bold text-[#0B1929] text-sm md:text-base flex items-center gap-2">
+                <Eye size={18} className="text-[var(--brand-primary)]" />
+                Comprobante de Pago
+              </h3>
+              <button 
+                onClick={() => setModalImg(null)} 
+                className="text-[#6B7A8D] hover:bg-gray-200 p-1 rounded-lg transition-colors cursor-pointer"
+                title="Cerrar"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <div className="p-4 overflow-y-auto bg-gray-100 flex-1 flex justify-center items-center">
-              <img src={modalImg} alt="Comprobante" className="max-w-full max-h-full rounded-lg shadow-sm border border-gray-200 object-contain" />
+            <div className="p-4 overflow-y-auto bg-gray-100 flex-1 flex justify-center items-center min-h-[300px]">
+              <img 
+                src={modalImg} 
+                alt="Comprobante" 
+                className="max-w-full max-h-[70vh] rounded-xl shadow-sm border border-gray-200 object-contain" 
+              />
             </div>
           </div>
         </div>

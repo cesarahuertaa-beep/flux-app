@@ -4,7 +4,8 @@ import {
   Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Mail, 
   Loader2, Circle, CircleDashed, Trash2, Crown, ChevronRight, ArrowLeft, 
   Check, Shield, Plus, Briefcase, Lock, UserCheck, Sliders, Edit2,
-  CalendarDays, ShoppingBag, Banknote, Activity, UtensilsCrossed, Dumbbell, Camera, UsersRound
+  CalendarDays, ShoppingBag, Banknote, Activity, UtensilsCrossed, Dumbbell, Camera, UsersRound,
+  Copy, DollarSign, Wallet, CreditCard, ChevronDown, Calendar, Send, Clock, Search, X
 } from "lucide-react";
 import { 
   authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, 
@@ -12,6 +13,7 @@ import {
 } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
+import { CustomSelect } from "../ui/CustomSelect";
 
 // ─── TODAS LAS PESTAÑAS DISPONIBLES DE SUPERADMIN ────────────────────────────
 export const SUPERADMIN_TABS = [
@@ -73,6 +75,40 @@ export const DEFAULT_STAFF_ROLES = [
 ];
 
 const ROLES_STORAGE_KEY = "flux_staff_roles_v4";
+const COMPENSACIONES_STORAGE_KEY = "flux_staff_compensaciones_v1";
+
+const DEFAULT_COMP = {
+  modalidad: "solo_comision",
+  sueldoBase: 0,
+  comisionPct: 35,
+  bonoFijo: 0,
+  banco: "",
+  clabe: "",
+  titular: "",
+  notas: ""
+};
+
+const loadCompensaciones = () => {
+  try {
+    const raw = localStorage.getItem(COMPENSACIONES_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+};
+
+const saveCompensaciones = (data) => {
+  try {
+    localStorage.setItem(COMPENSACIONES_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+};
+
+const formatMesNomina = (yyyyMm) => {
+  if (!yyyyMm) return "";
+  const [y, m] = yyyyMm.split('-');
+  if (!y || !m) return yyyyMm;
+  const d = new Date(Number(y), Number(m) - 1);
+  return d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+};
 
 // Renderizador visual del icono de cada pestaña
 function TabIcon({ id, size = 15, className = "" }) {
@@ -141,6 +177,21 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     return DEFAULT_STAFF_ROLES;
   });
 
+  // ─── ESQUEMA DE COMPENSACIÓN (MOTOR DE NÓMINAS) ────────────────────────────
+  const [compensaciones, setCompensaciones] = useState(() => loadCompensaciones());
+  const [editComp, setEditComp]             = useState(DEFAULT_COMP);
+
+  // ─── ESTADO NÓMINAS Y PAGOS (SUPERADMIN) ──────────────────────────────────
+  const [nominasRecibos, setNominasRecibos]         = useState([]);
+  const [nominasNutris, setNominasNutris]           = useState({});
+  const [nominasDb, setNominasDb]                   = useState({});
+  const [loadingNominas, setLoadingNominas]         = useState(false);
+  const [filtroMesNomina, setFiltroMesNomina]       = useState("");
+  const [filtroEstadoNomina, setFiltroEstadoNomina] = useState("todos");
+  const [busquedaNomina, setBusquedaNomina]         = useState("");
+  const [copiedClabeId, setCopiedClabeId]           = useState(null);
+  const [transferringColab, setTransferringColab]   = useState(null);
+
   // Modal para editar permisos/pestañas de un rol existente
   const [editingRole, setEditingRole] = useState(null);
   const [confirmDeleteRole, setConfirmDeleteRole] = useState(false);
@@ -199,14 +250,43 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     setLoading(false);
   }, [myId, isSuperadmin]);
 
+  const loadNominasData = useCallback(async () => {
+    if (!isSuperadmin) return;
+    setLoadingNominas(true);
+    try {
+      const [recibos, nutris, nominas] = await Promise.all([
+        dbGet("recibos_pago?order=created_at.desc"),
+        dbGet("profiles?role=in.(nutriologo,nutriologo_estudiante)&select=id,nombre,creado_por_nombre"),
+        dbGet("nomina_colaboradores")
+      ]);
+      setNominasRecibos(recibos || []);
+      const nMap = {};
+      (nutris || []).forEach(n => { nMap[n.id] = n; });
+      setNominasNutris(nMap);
+      const nomMap = {};
+      (nominas || []).forEach(nom => {
+        nomMap[`${nom.colaborador_nombre}|${nom.mes_facturacion}`] = nom;
+      });
+      setNominasDb(nomMap);
+    } catch (err) {
+      console.error("Error cargando nóminas:", err);
+    }
+    setLoadingNominas(false);
+  }, [isSuperadmin]);
+
   useEffect(() => {
     load();
+    if (isSuperadmin) loadNominasData();
+
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["profiles", "*"].includes(table)) return;
+      if (table && !["profiles", "nomina_colaboradores", "recibos_pago", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => load(), 250);
+      timer = setTimeout(() => {
+        load();
+        if (isSuperadmin) loadNominasData();
+      }, 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
@@ -215,7 +295,173 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
     };
-  }, [load]);
+  }, [load, loadNominasData, isSuperadmin]);
+
+  // ─── LÓGICA Y CÁLCULO DE NÓMINAS Y LIQUIDACIONES (SUPERADMIN) ─────────────
+  const mesesNominasDisponibles = useMemo(() => {
+    const setMeses = new Set();
+    const currentMonthStr = new Date().toISOString().substring(0, 7);
+    setMeses.add(currentMonthStr);
+    nominasRecibos.forEach(r => {
+      if (r.fecha_corte_mes) setMeses.add(r.fecha_corte_mes.substring(0, 7));
+    });
+    Object.values(nominasDb).forEach(n => {
+      if (n.mes_facturacion) setMeses.add(n.mes_facturacion);
+    });
+    return Array.from(setMeses).sort().reverse();
+  }, [nominasRecibos, nominasDb]);
+
+  useEffect(() => {
+    if (!filtroMesNomina && mesesNominasDisponibles.length > 0) {
+      setFiltroMesNomina(mesesNominasDisponibles[0]);
+    }
+  }, [mesesNominasDisponibles, filtroMesNomina]);
+
+  const nominasColabsCalculados = useMemo(() => {
+    if (!isSuperadmin) return [];
+    const staffMembers = equipo.filter(c => c.role === "staff");
+    const mes = filtroMesNomina || new Date().toISOString().substring(0, 7);
+
+    return staffMembers.map(colab => {
+      const comp = compensaciones[colab.id] || DEFAULT_COMP;
+      const modalidad = comp.modalidad || "solo_comision";
+      const sueldoBase = Number(comp.sueldoBase) || 0;
+      const comisionPct = comp.comisionPct != null ? Number(comp.comisionPct) : 35;
+      const bonoFijo = Number(comp.bonoFijo) || 0;
+
+      // Nutriólogos asignados a este colaborador
+      const nutrisAsignados = Object.values(nominasNutris).filter(n => 
+        (n.creado_por_nombre || "").trim().toLowerCase() === (colab.nombre || "").trim().toLowerCase()
+      );
+      const nutriIds = new Set(nutrisAsignados.map(n => n.id));
+
+      // Recibos aprobados del mes
+      const recibosAprobadosMes = nominasRecibos.filter(r => {
+        const isNutri = nutriIds.has(r.nutriologo_id);
+        const isAprobado = r.estado === "aprobado";
+        const isMes = r.fecha_corte_mes && r.fecha_corte_mes.startsWith(mes);
+        return isNutri && isAprobado && isMes;
+      });
+
+      const totalVentasNutris = recibosAprobadosMes.reduce((acc, r) => {
+        return acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0));
+      }, 0);
+
+      const tieneComision = modalidad === "solo_comision" || modalidad === "mixto";
+      const tieneSueldo = modalidad === "sueldo_fijo" || modalidad === "mixto" || modalidad === "honorarios";
+
+      const sueldoMonto = tieneSueldo ? sueldoBase : 0;
+      const comisionMonto = tieneComision ? (totalVentasNutris * (comisionPct / 100)) : 0;
+      const bonoMonto = bonoFijo;
+      const totalCalculado = sueldoMonto + comisionMonto + bonoMonto;
+
+      // Estado en BD
+      const dbKey = `${colab.nombre}|${mes}`;
+      const dbRecord = nominasDb[dbKey];
+      const isTransferido = !!dbRecord?.transferido_por_admin;
+      const isConfirmado = !!dbRecord?.confirmado_por_colaborador;
+      const fechaConfirmacion = dbRecord?.fecha_confirmacion;
+      const montoFinal = (isTransferido && dbRecord?.monto != null) ? Number(dbRecord.monto) : totalCalculado;
+
+      let estadoNomina = "pendiente";
+      if (isConfirmado) estadoNomina = "firmado";
+      else if (isTransferido) estadoNomina = "transferido";
+
+      return {
+        colab,
+        comp,
+        nutrisAsignados,
+        totalVentasNutris,
+        recibosCount: recibosAprobadosMes.length,
+        sueldoMonto,
+        comisionMonto,
+        bonoMonto,
+        totalCalculado,
+        montoFinal,
+        isTransferido,
+        isConfirmado,
+        fechaConfirmacion,
+        dbRecord,
+        estadoNomina
+      };
+    });
+  }, [isSuperadmin, equipo, filtroMesNomina, compensaciones, nominasNutris, nominasRecibos, nominasDb]);
+
+  const kpisNomina = useMemo(() => {
+    return {
+      totalNeto: nominasColabsCalculados.reduce((acc, c) => acc + c.montoFinal, 0),
+      totalSueldos: nominasColabsCalculados.reduce((acc, c) => acc + c.sueldoMonto, 0),
+      totalComisiones: nominasColabsCalculados.reduce((acc, c) => acc + c.comisionMonto, 0),
+      totalBonos: nominasColabsCalculados.reduce((acc, c) => acc + c.bonoMonto, 0),
+      pendientes: nominasColabsCalculados.filter(c => c.estadoNomina === "pendiente").length,
+      transferidos: nominasColabsCalculados.filter(c => c.estadoNomina === "transferido").length,
+      firmados: nominasColabsCalculados.filter(c => c.estadoNomina === "firmado").length
+    };
+  }, [nominasColabsCalculados]);
+
+  const nominasFiltradas = useMemo(() => {
+    return nominasColabsCalculados.filter(c => {
+      const matchEstado = filtroEstadoNomina === "todos" ? true : c.estadoNomina === filtroEstadoNomina;
+      const matchBusqueda = !busquedaNomina.trim() ? true : (
+        (c.colab.nombre || "").toLowerCase().includes(busquedaNomina.toLowerCase()) ||
+        (c.colab.email || "").toLowerCase().includes(busquedaNomina.toLowerCase())
+      );
+      return matchEstado && matchBusqueda;
+    });
+  }, [nominasColabsCalculados, filtroEstadoNomina, busquedaNomina]);
+
+  const handleTransferirNomina = async (colabNombre, monto) => {
+    try {
+      setTransferringColab(colabNombre);
+      const mes = filtroMesNomina || new Date().toISOString().substring(0, 7);
+      const key = `${colabNombre}|${mes}`;
+      const existing = nominasDb[key];
+      if (existing) {
+        await dbPatch(`nomina_colaboradores?id=eq.${existing.id}`, {
+          transferido_por_admin: true,
+          monto: Number(monto)
+        });
+      } else {
+        await dbPost("nomina_colaboradores", {
+          colaborador_nombre: colabNombre,
+          mes_facturacion: mes,
+          monto: Number(monto),
+          transferido_por_admin: true
+        });
+      }
+      setMsg(`✓ Transferencia de $${Number(monto).toFixed(2)} MXN registrada para ${colabNombre}.`);
+      await loadNominasData();
+    } catch (e) {
+      setMsg("❌ Error registrando transferencia: " + e.message);
+    }
+    setTransferringColab(null);
+  };
+
+  const handleRevertirTransferencia = async (existingId, colabNombre) => {
+    if (!existingId) return;
+    try {
+      await dbPatch(`nomina_colaboradores?id=eq.${existingId}`, {
+        transferido_por_admin: false,
+        confirmado_por_colaborador: false,
+        fecha_confirmacion: null
+      });
+      setMsg(`✓ Transferencia revertida a pendiente para ${colabNombre}`);
+      await loadNominasData();
+    } catch (e) {
+      setMsg("❌ Error: " + e.message);
+    }
+  };
+
+  const handleCopyClabe = (clabe, colabId) => {
+    if (!clabe) {
+      setMsg("⚠️ No hay cuenta CLABE configurada para este colaborador.");
+      return;
+    }
+    navigator.clipboard.writeText(clabe);
+    setCopiedClabeId(colabId);
+    setMsg("✓ CLABE copiada: " + clabe);
+    setTimeout(() => setCopiedClabeId(null), 2500);
+  };
 
   const getRoleInfo = (roleKey) => {
     return allStaffRoles.find(r => r.id === roleKey) || allStaffRoles[0] || DEFAULT_STAFF_ROLES[0];
@@ -257,6 +503,18 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       nombre: collaborator.nombre || "",
       telefono: collaborator.telefono || "",
       roleAssigned: collaborator.especialidad || "staff_general"
+    });
+    const currentComps = compensaciones || loadCompensaciones();
+    const existingComp = currentComps[collaborator.id] || {};
+    setEditComp({
+      modalidad: existingComp.modalidad || "solo_comision",
+      sueldoBase: existingComp.sueldoBase != null ? existingComp.sueldoBase : 0,
+      comisionPct: existingComp.comisionPct != null ? existingComp.comisionPct : 35,
+      bonoFijo: existingComp.bonoFijo != null ? existingComp.bonoFijo : 0,
+      banco: existingComp.banco || "",
+      clabe: existingComp.clabe || "",
+      titular: existingComp.titular || collaborator.nombre || "",
+      notas: existingComp.notas || ""
     });
     setShowConfirmDelete(false);
     setConfirmDeleteText("");
@@ -440,6 +698,16 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       telefono, 
       especialidad: isSuperadmin ? roleAssigned : item.especialidad 
     } : item));
+
+    if (isSuperadmin) {
+      const currentComps = loadCompensaciones();
+      currentComps[targetId] = {
+        ...editComp,
+        titular: editComp.titular || nombre
+      };
+      saveCompensaciones(currentComps);
+      setCompensaciones(currentComps);
+    }
 
     setMsg("✅ Colaborador actualizado con éxito.");
     closeEdit();
@@ -755,6 +1023,160 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
             )}
           </div>
 
+          {/* Tarjeta: Esquema de Compensación y Nómina (Superadmin) */}
+          {isSuperadmin && (
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Wallet size={18} className="text-[var(--brand-primary)]" />
+                  <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider">
+                    Esquema de Compensación y Nómina
+                  </h3>
+                </div>
+                <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                  Motor de Pagos
+                </span>
+              </div>
+
+              {/* Selector de Modalidad */}
+              <div>
+                <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-2">
+                  Modalidad de Pago del Colaborador
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {[
+                    { key: "solo_comision", label: "Solo Comisión", desc: "% sobre pagos de nutriólogos a cargo" },
+                    { key: "sueldo_fijo", label: "Sueldo Fijo", desc: "Monto fijo garantizado mensual" },
+                    { key: "mixto", label: "Mixto (Base + Com.)", desc: "Sueldo base fijo + comisiones" },
+                    { key: "honorarios", label: "Honorarios", desc: "Factura por servicios prestados" }
+                  ].map(mod => {
+                    const isSelected = editComp.modalidad === mod.key;
+                    return (
+                      <div
+                        key={mod.key}
+                        onClick={() => setEditComp(p => ({ ...p, modalidad: mod.key }))}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 ring-1 ring-[var(--brand-primary)] shadow-2xs'
+                            : 'border-[#E2E8F0] bg-[#F8FAFC] hover:border-[#CBD5E1]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-[#0B1929]">{mod.label}</span>
+                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white' : 'border-[#CBD5E1]'}`}>
+                            {isSelected && <Check size={8} strokeWidth={3} />}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#6B7A8D] leading-tight">{mod.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Campos de compensación */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                {(editComp.modalidad === "sueldo_fijo" || editComp.modalidad === "mixto" || editComp.modalidad === "honorarios") && (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#475569] mb-1">Sueldo Base Mensual</label>
+                    <div className="flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2">
+                      <span className="text-xs font-bold text-[#6B7A8D] mr-1.5">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editComp.sueldoBase}
+                        onChange={e => setEditComp(p => ({ ...p, sueldoBase: e.target.value }))}
+                        placeholder="0.00"
+                        className="w-full bg-transparent text-sm font-bold text-[#0B1929] outline-none"
+                      />
+                      <span className="text-xs text-[#6B7A8D] font-medium ml-1">MXN</span>
+                    </div>
+                  </div>
+                )}
+
+                {(editComp.modalidad === "solo_comision" || editComp.modalidad === "mixto") && (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#475569] mb-1">Comisión por Nutriólogo</label>
+                    <div className="flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editComp.comisionPct}
+                        onChange={e => setEditComp(p => ({ ...p, comisionPct: e.target.value }))}
+                        placeholder="35"
+                        className="w-full bg-transparent text-sm font-bold text-[#0B1929] outline-none"
+                      />
+                      <span className="text-xs font-bold text-[#6B7A8D] ml-1">%</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#475569] mb-1">Bono Mensual Recurrente</label>
+                  <div className="flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2">
+                    <span className="text-xs font-bold text-[#6B7A8D] mr-1.5">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editComp.bonoFijo}
+                      onChange={e => setEditComp(p => ({ ...p, bonoFijo: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full bg-transparent text-sm font-bold text-[#0B1929] outline-none"
+                    />
+                    <span className="text-xs text-[#6B7A8D] font-medium ml-1">MXN</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subsección Datos Bancarios para Dispersión */}
+              <div className="pt-3 border-t border-gray-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={15} className="text-[#6B7A8D]" />
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Datos Bancarios para Dispersión
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[#6B7A8D] mb-1">Banco Receptor</label>
+                    <input
+                      type="text"
+                      value={editComp.banco}
+                      onChange={e => setEditComp(p => ({ ...p, banco: e.target.value }))}
+                      placeholder="Ej. BBVA, Santander, Nu"
+                      className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs sm:text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[#6B7A8D] mb-1">Cuenta CLABE (18 dígitos)</label>
+                    <input
+                      type="text"
+                      maxLength={18}
+                      value={editComp.clabe}
+                      onChange={e => setEditComp(p => ({ ...p, clabe: e.target.value.replace(/\D/g, '') }))}
+                      placeholder="012180000000000000"
+                      className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs sm:text-sm font-mono text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[#6B7A8D] mb-1">Titular de la Cuenta</label>
+                    <input
+                      type="text"
+                      value={editComp.titular}
+                      onChange={e => setEditComp(p => ({ ...p, titular: e.target.value }))}
+                      placeholder="Nombre del beneficiario"
+                      className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs sm:text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tarjeta 3: Estado de la Cuenta y Suspender Acceso */}
           <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-6 shadow-2xs">
             <h3 className="text-sm font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -887,15 +1309,19 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       {/* Top action bar: Fijo en móvil sin scroll lateral, botón colapsado */}
       <div className="flex items-center justify-between sm:justify-start gap-2 mb-3 md:mb-5 px-4 pt-1 md:px-0 md:pt-0">
         {isSuperadmin ? (
-          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
-            {[["colaboradores", "Colaboradores"], ["roles", "Roles y Permisos"]].map(([k, lb]) => (
+          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0 overflow-x-auto scroll-hide">
+            {[
+              ["colaboradores", `Colaboradores (${equipo.length})`],
+              ["roles", `Roles y Permisos (${allStaffRoles.length})`],
+              ["nominas", "Nóminas y Pagos"]
+            ].map(([k, lb]) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setActiveSubTab(k)}
                 className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeSubTab === k
-                    ? "bg-white text-[var(--brand-primary)] shadow-sm"
+                    ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
                     : "text-[#6B7A8D] hover:text-[#0B1929]"
                 }`}
               >
@@ -916,7 +1342,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
             <Plus size={16} strokeWidth={2.5} className="shrink-0" />
             <span className="hidden sm:inline">Crear Nuevo Rol</span>
           </button>
-        ) : (
+        ) : activeSubTab === "colaboradores" ? (
           <button 
             type="button"
             onClick={() => setShowInvite(true)}
@@ -927,11 +1353,287 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
             <Plus size={16} strokeWidth={2.5} className="shrink-0" />
             <span className="hidden sm:inline">Invitar colaborador</span>
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* Subpestaña: GENERADOR Y CATÁLOGO DE ROLES (Superadmin) */}
-      {isSuperadmin && activeSubTab === "roles" ? (
+      {/* ─── Subpestaña 1: NÓMINAS Y PAGOS (Superadmin) ─── */}
+      {isSuperadmin && activeSubTab === "nominas" ? (
+        <div className="space-y-4 px-4 md:px-0">
+          {/* Barra de Filtros de Nómina: Mes, Buscador y Estado */}
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 shadow-2xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base md:text-lg font-bold text-[#0B1929] flex items-center gap-2">
+                  <Wallet size={20} className="text-[var(--brand-primary)]" />
+                  Nóminas, Salarios y Liquidación de Colaboradores
+                </h3>
+                <p className="hidden md:block text-xs text-[#6B7A8D] mt-0.5">
+                  Cálculo automatizado de sueldos base, bonos corporativos y comisiones por nutriólogos asignados.
+                </p>
+              </div>
+
+              {/* Selector de Mes */}
+              <div className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 shrink-0 shadow-2xs">
+                <Calendar size={15} className="text-[#6B7A8D] shrink-0" />
+                <CustomSelect
+                  title="Seleccionar mes de corte"
+                  value={filtroMesNomina}
+                  onChange={(v) => setFiltroMesNomina(v)}
+                  className="bg-transparent text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer capitalize border-none p-0 shadow-none"
+                  options={mesesNominasDisponibles.map((m) => ({ value: m, label: formatMesNomina(m) }))}
+                />
+              </div>
+            </div>
+
+            {/* Buscador + Pills de Filtro de Estado de Nómina */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+                <input
+                  type="text"
+                  placeholder="Buscar colaborador en nómina..."
+                  value={busquedaNomina}
+                  onChange={e => setBusquedaNomina(e.target.value)}
+                  className="w-full pl-8 pr-7 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs sm:text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] font-['Inter',sans-serif]"
+                />
+                {busquedaNomina && (
+                  <button
+                    onClick={() => setBusquedaNomina("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
+                {[
+                  { key: "todos", label: `Todos (${nominasColabsCalculados.length})` },
+                  { key: "pendiente", label: `Pendientes (${kpisNomina.pendientes})` },
+                  { key: "transferido", label: `Transferidos (${kpisNomina.transferidos})` },
+                  { key: "firmado", label: `Firmados (${kpisNomina.firmados})` },
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setFiltroEstadoNomina(p.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      filtroEstadoNomina === p.key
+                        ? "bg-[var(--brand-primary)] text-white shadow-2xs"
+                        : "bg-white border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-[#F8FAFC]"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjetas KPI de Resumen Financiero */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-2xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">Total Nómina a Dispersar</span>
+              <div className="text-xl md:text-2xl font-black text-[#0B1929] mt-1">
+                ${kpisNomina.totalNeto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Mes: {formatMesNomina(filtroMesNomina)}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-2xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">Sueldos Base Fijos</span>
+              <div className="text-xl md:text-2xl font-black text-[#0B1929] mt-1">
+                ${kpisNomina.totalSueldos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-[#6B7A8D] mt-0.5 block">Monto base garantizado</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-2xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">Comisiones Ganadas</span>
+              <div className="text-xl md:text-2xl font-black text-indigo-600 mt-1">
+                ${kpisNomina.totalComisiones.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-[#6B7A8D] mt-0.5 block">Por pagos de nutriólogos</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-2xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">Bonos Asignados</span>
+              <div className="text-xl md:text-2xl font-black text-amber-600 mt-1">
+                ${kpisNomina.totalBonos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-[#6B7A8D] mt-0.5 block">Incentivos corporativos</span>
+            </div>
+          </div>
+
+          {/* Lista de Colaboradores en Nómina */}
+          {loadingNominas ? (
+            <div className="text-center py-16 text-[#6B7A8D] flex flex-col items-center">
+              <Loader2 className="w-9 h-9 text-[var(--brand-primary)] animate-spin mb-3.5" />
+              Calculando nóminas del personal…
+            </div>
+          ) : nominasFiltradas.length === 0 ? (
+            <div className="bg-white p-12 text-center rounded-2xl border border-[#E2E8F0] text-[#6B7A8D] text-sm shadow-2xs">
+              No se encontraron colaboradores en nómina para este mes o con el filtro seleccionado.
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {nominasFiltradas.map((item) => {
+                const { colab, comp, nutrisAsignados, sueldoMonto, comisionMonto, bonoMonto, montoFinal, isTransferido, isConfirmado, dbRecord } = item;
+                const assignedRole = getRoleInfo(colab.especialidad);
+
+                return (
+                  <div
+                    key={colab.id}
+                    className="bg-white rounded-2xl border border-[#E2E8F0] p-4 md:p-5 shadow-2xs hover:shadow-md transition-shadow flex flex-col gap-4"
+                  >
+                    {/* Fila superior: Identidad y Modalidad */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-[#F0F4FA] border border-[#E2E8F0] flex items-center justify-center font-bold text-base text-[var(--brand-primary)] shrink-0">
+                          {(colab.nombre || "C").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-base text-[#0B1929]">{colab.nombre}</h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${assignedRole?.colorBadge || 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                              {assignedRole?.nombre || "Staff Corporativo"}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 capitalize">
+                              {comp.modalidad.replace("_", " ")}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#6B7A8D] mt-0.5">{colab.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Badge de Estado del Pago */}
+                      <div className="self-start sm:self-auto">
+                        {isConfirmado ? (
+                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                            <CheckCircle2 size={14} className="text-emerald-600" /> Firmado Digitalmente
+                          </span>
+                        ) : isTransferido ? (
+                          <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                            <Clock size={14} className="text-amber-600" /> Transferido (Esperando Firma)
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 bg-gray-100 text-[#475569] border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                            <Clock size={14} className="text-[#6B7A8D]" /> Pendiente de Dispersión
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fila central: Desglose Financiero */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F8FAFC] p-3.5 rounded-xl border border-[#E2E8F0]">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">Sueldo Base</span>
+                        <span className="text-sm font-bold text-[#0B1929]">${sueldoMonto.toFixed(2)}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                          Comisión ({comp.comisionPct || 35}%)
+                        </span>
+                        <span className="text-sm font-bold text-indigo-700">${comisionMonto.toFixed(2)}</span>
+                        <span className="text-[10px] text-[#6B7A8D] block">
+                          {nutrisAsignados.length} nutriólogo{nutrisAsignados.length !== 1 ? 's' : ''} a cargo
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">Bono</span>
+                        <span className="text-sm font-bold text-amber-700">${bonoMonto.toFixed(2)}</span>
+                      </div>
+
+                      <div className="border-l border-gray-200 pl-3">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)] block">Total a Pagar</span>
+                        <span className="text-base md:text-lg font-black text-[#0B1929] block">
+                          ${montoFinal.toFixed(2)} <span className="text-xs font-semibold text-[#6B7A8D]">MXN</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Fila inferior: Datos Bancarios + Acciones */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
+                      {/* Datos Bancarios y Botón de Copiar CLABE */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-[#0B1929]">
+                        {comp.banco && (
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-md font-bold text-[#475569] border border-gray-200">
+                            {comp.banco}
+                          </span>
+                        )}
+                        {comp.clabe ? (
+                          <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#CBD5E1] px-2.5 py-1 rounded-lg">
+                            <CreditCard size={13} className="text-[#6B7A8D]" />
+                            <span className="font-mono font-bold text-xs">{comp.clabe}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyClabe(comp.clabe, colab.id)}
+                              className="ml-1 p-1 hover:bg-gray-200 rounded text-[var(--brand-primary)] transition-colors cursor-pointer"
+                              title="Copiar CLABE"
+                            >
+                              {copiedClabeId === colab.id ? (
+                                <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-0.5">
+                                  <Check size={12} strokeWidth={3} /> ¡Copiada!
+                                </span>
+                              ) : (
+                                <Copy size={13} />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[#94A3B8] italic text-xs">Sin cuenta bancaria registrada</span>
+                        )}
+                        {comp.titular && (
+                          <span className="text-xs text-[#6B7A8D]">({comp.titular})</span>
+                        )}
+                      </div>
+
+                      {/* Botones de Acción */}
+                      <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(colab)}
+                          className="px-3 py-1.5 text-xs font-semibold text-[#6B7A8D] bg-white hover:bg-gray-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Configurar esquema de compensación"
+                        >
+                          <Sliders size={13} />
+                          <span>Configurar Esquema</span>
+                        </button>
+
+                        {!isTransferido ? (
+                          <button
+                            type="button"
+                            disabled={transferringColab === colab.nombre}
+                            onClick={() => handleTransferirNomina(colab.nombre, montoFinal)}
+                            className="px-4 py-1.5 text-xs font-bold text-white bg-[var(--brand-primary)] hover:opacity-90 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                          >
+                            {transferringColab === colab.nombre ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <Send size={13} />
+                            )}
+                            <span>Registrar Transferencia</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleRevertirTransferencia(dbRecord?.id, colab.nombre)}
+                            className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors cursor-pointer"
+                          >
+                            Revertir a Pendiente
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : isSuperadmin && activeSubTab === "roles" ? (
         <div className="space-y-4 px-4 md:px-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allStaffRoles.map(r => {

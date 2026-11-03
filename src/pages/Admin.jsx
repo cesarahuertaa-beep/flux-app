@@ -1609,10 +1609,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {isSuperadmin && (tab === "pagos" || visitedTabs.has("pagos")) && (
-        <div className={tab === "pagos" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <SubComponentWrapper title="Auditoría Financiera" subtitle="Control de pagos, tarifas vigentes y comisiones de colaboradores">
-            <ControlPagos setMsg={setMsg} />
-          </SubComponentWrapper>
+        <div className={tab === "pagos" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
+          <ControlPagos setMsg={setMsg} />
         </div>
       )}
 
