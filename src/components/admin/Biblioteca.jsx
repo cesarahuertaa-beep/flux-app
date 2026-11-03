@@ -505,7 +505,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   return (
     <div className="w-full flex-1 flex flex-col">
       {/* ── Cabecera Principal con Barra de Búsqueda Integrada ── */}
-      <div className="px-4 md:px-8 pt-3 pb-3 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex flex-col gap-3 md:gap-4">
+      <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex flex-col gap-3 md:gap-4">
         <div>
           <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             Panel de Administración
@@ -542,7 +542,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       </div>
 
       {/* ── Fila 1: Sub-tabs Switch Homologado + Botón de Acción ── */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-4 pb-1">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-2 md:pt-4 pb-1">
         <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
           <button
             type="button"
