@@ -50,7 +50,7 @@ const sanitizeWhatsAppPhone = (phone) => {
 const SubComponentWrapper = ({ children, title, subtitle, eyebrow = "Panel de Administración", action }) => (
   <div className="flex-1 flex flex-col w-full text-[#0B1929] bg-white md:bg-[#F7F9FC]">
     {title && (
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0] flex items-center justify-between gap-2 md:gap-4 shrink-0">
+      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b-0 md:border-b border-[#E2E8F0] flex items-center justify-between gap-2 md:gap-4 shrink-0">
         <div>
           <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
             {eyebrow}

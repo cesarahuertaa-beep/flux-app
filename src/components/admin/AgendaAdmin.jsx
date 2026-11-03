@@ -774,7 +774,7 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
   return (
     <div className="w-full pb-28 md:pb-8">
       {/* Top bar: Sub-tabs + Botón de acción */}
-      <div className="flex items-center gap-2 overflow-x-auto scroll-hide mb-4 md:mb-5 px-4 pt-3 md:px-0 md:pt-0 pb-0.5">
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide mb-3 md:mb-5 px-4 pt-1 md:px-0 md:pt-0 pb-0.5">
         <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
           {[["citas","Citas"], ["horarios","Horarios"]].map(([k, lb]) => (
             <button key={k} onClick={() => setSubTab(k)} className={`
