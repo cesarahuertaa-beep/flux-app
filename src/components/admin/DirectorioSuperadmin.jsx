@@ -1,12 +1,63 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { updateProfile, authInvite, authResetPassword, storageUpload, storageListFolder, storageRemoveMany, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, updateQueryCache, invalidateCache } from "../../lib/supabase";
-import { User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2 } from "lucide-react";
+import { 
+  User, UserPlus, MessageCircle, Pencil, X, Plus, Mail, ChevronDown, ChevronUp, 
+  Users, Search, Target, CheckCircle2, AlertCircle, Dumbbell, Trash2,
+  ArrowLeft, Clock, Sparkles, UtensilsCrossed, Phone, CalendarDays, Edit2
+} from "lucide-react";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
 import BrandColorPicker from "../ui/BrandColorPicker";
 import PhotoUploadBox from "../ui/PhotoUploadBox";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
+import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
+import { peekClinicalRecord } from "../../lib/clinicalRecord";
+
+const getInitials = (name) => {
+  if (!name) return "P";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const sanitizeWhatsAppPhone = (phone) => {
+  if (!phone) return "";
+  let clean = String(phone).replace(/\D/g, "");
+  if (clean.length === 10) clean = "52" + clean;
+  return clean;
+};
+
+const getWhatsAppUrl = (phone, text) => {
+  const cleanPhone = sanitizeWhatsAppPhone(phone);
+  if (!cleanPhone) return "";
+  if (!text) return `https://wa.me/${cleanPhone}`;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+};
+
+const buildWhatsAppMessage = (c, templateType, remitente) => {
+  const primerNombre = (c.nombre || "campeón").trim().split(" ")[0];
+  const sender = remitente || "tu especialista";
+
+  if (templateType === "cuestionario") {
+    const appUrl = typeof window !== "undefined" ? window.location.origin : "https://flux-sport.com";
+    return `¡Hola ${primerNombre}! 👋 Te saluda ${sender}. Te recuerdo llenar tu cuestionario inicial en tu app FLUX antes de nuestra cita para tener listo tu plan personalizado: ${appUrl} 💪`;
+  }
+
+  if (templateType === "inactividad") {
+    return `¡Hola ${primerNombre}! 👋 Te escribe ${sender}. Noté que llevas unos días sin registrar tus comidas o entrenamientos en tu app FLUX. ¿Cómo te has sentido? ¿Se te ha complicado algún ejercicio o comida? Recuerda que estoy aquí para apoyarte y podemos hacer cualquier ajuste que necesites 💪`;
+  }
+
+  if (templateType === "renovacion") {
+    return `¡Hola ${primerNombre}! 🎯 Te escribe ${sender}. Tu plan actual de entrenamiento y nutrición está por concluir. ¡Muchas felicidades por el esfuerzo y constancia en el proceso! 🚀 ¿Cuándo tienes un espacio para agendar tu cita de valoración y preparar tu siguiente ciclo con nuevos objetivos?`;
+  }
+
+  if (templateType === "bienvenida") {
+    return `¡Hola ${primerNombre}! 🎉 ¡Te damos la bienvenida a FLUX! Ya tienes activo tu plan. Recuerda entrar a tu app para consultar tus rutinas de entrenamiento y nutrición. Cualquier duda que tengas sobre cómo registrar tus avances, aquí estoy para ayudarte 🙌`;
+  }
+
+  return `¡Hola ${primerNombre}! 👋 Te saluda ${sender}. Paso a saludarte y ver cómo vas con tu plan esta semana. ¿Tienes alguna duda con tus entrenamientos o tu alimentación? ¡A seguir con toda la motivación! 💥`;
+};
 
 const uploadLogo = async (file) => {
   const ext  = file.name.split(".").pop();
@@ -96,7 +147,29 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   
-  const [expandedNutri, setExpandedNutri] = useState(null);
+  // Vista detallada de pacientes del nutriólogo
+  const [selectedNutri, setSelectedNutri] = useState(() => {
+    try {
+      const s = sessionStorage.getItem("flux_admin_selected_nutri");
+      return s ? JSON.parse(s) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (selectedNutri) {
+      sessionStorage.setItem("flux_admin_selected_nutri", JSON.stringify(selectedNutri));
+    } else {
+      sessionStorage.removeItem("flux_admin_selected_nutri");
+    }
+  }, [selectedNutri]);
+
+  useBackButton(!!selectedNutri, () => setSelectedNutri(null), 15);
+
+  const [patientSearch, setPatientSearch] = useState("");
+  const [patientFilter, setPatientFilter] = useState("todos"); // "todos" | "inactivos" | "venciendo" | "al_dia"
+  const [retentionData, setRetentionData] = useState({ activeCiclos: [], lastActivityMap: {} });
 
   // Forms
   const [formNutri, setFormNutri] = useState({ nombre: "", email: "", telefono: "", nombre_marca: "", logo_url: "", color_primario: "#1A6FD4", role: "nutriologo", cedula: "" });
@@ -524,119 +597,233 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     return (n.nombre || "").toLowerCase().includes(term) || (n.nombre_marca || "").toLowerCase().includes(term);
   });
 
+  // Cargar métricas de retención para el nutriólogo seleccionado
+  useEffect(() => {
+    if (!selectedNutri) return;
+    const targetClients = selectedNutri.id === "__atletas__" 
+      ? clientes.filter(c => !c.nutriologo_id)
+      : clientes.filter(c => c.nutriologo_id === selectedNutri.id);
+    const ids = targetClients.map(c => c.id).filter(Boolean);
+    if (ids.length === 0) {
+      setRetentionData({ activeCiclos: [], lastActivityMap: {} });
+      return;
+    }
+    const cIdsParam = ids.slice(0, 100).join(",");
+    Promise.all([
+      dbGet(`ciclos?activo=eq.true&cliente_id=in.(${cIdsParam})&select=id,cliente_id,nombre,fecha_inicio,activo`).catch(() => []),
+      dbGet(`progreso?cliente_id=in.(${cIdsParam})&select=cliente_id,updated_at&order=updated_at.desc&limit=500`).catch(() => []),
+      dbGet(`metricas_progreso?cliente_id=in.(${cIdsParam})&select=cliente_id,fecha,created_at&order=created_at.desc&limit=500`).catch(() => [])
+    ]).then(([activeCiclosRes, recentProgRes, recentMetricasRes]) => {
+      const activityMap = {};
+      if (Array.isArray(recentMetricasRes)) {
+        for (const m of recentMetricasRes) {
+          if (!m.cliente_id) continue;
+          const dateStr = m.fecha || m.created_at;
+          if (!dateStr) continue;
+          const time = new Date(dateStr).getTime();
+          if (!isNaN(time) && (!activityMap[m.cliente_id] || time > activityMap[m.cliente_id])) {
+            activityMap[m.cliente_id] = time;
+          }
+        }
+      }
+      if (Array.isArray(recentProgRes)) {
+        for (const p of recentProgRes) {
+          if (!p.cliente_id) continue;
+          const dateStr = p.updated_at;
+          if (!dateStr) continue;
+          const time = new Date(dateStr).getTime();
+          if (!isNaN(time) && (!activityMap[p.cliente_id] || time > activityMap[p.cliente_id])) {
+            activityMap[p.cliente_id] = time;
+          }
+        }
+      }
+      setRetentionData({
+        activeCiclos: Array.isArray(activeCiclosRes) ? activeCiclosRes : [],
+        lastActivityMap: activityMap
+      });
+    }).catch(() => {});
+  }, [selectedNutri, clientes]);
+
+  const getPatientRetention = (c) => {
+    if (!c) return { isInactivo: false, isVenciendo: false, isVencido: false, daysInactive: null, daysToExpire: null, activeCycle: null, isAlDia: false, isNuevo: false };
+    const now = new Date();
+    
+    // 1. Ciclo Activo
+    const activeCycle = retentionData.activeCiclos?.find(ac => ac.cliente_id === c.id);
+    let daysToExpire = null;
+    let isVenciendo = false;
+    let isVencido = false;
+    
+    if (activeCycle) {
+      let semanas = 4;
+      if (activeCycle.nombre && activeCycle.nombre.includes("|")) {
+        const parsed = parseInt(activeCycle.nombre.split("|")[1], 10);
+        if (!isNaN(parsed) && parsed > 0) semanas = parsed;
+      }
+      const startDate = new Date(activeCycle.fecha_inicio + "T12:00:00");
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + (semanas * 7));
+      const diffMs = endDate.getTime() - now.getTime();
+      daysToExpire = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      isVenciendo = daysToExpire <= 3;
+      isVencido = daysToExpire <= 0;
+    }
+    
+    // 2. Inactividad
+    const lastTime = retentionData.lastActivityMap?.[c.id];
+    let daysInactive = null;
+    let isInactivo = false;
+    let isNuevo = false;
+    
+    if (lastTime) {
+      const diffMs = now.getTime() - lastTime;
+      daysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      isInactivo = daysInactive >= 5;
+    } else if (c.created_at) {
+      const regTime = new Date(c.created_at).getTime();
+      const diffMs = now.getTime() - regTime;
+      const daysSinceReg = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (daysSinceReg < 5) {
+        isNuevo = true;
+      } else {
+        daysInactive = daysSinceReg;
+        isInactivo = true;
+      }
+    }
+
+    const isAlDia = !isInactivo && !isVenciendo && c.activo;
+
+    return {
+      activeCycle,
+      daysToExpire,
+      isVenciendo,
+      isVencido,
+      daysInactive,
+      isInactivo,
+      isNuevo,
+      isAlDia
+    };
+  };
+
+  const currentNutriClients = useMemo(() => {
+    if (!selectedNutri) return [];
+    if (selectedNutri.id === "__atletas__") {
+      return clientes.filter(c => !c.nutriologo_id);
+    }
+    return clientes.filter(c => c.nutriologo_id === selectedNutri.id);
+  }, [clientes, selectedNutri]);
+
+  const activeClientsCount = currentNutriClients.filter(c => c.activo).length;
+  const inactivosCount = currentNutriClients.filter(c => c.activo && getPatientRetention(c).isInactivo).length;
+  const venciendoCount = currentNutriClients.filter(c => c.activo && getPatientRetention(c).isVenciendo).length;
+  const alDiaCount = currentNutriClients.filter(c => c.activo && getPatientRetention(c).isAlDia).length;
+
+  const filteredPatients = useMemo(() => {
+    return currentNutriClients.filter(c => {
+      const term = patientSearch.toLowerCase().trim();
+      const matchesSearch = !term || 
+        (c.nombre || "").toLowerCase().includes(term) ||
+        (c.email || "").toLowerCase().includes(term);
+      if (!matchesSearch) return false;
+
+      if (patientFilter === "inactivos") return c.activo && getPatientRetention(c).isInactivo;
+      if (patientFilter === "venciendo") return c.activo && getPatientRetention(c).isVenciendo;
+      if (patientFilter === "al_dia") return c.activo && getPatientRetention(c).isAlDia;
+      return true;
+    });
+  }, [currentNutriClients, patientSearch, patientFilter, retentionData]);
+
   const renderNutri = (n) => {
     const nClients = clientes.filter(c => c.nutriologo_id === n.id);
-    const isExpanded = expandedNutri === n.id;
     
     return (
-      <div key={n.id} className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-sm transition-all hover:border-slate-300">
-        {/* Nutriologo Row */}
-        <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
+      <div 
+        key={n.id} 
+        onClick={() => setSelectedNutri(n)}
+        className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
+      >
+        <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
               {n.logo_url ? (
                 <CachedImage 
                   src={n.logo_url} 
                   alt={n.nombre || "Logo"} 
                   className="w-full h-full object-cover" 
-                  fallback={<User className="text-slate-300" size={24}/>} 
+                  fallback={<User className="text-slate-300" size={22}/>} 
                 />
               ) : (
-                <User className="text-slate-300" size={24}/>
+                <User className="text-slate-300" size={22}/>
               )}
-              {n.isSuperadmin && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-white"></div>}
+              {n.isSuperadmin && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white"></div>}
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="font-bold text-[#0B1929] text-lg">{n.nombre_marca || n.nombre || "Sin nombre"}</h3>
-                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
-                {n.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">ESTUDIANTE</span>}
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                <h3 className="font-bold text-[#0B1929] text-base md:text-lg truncate group-hover:text-[var(--brand-primary)] transition-colors">
+                  {n.nombre_marca || n.nombre || "Sin nombre"}
+                </h3>
+                {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 shrink-0">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
+                {n.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 shrink-0">ESTUDIANTE</span>}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {n.activo !== false ? "Activo" : "Suspendido"}
                 </span>
               </div>
-              <div className="text-xs text-[#6B7A8D] flex flex-col items-start gap-1.5 mt-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span>{n.nombre}</span>
-                  {n.cedula && (
-                    <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                      Céd: {n.cedula}
-                    </span>
-                  )}
-                  {n.telefono && (
-                    <a href={`https://wa.me/${n.telefono.replace(/\D/g,'').length === 10 ? '52' + n.telefono.replace(/\D/g,'') : n.telefono.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors">
-                      <MessageCircle size={12} /> WhatsApp
-                    </a>
-                  )}
-                </div>
+              <div className="text-xs text-[#6B7A8D] flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>{n.nombre}</span>
+                {n.cedula && (
+                  <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                    Céd: {n.cedula}
+                  </span>
+                )}
+                {n.telefono && (
+                  <a 
+                    href={`https://wa.me/${n.telefono.replace(/\D/g,'').length === 10 ? '52' + n.telefono.replace(/\D/g,'') : n.telefono.replace(/\D/g,'')}`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-emerald-600 font-medium no-underline inline-flex items-center gap-1 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+                  >
+                    <MessageCircle size={12} /> WhatsApp
+                  </a>
+                )}
                 {n.creado_por_nombre && !n.isSuperadmin && (
-                  <span className="flex items-center gap-1 text-slate-400">
-                    <UserPlus size={12} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
+                  <span className="flex items-center gap-1 text-slate-400 text-[11px]">
+                    <UserPlus size={11} /> Invitado por: <span className="font-medium text-slate-500">{n.creado_por_nombre}</span>
                   </span>
                 )}
               </div>
             </div>
           </div>
           
-          <div className="flex flex-col items-end gap-2 w-full md:w-auto mt-3 md:mt-0">
-            <button 
-              onClick={() => setExpandedNutri(isExpanded ? null : n.id)}
-              className={`flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isExpanded ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
-            >
-              <Users size={16} />
-              <span>{nClients.length} Pacientes</span>
-              {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-            </button>
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <Btn small outline onClick={() => {
-                setShowEditNutri(n);
-                setEditFormNutri({ nombre: n.nombre || "", nombre_marca: n.nombre_marca || "", color_primario: n.color_primario || "#1A6FD4", email: n.email || "", telefono: n.telefono || "", logo_url: n.logo_url || "", role: n.role || "nutriologo", cedula: n.cedula || "" });
-              }}>Editar</Btn>
-              {!n.isSuperadmin && (
-                <Btn small outline className={n.activo !== false ? "text-red-500" : ""} onClick={() => toggleActivoNutri(n)}>
-                  {n.activo !== false ? "Suspender" : "Activar"}
-                </Btn>
-              )}
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F4FA] text-[#0B1929] text-xs font-bold border border-[#E2E8F0]/80">
+              <Users size={14} className="text-[#6B7A8D]" />
+              <span>{nClients.length} {nClients.length === 1 ? "Paciente" : "Pacientes"}</span>
             </div>
+
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditNutri(n);
+                setEditFormNutri({ 
+                  nombre: n.nombre || "", 
+                  nombre_marca: n.nombre_marca || "", 
+                  color_primario: n.color_primario || "#1A6FD4", 
+                  email: n.email || "", 
+                  telefono: n.telefono || "", 
+                  logo_url: n.logo_url || "", 
+                  role: n.role || "nutriologo", 
+                  cedula: n.cedula || "" 
+                });
+              }}
+              className="w-8 h-8 rounded-xl border border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#6B7A8D] hover:text-[var(--brand-primary)] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
+              title="Editar nutriólogo"
+            >
+              <Pencil size={14} />
+            </button>
           </div>
         </div>
-
-        {/* Expanded Clients Sub-grid */}
-        {isExpanded && (
-          <div className="bg-slate-50 border-t border-slate-100 p-5">
-            {nClients.length === 0 ? (
-              <p className="text-sm text-center text-slate-500 py-4">No tiene pacientes registrados.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {nClients.map(c => (
-                  <div 
-                    key={c.id} 
-                    className="bg-white border border-slate-200 rounded-xl p-4 transition-all group relative overflow-hidden flex flex-col"
-                  >
-                    <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`} />
-                    <div 
-                      className="pl-2 cursor-pointer flex-1"
-                      onClick={() => { setSelected(c); setTab("programar"); }}
-                    >
-                      <h4 className="font-bold text-[#0B1929] text-sm truncate group-hover:text-[var(--brand-primary)] transition-colors">{c.nombre}</h4>
-                      <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
-                      <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg line-clamp-2 min-h-[32px]">
-                        <Target size={14} className="shrink-0 text-slate-400 mt-0.5" />
-                        <span>{c.objetivo || "Sin objetivo definido"}</span>
-                      </div>
-                    </div>
-                    <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
-                      <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-[var(--brand-primary)] transition-colors">Editar</button>
-                      <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
-                        {c.activo ? "Suspender" : "Activar"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     );
   };
@@ -645,129 +832,474 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC]">
-      {/* Header */}
-      <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3 md:gap-4 pr-12 md:pr-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
-              {myRole === "staff" ? "Panel de Staff FLUX" : "Panel de Super Administrador"}
-            </p>
-            <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Directorio</h1>
-            <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">{clientes.length} pacientes y {nutriologos.length} nutriólogos en la plataforma</p>
-          </div>
-          
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button onClick={() => setShowNewClient(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
-              <Plus size={16} /> Paciente
-            </button>
-            <button onClick={() => setShowInviteNutri(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors">
-              <Plus size={16} /> Nutriólogo
-            </button>
-          </div>
-        </div>
+      {selectedNutri ? (
+        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+          {/* Header Vista Nutriólogo */}
+          <div className="px-4 md:px-8 pt-4 pb-3 md:pt-6 md:pb-5 bg-white border-b border-[#E2E8F0] flex flex-col gap-3">
+            <div>
+              <button 
+                type="button"
+                onClick={() => setSelectedNutri(null)}
+                className="inline-flex items-center gap-2 text-xs md:text-sm font-bold text-[#6B7A8D] hover:text-[#0B1929] transition-colors cursor-pointer group"
+              >
+                <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+                <span>Volver al Directorio</span>
+              </button>
+            </div>
 
-        <div className="relative mt-2">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
-          <input
-            type="text"
-            placeholder="Buscar por nutriólogo o marca..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
-          />
-        </div>
-      </div>
-
-      {/* Directorio List */}
-      <div className="flex-1 px-0 py-3 pb-28 md:p-8">
-        {loading ? (
-          <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
-        ) : (
-          <div className="flex flex-col gap-4 max-w-5xl mx-auto">
-            {filteredNutris.filter(n => n.isSuperadmin).map(n => renderNutri(n))}
-
-            {(() => {
-              const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
-              const isExpanded = expandedNutri === "__atletas__";
-              return (
-                <div key="__atletas__" className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-sm transition-all hover:border-slate-300">
-                  {/* Header row */}
-                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-12 h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
-                        <Dumbbell className="text-[var(--brand-primary)]" size={22} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <h3 className="font-bold text-[#0B1929] text-lg leading-tight">Atletas Independientes</h3>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#E8F1FB] text-[var(--brand-primary)] shrink-0">AUTODIRIGIDOS</span>
-                        </div>
-                        <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setExpandedNutri(isExpanded ? null : "__atletas__")}
-                      className={`flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${isExpanded ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
-                    >
-                      <Users size={16} />
-                      <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
-                      {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                    </button>
-                  </div>
-
-                  {/* Expanded list */}
-                  {isExpanded && (
-                    <div className="bg-slate-50 border-t border-slate-100 p-4">
-                      {atletasIndependientes.length === 0 ? (
-                        <p className="text-sm text-center text-slate-500 py-4">No hay atletas independientes registrados aún.</p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {atletasIndependientes.map(c => {
-                            const plan = c.plan_tipo || 'estandar';
-                            return (
-                              <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 transition-all relative overflow-hidden flex flex-col group">
-                                <div className={`absolute top-0 left-0 w-1 h-full ${c.activo ? 'bg-[var(--brand-primary)]' : 'bg-red-400'}`}></div>
-                                <div 
-                                  className="pl-2 min-w-0 cursor-pointer flex-1"
-                                  onClick={() => { setSelected(c); setTab("programar"); }}
-                                >
-                                  <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-sm text-[#0B1929] truncate pr-2 group-hover:text-[var(--brand-primary)] transition-colors">{c.nombre || "Sin nombre"}</h4>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shrink-0 ${
-                                      plan === 'premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                                    }`}>
-                                      {plan}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-500 truncate mb-2">{c.email}</p>
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                      {c.activo ? "Activo" : "Inactivo"}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="pl-2 flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
-                                  <button onClick={(e) => { e.stopPropagation(); setEditClient({ ...c }); }} className="text-xs font-semibold text-slate-500 hover:text-[var(--brand-primary)] transition-colors">Editar</button>
-                                  <button onClick={(e) => { e.stopPropagation(); toggleActivo(c); }} className={`text-xs font-semibold transition-colors ${c.activo ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}>
-                                    {c.activo ? "Suspender" : "Activar"}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+            <div className="flex items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center bg-[#F8FAFC]">
+                  {selectedNutri.isAtletas ? (
+                    <Dumbbell className="text-[var(--brand-primary)]" size={22} />
+                  ) : selectedNutri.logo_url ? (
+                    <CachedImage 
+                      src={selectedNutri.logo_url} 
+                      alt={selectedNutri.nombre || "Logo"} 
+                      className="w-full h-full object-cover" 
+                      fallback={<User className="text-slate-300" size={24}/>} 
+                    />
+                  ) : (
+                    <User className="text-slate-300" size={24}/>
                   )}
                 </div>
-              );
-            })()}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-lg md:text-2xl font-bold text-[#0B1929] leading-tight truncate" style={{ fontFamily: "DM Sans" }}>
+                      {selectedNutri.nombre_marca || selectedNutri.nombre || "Sin nombre"}
+                    </h1>
+                    {selectedNutri.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">TÚ</span>}
+                    {selectedNutri.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">ESTUDIANTE</span>}
+                    {!selectedNutri.isAtletas && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedNutri.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {selectedNutri.activo !== false ? "Activo" : "Suspendido"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs md:text-sm text-[#6B7A8D] mt-0.5">
+                    {activeClientsCount} pacientes activos de {currentNutriClients.length} totales
+                    {!selectedNutri.isAtletas && selectedNutri.nombre && selectedNutri.nombre !== selectedNutri.nombre_marca && (
+                      <span className="hidden sm:inline text-slate-400"> · Especialista: <strong className="text-slate-600 font-semibold">{selectedNutri.nombre}</strong></span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            {filteredNutris.filter(n => !n.isSuperadmin).map(n => renderNutri(n))}
+            {/* Buscador */}
+            <div className="relative mt-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o email..."
+                value={patientSearch}
+                onChange={(e) => setPatientSearch(e.target.value)}
+                className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
+              />
+            </div>
+
+            {/* Píldoras de retención */}
+            <div className="flex items-center gap-2 pt-0.5 overflow-x-auto scroll-hide pb-0.5 -mx-4 px-4 md:mx-0 md:px-0">
+              <button
+                type="button"
+                onClick={() => setPatientFilter("todos")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  patientFilter === "todos"
+                    ? "bg-[#0B1929] text-white shadow-sm"
+                    : "bg-[#F0F4FA] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-200"
+                }`}
+              >
+                Todos ({currentNutriClients.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPatientFilter("inactivos")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  patientFilter === "inactivos"
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                }`}
+              >
+                <AlertCircle size={13} />
+                <span>Inactivos &gt;5d ({inactivosCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPatientFilter("venciendo")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  patientFilter === "venciendo"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                }`}
+              >
+                <Clock size={13} />
+                <span>Por Vencer ({venciendoCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPatientFilter("al_dia")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  patientFilter === "al_dia"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                }`}
+              >
+                <CheckCircle2 size={13} />
+                <span>Al Día ({alDiaCount})</span>
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Grilla de Pacientes */}
+          <div className="flex-1 px-0 py-3 pb-28 md:p-8">
+            {filteredPatients.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center opacity-60">
+                <div className="w-16 h-16 bg-[#E2E8F0] rounded-full flex items-center justify-center mb-4">
+                  <Users size={30} className="text-[#6B7A8D]" />
+                </div>
+                <h2 className="text-lg font-bold text-[#0B1929] mb-1" style={{ fontFamily: "DM Sans" }}>
+                  No se encontraron pacientes
+                </h2>
+                <p className="text-xs text-[#6B7A8D]">
+                  {currentNutriClients.length === 0 ? "Este nutriólogo aún no tiene pacientes asignados." : "Ningún paciente coincide con los filtros aplicados."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4 max-w-6xl mx-auto">
+                {filteredPatients.map(c => {
+                  const ret = getPatientRetention(c);
+                  const barColor = !c.activo 
+                    ? 'bg-slate-300' 
+                    : ret.isVenciendo 
+                    ? 'bg-amber-400' 
+                    : ret.isInactivo 
+                    ? 'bg-rose-500' 
+                    : 'bg-[var(--brand-primary)]';
+
+                  const clinRec = peekClinicalRecord(c.id);
+                  const edad = calcEdadFromBirthdate(c.fecha_nacimiento || clinRec?.anamnesis?.fecha_nacimiento, null);
+                  const generoRaw = c.genero || clinRec?.anamnesis?.genero;
+                  const genero = generoRaw ? (generoRaw.toLowerCase().startsWith("m") ? "Masculino" : generoRaw.toLowerCase().startsWith("f") ? "Femenino" : generoRaw) : null;
+                  const pesoVal = c.peso || clinRec?.anamnesis?.peso;
+                  const peso = pesoVal ? `${pesoVal} kg` : null;
+                  const demograficos = [edad ? `${edad} años` : null, genero, peso].filter(Boolean);
+
+                  const activeCycle = ret.activeCycle;
+                  const cleanCycleName = activeCycle?.nombre ? activeCycle.nombre.split("|")[0].trim() : null;
+                  const isIntakePending = clinRec?.solicitud_activa === "historia_inicial" && !clinRec?.anamnesis_completada;
+
+                  return (
+                    <div 
+                      key={c.id} 
+                      className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] hover:border-[var(--brand-primary)] hover:shadow-md transition-all flex flex-col shadow-none md:shadow-xs overflow-hidden"
+                    >
+                      <div className={`h-1.5 w-full ${barColor}`} />
+
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          {/* Cabecera paciente */}
+                          <div className="flex items-start justify-between gap-2.5 mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="relative shrink-0">
+                                {c.avatar_url || c.foto_url ? (
+                                  <CachedImage
+                                    src={c.avatar_url || c.foto_url}
+                                    alt={c.nombre}
+                                    className="w-11 h-11 rounded-2xl object-cover border border-slate-200/80 shadow-2xs bg-[#F7F9FC]"
+                                    fallback={
+                                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
+                                        {getInitials(c.nombre)}
+                                      </div>
+                                    }
+                                  />
+                                ) : (
+                                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 border border-blue-200/60 flex items-center justify-center text-[var(--brand-primary)] font-black text-sm tracking-wide shadow-2xs">
+                                    {getInitials(c.nombre)}
+                                  </div>
+                                )}
+                                <span 
+                                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                                    !c.activo 
+                                      ? 'bg-slate-400' 
+                                      : ret.isInactivo 
+                                      ? 'bg-rose-500' 
+                                      : ret.isVenciendo 
+                                      ? 'bg-amber-400' 
+                                      : 'bg-emerald-500'
+                                  }`} 
+                                  title={!c.activo ? "Inactivo" : ret.isInactivo ? "Requiere atención / Inactivo" : ret.isVenciendo ? "Por vencer" : "Activo y al día"}
+                                />
+                              </div>
+
+                              <div className="min-w-0">
+                                <h3 className="font-bold text-[#0B1929] text-base leading-tight truncate" title={c.nombre}>
+                                  {c.nombre}
+                                </h3>
+                                <div className="text-xs text-[#6B7A8D] font-medium mt-0.5 truncate">
+                                  {demograficos.length > 0 ? demograficos.join(" • ") : (
+                                    <span className="text-[#9BA5B0] italic">Datos clínicos pendientes</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Badges de estado */}
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                {c.activo && ret.isNuevo && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                    <Sparkles size={10} />
+                                    Nuevo
+                                  </span>
+                                )}
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                  c.activo 
+                                    ? 'bg-[#E8F1FB] text-[var(--brand-primary)]' 
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {c.activo ? "Activo" : "Inactivo"}
+                                </span>
+                              </div>
+
+                              {c.activo && ret.isVenciendo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                  <Clock size={10} />
+                                  {ret.isVencido 
+                                    ? `Vencido (${Math.abs(ret.daysToExpire)}d)` 
+                                    : (ret.daysToExpire === 0 ? "Vence hoy" : `Vence en ${ret.daysToExpire}d`)}
+                                </span>
+                              )}
+
+                              {c.activo && ret.isInactivo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+                                  <AlertCircle size={10} />
+                                  {ret.daysInactive ? `Inactivo (${ret.daysInactive}d)` : "Inactivo"}
+                                </span>
+                              )}
+
+                              {c.activo && ret.isAlDia && !ret.isVenciendo && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                  <CheckCircle2 size={10} />
+                                  Al día
+                                </span>
+                              )}
+
+                              {isIntakePending && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                  <Clock size={10} />
+                                  Expediente solicitado
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recuadro de Objetivo y Plan Actual */}
+                          <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0] space-y-2 mb-3">
+                            <div className="flex items-center gap-2 text-xs truncate">
+                              <Target size={14} className="text-[var(--brand-primary)] shrink-0" />
+                              <div className="min-w-0 flex-1 truncate">
+                                <span className="text-[#6B7A8D] font-medium">Objetivo: </span>
+                                <span className="text-[#0B1929] font-bold" title={c.objetivo || "General / Salud"}>
+                                  {c.objetivo || "General / Salud"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs">
+                              <UtensilsCrossed size={14} className="text-indigo-600 shrink-0" />
+                              <div className="min-w-0 flex-1 flex items-center justify-between gap-1">
+                                <div className="min-w-0 flex-1 truncate">
+                                  <span className="text-[#6B7A8D] font-medium">Plan activo: </span>
+                                  {cleanCycleName ? (
+                                    <span className="text-[#0B1929] font-bold" title={cleanCycleName}>{cleanCycleName}</span>
+                                  ) : (
+                                    <span className="text-[#9BA5B0] italic">Sin plan asignado</span>
+                                  )}
+                                </div>
+                                {activeCycle && ret.daysToExpire !== null && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                                    ret.isVencido 
+                                      ? 'bg-rose-100 text-rose-700' 
+                                      : ret.isVenciendo 
+                                      ? 'bg-amber-100 text-amber-800' 
+                                      : 'bg-blue-100/80 text-[var(--brand-primary)]'
+                                  }`}>
+                                    {ret.isVencido 
+                                      ? `Vencido` 
+                                      : ret.daysToExpire === 0 
+                                      ? 'Vence hoy' 
+                                      : `${ret.daysToExpire}d rest.`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Contacto: Email y WhatsApp */}
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#F0F4FA]">
+                            <div className="flex items-center gap-1.5 text-xs text-[#6B7A8D] min-w-0 flex-1" title={c.email}>
+                              <Mail size={13} className="text-[#9BA5B0] shrink-0" />
+                              <span className="truncate">{c.email}</span>
+                            </div>
+
+                            {c.telefono ? (
+                              <a 
+                                href={getWhatsAppUrl(
+                                  c.telefono,
+                                  buildWhatsAppMessage(
+                                    c, 
+                                    isIntakePending ? "cuestionario" : (ret.isVenciendo ? "renovacion" : (ret.isInactivo ? "inactividad" : (ret.isNuevo ? "bienvenida" : "seguimiento"))),
+                                    selectedNutri.nombre_marca || selectedNutri.nombre
+                                  )
+                                )} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className={`inline-flex items-center gap-1 text-[11px] font-bold text-white px-2.5 py-1 rounded-lg transition-colors shrink-0 ${
+                                  isIntakePending
+                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                    : ret.isVenciendo 
+                                    ? 'bg-amber-600 hover:bg-amber-700' 
+                                    : ret.isInactivo 
+                                    ? 'bg-rose-600 hover:bg-rose-700' 
+                                    : 'bg-[#25D366] hover:bg-[#20bd5a]'
+                                }`}
+                                title="Enviar mensaje por WhatsApp a 1 clic"
+                              >
+                                <MessageCircle size={12} className="fill-white shrink-0" />
+                                <span>
+                                  {isIntakePending ? "Cuestionario" : ret.isVenciendo ? "Renovación" : ret.isInactivo ? "Check-in" : "WhatsApp"}
+                                </span>
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-[#9BA5B0] italic flex items-center gap-1 shrink-0">
+                                <Phone size={11} className="text-slate-300" /> Sin tel
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Footer de Acciones */}
+                        <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex items-center gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => { setSelected(c); setTab("programar"); }}
+                            className="flex-1 bg-[var(--brand-primary)] hover:opacity-90 text-white px-3 py-2.5 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                            title="Programar nutrición y entrenamiento"
+                          >
+                            <CalendarDays size={14} />
+                            <span>Programar</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setEditClient(c)}
+                            className="flex items-center justify-center bg-white border border-[#E2E8F0] text-[#6B7A8D] p-2.5 rounded-xl hover:text-[#0B1929] hover:bg-[#F0F4FA] transition-colors cursor-pointer shrink-0"
+                            title="Editar datos básicos"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => toggleActivo(c)}
+                            className={`flex items-center justify-center bg-white border border-[#E2E8F0] p-2.5 rounded-xl transition-colors cursor-pointer shrink-0 ${
+                              c.activo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50'
+                            }`}
+                            title={c.activo ? "Desactivar paciente" : "Activar paciente"}
+                          >
+                            {c.activo ? <X size={15} /> : <CheckCircle2 size={15} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col bg-[#F7F9FC]">
+          {/* Header */}
+          <div className="px-4 md:px-8 py-3 md:pt-8 md:pb-6 bg-white border-b border-[#F0F4FA] flex flex-col gap-3 md:gap-4 pr-12 md:pr-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+                  {myRole === "staff" ? "Panel de Staff FLUX" : "Panel de Super Administrador"}
+                </p>
+                <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Directorio</h1>
+                <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">{clientes.length} pacientes y {nutriologos.length} nutriólogos en la plataforma</p>
+              </div>
+              
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button onClick={() => setShowNewClient(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
+                  <Plus size={16} /> Paciente
+                </button>
+                <button onClick={() => setShowInviteNutri(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors">
+                  <Plus size={16} /> Nutriólogo
+                </button>
+              </div>
+            </div>
+
+            <div className="relative mt-2">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+              <input
+                type="text"
+                placeholder="Buscar por nutriólogo o marca..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[#F0F4FA] text-[#0B1929] text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] transition-all placeholder:text-[#9BA5B0]"
+              />
+            </div>
+          </div>
+
+          {/* Directorio List */}
+          <div className="flex-1 px-0 py-3 pb-28 md:p-8">
+            {loading ? (
+              <div className="max-w-5xl mx-auto"><ListSkeleton rows={5} /></div>
+            ) : (
+              <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+                {filteredNutris.filter(n => n.isSuperadmin).map(n => renderNutri(n))}
+
+                {(() => {
+                  const atletasIndependientes = clientes.filter(c => !c.nutriologo_id);
+                  return (
+                    <div 
+                      key="__atletas__" 
+                      onClick={() => setSelectedNutri({ id: "__atletas__", nombre: "Atletas Independientes", nombre_marca: "Atletas Independientes", isAtletas: true })}
+                      className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
+                    >
+                      <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl border border-slate-100 shrink-0 flex items-center justify-center bg-[var(--brand-primary)]/10">
+                            <Dumbbell className="text-[var(--brand-primary)]" size={20} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                              <h3 className="font-bold text-[#0B1929] text-base md:text-lg leading-tight group-hover:text-[var(--brand-primary)] transition-colors">
+                                Atletas Independientes
+                              </h3>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#E8F1FB] text-[var(--brand-primary)] shrink-0">AUTODIRIGIDOS</span>
+                            </div>
+                            <p className="text-xs text-[#6B7A8D]">Usuarios que gestionan su propio plan · Sin nutriólogo asignado</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F4FA] text-[#0B1929] text-xs font-bold border border-[#E2E8F0]/80">
+                            <Users size={14} className="text-[#6B7A8D]" />
+                            <span>{atletasIndependientes.length} Atleta{atletasIndependientes.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {filteredNutris.filter(n => !n.isSuperadmin).map(n => renderNutri(n))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
 
       {/* Modals */}
@@ -940,6 +1472,40 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               />
             </div>
           </div>
+
+          {!showEditNutri.isSuperadmin && (
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#0B1929] flex items-center gap-2">
+                  <span>Estado de la cuenta:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${showEditNutri.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                    {showEditNutri.activo !== false ? "Activo" : "Suspendido"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  {showEditNutri.activo !== false 
+                    ? "El nutriólogo y sus pacientes tienen acceso a la plataforma." 
+                    : "El acceso del nutriólogo se encuentra suspendido temporalmente."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const updatedStatus = showEditNutri.activo === false;
+                  await toggleActivoNutri(showEditNutri);
+                  setShowEditNutri(prev => prev ? { ...prev, activo: updatedStatus } : null);
+                }}
+                disabled={saving}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shrink-0 cursor-pointer ${
+                  showEditNutri.activo !== false
+                    ? "border-red-200 bg-white text-red-600 hover:bg-red-50"
+                    : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                }`}
+              >
+                {showEditNutri.activo !== false ? "Suspender cuenta" : "Activar cuenta"}
+              </button>
+            </div>
+          )}
 
           <div className="pt-4 border-t border-slate-100 mt-4">
             {showConfirmDeleteNutri && !showEditNutri.isSuperadmin ? (
