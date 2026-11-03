@@ -1680,15 +1680,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {showNewClient && (
-        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-md h-full md:h-auto flex flex-col overflow-hidden animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0 bg-white">
               <h2 className="text-lg font-bold text-[#0B1929]">Nuevo Paciente</h2>
               <button onClick={() => setShowNewClient(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
+            <div className="p-4 md:p-6 space-y-4 flex-1 md:max-h-[calc(85vh-130px)] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Nombre completo</label>
                 <input value={newClient.nombre} onChange={e=>setNewClient(p=>({...p,nombre:e.target.value}))} placeholder="Ej. Ana García" className="w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-sm outline-none transition-colors" />
@@ -1720,10 +1720,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
 
       {editClient && (
-        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-none md:rounded-2xl shadow-xl w-full md:max-w-md h-full md:h-auto flex flex-col overflow-hidden animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header con botón colapsado Guardar y X */}
-            <div className="px-5 sm:px-6 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
+            <div className="px-5 sm:px-6 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0 bg-white">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Editar Paciente</h2>
               <div className="flex items-center gap-2">
                 <button
@@ -1747,7 +1747,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 </button>
               </div>
             </div>
-            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
+            <div className="p-4 md:p-6 space-y-4 flex-1 md:max-h-[calc(85vh-60px)] overflow-y-auto">
               {editClient.email && (
                 <div>
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">Correo de acceso</label>
