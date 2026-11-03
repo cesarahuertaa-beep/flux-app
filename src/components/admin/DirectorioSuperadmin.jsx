@@ -830,13 +830,19 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
   const InputClass = "w-full bg-[#F0F4FA] border border-transparent rounded-xl px-3.5 py-2.5 text-sm text-[#0B1929] outline-none focus:bg-white focus:border-[var(--brand-primary)] transition-all";
 
+  const isSuperadminProfile = !!selectedNutri && (
+    selectedNutri.isSuperadmin || 
+    selectedNutri.id === myId || 
+    selectedNutri.id === resolvedOwnerId
+  );
+
   return (
     <div className="flex-1 flex flex-col bg-[#F7F9FC]">
       {selectedNutri ? (
         <div className="flex-1 flex flex-col bg-[#F7F9FC]">
           {/* Header Vista Nutriólogo */}
           <div className="px-4 md:px-8 pt-4 pb-3 md:pt-6 md:pb-5 bg-white border-b border-[#E2E8F0] flex flex-col gap-3">
-            <div>
+            <div className="flex items-center justify-between">
               <button 
                 type="button"
                 onClick={() => setSelectedNutri(null)}
@@ -845,6 +851,18 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                 <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
                 <span>Volver al Directorio</span>
               </button>
+
+              {isSuperadminProfile && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewClient(true)}
+                  className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--brand-primary)] text-white shadow-sm active:scale-95 transition-all cursor-pointer"
+                  title="Nuevo Paciente"
+                  aria-label="Nuevo Paciente"
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                </button>
+              )}
             </div>
 
             <div className="flex items-start md:items-center justify-between gap-4">
@@ -884,6 +902,18 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                   </p>
                 </div>
               </div>
+
+              {isSuperadminProfile && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewClient(true)}
+                  className="hidden md:inline-flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer shrink-0"
+                  title="Nuevo Paciente"
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  <span>Nuevo Paciente</span>
+                </button>
+              )}
             </div>
 
             {/* Buscador */}
@@ -1230,10 +1260,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               </div>
               
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button onClick={() => setShowNewClient(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
-                  <Plus size={16} /> Paciente
-                </button>
-                <button onClick={() => setShowInviteNutri(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-[#E2E8F0] text-[#0B1929] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors">
+                <button 
+                  type="button"
+                  onClick={() => setShowInviteNutri(true)} 
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                >
                   <Plus size={16} /> Nutriólogo
                 </button>
               </div>
