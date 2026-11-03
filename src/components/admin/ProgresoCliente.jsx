@@ -24,7 +24,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Star, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -281,8 +281,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
     return npMap;
   });
-  const [selectedNutriWeek, setSelectedNutriWeek] = useState(null);
-  const [showPastWeeks, setShowPastWeeks] = useState(false);
   const [ciclos,       setCiclos]       = useState(() => Array.isArray(_peekCiclos) ? _peekCiclos : []);
   const [cicloSel,     setCicloSel]     = useState(() => cicloActivo || _peekActiveCiclo);
   const [progreso,     setProgreso]     = useState(() => {
@@ -2132,385 +2130,145 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             const currentWeekObj = hasCurrent ? semanasNutri[currentWeekIndex] : (semanasNutri[0] || null);
             const currentWeekNum = currentWeekObj?.weekNum || 1;
 
-            // Filtrar semanas futuras: solo semanas hasta la actual ("el actual si se muestra y los futuros no")
+            // Filtrar semanas futuras: solo semanas hasta la actual
             const validWeeks = hasCurrent 
               ? semanasNutri.filter(s => s.weekNum <= currentWeekNum)
-              : semanasNutri;
-
-            const pastWeeks = validWeeks.filter(s => s.weekNum < currentWeekNum);
-            const activeWeekNum = selectedNutriWeek || currentWeekNum;
-            const activeWeekObj = validWeeks.find(s => s.weekNum === activeWeekNum) || currentWeekObj;
-
-            const pesoRef = Number(displayedMetricas[0]?.peso || activeMetricas[0]?.peso || selected?.peso) || 0;
-            const defaultMetaAgua = pesoRef > 0 ? Math.round((pesoRef * 35) / 50) * 50 : 2500;
-
-            let totalComidasSemana = 0;
-            let totalComidasRealizadasSemana = 0;
-            let totalAguaSemana = 0;
-            let totalMetaAguaSemana = 0;
-            let diasConMetaAgua = 0;
-            let diasConRegistroAgua = 0;
-
-            const diasDetalle = nutriDias.map((d, idx) => {
-              const rec = nutriProgreso[`${d.id}-${activeWeekNum}`];
-              const totalComidasDia = (d.comidas || []).length;
-              const comidasDoneMap = (rec && typeof rec.comidas_done === "object" && rec.comidas_done !== null) ? rec.comidas_done : {};
-              let realizadasDia = (d.comidas || []).filter((c, ci) => Boolean(
-                (c.id && comidasDoneMap[c.id]) ||
-                comidasDoneMap[ci] ||
-                comidasDoneMap[String(ci)] ||
-                (c.orden != null && comidasDoneMap[c.orden])
-              )).length;
-              if (realizadasDia === 0 && Number(rec?.comidas_realizadas) > 0) {
-                realizadasDia = Math.min(Number(rec.comidas_realizadas), totalComidasDia);
-              }
-              const aguaMl = Number(rec?.agua_ml) || 0;
-              const metaAguaDia = Number(rec?.meta_agua_ml) || defaultMetaAgua;
-
-              totalComidasSemana += totalComidasDia;
-              totalComidasRealizadasSemana += realizadasDia;
-              totalAguaSemana += aguaMl;
-              totalMetaAguaSemana += metaAguaDia;
-              if (aguaMl > 0) diasConRegistroAgua++;
-              if (aguaMl >= metaAguaDia && metaAguaDia > 0) diasConMetaAgua++;
-
-              const rawLabel = (d.dia_semana || d.nombre || `Día ${idx + 1}`).trim();
-              const shortTag = rawLabel.slice(0, 3).toUpperCase();
-
-              return {
-                ...d,
-                shortTag,
-                rawLabel,
-                aguaMl,
-                metaAguaDia,
-                aguaPct: metaAguaDia > 0 ? Math.min(Math.round((aguaMl / metaAguaDia) * 100), 100) : 0,
-                totalComidasDia,
-                realizadasDia,
-                comidasPct: totalComidasDia > 0 ? Math.round((realizadasDia / totalComidasDia) * 100) : 0,
-                comidasDoneMap,
-                updatedAt: rec?.updated_at || null
-              };
-            });
-
-            const pctComidasSemana = totalComidasSemana > 0
-              ? Math.round((totalComidasRealizadasSemana / totalComidasSemana) * 100)
-              : 0;
-            const promedioAguaDia = nutriDias.length > 0
-              ? Math.round(totalAguaSemana / nutriDias.length)
-              : 0;
-            const pctAguaSemana = totalMetaAguaSemana > 0
-              ? Math.min(Math.round((totalAguaSemana / totalMetaAguaSemana) * 100), 100)
-              : 0;
+              : (semanasNutri.length > 0 ? semanasNutri : [{ weekNum: 1, label: "Semana 1", isCurrent: true }]);
 
             return (
-              <div className="space-y-5">
-                {/* Week Selector Pills */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div>
-                      <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px]">Semana del Ciclo</div>
-                      <div className="text-xs text-[#6B7A8D] mt-0.5">
-                        Plan de <span className="font-bold text-[#0B1929]">{nutriDias.length} {nutriDias.length === 1 ? "día" : "días"}</span> por semana · Reinicio automático cada nuevo Lunes (00:00).
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {pastWeeks.length > 0 && (
-                        <button
-                          onClick={() => setShowPastWeeks(p => !p)}
-                          className="flex items-center justify-center p-2 sm:px-3 sm:py-1.5 border border-[#E2E8F0] rounded-lg text-[#6B7A8D] hover:bg-gray-50 transition-colors cursor-pointer"
-                          title={showPastWeeks ? "Ocultar semanas anteriores" : "Ver semanas anteriores"}
-                        >
-                          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showPastWeeks ? "rotate-180" : ""}`} />
-                        </button>
-                      )}
-                    </div>
+              <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#E2E8F0] bg-gray-50/60 flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                      Historial Comparativo por Semana del Ciclo
+                    </span>
+                    <span className="block text-[11px] text-[#6B7A8D] mt-0.5">
+                      Plan de {nutriDias.length} {nutriDias.length === 1 ? "día" : "días"} por semana · Comidas cumplidas · Agua registrada
+                    </span>
                   </div>
-
-                  <div className="flex gap-1.5 flex-wrap">
-                    {(() => {
-                      const renderPill = (s) => {
-                        const isSel = s.weekNum === activeWeekNum;
-                        const hasAnyDataInWeek = nutriDias.some(d => {
-                          const r = nutriProgreso[`${d.id}-${s.weekNum}`];
-                          return r && ((Number(r.agua_ml) || 0) > 0 || (Number(r.comidas_realizadas) || 0) > 0 || Object.values(r.comidas_done || {}).some(Boolean));
-                        });
-                        return (
-                          <button
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="border-collapse text-[11px] min-w-full bg-white">
+                    <thead>
+                      <tr>
+                        <th className="bg-gray-50 text-[#0B1929] px-3 py-2.5 border-b border-r border-[#E2E8F0] text-left min-w-[130px]">
+                          Día del Plan
+                        </th>
+                        {validWeeks.map(s => (
+                          <th
                             key={s.weekNum}
-                            onClick={() => setSelectedNutriWeek(s.weekNum)}
-                            className={`px-3 py-1.5 rounded-xl text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
-                              isSel
-                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-sm"
-                                : "bg-gray-50/70 text-[#0B1929] border-[#E2E8F0] font-semibold hover:bg-gray-100"
+                            className={`px-3 py-2 border-b border-r border-[#E2E8F0] text-center whitespace-nowrap ${
+                              s.isCurrent
+                                ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-extrabold"
+                                : "bg-gray-50 text-[#0B1929] font-bold"
                             }`}
                           >
-                            <span>{s.label}</span>
-                            {s.isCurrent && (
-                              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-extrabold uppercase ${
-                                isSel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
-                              }`}>
-                                Actual
-                              </span>
-                            )}
-                            {!s.isCurrent && hasAnyDataInWeek && (
-                              <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-white" : "bg-[var(--brand-primary)]"}`} />
-                            )}
-                          </button>
-                        );
-                      };
-
-                      return (
-                        <>
-                          {/* Semanas pasadas (desplegables con acordeón como Mis Planes) */}
-                          {showPastWeeks && pastWeeks.map(s => (
-                            <div key={s.weekNum} className="animate-in fade-in slide-in-from-left-2">
-                              {renderPill(s)}
+                            <div className="flex flex-col items-center gap-1">
+                              <span>{s.label}</span>
+                              {s.isCurrent && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[var(--brand-primary)] text-white font-extrabold uppercase">
+                                  Actual
+                                </span>
+                              )}
                             </div>
-                          ))}
-
-                          {/* Semana pasada seleccionada si está colapsado, para no perder visibilidad */}
-                          {!showPastWeeks && activeWeekNum !== currentWeekNum && (
-                            (() => {
-                              const selPastObj = pastWeeks.find(s => s.weekNum === activeWeekNum);
-                              return selPastObj ? renderPill(selPastObj) : null;
-                            })()
-                          )}
-
-                          {/* Semana actual (siempre visible) */}
-                          {currentWeekObj && renderPill(currentWeekObj)}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Weekly Summary KPIs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Meal Compliance Card */}
-                  <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <UtensilsCrossed className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Adherencia de Comidas (Sem {activeWeekNum})</div>
-                          <div className="text-lg font-extrabold text-[#0B1929]">
-                            {totalComidasRealizadasSemana} <span className="text-xs font-normal text-[#6B7A8D]">de {totalComidasSemana} comidas cumplidas</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`text-xl font-black font-['Rajdhani'] px-2.5 py-1 rounded-xl ${
-                        pctComidasSemana >= 80 ? "bg-emerald-50 text-emerald-600" : pctComidasSemana >= 50 ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-[#6B7A8D]"
-                      }`}>
-                        {pctComidasSemana}%
-                      </div>
-                    </div>
-                    <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-500"
-                        style={{ width: `${pctComidasSemana}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Water Intake Card */}
-                  <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 shadow-none md:shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                          <Droplets className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Hidratación Semanal (Sem {activeWeekNum})</div>
-                          <div className="text-lg font-extrabold text-[#0B1929]">
-                            {(promedioAguaDia / 1000).toFixed(2)} L/día <span className="text-xs font-normal text-[#6B7A8D]">promedio · Meta {(defaultMetaAgua / 1000).toFixed(2)} L ({diasConMetaAgua}/{nutriDias.length} días al 100%)</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`text-xl font-black font-['Rajdhani'] px-2.5 py-1 rounded-xl ${
-                        pctAguaSemana >= 80 ? "bg-sky-50 text-sky-600" : pctAguaSemana >= 50 ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-[#6B7A8D]"
-                      }`}>
-                        {pctAguaSemana}%
-                      </div>
-                    </div>
-                    <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-sky-400 to-blue-600 rounded-full transition-all duration-500"
-                        style={{ width: `${pctAguaSemana}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Daily Breakdown Cards Grid */}
-                <div>
-                  <div className="text-xs font-bold text-[#6B7A8D] uppercase tracking-[0.8px] mb-2.5">
-                    Desglose Diario — Semana {activeWeekNum} ({nutriDias.length} {nutriDias.length === 1 ? "día programado" : "días programados"})
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {diasDetalle.map(d => (
-                      <div key={d.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm flex flex-col justify-between gap-3">
-                        <div>
-                          {/* Header */}
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="px-2.5 py-1 rounded-lg bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-extrabold text-xs tracking-wide">
-                                {d.shortTag}
-                              </span>
-                              <span className="font-bold text-sm text-[#0B1929] truncate">{d.nombre || d.rawLabel}</span>
-                            </div>
-                            {d.comidasPct === 100 && d.aguaPct >= 100 && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                <Star className="w-3 h-3 fill-emerald-600 text-emerald-600" /> Día al 100%
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Water progress */}
-                          <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-2.5 mb-2.5">
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="font-bold text-sky-800 flex items-center gap-1">
-                                <Droplets className="w-3.5 h-3.5 text-sky-500" /> Agua
-                              </span>
-                              <span className="font-bold text-[#0B1929] font-['Rajdhani'] text-sm">
-                                {d.aguaMl} <span className="text-[11px] font-normal text-[#6B7A8D]">/ {d.metaAguaDia} ml ({d.aguaPct}%)</span>
-                              </span>
-                            </div>
-                            <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-sky-100">
-                              <div
-                                className="h-full bg-gradient-to-r from-sky-400 to-blue-500 rounded-full transition-all duration-300"
-                                style={{ width: `${d.aguaPct}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Meals progress */}
-                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-2.5">
-                            <div className="flex items-center justify-between text-xs mb-1.5">
-                              <span className="font-bold text-emerald-800 flex items-center gap-1">
-                                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600" /> Comidas
-                              </span>
-                              <span className="font-bold text-[#0B1929] font-['Rajdhani'] text-sm">
-                                {d.realizadasDia} <span className="text-[11px] font-normal text-[#6B7A8D]">/ {d.totalComidasDia} ({d.comidasPct}%)</span>
-                              </span>
-                            </div>
-                            <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-emerald-100 mb-2">
-                              <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-300"
-                                style={{ width: `${d.comidasPct}%` }}
-                              />
-                            </div>
-                            {(d.comidas || []).length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                {(d.comidas || []).map((c, ci) => {
-                                  const isDone = Boolean(
-                                    (c.id && d.comidasDoneMap[c.id]) ||
-                                    d.comidasDoneMap[ci] ||
-                                    d.comidasDoneMap[String(ci)] ||
-                                    (c.orden != null && d.comidasDoneMap[c.orden]) ||
-                                    (ci < d.realizadasDia && Object.keys(d.comidasDoneMap).length === 0)
-                                  );
-                                  return (
-                                    <span
-                                      key={c.id || ci}
-                                      className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold border ${
-                                        isDone
-                                          ? "bg-emerald-500 text-white border-emerald-500"
-                                          : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
-                                      }`}
-                                    >
-                                      {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                                      {c.tiempo || c.nombre || `Comida ${ci + 1}`}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Multi-Week History Matrix */}
-                {validWeeks.length > 1 && (
-                  <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-                    <div className="px-4 py-3 border-b border-[#E2E8F0] bg-gray-50/60 flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                        Historial Comparativo por Semana del Ciclo
-                      </span>
-                      <span className="text-[11px] text-[#6B7A8D]">Comidas cumplidas · Agua registrada</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="border-collapse text-[11px] min-w-full bg-white">
-                        <thead>
-                          <tr>
-                            <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border-b border-r border-[#E2E8F0] text-left min-w-[130px]">Día del Plan</th>
-                            {validWeeks.map(s => (
-                              <th
-                                key={s.weekNum}
-                                onClick={() => setSelectedNutriWeek(s.weekNum)}
-                                className={`px-2.5 py-2 border-b border-r border-[#E2E8F0] text-center whitespace-nowrap cursor-pointer transition-colors ${
-                                  s.weekNum === activeWeekNum
-                                    ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-extrabold"
-                                    : "bg-gray-50 text-[#0B1929] hover:bg-gray-100"
-                                }`}
-                              >
-                                <div>{s.label}</div>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {nutriDias.map((d, idx) => {
-                            const totalC = (d.comidas || []).length;
-                            return (
-                              <tr key={d.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}>
-                                <td className="px-3 py-2 border-b border-r border-[#E2E8F0] font-bold text-[#0B1929]">
-                                  {d.nombre || d.dia_semana || `Día ${idx + 1}`}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {nutriDias.map((d, idx) => {
+                        const totalC = (d.comidas || []).length;
+                        return (
+                          <tr key={d.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}>
+                            <td className="px-3 py-2.5 border-b border-r border-[#E2E8F0] font-bold text-[#0B1929]">
+                              {d.nombre || d.dia_semana || `Día ${idx + 1}`}
+                            </td>
+                            {validWeeks.map(s => {
+                              const r = nutriProgreso[`${d.id}-${s.weekNum}`];
+                              const agua = Number(r?.agua_ml) || 0;
+                              const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
+                              let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
+                                (c.id && doneMap[c.id]) ||
+                                doneMap[ci] ||
+                                doneMap[String(ci)] ||
+                                (c.orden != null && doneMap[c.orden])
+                              )).length;
+                              if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
+                                doneCount = Math.min(Number(r.comidas_realizadas), totalC);
+                              }
+                              const hasAny = agua > 0 || doneCount > 0;
+                              return (
+                                <td
+                                  key={s.weekNum}
+                                  className={`px-2 py-2 border-b border-r border-[#E2E8F0] text-center ${
+                                    s.isCurrent ? "bg-[var(--brand-primary)]/5" : ""
+                                  }`}
+                                >
+                                  {hasAny ? (
+                                    <div className="flex flex-col items-center gap-0.5 leading-tight">
+                                      <span className="font-bold text-emerald-600">{doneCount}/{totalC} com.</span>
+                                      <span className="text-[10px] font-semibold text-sky-600">{(agua / 1000).toFixed(2)} L</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#CBD5E1]">—</span>
+                                  )}
                                 </td>
-                                {validWeeks.map(s => {
-                                  const r = nutriProgreso[`${d.id}-${s.weekNum}`];
-                                  const agua = Number(r?.agua_ml) || 0;
-                                  const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
-                                  let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
-                                    (c.id && doneMap[c.id]) ||
-                                    doneMap[ci] ||
-                                    doneMap[String(ci)] ||
-                                    (c.orden != null && doneMap[c.orden])
-                                  )).length;
-                                  if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
-                                    doneCount = Math.min(Number(r.comidas_realizadas), totalC);
-                                  }
-                                  const hasAny = agua > 0 || doneCount > 0;
-                                  return (
-                                    <td
-                                      key={s.weekNum}
-                                      className={`px-2 py-1.5 border-b border-r border-[#E2E8F0] text-center ${
-                                        s.weekNum === activeWeekNum ? "bg-[var(--brand-primary)]/5" : ""
-                                      }`}
-                                    >
-                                      {hasAny ? (
-                                        <div className="flex flex-col items-center gap-0.5 leading-tight">
-                                          <span className="font-bold text-emerald-600">{doneCount}/{totalC} com.</span>
-                                          <span className="text-[10px] font-semibold text-sky-600">{(agua / 1000).toFixed(2)} L</span>
-                                        </div>
-                                      ) : (
-                                        <span className="text-[#CBD5E1]">—</span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 font-bold">
+                        <td className="px-3 py-2.5 border-t-2 border-b border-r border-[#E2E8F0] text-[#0B1929]">
+                          Total Semanal
+                        </td>
+                        {validWeeks.map(s => {
+                          let semComidas = 0;
+                          let semTotalComidas = 0;
+                          let semAgua = 0;
+                          nutriDias.forEach(d => {
+                            const r = nutriProgreso[`${d.id}-${s.weekNum}`];
+                            const totalC = (d.comidas || []).length;
+                            semTotalComidas += totalC;
+                            const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
+                            let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
+                              (c.id && doneMap[c.id]) ||
+                              doneMap[ci] ||
+                              doneMap[String(ci)] ||
+                              (c.orden != null && doneMap[c.orden])
+                            )).length;
+                            if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
+                              doneCount = Math.min(Number(r.comidas_realizadas), totalC);
+                            }
+                            semComidas += doneCount;
+                            semAgua += Number(r?.agua_ml) || 0;
+                          });
+                          const hasData = semComidas > 0 || semAgua > 0;
+                          const promAgua = nutriDias.length > 0 ? (semAgua / (nutriDias.length * 1000)).toFixed(2) : "0.00";
+                          return (
+                            <td
+                              key={s.weekNum}
+                              className={`px-2 py-2 border-t-2 border-b border-r border-[#E2E8F0] text-center ${
+                                s.isCurrent ? "bg-[var(--brand-primary)]/5" : ""
+                              }`}
+                            >
+                              {hasData ? (
+                                <div className="flex flex-col items-center gap-0.5 leading-tight">
+                                  <span className="font-extrabold text-emerald-700">{semComidas}/{semTotalComidas} com.</span>
+                                  <span className="text-[10px] font-bold text-sky-700">{promAgua} L/día prom.</span>
+                                </div>
+                              ) : (
+                                <span className="text-[#CBD5E1]">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             );
           })()}
