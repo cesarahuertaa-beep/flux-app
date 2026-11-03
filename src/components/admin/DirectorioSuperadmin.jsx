@@ -801,9 +801,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                   {n.id === myId ? "TÚ" : "CORPORATIVO"}
                 </span>
               )}
-              {n.role === "nutriologo_estudiante" && (
+              {n.role === "nutriologo_estudiante" ? (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 shrink-0">
                   ESTUDIANTE
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 shrink-0">
+                  TITULAR
                 </span>
               )}
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
@@ -877,7 +881,11 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                   {n.nombre_marca || n.nombre || "Sin nombre"}
                 </h3>
                 {n.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 shrink-0">{n.id === myId ? "TÚ" : "CORPORATIVO"}</span>}
-                {n.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 shrink-0">ESTUDIANTE</span>}
+                {n.role === "nutriologo_estudiante" ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 shrink-0">ESTUDIANTE</span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 shrink-0">TITULAR</span>
+                )}
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {n.activo !== false ? "Activo" : "Suspendido"}
                 </span>
@@ -976,7 +984,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                       {selectedNutri.nombre_marca || selectedNutri.nombre || "Sin nombre"}
                     </h1>
                     {selectedNutri.isSuperadmin && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">TÚ</span>}
-                    {selectedNutri.role === "nutriologo_estudiante" && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">ESTUDIANTE</span>}
+                    {!selectedNutri.isAtletas && (
+                      selectedNutri.role === "nutriologo_estudiante" ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">ESTUDIANTE</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">TITULAR</span>
+                      )
+                    )}
                     {!selectedNutri.isAtletas && (
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedNutri.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {selectedNutri.activo !== false ? "Activo" : "Suspendido"}
