@@ -735,6 +735,25 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
   const renderNutri = (n) => {
     const nClients = clientes.filter(c => c.nutriologo_id === n.id);
+
+    const handleEditNutri = (e) => {
+      e.stopPropagation();
+      setShowEditNutri(n);
+      setEditFormNutri({ 
+        nombre: n.nombre || "", 
+        nombre_marca: n.nombre_marca || "", 
+        color_primario: n.color_primario || "#1A6FD4", 
+        email: n.email || "", 
+        telefono: n.telefono || "", 
+        logo_url: n.logo_url || "", 
+        role: n.role || "nutriologo", 
+        cedula: n.cedula || "" 
+      });
+    };
+
+    const whatsAppUrl = n.telefono
+      ? `https://wa.me/${n.telefono.replace(/\D/g, '').length === 10 ? '52' + n.telefono.replace(/\D/g, '') : n.telefono.replace(/\D/g, '')}`
+      : "";
     
     return (
       <div 
@@ -742,9 +761,104 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
         onClick={() => setSelectedNutri(n)}
         className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] overflow-hidden shadow-none md:shadow-xs hover:border-[var(--brand-primary)]/40 hover:shadow-sm transition-all cursor-pointer group"
       >
-        <div className="p-4 md:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        {/* ── VISTA MÓVIL (Formato estructurado de 5 filas) ── */}
+        <div className="p-4 md:hidden flex items-start gap-3.5">
+          {/* Foto (posición y tamaño intactos) */}
+          <div className="w-11 h-11 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative mt-0.5">
+            {n.logo_url ? (
+              <CachedImage 
+                src={n.logo_url} 
+                alt={n.nombre || "Logo"} 
+                className="w-full h-full object-cover" 
+                fallback={<User className="text-slate-300" size={22}/>} 
+              />
+            ) : (
+              <User className="text-slate-300" size={22}/>
+            )}
+            {n.isSuperadmin && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white"></div>}
+          </div>
+
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            {/* Fila 1: Nombre de la marca y todo a la derecha el lápiz de edición */}
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-bold text-[#0B1929] text-base leading-tight truncate group-hover:text-[var(--brand-primary)] transition-colors">
+                {n.nombre_marca || n.nombre || "Sin nombre"}
+              </h3>
+              <button 
+                type="button"
+                onClick={handleEditNutri}
+                className="w-7 h-7 rounded-lg border border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#6B7A8D] hover:text-[var(--brand-primary)] flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer"
+                title="Editar nutriólogo"
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
+
+            {/* Fila 2: Todos sus banners (tarjetitas de colores) */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {n.isSuperadmin && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 shrink-0">
+                  {n.id === myId ? "TÚ" : "CORPORATIVO"}
+                </span>
+              )}
+              {n.role === "nutriologo_estudiante" && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 shrink-0">
+                  ESTUDIANTE
+                </span>
+              )}
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                n.activo !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+              }`}>
+                {n.activo !== false ? "Activo" : "Suspendido"}
+              </span>
+              {n.cedula && (
+                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0">
+                  Céd: {n.cedula}
+                </span>
+              )}
+            </div>
+
+            {/* Fila 3: Su nombre */}
+            <div className="text-xs text-[#475569] font-medium leading-tight">
+              <span>{n.nombre || "Sin nombre registrado"}</span>
+            </div>
+
+            {/* Fila 4: Cantidad de pacientes (ajustada para no usar tanto espacio) y su WhatsApp */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F0F4FA] text-[#0B1929] text-[11px] font-bold border border-[#E2E8F0]/80 shrink-0">
+                <Users size={12} className="text-[#6B7A8D]" />
+                <span>{nClients.length} {nClients.length === 1 ? "paciente" : "pacientes"}</span>
+              </div>
+
+              {whatsAppUrl && (
+                <a 
+                  href={whatsAppUrl} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-emerald-700 font-semibold no-underline inline-flex items-center gap-1 hover:text-emerald-800 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-lg text-[11px] transition-colors shrink-0"
+                >
+                  <MessageCircle size={12} /> WhatsApp
+                </a>
+              )}
+            </div>
+
+            {/* Fila 5: Si aplica, quién lo invitó */}
+            {n.creado_por_nombre && !n.isSuperadmin && (
+              <div className="pt-0.5">
+                <span className="inline-flex items-center gap-1 text-slate-400 text-[11px]">
+                  <UserPlus size={11} className="shrink-0" />
+                  <span>Invitado por: <strong className="font-medium text-slate-600">{n.creado_por_nombre}</strong></span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── VISTA ESCRITORIO (md:flex) ── */}
+        <div className="hidden md:flex p-4.5 items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
+            <div className="w-12 h-12 rounded-xl border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center bg-slate-50 relative">
               {n.logo_url ? (
                 <CachedImage 
                   src={n.logo_url} 
@@ -775,9 +889,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
                     Céd: {n.cedula}
                   </span>
                 )}
-                {n.telefono && (
+                {whatsAppUrl && (
                   <a 
-                    href={`https://wa.me/${n.telefono.replace(/\D/g,'').length === 10 ? '52' + n.telefono.replace(/\D/g,'') : n.telefono.replace(/\D/g,'')}`} 
+                    href={whatsAppUrl} 
                     target="_blank" 
                     rel="noreferrer" 
                     onClick={(e) => e.stopPropagation()}
@@ -795,7 +909,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
             </div>
           </div>
           
-          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F4FA] text-[#0B1929] text-xs font-bold border border-[#E2E8F0]/80">
               <Users size={14} className="text-[#6B7A8D]" />
               <span>{nClients.length} {nClients.length === 1 ? "Paciente" : "Pacientes"}</span>
@@ -803,20 +917,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
 
             <button 
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowEditNutri(n);
-                setEditFormNutri({ 
-                  nombre: n.nombre || "", 
-                  nombre_marca: n.nombre_marca || "", 
-                  color_primario: n.color_primario || "#1A6FD4", 
-                  email: n.email || "", 
-                  telefono: n.telefono || "", 
-                  logo_url: n.logo_url || "", 
-                  role: n.role || "nutriologo", 
-                  cedula: n.cedula || "" 
-                });
-              }}
+              onClick={handleEditNutri}
               className="w-8 h-8 rounded-xl border border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#6B7A8D] hover:text-[var(--brand-primary)] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
               title="Editar nutriólogo"
             >
