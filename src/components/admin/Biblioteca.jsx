@@ -513,7 +513,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
           <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
             Biblioteca de Ejercicios
           </h1>
-          <p className="text-xs md:text-sm text-[#6B7A8D] mt-1">
+          <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
             Colección global de ejercicios con demostración visual, platillos y recetas culinarias
           </p>
         </div>
