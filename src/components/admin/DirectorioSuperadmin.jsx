@@ -831,21 +831,22 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
               )}
             </div>
 
-            {/* Fila 3: Su nombre y a la derecha su WhatsApp colapsado */}
-            <div className="flex items-center gap-2 text-xs text-[#475569] font-medium leading-tight">
-              <span className="truncate">{n.nombre || "Sin nombre registrado"}</span>
-              {whatsAppUrl && (
+            {/* Fila 3: Icono de WhatsApp + Nombre como enlace directo */}
+            <div className="text-xs leading-tight pt-0.5">
+              {whatsAppUrl ? (
                 <a 
                   href={whatsAppUrl} 
                   target="_blank" 
                   rel="noreferrer" 
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/70 transition-colors shrink-0 shadow-2xs"
-                  title="Contactar por WhatsApp"
-                  aria-label="WhatsApp"
+                  className="text-emerald-700 font-medium no-underline inline-flex items-center gap-1.5 hover:text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded transition-colors max-w-full"
+                  title={`Contactar por WhatsApp a ${n.nombre}`}
                 >
-                  <MessageCircle size={13} />
+                  <MessageCircle size={12} className="text-emerald-600 shrink-0" />
+                  <span className="truncate">{n.nombre || "Sin nombre registrado"}</span>
                 </a>
+              ) : (
+                <span className="text-[#475569] font-medium">{n.nombre || "Sin nombre registrado"}</span>
               )}
             </div>
 
