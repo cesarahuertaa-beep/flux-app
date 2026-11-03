@@ -667,73 +667,115 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px]">
-                {ejerciciosFiltrados.map((e, i) => {
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                {ejerciciosFiltrados.map((e) => {
                   const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
                   return (
                     <div
                       key={e.id}
                       className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
                     >
-                      <div style={{
-                        position: "absolute", top: 0, left: 0, right: 0, height: 2,
-                        background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`
-                      }} />
-
                       {/* Media Area */}
                       <div
                         onClick={() => e.gif_url && setPreviewEj(e)}
-                        className={`h-[130px] bg-gray-50 flex items-center justify-center relative overflow-hidden ${e.gif_url ? "cursor-pointer" : "cursor-default"}`}
+                        className={`h-[145px] bg-slate-100 relative overflow-hidden ${e.gif_url ? "cursor-pointer" : "cursor-default"}`}
                       >
                         {e.gif_url ? (
                           <>
                             <img
                               src={e.gif_url}
                               alt={e.nombre}
-                              className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0B1929] shadow-lg">
-                                <Play size={20} className="ml-1" />
+                            <div className="absolute inset-0 bg-[#0B1929]/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center text-[#0B1929] shadow-lg">
+                                <Play size={20} className="ml-0.5 fill-current" />
                               </div>
                             </div>
                           </>
                         ) : (
-                          <Dumbbell size={40} className="text-gray-300" />
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1 bg-slate-50">
+                            <Dumbbell size={36} />
+                            <span className="text-[11px] font-semibold">Sin demostración</span>
+                          </div>
                         )}
+
+                        {/* Badges superiores sobre el media */}
+                        <div className="absolute top-2.5 left-2.5">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
+                            <span>{e.grupo_muscular}</span>
+                          </span>
+                        </div>
+                        <div className="absolute top-2.5 right-2.5">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
+                            <Dumbbell className="w-3 h-3 text-sky-400" />
+                            <span>{e.gif_url ? "Video / GIF" : "Ejercicio"}</span>
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Info */}
-                      <div className="p-3 flex-1 flex flex-col justify-between">
+                      {/* Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="font-semibold text-[13px] text-[#0B1929] mb-2 leading-snug">
+                          <h4 className="font-bold text-[14px] text-[#0B1929] leading-snug line-clamp-2 mb-2">
                             {e.nombre}
-                          </div>
-                          <div className="flex gap-1 flex-wrap mb-2.5">
-                            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
-                              {e.grupo_muscular}
-                            </span>
+                          </h4>
+
+                          {/* Especificaciones / Info pills homologadas */}
+                          <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
+                            <div className="bg-sky-50/70 border border-sky-100 rounded-lg p-1.5">
+                              <span className="text-[10px] text-sky-600 block font-semibold">Grupo Muscular</span>
+                              <span className="text-xs font-bold text-sky-950 truncate block">{e.grupo_muscular}</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
+                              <span className="text-[10px] text-slate-500 block font-semibold">Multimedia</span>
+                              <span className="text-xs font-bold text-slate-800 flex items-center justify-center gap-1">
+                                {e.gif_url ? (
+                                  <span className="text-emerald-600 flex items-center gap-1 font-semibold">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Activo
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal">Sin video</span>
+                                )}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {isSuperadmin && (
-                          <div className="flex gap-1.5 mt-2 pt-2 border-t border-[#F8FAFC]">
+                        {/* Botones de acción homologados */}
+                        <div className="flex gap-1.5 pt-2 border-t border-[#F0F4FA]">
+                          {e.gif_url && (
                             <button
                               type="button"
-                              onClick={() => openEditEj(e)}
-                              className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              onClick={() => setPreviewEj(e)}
+                              className="flex items-center justify-center gap-1 text-[#6B7A8D] hover:text-[#0B1929] bg-gray-50 hover:bg-gray-100 border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              title="Ver demostración"
                             >
-                              <Edit2 size={12} /> Editar
+                              <Eye size={12} />
+                              <span>Ver</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteEjModal(e)}
-                              className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
-                            >
-                              <Trash2 size={12} /> Borrar
-                            </button>
-                          </div>
-                        )}
+                          )}
+                          {isSuperadmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditEj(e)}
+                                className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Edit2 size={12} /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteEjModal(e)}
+                                className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                                title="Eliminar ejercicio"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -887,60 +929,97 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
                 {ingredientesFiltrados.map((ing) => {
                   const catInfo = CATEGORIAS_INGREDIENTES.find(c => c.id === ing.categoria);
 
                   return (
                     <div
                       key={ing.id}
-                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl p-3.5 text-center relative transition-all hover:shadow-md flex flex-col justify-between"
+                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
                     >
-                      <div>
-                        {/* Imagen centrada y nítida */}
-                        <div className="w-20 h-20 mx-auto mb-2 flex items-center justify-center bg-[#F8FAFC] rounded-2xl p-2 border border-[#F0F4FA] group-hover:scale-105 transition-transform duration-300">
-                          {ing.foto ? (
-                            <img
-                              src={ing.foto}
-                              alt={ing.nombre}
-                              className="max-h-full max-w-full object-contain drop-shadow-xs"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=150&auto=format&fit=crop&q=60";
-                              }}
-                            />
-                          ) : (
-                            <Apple className="w-8 h-8 text-slate-300" />
-                          )}
+                      {/* Media Area */}
+                      <div className="h-[145px] bg-[#F8FAFC] relative overflow-hidden flex items-center justify-center p-4 border-b border-[#F0F4FA]">
+                        {ing.foto ? (
+                          <img
+                            src={ing.foto}
+                            alt={ing.nombre}
+                            className="max-h-[105px] max-w-[105px] object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=150&auto=format&fit=crop&q=60";
+                            }}
+                          />
+                        ) : (
+                          <Apple className="w-10 h-10 text-slate-300" />
+                        )}
+
+                        {/* Badges superiores sobre el media */}
+                        <div className="absolute top-2.5 left-2.5">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5">
+                            <span>{catInfo?.icono || "🍽️"}</span>
+                            <span>{catInfo?.nombre || ing.categoria}</span>
+                          </span>
                         </div>
-
-                        <h4 className="font-bold text-[13px] text-[#0B1929] leading-snug line-clamp-2 mb-1.5">
-                          {ing.nombre}
-                        </h4>
-
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-[#475569] mb-2">
-                          {catInfo ? `${catInfo.icono} ${catInfo.nombre}` : ing.categoria}
-                        </span>
+                        <div className="absolute top-2.5 right-2.5">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
+                            <Apple className="w-3 h-3 text-emerald-400" />
+                            <span>Ingrediente</span>
+                          </span>
+                        </div>
                       </div>
 
-                      {isSuperadmin && (
-                        <div className="flex gap-1.5 pt-2 border-t border-[#F8FAFC]">
-                          <button
-                            type="button"
-                            onClick={() => openEditIng(ing)}
-                            className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <Edit2 size={11} /> Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteIngModal(ing)}
-                            className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <Trash2 size={11} />
-                          </button>
+                      {/* Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-bold text-[14px] text-[#0B1929] leading-snug line-clamp-2 mb-2 text-left">
+                            {ing.nombre}
+                          </h4>
+
+                          {/* Especificaciones / Info pills homologadas */}
+                          <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
+                            <div className="bg-emerald-50/70 border border-emerald-100 rounded-lg p-1.5">
+                              <span className="text-[10px] text-emerald-600 block font-semibold">Categoría</span>
+                              <span className="text-xs font-bold text-emerald-950 truncate block">{catInfo?.nombre || ing.categoria}</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
+                              <span className="text-[10px] text-slate-500 block font-semibold">Gráfico</span>
+                              <span className="text-xs font-bold text-slate-800 flex items-center justify-center gap-1">
+                                {ing.foto ? (
+                                  <span className="text-emerald-600 flex items-center gap-1 font-semibold">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Disponible
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal">Estándar</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      )}
+
+                        {/* Botones de acción homologados */}
+                        <div className="flex gap-1.5 pt-2 border-t border-[#F0F4FA]">
+                          {isSuperadmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditIng(ing)}
+                                className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Edit2 size={12} /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteIngModal(ing)}
+                                className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                                title="Eliminar ingrediente"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
