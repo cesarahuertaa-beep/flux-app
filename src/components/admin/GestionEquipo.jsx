@@ -1,5 +1,5 @@
 import { useBrand } from "../BrandContext";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
   Users, AlertCircle, CheckCircle2, XCircle, Folder, MessageCircle, Mail, 
   Loader2, Circle, CircleDashed, Trash2, Crown, ChevronRight, ArrowLeft, 
@@ -106,6 +106,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
   // Subpestañas principales (Superadmin): 'colaboradores' | 'roles'
   const [activeSubTab, setActiveSubTab] = useState("colaboradores");
+  const [roleFilter, setRoleFilter]     = useState("todos");
 
   // Edición Inline de Colaborador (Al hacer clic en la tarjeta)
   const [editUser, setEditUser]     = useState(null);
@@ -849,66 +850,78 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     );
   }
 
+  // Opciones de filtro por rol (homologado con Agenda)
+  const roleFilters = useMemo(() => {
+    if (!isSuperadmin) {
+      return [
+        ["todos", `Todos (${equipo.length})`],
+        ["activos", `Activos (${equipo.filter(c => c.activo !== false).length})`],
+        ["suspendidos", `Suspendidos (${equipo.filter(c => c.activo === false).length})`]
+      ];
+    }
+    return [
+      ["todos", `Todos (${equipo.length})`],
+      ...allStaffRoles.map(r => {
+        const cleanName = r.nombre.replace(" (General)", "");
+        const count = equipo.filter(c => (c.especialidad || "staff_general") === r.id).length;
+        return [r.id, `${cleanName} (${count})`];
+      })
+    ];
+  }, [isSuperadmin, equipo, allStaffRoles]);
+
+  const filteredEquipo = useMemo(() => {
+    if (roleFilter === "todos") return equipo;
+    if (isSuperadmin) {
+      return equipo.filter(c => (c.especialidad || "staff_general") === roleFilter);
+    }
+    if (roleFilter === "activos") return equipo.filter(c => c.activo !== false);
+    if (roleFilter === "suspendidos") return equipo.filter(c => c.activo === false);
+    return equipo;
+  }, [equipo, roleFilter, isSuperadmin]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // VISTA PRINCIPAL: LISTA DE COLABORADORES O GENERADOR DE ROLES
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className="pb-28 md:pb-8">
-      {/* Top action bar */}
-      <div className="flex justify-between items-center mb-4 md:mb-5 flex-wrap gap-3 px-4 pt-3 md:px-0 md:pt-0">
-        {/* Selector de subpestañas para Superadmin */}
+      {/* Top action bar (homologado con Agenda) */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-hide mb-4 md:mb-5 px-4 pt-1 md:px-0 md:pt-0 pb-0.5">
         {isSuperadmin ? (
-          <div className="flex items-center gap-2 bg-[#E2E8F0]/60 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("colaboradores")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === "colaboradores" 
-                  ? 'bg-white text-[#0B1929] shadow-2xs' 
-                  : 'text-[#6B7A8D] hover:text-[#0B1929]'
-              }`}
-            >
-              <Users size={14} />
-              Colaboradores ({equipo.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("roles")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === "roles" 
-                  ? 'bg-white text-[#0B1929] shadow-2xs' 
-                  : 'text-[#6B7A8D] hover:text-[#0B1929]'
-              }`}
-            >
-              <Shield size={14} />
-              Roles y Permisos ({allStaffRoles.length})
-            </button>
+          <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
+            {[["colaboradores", "Colaboradores"], ["roles", "Roles y Permisos"]].map(([k, lb]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setActiveSubTab(k)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  activeSubTab === k
+                    ? "bg-white text-[var(--brand-primary)] shadow-sm"
+                    : "text-[#6B7A8D] hover:text-[#0B1929]"
+                }`}
+              >
+                {lb}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="text-sm text-[#6B7A8D] font-medium">
-            {equipo.length} colaborador{equipo.length !== 1 ? "es" : ""} registrado{equipo.length !== 1 ? "s" : ""}
-          </div>
-        )}
+        ) : null}
 
-        <div className="flex items-center gap-2">
-          {activeSubTab === "roles" && isSuperadmin ? (
-            <button 
-              type="button"
-              onClick={() => setShowNewRoleModal(true)}
-              className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition-opacity shadow-2xs text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={16} /> Crear Nuevo Rol
-            </button>
-          ) : (
-            <button 
-              type="button"
-              onClick={() => setShowInvite(true)}
-              className="bg-[var(--brand-primary)] text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition-opacity shadow-2xs text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={16} /> Invitar colaborador
-            </button>
-          )}
-        </div>
+        {activeSubTab === "roles" && isSuperadmin ? (
+          <button 
+            type="button"
+            onClick={() => setShowNewRoleModal(true)}
+            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-1.5 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Plus size={16} /> Crear Nuevo Rol
+          </button>
+        ) : (
+          <button 
+            type="button"
+            onClick={() => setShowInvite(true)}
+            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-1.5 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Plus size={16} /> Invitar colaborador
+          </button>
+        )}
       </div>
 
       {/* Subpestaña: GENERADOR Y CATÁLOGO DE ROLES (Superadmin) */}
@@ -982,13 +995,24 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       ) : (
         /* Subpestaña: LISTA DE COLABORADORES */
         <>
-          {/* Explicación amigable */}
-          <div className="hidden md:block bg-[#F8FAFC] border-y md:border border-[#BFDBFE] rounded-none md:rounded-xl px-4 md:px-5 py-3.5 text-sm text-[#6B7A8D] mb-4 md:mb-6 leading-relaxed">
-            <strong className="text-[#0B1929]">Gestión de Colaboradores:</strong><br />
-            {isSuperadmin 
-              ? "Haz clic sobre cualquier tarjeta de empleado para editar sus datos, ajustar su rol corporativo o suspender su acceso al sistema." 
-              : "Haz clic sobre la tarjeta de tu administrativo para editar sus datos de contacto o gestionar su acceso."
-            }
+          {/* Barra de filtros horizontales por rol (homologado con Agenda) */}
+          <div className="mb-4">
+            <div className="flex gap-2 overflow-x-auto scroll-hide pb-1 px-4 md:px-0">
+              {roleFilters.map(([k, lb]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setRoleFilter(k)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                    roleFilter === k
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                      : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-[#E8F1FB]"
+                  }`}
+                >
+                  {lb}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Lista de Colaboradores */}
@@ -1012,16 +1036,20 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 </button>
               </div>
             </div>
+          ) : filteredEquipo.length === 0 ? (
+            <div className="mx-4 md:mx-0 text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="text-[15px] font-semibold text-[#6B7A8D]">No hay colaboradores con este rol</div>
+            </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {equipo.map((p, i) => {
+            <div className="flex flex-col gap-0 md:gap-3">
+              {filteredEquipo.map((p, i) => {
                 const assignedRole = isSuperadmin ? getRoleInfo(p.especialidad) : null;
 
                 return (
                   <div 
                     key={p.id} 
                     onClick={() => openEdit(p)}
-                    className="animate-in bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 md:p-5 flex items-center justify-between gap-3 relative overflow-hidden shadow-none md:shadow-2xs hover:shadow-md hover:border-[#CBD5E1] transition-all cursor-pointer group"
+                    className="animate-in bg-white rounded-none md:rounded-2xl border-b first:border-t md:first:border-t-0 md:border border-[#E2E8F0] p-4 md:p-5 flex items-center justify-between gap-3 relative overflow-hidden shadow-none md:shadow-2xs hover:shadow-md hover:border-[#CBD5E1] transition-all cursor-pointer group"
                     style={{ animationDelay: `${i * 0.04}s` }}
                   >
                     {/* Barra lateral de estado */}
