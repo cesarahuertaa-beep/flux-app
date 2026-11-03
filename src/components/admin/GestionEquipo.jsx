@@ -313,6 +313,16 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
   useEffect(() => {
     if (!filtroMesNomina && mesesNominasDisponibles.length > 0) {
+      const now = new Date();
+      // Si estamos antes del corte del día 10 del mes, el periodo 100% cobrado y listo para conciliar es el mes anterior
+      if (now.getDate() < 11 && mesesNominasDisponibles.length > 1) {
+        const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}`;
+        if (mesesNominasDisponibles.includes(prevMonthStr)) {
+          setFiltroMesNomina(prevMonthStr);
+          return;
+        }
+      }
       setFiltroMesNomina(mesesNominasDisponibles[0]);
     }
   }, [mesesNominasDisponibles, filtroMesNomina]);
@@ -388,19 +398,25 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   }, [isSuperadmin, equipo, filtroMesNomina, compensaciones, nominasNutris, nominasRecibos, nominasDb]);
 
   const kpisNomina = useMemo(() => {
+    // Solo consideramos colaboradores con balance positivo (>0) o que ya hayan sido transferidos/firmados
+    const conMonto = nominasColabsCalculados.filter(c => c.montoFinal > 0 || c.isTransferido);
     return {
-      totalNeto: nominasColabsCalculados.reduce((acc, c) => acc + c.montoFinal, 0),
-      totalSueldos: nominasColabsCalculados.reduce((acc, c) => acc + c.sueldoMonto, 0),
-      totalComisiones: nominasColabsCalculados.reduce((acc, c) => acc + c.comisionMonto, 0),
-      totalBonos: nominasColabsCalculados.reduce((acc, c) => acc + c.bonoMonto, 0),
-      pendientes: nominasColabsCalculados.filter(c => c.estadoNomina === "pendiente").length,
-      transferidos: nominasColabsCalculados.filter(c => c.estadoNomina === "transferido").length,
-      firmados: nominasColabsCalculados.filter(c => c.estadoNomina === "firmado").length
+      totalNeto: conMonto.reduce((acc, c) => acc + c.montoFinal, 0),
+      totalSueldos: conMonto.reduce((acc, c) => acc + c.sueldoMonto, 0),
+      totalComisiones: conMonto.reduce((acc, c) => acc + c.comisionMonto, 0),
+      totalBonos: conMonto.reduce((acc, c) => acc + c.bonoMonto, 0),
+      pendientes: conMonto.filter(c => c.estadoNomina === "pendiente").length,
+      transferidos: conMonto.filter(c => c.estadoNomina === "transferido").length,
+      firmados: conMonto.filter(c => c.estadoNomina === "firmado").length,
+      totalVisibles: conMonto.length
     };
   }, [nominasColabsCalculados]);
 
   const nominasFiltradas = useMemo(() => {
     return nominasColabsCalculados.filter(c => {
+      // Si el pago es $0 y no tiene transferencia registrada, no mostrar
+      if (c.montoFinal <= 0 && !c.isTransferido) return false;
+
       const matchEstado = filtroEstadoNomina === "todos" ? true : c.estadoNomina === filtroEstadoNomina;
       const matchBusqueda = !busquedaNomina.trim() ? true : (
         (c.colab.nombre || "").toLowerCase().includes(busquedaNomina.toLowerCase()) ||
@@ -1408,7 +1424,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
               <div className="flex items-center gap-1.5 overflow-x-auto scroll-hide">
                 {[
-                  { key: "todos", label: `Todos (${nominasColabsCalculados.length})` },
+                  { key: "todos", label: `Todos (${kpisNomina.totalVisibles})` },
                   { key: "pendiente", label: `Pendientes (${kpisNomina.pendientes})` },
                   { key: "transferido", label: `Transferidos (${kpisNomina.transferidos})` },
                   { key: "firmado", label: `Firmados (${kpisNomina.firmados})` },
@@ -1472,8 +1488,14 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
               Calculando nóminas del personal…
             </div>
           ) : nominasFiltradas.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-2xl border border-[#E2E8F0] text-[#6B7A8D] text-sm shadow-2xs">
-              No se encontraron colaboradores en nómina para este mes o con el filtro seleccionado.
+            <div className="bg-white p-10 md:p-14 text-center rounded-2xl border border-[#E2E8F0] text-[#6B7A8D] shadow-2xs flex flex-col items-center justify-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-[#9BA5B0] mb-1">
+                <Banknote size={22} strokeWidth={1.5} />
+              </div>
+              <h4 className="font-bold text-[#0B1929] text-base">Sin dispersiones pendientes para este periodo</h4>
+              <p className="text-xs text-[#6B7A8D] max-w-md">
+                No hay colaboradores con saldo por pagar o transferencias en {formatMesNomina(filtroMesNomina)}. Los colaboradores con balance de $0.00 se omiten automáticamente para mantener limpia tu pantalla.
+              </p>
             </div>
           ) : (
             <div className="space-y-3.5">
