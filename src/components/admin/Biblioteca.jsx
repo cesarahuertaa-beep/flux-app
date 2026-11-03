@@ -453,482 +453,504 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     colacion: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" }
   };
 
+  // ── Píldoras de Filtros Homologadas con Conteo en Vivo ──
+  const grupoPills = useMemo(() => {
+    return opcionesGrupos.map(og => {
+      const count = og.value === "Todos"
+        ? (biblioteca || []).length
+        : (biblioteca || []).filter(e => matchMuscleGroup(e.grupo_muscular, og.value)).length;
+      return {
+        key: og.value,
+        label: `${og.label} (${count})`
+      };
+    });
+  }, [biblioteca, opcionesGrupos]);
+
+  const platilloPills = useMemo(() => {
+    return CATEGORIAS_PLATILLOS.map(c => {
+      const count = c.id === "todos"
+        ? platillos.length
+        : platillos.filter(p => p.categoria === c.id).length;
+      return {
+        key: c.id,
+        label: `${c.icono} ${c.nombre} (${count})`
+      };
+    });
+  }, [platillos]);
+
+  const ingredientePills = useMemo(() => {
+    return CATEGORIAS_INGREDIENTES.map(c => {
+      const count = c.id === "todos"
+        ? ingredientes.length
+        : ingredientes.filter(i => i.categoria === c.id).length;
+      return {
+        key: c.id,
+        label: `${c.icono} ${c.nombre} (${count})`
+      };
+    });
+  }, [ingredientes]);
+
+  // ── Control Centralizado de Búsqueda para Cabecera ──
+  const searchVal = subtab === "ejercicios" ? busquedaEj : subtab === "platillos" ? busquedaPlatillo : busquedaIng;
+  const handleSearchChange = (val) => {
+    if (subtab === "ejercicios") setBusquedaEj(val);
+    else if (subtab === "platillos") setBusquedaPlatillo(val);
+    else setBusquedaIng(val);
+  };
+  const searchPlaceholder =
+    subtab === "ejercicios" ? "Buscar ejercicio…" :
+    subtab === "platillos" ? "Buscar platillo o ingrediente…" :
+    "Buscar ingrediente…";
+
   return (
-    <div className="space-y-4 md:space-y-5 pt-2 md:pt-0 pb-28 md:pb-8">
-      {/* ── Sub-tabs Superiores: Selector de Colección (Multi-Módulo) ── */}
-      <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] px-3.5 py-2.5 md:p-1.5 shadow-none md:shadow-sm flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-1.5 overflow-x-auto scroll-hide w-full sm:w-auto">
-          {/* Tab Ejercicios */}
+    <div className="w-full flex-1 flex flex-col">
+      {/* ── Cabecera Principal con Barra de Búsqueda Integrada ── */}
+      <div className="px-4 md:px-8 pt-3 pb-2.5 md:pt-8 md:pb-6 bg-white border-b border-[#E2E8F0]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="hidden md:block text-[10px] font-mono tracking-widest text-[#6B7A8D] uppercase mb-1">
+              Panel de Administración
+            </p>
+            <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
+              Biblioteca de Ejercicios
+            </h1>
+            <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
+              Colección global de ejercicios con demostración visual, platillos y recetas culinarias
+            </p>
+          </div>
+
+          {/* Barra de Búsqueda en la Cabecera */}
+          <div className="relative w-full md:w-80 shrink-0">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA5B0]" />
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={searchVal}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-[#F7F9FC] md:bg-white border border-[#E2E8F0] rounded-xl text-xs sm:text-[13px] text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] placeholder:text-[#9BA5B0] transition-all font-['Inter',sans-serif]"
+            />
+            {searchVal && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9BA5B0] hover:text-[#0B1929] p-0.5 rounded transition-colors cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fila 1: Sub-tabs Switch Homologado + Botón de Acción ── */}
+      <div className="flex items-center justify-between gap-2 overflow-x-auto scroll-hide px-4 md:px-8 pt-4 pb-1">
+        <div className="flex gap-1 bg-[#F0F4FA] p-1 rounded-xl shrink-0">
           <button
             type="button"
             onClick={() => setSubtab("ejercicios")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               subtab === "ejercicios"
-                ? "bg-[var(--brand-primary)] text-white shadow-sm"
-                : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
             }`}
           >
             <Dumbbell className="w-4 h-4 shrink-0" />
             <span>Ejercicios</span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
-              subtab === "ejercicios" ? "bg-white/20 text-white" : "bg-gray-100 text-[#6B7A8D]"
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              subtab === "ejercicios" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
               {biblioteca.length}
             </span>
           </button>
 
-          {/* Tab Platillos */}
           <button
             type="button"
             onClick={() => setSubtab("platillos")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               subtab === "platillos"
-                ? "bg-[var(--brand-primary)] text-white shadow-sm"
-                : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
             }`}
           >
             <Utensils className="w-4 h-4 shrink-0" />
             <span>Platillos y Recetas</span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
-              subtab === "platillos" ? "bg-white/20 text-white" : "bg-gray-100 text-[#6B7A8D]"
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              subtab === "platillos" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
               {platillos.length}
             </span>
           </button>
 
-          {/* Tab Ingredientes */}
           <button
             type="button"
             onClick={() => setSubtab("ingredientes")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               subtab === "ingredientes"
-                ? "bg-[var(--brand-primary)] text-white shadow-sm"
-                : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                ? "bg-white text-[var(--brand-primary)] shadow-sm font-bold"
+                : "text-[#6B7A8D] hover:text-[#0B1929]"
             }`}
           >
             <Apple className="w-4 h-4 shrink-0" />
             <span>Ingredientes Culinarios</span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
-              subtab === "ingredientes" ? "bg-white/20 text-white" : "bg-gray-100 text-[#6B7A8D]"
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+              subtab === "ingredientes" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
               {ingredientes.length}
             </span>
           </button>
         </div>
 
-        {/* Botón de Creación Dinámico según el Tab Activo */}
+        {/* Botón de Creación Dinámico */}
         {isSuperadmin && (
-          <div className="w-full sm:w-auto flex justify-end">
-            {subtab === "ejercicios" && (
-              <button
-                type="button"
-                onClick={openNewEj}
-                className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-4 py-2 rounded-xl text-xs sm:text-[13px] font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Plus size={16} /> <span>Nuevo ejercicio</span>
-              </button>
-            )}
-            {subtab === "platillos" && (
-              <button
-                type="button"
-                onClick={openNewPlatillo}
-                className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-4 py-2 rounded-xl text-xs sm:text-[13px] font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Plus size={16} /> <span>Nuevo platillo</span>
-              </button>
-            )}
-            {subtab === "ingredientes" && (
-              <button
-                type="button"
-                onClick={openNewIng}
-                className="bg-[var(--brand-primary)] hover:opacity-90 text-white px-4 py-2 rounded-xl text-xs sm:text-[13px] font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Plus size={16} /> <span>Nuevo ingrediente</span>
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={
+              subtab === "ejercicios" ? openNewEj :
+              subtab === "platillos" ? openNewPlatillo :
+              openNewIng
+            }
+            className="inline-flex items-center gap-1.5 justify-center font-semibold rounded-xl transition-all focus:outline-none bg-[var(--brand-primary)] text-white shadow-sm hover:opacity-90 px-3.5 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Plus size={16} strokeWidth={2.5} className="shrink-0" />
+            <span className="hidden sm:inline">
+              {subtab === "ejercicios" ? "Nuevo ejercicio" : subtab === "platillos" ? "Nuevo platillo" : "Nuevo ingrediente"}
+            </span>
+            <span className="inline sm:hidden">Nuevo</span>
+          </button>
         )}
       </div>
 
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {/* VISTA 1: EJERCICIOS */}
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {subtab === "ejercicios" && (
-        <div className="space-y-4">
-          {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
-            <div className="relative flex-1 min-w-[160px] max-w-[240px]">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
-              <input
-                value={busquedaEj}
-                onChange={e => setBusquedaEj(e.target.value)}
-                placeholder="Buscar ejercicio…"
-                className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif]"
-              />
-            </div>
-            <CustomSelect
-              value={filtroGrupoEj}
-              onChange={setFiltroGrupoEj}
-              options={opcionesGrupos}
-              className="min-w-[140px]"
-            />
-            {(filtroGrupoEj !== "Todos" || busquedaEj) && (
-              <button
-                onClick={() => { setBusquedaEj(""); setFiltroGrupoEj("Todos"); }}
-                className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
-              >
-                <X size={14} /> Limpiar
-              </button>
-            )}
-          </div>
+      {/* ── Fila 2: Filtros en Píldoras Horizontales con Conteo ── */}
+      <div className="flex gap-2 overflow-x-auto scroll-hide px-4 md:px-8 py-2.5">
+        {(subtab === "ejercicios" ? grupoPills : subtab === "platillos" ? platilloPills : ingredientePills).map(p => {
+          const isActive = (
+            subtab === "ejercicios" ? filtroGrupoEj === p.key :
+            subtab === "platillos" ? filtroCatPlatillo === p.key :
+            filtroCatIng === p.key
+          );
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => {
+                if (subtab === "ejercicios") setFiltroGrupoEj(p.key);
+                else if (subtab === "platillos") setFiltroCatPlatillo(p.key);
+                else setFiltroCatIng(p.key);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                  : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-[#E8F1FB]"
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
 
-          {/* Grid de Ejercicios */}
-          {ejerciciosFiltrados.length === 0 ? (
-            <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
-              <Dumbbell size={48} className="mx-auto mb-4 opacity-20" />
-              <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
-                {biblioteca.length === 0 ? "La biblioteca de ejercicios está vacía" : "No hay ejercicios que coincidan"}
+      {/* ── Fila 3: Grilla de Contenido ── */}
+      <div className="px-4 md:px-8 pt-2 pb-28 md:pb-8 flex-1">
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {/* VISTA 1: EJERCICIOS */}
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {subtab === "ejercicios" && (
+          <div className="space-y-4">
+            {/* Grid de Ejercicios */}
+            {ejerciciosFiltrados.length === 0 ? (
+              <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+                <Dumbbell size={48} className="mx-auto mb-4 opacity-20" />
+                <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
+                  {biblioteca.length === 0 ? "La biblioteca de ejercicios está vacía" : "No hay ejercicios que coincidan"}
+                </div>
+                <div className="text-[13px] text-[#6B7A8D]">
+                  {biblioteca.length === 0 && isSuperadmin ? "Agrega el primer ejercicio con el botón de arriba" : "Intenta con otros filtros"}
+                </div>
               </div>
-              <div className="text-[13px] text-[#6B7A8D]">
-                {biblioteca.length === 0 && isSuperadmin ? "Agrega el primer ejercicio con el botón de arriba" : "Intenta con otros filtros"}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px] px-3.5 md:px-0">
-              {ejerciciosFiltrados.map((e, i) => {
-                const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
-                return (
-                  <div
-                    key={e.id}
-                    className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
-                  >
-                    <div style={{
-                      position: "absolute", top: 0, left: 0, right: 0, height: 2,
-                      background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`
-                    }} />
-
-                    {/* Media Area */}
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-[14px]">
+                {ejerciciosFiltrados.map((e, i) => {
+                  const accentColor = groupColors[e.grupo_muscular] || "#38bdf8";
+                  return (
                     <div
-                      onClick={() => e.gif_url && setPreviewEj(e)}
-                      className={`h-[130px] bg-gray-50 flex items-center justify-center relative overflow-hidden ${e.gif_url ? "cursor-pointer" : "cursor-default"}`}
+                      key={e.id}
+                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
                     >
-                      {e.gif_url ? (
-                        <>
-                          <img
-                            src={e.gif_url}
-                            alt={e.nombre}
-                            className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0B1929] shadow-lg">
-                              <Play size={20} className="ml-1" />
+                      <div style={{
+                        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+                        background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`
+                      }} />
+
+                      {/* Media Area */}
+                      <div
+                        onClick={() => e.gif_url && setPreviewEj(e)}
+                        className={`h-[130px] bg-gray-50 flex items-center justify-center relative overflow-hidden ${e.gif_url ? "cursor-pointer" : "cursor-default"}`}
+                      >
+                        {e.gif_url ? (
+                          <>
+                            <img
+                              src={e.gif_url}
+                              alt={e.nombre}
+                              className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-[#0B1929]/40 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0B1929] shadow-lg">
+                                <Play size={20} className="ml-1" />
+                              </div>
                             </div>
-                          </div>
-                        </>
-                      ) : (
-                        <Dumbbell size={40} className="text-gray-300" />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-3 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="font-semibold text-[13px] text-[#0B1929] mb-2 leading-snug">
-                          {e.nombre}
-                        </div>
-                        <div className="flex gap-1 flex-wrap mb-2.5">
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
-                            {e.grupo_muscular}
-                          </span>
-                        </div>
-                      </div>
-
-                      {isSuperadmin && (
-                        <div className="flex gap-1.5 mt-2 pt-2 border-t border-[#F8FAFC]">
-                          <button
-                            type="button"
-                            onClick={() => openEditEj(e)}
-                            className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <Edit2 size={12} /> Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteEjModal(e)}
-                            className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <Trash2 size={12} /> Borrar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {/* VISTA 2: PLATILLOS Y RECETAS */}
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {subtab === "platillos" && (
-        <div className="space-y-4">
-          {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
-            <div className="relative flex-1 min-w-[160px] max-w-[240px]">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
-              <input
-                value={busquedaPlatillo}
-                onChange={e => setBusquedaPlatillo(e.target.value)}
-                placeholder="Buscar platillo o ingrediente…"
-                className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif]"
-              />
-            </div>
-            <CustomSelect
-              value={filtroCatPlatillo}
-              onChange={setFiltroCatPlatillo}
-              options={CATEGORIAS_PLATILLOS.map(c => ({ value: c.id, label: `${c.icono} ${c.nombre}` }))}
-              className="min-w-[160px]"
-            />
-            {(filtroCatPlatillo !== "todos" || busquedaPlatillo) && (
-              <button
-                onClick={() => { setBusquedaPlatillo(""); setFiltroCatPlatillo("todos"); }}
-                className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
-              >
-                <X size={14} /> Limpiar
-              </button>
-            )}
-          </div>
-
-          {/* Grid de Platillos */}
-          {platillosFiltrados.length === 0 ? (
-            <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
-              <Utensils size={48} className="mx-auto mb-4 opacity-20" />
-              <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
-                {platillos.length === 0 ? "El catálogo de platillos está vacío" : "No hay platillos que coincidan"}
-              </div>
-              <div className="text-[13px] text-[#6B7A8D]">
-                {platillos.length === 0 && isSuperadmin ? "Agrega el primer platillo con el botón de arriba" : "Intenta con otros filtros"}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 px-3.5 md:px-0">
-              {platillosFiltrados.map((p) => {
-                const badge = platilloCatColors[p.categoria] || { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" };
-                const catLabel = CATEGORIAS_PLATILLOS.find(c => c.id === p.categoria)?.nombre || p.categoria;
-
-                return (
-                  <div
-                    key={p.id}
-                    className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
-                  >
-                    {/* Media Area */}
-                    <div
-                      onClick={() => setRecipePreviewModal(p)}
-                      className="h-[145px] bg-slate-100 relative overflow-hidden cursor-pointer"
-                    >
-                      {p.foto_url ? (
-                        <img
-                          src={p.foto_url}
-                          alt={p.nombre}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
-                          <Utensils size={36} />
-                          <span className="text-[11px] font-semibold">Sin imagen</span>
-                        </div>
-                      )}
-                      <div className="absolute top-2.5 left-2.5">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs ${badge.bg} ${badge.text} ${badge.border}`}>
-                          {catLabel}
-                        </span>
-                      </div>
-                      <div className="absolute top-2.5 right-2.5">
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
-                          <Flame className="w-3 h-3 text-amber-400" />
-                          <span>{p.calorias || 0} kcal</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-3.5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-bold text-[14px] text-[#0B1929] leading-snug line-clamp-2 mb-2">
-                          {p.nombre}
-                        </h4>
-
-                        {/* Macros Pills */}
-                        <div className="grid grid-cols-3 gap-1.5 mb-3 text-center">
-                          <div className="bg-red-50/70 border border-red-100 rounded-lg p-1">
-                            <span className="text-[10px] text-red-600 block font-semibold">Proteína</span>
-                            <span className="text-xs font-bold text-red-900">{p.proteina || 0}g</span>
-                          </div>
-                          <div className="bg-amber-50/70 border border-amber-100 rounded-lg p-1">
-                            <span className="text-[10px] text-amber-600 block font-semibold">Carbos</span>
-                            <span className="text-xs font-bold text-amber-900">{p.carbohidratos || 0}g</span>
-                          </div>
-                          <div className="bg-emerald-50/70 border border-emerald-100 rounded-lg p-1">
-                            <span className="text-[10px] text-emerald-600 block font-semibold">Grasas</span>
-                            <span className="text-xs font-bold text-emerald-900">{p.grasas || 0}g</span>
-                          </div>
-                        </div>
-
-                        {/* Recipe preview */}
-                        {p.texto && (
-                          <p className="text-[11px] text-[#6B7A8D] line-clamp-2 leading-relaxed mb-2">
-                            {p.texto}
-                          </p>
+                          </>
+                        ) : (
+                          <Dumbbell size={40} className="text-gray-300" />
                         )}
                       </div>
 
-                      {/* Botones de acción */}
-                      <div className="flex gap-1.5 pt-2 border-t border-[#F0F4FA]">
-                        <button
-                          type="button"
-                          onClick={() => setRecipePreviewModal(p)}
-                          className="flex items-center justify-center gap-1 text-[#6B7A8D] hover:text-[#0B1929] bg-gray-50 hover:bg-gray-100 border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
-                          title="Ver receta completa"
-                        >
-                          <Eye size={12} />
-                          <span>Ver</span>
-                        </button>
+                      {/* Info */}
+                      <div className="p-3 flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="font-semibold text-[13px] text-[#0B1929] mb-2 leading-snug">
+                            {e.nombre}
+                          </div>
+                          <div className="flex gap-1 flex-wrap mb-2.5">
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
+                              {e.grupo_muscular}
+                            </span>
+                          </div>
+                        </div>
+
                         {isSuperadmin && (
-                          <>
+                          <div className="flex gap-1.5 mt-2 pt-2 border-t border-[#F8FAFC]">
                             <button
                               type="button"
-                              onClick={() => openEditPlatillo(p)}
+                              onClick={() => openEditEj(e)}
                               className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                             >
                               <Edit2 size={12} /> Editar
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeletePlatilloModal(p)}
-                              className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              onClick={() => setDeleteEjModal(e)}
+                              className="flex-1 flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={12} /> Borrar
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {/* VISTA 3: INGREDIENTES CULINARIOS */}
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {subtab === "ingredientes" && (
-        <div className="space-y-4">
-          {/* Barra de Filtros */}
-          <div className="flex gap-2.5 flex-wrap p-3.5 bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] shadow-none md:shadow-sm items-center">
-            <div className="relative flex-1 min-w-[160px] max-w-[240px]">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A8D]" />
-              <input
-                value={busquedaIng}
-                onChange={e => setBusquedaIng(e.target.value)}
-                placeholder="Buscar ingrediente…"
-                className="w-full bg-white text-[#0B1929] border border-[#E2E8F0] rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-['Inter',sans-serif]"
-              />
-            </div>
-            <CustomSelect
-              value={filtroCatIng}
-              onChange={setFiltroCatIng}
-              options={CATEGORIAS_INGREDIENTES.map(c => ({ value: c.id, label: `${c.icono} ${c.nombre}` }))}
-              className="min-w-[180px]"
-            />
-            {(filtroCatIng !== "todos" || busquedaIng) && (
-              <button
-                onClick={() => { setBusquedaIng(""); setFiltroCatIng("todos"); }}
-                className="bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-2 text-red-500 text-xs cursor-pointer font-semibold font-['Inter',sans-serif] transition-colors flex items-center gap-1"
-              >
-                <X size={14} /> Limpiar
-              </button>
+                  );
+                })}
+              </div>
             )}
           </div>
+        )}
 
-          {/* Grid de Ingredientes */}
-          {ingredientesFiltrados.length === 0 ? (
-            <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
-              <Apple size={48} className="mx-auto mb-4 opacity-20" />
-              <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
-                {ingredientes.length === 0 ? "El catálogo de ingredientes está vacío" : "No hay ingredientes que coincidan"}
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {/* VISTA 2: PLATILLOS Y RECETAS */}
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {subtab === "platillos" && (
+          <div className="space-y-4">
+            {/* Grid de Platillos */}
+            {platillosFiltrados.length === 0 ? (
+              <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+                <Utensils size={48} className="mx-auto mb-4 opacity-20" />
+                <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
+                  {platillos.length === 0 ? "El catálogo de platillos está vacío" : "No hay platillos que coincidan"}
+                </div>
+                <div className="text-[13px] text-[#6B7A8D]">
+                  {platillos.length === 0 && isSuperadmin ? "Agrega el primer platillo con el botón de arriba" : "Intenta con otros filtros"}
+                </div>
               </div>
-              <div className="text-[13px] text-[#6B7A8D]">
-                {ingredientes.length === 0 && isSuperadmin ? "Agrega el primer ingrediente con el botón de arriba" : "Intenta con otros filtros"}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5 px-3.5 md:px-0">
-              {ingredientesFiltrados.map((ing) => {
-                const catInfo = CATEGORIAS_INGREDIENTES.find(c => c.id === ing.categoria);
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                {platillosFiltrados.map((p) => {
+                  const badge = platilloCatColors[p.categoria] || { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" };
+                  const catLabel = CATEGORIAS_PLATILLOS.find(c => c.id === p.categoria)?.nombre || p.categoria;
 
-                return (
-                  <div
-                    key={ing.id}
-                    className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl p-3.5 text-center relative transition-all hover:shadow-md flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Imagen centrada y nítida */}
-                      <div className="w-20 h-20 mx-auto mb-2 flex items-center justify-center bg-[#F8FAFC] rounded-2xl p-2 border border-[#F0F4FA] group-hover:scale-105 transition-transform duration-300">
-                        {ing.foto ? (
+                  return (
+                    <div
+                      key={p.id}
+                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl overflow-hidden relative transition-all hover:shadow-md flex flex-col justify-between"
+                    >
+                      {/* Media Area */}
+                      <div
+                        onClick={() => setRecipePreviewModal(p)}
+                        className="h-[145px] bg-slate-100 relative overflow-hidden cursor-pointer"
+                      >
+                        {p.foto_url ? (
                           <img
-                            src={ing.foto}
-                            alt={ing.nombre}
-                            className="max-h-full max-w-full object-contain drop-shadow-xs"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=150&auto=format&fit=crop&q=60";
-                            }}
+                            src={p.foto_url}
+                            alt={p.nombre}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         ) : (
-                          <Apple className="w-8 h-8 text-slate-300" />
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
+                            <Utensils size={36} />
+                            <span className="text-[11px] font-semibold">Sin imagen</span>
+                          </div>
                         )}
+                        <div className="absolute top-2.5 left-2.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs ${badge.bg} ${badge.text} ${badge.border}`}>
+                            {catLabel}
+                          </span>
+                        </div>
+                        <div className="absolute top-2.5 right-2.5">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
+                            <Flame className="w-3 h-3 text-amber-400" />
+                            <span>{p.calorias || 0} kcal</span>
+                          </span>
+                        </div>
                       </div>
 
-                      <h4 className="font-bold text-[13px] text-[#0B1929] leading-snug line-clamp-2 mb-1.5">
-                        {ing.nombre}
-                      </h4>
+                      {/* Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-bold text-[14px] text-[#0B1929] leading-snug line-clamp-2 mb-2">
+                            {p.nombre}
+                          </h4>
 
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-[#475569] mb-2">
-                        {catInfo ? `${catInfo.icono} ${catInfo.nombre}` : ing.categoria}
-                      </span>
+                          {/* Macros Pills */}
+                          <div className="grid grid-cols-3 gap-1.5 mb-3 text-center">
+                            <div className="bg-red-50/70 border border-red-100 rounded-lg p-1">
+                              <span className="text-[10px] text-red-600 block font-semibold">Proteína</span>
+                              <span className="text-xs font-bold text-red-900">{p.proteina || 0}g</span>
+                            </div>
+                            <div className="bg-amber-50/70 border border-amber-100 rounded-lg p-1">
+                              <span className="text-[10px] text-amber-600 block font-semibold">Carbos</span>
+                              <span className="text-xs font-bold text-amber-900">{p.carbohidratos || 0}g</span>
+                            </div>
+                            <div className="bg-emerald-50/70 border border-emerald-100 rounded-lg p-1">
+                              <span className="text-[10px] text-emerald-600 block font-semibold">Grasas</span>
+                              <span className="text-xs font-bold text-emerald-900">{p.grasas || 0}g</span>
+                            </div>
+                          </div>
+
+                          {/* Recipe preview */}
+                          {p.texto && (
+                            <p className="text-[11px] text-[#6B7A8D] line-clamp-2 leading-relaxed mb-2">
+                              {p.texto}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Botones de acción */}
+                        <div className="flex gap-1.5 pt-2 border-t border-[#F0F4FA]">
+                          <button
+                            type="button"
+                            onClick={() => setRecipePreviewModal(p)}
+                            className="flex items-center justify-center gap-1 text-[#6B7A8D] hover:text-[#0B1929] bg-gray-50 hover:bg-gray-100 border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                            title="Ver receta completa"
+                          >
+                            <Eye size={12} />
+                            <span>Ver</span>
+                          </button>
+                          {isSuperadmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditPlatillo(p)}
+                                className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Edit2 size={12} /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletePlatilloModal(p)}
+                                className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-                    {isSuperadmin && (
-                      <div className="flex gap-1.5 pt-2 border-t border-[#F8FAFC]">
-                        <button
-                          type="button"
-                          onClick={() => openEditIng(ing)}
-                          className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          <Edit2 size={11} /> Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteIngModal(ing)}
-                          className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={11} />
-                        </button>
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {/* VISTA 3: INGREDIENTES CULINARIOS */}
+        {/* ═════════════════════════════════════════════════════════════════════════ */}
+        {subtab === "ingredientes" && (
+          <div className="space-y-4">
+            {/* Grid de Ingredientes */}
+            {ingredientesFiltrados.length === 0 ? (
+              <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+                <Apple size={48} className="mx-auto mb-4 opacity-20" />
+                <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
+                  {ingredientes.length === 0 ? "El catálogo de ingredientes está vacío" : "No hay ingredientes que coincidan"}
+                </div>
+                <div className="text-[13px] text-[#6B7A8D]">
+                  {ingredientes.length === 0 && isSuperadmin ? "Agrega el primer ingrediente con el botón de arriba" : "Intenta con otros filtros"}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5">
+                {ingredientesFiltrados.map((ing) => {
+                  const catInfo = CATEGORIAS_INGREDIENTES.find(c => c.id === ing.categoria);
+
+                  return (
+                    <div
+                      key={ing.id}
+                      className="group bg-white border border-[#E2E8F0] shadow-sm rounded-2xl p-3.5 text-center relative transition-all hover:shadow-md flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Imagen centrada y nítida */}
+                        <div className="w-20 h-20 mx-auto mb-2 flex items-center justify-center bg-[#F8FAFC] rounded-2xl p-2 border border-[#F0F4FA] group-hover:scale-105 transition-transform duration-300">
+                          {ing.foto ? (
+                            <img
+                              src={ing.foto}
+                              alt={ing.nombre}
+                              className="max-h-full max-w-full object-contain drop-shadow-xs"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=150&auto=format&fit=crop&q=60";
+                              }}
+                            />
+                          ) : (
+                            <Apple className="w-8 h-8 text-slate-300" />
+                          )}
+                        </div>
+
+                        <h4 className="font-bold text-[13px] text-[#0B1929] leading-snug line-clamp-2 mb-1.5">
+                          {ing.nombre}
+                        </h4>
+
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-[#475569] mb-2">
+                          {catInfo ? `${catInfo.icono} ${catInfo.nombre}` : ing.categoria}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+
+                      {isSuperadmin && (
+                        <div className="flex gap-1.5 pt-2 border-t border-[#F8FAFC]">
+                          <button
+                            type="button"
+                            onClick={() => openEditIng(ing)}
+                            className="flex-1 flex justify-center items-center gap-1 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <Edit2 size={11} /> Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteIngModal(ing)}
+                            className="flex justify-center items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ───────────────────────────────────────────────────────────────────────────── */}
       {/* MODALES DE CREACIÓN Y EDICIÓN */}

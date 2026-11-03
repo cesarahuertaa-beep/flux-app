@@ -1516,10 +1516,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {/* Sub-Components */}
       {(role === "superadmin" || role === "staff") && (tab === "biblioteca" || visitedTabs.has("biblioteca")) && (
-        <div className={tab === "biblioteca" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
-          <SubComponentWrapper title="Biblioteca de Ejercicios" subtitle="Colección global de ejercicios con demostración visual">
-            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
-          </SubComponentWrapper>
+        <div className={tab === "biblioteca" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
+          <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
         </div>
       )}
       
