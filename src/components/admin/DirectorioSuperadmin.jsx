@@ -201,6 +201,9 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
           if (me.nutriologo_id) {
             const boss = await dbGet(`profiles?id=eq.${me.nutriologo_id}`).catch(() => []);
             if (boss && boss.length > 0) owner = { ...boss[0] };
+          } else {
+            const superBoss = await dbGet("profiles?role=eq.superadmin&limit=1").catch(() => []);
+            if (superBoss && superBoss.length > 0) owner = { ...superBoss[0] };
           }
         }
 

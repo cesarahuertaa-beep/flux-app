@@ -646,11 +646,29 @@ export function AgendaAdmin({ setMsg, profileId, clientes: clientesProp }) {
       setMsg("Selecciona un paciente y una fecha");
       return;
     }
-    setSaving(true);
     const [y, mo, dDay] = nuevaCitaForm.fecha.split("-").map(Number);
     const [h, m] = (nuevaCitaForm.hora || "10:00").split(":").map(Number);
-    const fechaHora = new Date(y, mo - 1, dDay, h, m, 0).toISOString();
+    const startObj = new Date(y, mo - 1, dDay, h, m, 0);
+    const fechaHora = startObj.toISOString();
     const durMin = Number(nuevaCitaForm.duracion_minutos) || duracionGlobal || 60;
+    const newStartMs = startObj.getTime();
+    const newEndMs = newStartMs + durMin * 60000;
+
+    const citaEnConflicto = (citas || []).find(c => {
+      if (c.estado !== "confirmada" && c.estado !== "pendiente") return false;
+      const cStartMs = new Date(c.fecha_hora).getTime();
+      const cDur = Number(c.duracion_minutos) || duracionGlobal || 60;
+      const cEndMs = cStartMs + cDur * 60000;
+      return newStartMs < cEndMs && newEndMs > cStartMs;
+    });
+
+    if (citaEnConflicto) {
+      const pacConflict = clienteNombre(citaEnConflicto.cliente_id);
+      setMsg(`⚠️ Ya existe una cita ${citaEnConflicto.estado} con ${pacConflict} en ese horario`);
+      return;
+    }
+
+    setSaving(true);
 
     const payload = {
       cliente_id: nuevaCitaForm.cliente_id,

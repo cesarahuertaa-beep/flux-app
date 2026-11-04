@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { 
   authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, 
-  dbPatch, getProfileId, updateQueryCache, invalidateCache 
+  dbPatch, getProfileId, updateQueryCache, invalidateCache, syncPersonalData 
 } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
@@ -666,6 +666,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
           telefono: finalTelefono
         });
       }
+      if (useNewData && conflictUser.email) {
+        await syncPersonalData(conflictUser.email, { nombre: finalNombre, telefono: finalTelefono }).catch(() => {});
+      }
 
       setMsg(`✅ Permisos otorgados exitosamente. El colaborador podrá acceder de inmediato.`);
       setConflictUser(null);
@@ -740,6 +743,9 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
         patchData.especialidad = roleAssigned;
       }
       await dbPatch(`profiles?id=eq.${targetId}`, patchData);
+      if (editUser.email) {
+        await syncPersonalData(editUser.email, { nombre, telefono }).catch(() => {});
+      }
       invalidateCache("profiles");
       load({ forceFresh: true });
     } catch (e) {

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
-import { authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany, updateQueryCache, invalidateCache } from "../lib/supabase";
+import { authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, dbPatch, dbDel, getProfileId, storageListFolder, storageRemoveMany, updateQueryCache, invalidateCache, syncPersonalData } from "../lib/supabase";
 import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 import { useBackButton } from "../lib/backButtonHandler";
@@ -17,7 +17,7 @@ import { useBackButton } from "../lib/backButtonHandler";
 import { Biblioteca } from "../components/admin/Biblioteca";
 import { ProgramarCliente } from "../components/admin/ProgramarCliente";
 import MiMembresiaCivil from "../components/admin/MiMembresiaCivil";
-import { GestionEquipo } from "../components/admin/GestionEquipo";
+import { GestionEquipo, DEFAULT_STAFF_ROLES } from "../components/admin/GestionEquipo";
 import { AgendaAdmin } from "../components/admin/AgendaAdmin";
 import ClienteView from "./Cliente";
 import UserProfile from "../components/UserProfile";
@@ -104,12 +104,15 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   }, []);
   
   const myId = profileId || getProfileId();
+  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,avatar_url,nutriologo_id,especialidad`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
+  const _initOwnerId = (role === "administrativo" && ((Array.isArray(_peekMe) && _peekMe[0]?.nutriologo_id) || session?.data?.nutriologo_id))
+    ? ((Array.isArray(_peekMe) && _peekMe[0]?.nutriologo_id) || session?.data?.nutriologo_id)
+    : myId;
   const _initClientesFilter = (isSuperadmin || role === "staff")
     ? "clientes?order=created_at.asc"
-    : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
+    : `clientes?nutriologo_id=eq.${_initOwnerId}&order=created_at.asc`;
   const _peekClientes = dbPeek(_initClientesFilter);
   const _peekBiblio = dbPeek("biblioteca_ejercicios?order=nombre.asc");
-  const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,avatar_url`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
 
   const [clientes, setClientes] = useState(() =>
     Array.isArray(_peekClientes)
@@ -339,9 +342,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     checkPago();
   }, [myId, role, isCivil, clienteData]);
 
+  const clinicOwnerId = (role === "administrativo" && (myProfile?.nutriologo_id || session?.data?.nutriologo_id))
+    ? (myProfile?.nutriologo_id || session?.data?.nutriologo_id)
+    : myId;
+
   const clientesFilter = (isSuperadmin || role ==="staff")
     ?"clientes?order=created_at.asc"
-    : `clientes?nutriologo_id=eq.${myId}&order=created_at.asc`;
+    : `clientes?nutriologo_id=eq.${clinicOwnerId}&order=created_at.asc`;
   const bibliotecaFilter ="biblioteca_ejercicios?order=nombre.asc";
 
   const loadClientes = useCallback(async ({ silent = false, forceFresh = false } = {}) => {
@@ -396,12 +403,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       const rawEmail = (me.length > 0 && me[0].email) ? me[0].email : jwtEmail;
       const myEmailNorm = (rawEmail || "").trim().toLowerCase();
 
-      const nutriEmails = new Set(
-        allNutris
-          .map(n => (n.email || "").trim().toLowerCase())
-          .filter(Boolean)
-      );
-      if (myEmailNorm) nutriEmails.add(myEmailNorm);
+      const nutriIdByEmail = new Map();
+      allNutris.forEach(n => {
+        const em = (n.email || "").trim().toLowerCase();
+        if (em && n.id) nutriIdByEmail.set(em, n.id);
+      });
+      if (myEmailNorm && myId) nutriIdByEmail.set(myEmailNorm, myId);
 
       const candidates = findShadowCandidates(r, myEmailNorm);
       if (candidates.length > 0) {
@@ -416,8 +423,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           if (deletingClientIdsRef.current.has(c.id)) return false;
           if (shadowIds.has(c.id)) return false;
           if (c.objetivo === "Mi entrenamiento personal") return false;
+          if (c.auth_id && c.nutriologo_id && c.auth_id === c.nutriologo_id) return false;
           const cEmail = (c.email || "").trim().toLowerCase();
-          if (cEmail && nutriEmails.has(cEmail)) return false;
+          if (myEmailNorm && cEmail === myEmailNorm) return false;
+          if (cEmail && nutriIdByEmail.has(cEmail)) {
+            const ownerNutriId = nutriIdByEmail.get(cEmail);
+            if (!c.nutriologo_id || c.nutriologo_id === ownerNutriId) return false;
+          }
           return true;
         })
       );
@@ -427,8 +439,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     try { 
       const [r, allNutris, me] = await Promise.all([
         fetcher(clientesFilter, (freshR) => updateState(freshR, _allNutris, _me)).catch(() => []),
-        fetcher(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=email`).catch(() => []),
-        fetcher(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url`).catch(() => []),
+        fetcher(`profiles?role=in.(nutriologo,nutriologo_estudiante,superadmin)&select=id,email`).catch(() => []),
+        fetcher(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,nutriologo_id,especialidad`).catch(() => []),
       ]);
       _allNutris = allNutris;
       _me = me;
@@ -663,7 +675,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       const { existingProfiles, existingClientes } = await checkAndCleanOrphanedEmail(cleanEmail);
 
       // 1. Verificar si ya es paciente de ESTE mismo nutriólogo (evitar duplicados)
-      const alreadyMyClient = existingClientes.find(c => c.nutriologo_id === myId);
+      const alreadyMyClient = existingClientes.find(c => c.nutriologo_id === clinicOwnerId);
       if (alreadyMyClient) {
         if (!alreadyMyClient.activo) {
           await dbPatch(`clientes?id=eq.${alreadyMyClient.id}`, { activo: true, deactivated_at: null });
@@ -686,11 +698,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
         // Bloqueo / Consentimiento: Si es un colega o rol superior
         if (profile && ["nutriologo", "nutriologo_estudiante", "administrativo", "staff", "superadmin"].includes(profile.role)) {
-          const me = await dbGet(`profiles?id=eq.${myId}`);
+          const me = await dbGet(`profiles?id=eq.${clinicOwnerId}`);
           const myName = me[0]?.nombre || 'Nutriólogo';
 
           await dbPost("solicitudes_entrenamiento", {
-            from_nutriologo_id: myId,
+            from_nutriologo_id: clinicOwnerId,
             from_nutriologo_nombre: myName,
             to_email: cleanEmail,
             estado: "pendiente"
@@ -723,7 +735,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         telefono: newClient.telefono,
         auth_id: authUser.id,
         activo: true,
-        nutriologo_id: myId
+        nutriologo_id: clinicOwnerId
       });
       setShowNewClient(false); setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
       await loadClientes(); setMsg("✅ Paciente creado — se le envió correo de invitación para crear su contraseña.");
@@ -742,7 +754,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             telefono: newClient.telefono,
             auth_id: fallbackAuthId,
             activo: true,
-            nutriologo_id: myId
+            nutriologo_id: clinicOwnerId
           });
           setShowNewClient(false); setNewClient({ nombre: "", email: "", objetivo: "", telefono: "" });
           await loadClientes();
@@ -774,7 +786,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       }
 
       // Evitar duplicado si ya existiera bajo este nutriólogo
-      const existingCheck = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictClient.email)}&nutriologo_id=eq.${myId}`);
+      const existingCheck = await dbGet(`clientes?email=ilike.${encodeURIComponent(conflictClient.email)}&nutriologo_id=eq.${clinicOwnerId}`);
       if (existingCheck.length === 0) {
         await dbPost("clientes", {
           nombre: finalNombre,
@@ -783,7 +795,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           telefono: finalTelefono,
           auth_id: resolvedAuthId,
           activo: true,
-          nutriologo_id: myId
+          nutriologo_id: clinicOwnerId
         });
       }
 
@@ -795,6 +807,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       // Sincronizar datos si eligió actualizarlos
       if (useNewData) {
         if (p) await dbPatch(`profiles?id=eq.${p.id}`, { nombre: finalNombre, telefono: finalTelefono });
+        await syncPersonalData(conflictClient.email, { nombre: finalNombre, telefono: finalTelefono }).catch(() => {});
       }
 
       setMsg(`✅ Paciente vinculado exitosamente a tu lista.`);
@@ -861,6 +874,12 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     setSaving(true);
     try {
       await dbPatch(`clientes?id=eq.${editClient.id}`, editClientForm);
+      if (editClient.email) {
+        await syncPersonalData(editClient.email, {
+          nombre: editClientForm.nombre,
+          telefono: editClientForm.telefono
+        }).catch(() => {});
+      }
       setMsg("✓ Cliente actualizado");
       setEditClient(null);
       loadClientes({ forceFresh: true });
@@ -1044,6 +1063,38 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return true;
   });
 
+  const staffModules = (() => {
+    if (role !== "staff") return [];
+    const esp = myProfile?.especialidad || session?.data?.especialidad || "staff_general";
+    let allRoles = DEFAULT_STAFF_ROLES;
+    try {
+      const saved = localStorage.getItem("flux_staff_roles_v4");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) allRoles = parsed;
+      }
+    } catch {}
+    const found = allRoles.find(r => r.id === esp);
+    if (found && Array.isArray(found.modulos) && found.modulos.length > 0) {
+      return found.modulos;
+    }
+    return ["clientes", "aprobaciones", "biblioteca", "tienda"];
+  })();
+
+  const STAFF_ALL_CATALOG_ITEMS = [
+    { id:"clientes",         label:"Directorio",          icon: <Users size={18} strokeWidth={1.5} /> },
+    { id:"agenda",           label:"Agenda",              icon: <CalendarDays size={18} strokeWidth={1.5} /> },
+    { id:"equipo",           label:"Mi Equipo",           icon: <UsersRound size={18} strokeWidth={1.5} /> },
+    { id:"aprobaciones",     label:"Aprobaciones",        icon: <UserCheck size={18} strokeWidth={1.5} /> },
+    { id:"biblioteca",       label:"Biblioteca",          icon: <Folder size={18} strokeWidth={1.5} /> },
+    { id:"tienda",           label:"Tienda",              icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+    { id:"pagos",            label:"Control de Ingresos", icon: <Banknote size={18} strokeWidth={1.5} /> },
+    { id:"mi_entrenamiento", label:"Mi Plan",             icon: <Activity size={18} strokeWidth={1.5} /> },
+    { id:"nutricion",        label:"Nutrición",           icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
+    { id:"entrenamiento",    label:"Entrenamiento",       icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id:"progreso_atleta",  label:"Progreso",            icon: <Camera size={18} strokeWidth={1.5} /> },
+  ];
+
   const SIDEBAR_ITEMS = isCivil ? [
     { id:"mi_plan",         label:"Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
     { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
@@ -1053,10 +1104,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   ]
   : role ==="staff"
     ? [
-        { id:"clientes",   label:"Directorio", icon: <Users size={18} strokeWidth={1.5} /> },
-        { id:"aprobaciones", label:"Aprobaciones", icon: <UserCheck size={18} strokeWidth={1.5} /> },
-        { id:"biblioteca", label:"Biblioteca", icon: <Folder size={18} strokeWidth={1.5} /> },
-        { id:"tienda",     label:"Tienda",     icon: <ShoppingBag size={18} strokeWidth={1.5} /> },
+        ...STAFF_ALL_CATALOG_ITEMS.filter(item => staffModules.includes(item.id)),
         { id:"comisiones", label:"Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
       ]
     : role ==="administrativo"
@@ -1579,7 +1627,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && role !== "administrativo" && role !== "staff" && (tab === "equipo" || visitedTabs.has("equipo")) && (
+      {!isCivil && role !== "administrativo" && (role !== "staff" || staffModules.includes("equipo")) && (tab === "equipo" || visitedTabs.has("equipo")) && (
         <div className={tab === "equipo" ? "flex-1 flex flex-col bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title={isSuperadmin ? "Staff Corporativo" : "Mi Equipo"} subtitle="Administra los accesos de tus colaboradores">
             <GestionEquipo setMsg={setMsg} profileId={myId} isSuperadmin={isSuperadmin} role={role}/>
@@ -1587,10 +1635,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {!isCivil && role !== "staff" && (tab === "agenda" || visitedTabs.has("agenda")) && (
+      {!isCivil && (role !== "staff" || staffModules.includes("agenda")) && (tab === "agenda" || visitedTabs.has("agenda")) && (
         <div className={tab === "agenda" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
           <SubComponentWrapper title="Agenda y Disponibilidad" subtitle="Gestiona tus citas programadas y horarios de atención">
-            <AgendaAdmin setMsg={setMsg} profileId={myId} clientes={clientes}/>
+            <AgendaAdmin setMsg={setMsg} profileId={clinicOwnerId} clientes={clientes}/>
           </SubComponentWrapper>
         </div>
       )}
@@ -1611,7 +1659,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         </div>
       )}
 
-      {isSuperadmin && (tab === "pagos" || visitedTabs.has("pagos")) && (
+      {(isSuperadmin || (role === "staff" && staffModules.includes("pagos"))) && (tab === "pagos" || visitedTabs.has("pagos")) && (
         <div className={tab === "pagos" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
           <ControlPagos setMsg={setMsg} />
         </div>
