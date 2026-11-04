@@ -5,9 +5,9 @@ import { showFluxAlert } from './ui/ConfirmModal';
 export default function RoleSwitcher({ currentRole, currentData, multiRoles, onChangeRole, activeNutriologo }) {
   const [switchingTo, setSwitchingTo] = useState(null);
 
-  const rolesToShow = (currentRole === 'nutriologo' || currentRole === 'nutriologo_estudiante' || currentRole === 'superadmin')
-    ? (multiRoles || []).filter(r => r.role !== 'cliente')
-    : (multiRoles || []);
+  const rolesToShow = (multiRoles || []).filter(
+    r => (r.data?.objetivo || '').trim() !== 'Mi entrenamiento personal'
+  );
 
   if (!rolesToShow || rolesToShow.length <= 1) return null;
 

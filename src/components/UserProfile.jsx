@@ -74,9 +74,13 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
 
   // Refrescar datos frescos desde la BD al montar y cuando ocurran cambios en tiempo real
   useEffect(() => {
-    const email = user?.email;
-    if (!email) return;
-    const query = isCliente ? `clientes?email=ilike.${email}` : `profiles?email=ilike.${email}`;
+    const email = (user?.email || "").trim();
+    const recordId = user?.id;
+    if (!email && !recordId) return;
+    const table = isCliente ? "clientes" : "profiles";
+    const query = recordId
+      ? `${table}?id=eq.${encodeURIComponent(recordId)}`
+      : `${table}?email=ilike.${encodeURIComponent(email)}`;
     const loadPersonal = () => {
       dbGet(query).then(rows => {
         if (rows && rows.length > 0) {
@@ -91,7 +95,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
             pais: p.pais || prev.pais || "México",
             estado_provincia: p.estado_provincia || "",
           }));
-          if (isCliente && p.objetivo) setObjetivo(p.objetivo);
+          if (isCliente && p.objetivo !== undefined) setObjetivo(p.objetivo || "");
         }
       }).catch(() => {});
     };
@@ -108,7 +112,7 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
     };
-  }, [user?.email, isCliente]);
+  }, [user?.id, user?.email, isCliente]);
 
   const handleSavePersonal = async (formData) => {
     setIsSaving(true);
@@ -413,11 +417,11 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
             <div className="bg-red-50/70 border border-red-100 rounded-2xl p-3.5 text-xs text-red-900 space-y-1.5 mb-4 leading-relaxed">
               {isCliente ? (
                 <p>
-                  Se eliminará tu cuenta de acceso, perfil personal, planes asociados, historial de entrenamientos, mediciones y fotografías de progreso de forma definitiva.
+                  Se eliminará este perfil, sus planes asociados, historial de entrenamientos, mediciones y fotografías de progreso de forma definitiva. Si tienes otros perfiles vinculados a tu correo, estos se conservarán intactos.
                 </p>
               ) : (
                 <p>
-                  Se eliminará tu perfil profesional, credenciales de acceso y configuración de consultorio. Tus pacientes registrados conservarán sus cuentas personales como usuarios independientes.
+                  Se eliminará este perfil profesional y tu vinculación con el consultorio. Si tienes otros perfiles vinculados a tu correo (como atleta o en otro consultorio), estos se conservarán intactos.
                 </p>
               )}
             </div>

@@ -384,7 +384,9 @@ export default function Login({ onLogin }) {
   };
 
   const signUpSubmit = async () => {
-    if (!nombre || !nombre.trim() || !email || !email.trim() || !pass) {
+    const cleanNombre = (nombre || "").trim();
+    const cleanEmail = (email || "").trim().toLowerCase();
+    if (!cleanNombre || !cleanEmail || !pass) {
       setErr("Completa todos los campos");
       return;
     }
@@ -397,19 +399,75 @@ export default function Login({ onLogin }) {
       return;
     }
     setLoading(true); setErr(""); setInfo("");
+
+    // Helper para vincular un rol de Atleta Independiente a una cuenta ya existente en FLUX
+    const linkExistingUserAsCivil = async () => {
+      try {
+        const signInData = await authSignIn(cleanEmail, pass);
+        setAuthToken(signInData.access_token);
+        setProfileId(signInData.user.id);
+
+        const encodedEmail = encodeURIComponent(cleanEmail);
+        const [existingClientes, existingProfiles] = await Promise.all([
+          dbGet(`clientes?email=ilike.${encodedEmail}`).catch(() => []),
+          dbGet(`profiles?email=ilike.${encodedEmail}`).catch(() => [])
+        ]);
+
+        const alreadyHasCivil = (existingClientes || []).some(
+          c => !c.nutriologo_id && (c.objetivo || "").trim() !== "Mi entrenamiento personal"
+        );
+
+        if (!alreadyHasCivil) {
+          const donor = (existingProfiles && existingProfiles[0]) || (existingClientes && existingClientes[0]) || {};
+          await dbPostMinimal("clientes", {
+            nombre: cleanNombre || donor.nombre || "Atleta",
+            email: cleanEmail,
+            auth_id: signInData.user.id,
+            activo: true,
+            nutriologo_id: null,
+            telefono: donor.telefono || null,
+            fecha_nacimiento: donor.fecha_nacimiento || null,
+            genero: donor.genero || null,
+            pais: donor.pais || "México",
+            estado_provincia: donor.estado_provincia || null,
+            avatar_url: donor.avatar_url || null
+          });
+        }
+
+        await submit(cleanEmail, pass);
+        return true;
+      } catch (signInErr) {
+        const msg = (signInErr?.message || String(signInErr || "")).toLowerCase();
+        if (msg.includes("invalid login") || msg.includes("invalid_grant") || msg.includes("credenciales")) {
+          setErr("Este correo ya cuenta con un perfil en FLUX. Ingresa tu contraseña actual de FLUX para activar tu perfil de Atleta Independiente o usa '¿Olvidaste tu contraseña?'.");
+        } else {
+          setErr(formatAuthError(signInErr));
+        }
+        setLoading(false);
+        return false;
+      }
+    };
+
     try {
-      await checkAndCleanOrphanedEmail(email.trim()).catch(() => {});
-      const data = await authSignUp(email.trim(), pass, nombre.trim());
+      await checkAndCleanOrphanedEmail(cleanEmail).catch(() => {});
+      const data = await authSignUp(cleanEmail, pass, cleanNombre);
       const userId = data?.user?.id || data?.id;
       const sessionToken = data?.session?.access_token || data?.access_token;
+      const identities = data?.user?.identities ?? data?.identities;
+
+      // Si Supabase devuelve identities vacío, el correo ya existe en auth.users
+      if (Array.isArray(identities) && identities.length === 0) {
+        await linkExistingUserAsCivil();
+        return;
+      }
 
       if (sessionToken && userId) {
         setAuthToken(sessionToken);
         setProfileId(userId);
         try {
           await dbPostMinimal("clientes", {
-            nombre: nombre.trim(),
-            email: email.trim(),
+            nombre: cleanNombre,
+            email: cleanEmail,
             auth_id: userId,
             activo: true,
             nutriologo_id: null
@@ -417,14 +475,14 @@ export default function Login({ onLogin }) {
         } catch (postErr) {
           console.error("Client creation handled in submit:", postErr);
         }
-        await submit(email.trim(), pass);
+        await submit(cleanEmail, pass);
         return;
       }
 
       try {
         await dbPostMinimal("clientes", {
-          nombre: nombre.trim(),
-          email: email.trim(),
+          nombre: cleanNombre,
+          email: cleanEmail,
           auth_id: userId,
           activo: true,
           nutriologo_id: null
@@ -435,6 +493,11 @@ export default function Login({ onLogin }) {
       setMode("login");
       setLoading(false);
     } catch (e) {
+      const m = (e?.message || String(e || "")).toLowerCase();
+      if (m.includes("already registered") || m.includes("already been registered") || m.includes("already exists")) {
+        await linkExistingUserAsCivil();
+        return;
+      }
       setErr(formatAuthError(e));
       setLoading(false);
     }

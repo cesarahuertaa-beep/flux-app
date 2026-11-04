@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { dbPeek, dbGet, dbPatch, dbPost } from"../../lib/supabase";
-import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle } from"lucide-react";
+import { peekClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
+import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle, Trash2, AlertTriangle, X } from"lucide-react";
 import { useBrand } from"../BrandContext";
 import DatosPersonalesCard from"./DatosPersonalesCard";
 import IdentidadEmpresarialCard from"./IdentidadEmpresarialCard";
 import RoleSwitcher from"../RoleSwitcher";
 import { syncPersonalData } from"../../lib/supabase";
 import { isNativePlayApp } from "../../lib/playBilling";
-import { refreshUserRoles } from "../../lib/authRoles";
+import { refreshUserRoles, deleteNutriologoAccount, deleteCollaboratorAccount } from "../../lib/authRoles";
 
 export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRole, onRolesUpdated, multiRoles }) {
   const navigate = useNavigate();
@@ -64,6 +65,10 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const isFirstRenderConfig = useRef(true);
   const hasPatchedEmailRef = useRef(false);
   const [solicitudes, setSolicitudes] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -184,10 +189,65 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         });
         localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
       }
+
+      // Sincronizar también con el expediente clínico de su propio "Mi Plan" (cliente sombra) si existe
+      if (profileId) {
+        try {
+          const shadowRows = await dbGet(`clientes?nutriologo_id=eq.${profileId}&objetivo=eq.${encodeURIComponent("Mi entrenamiento personal")}&select=id`).catch(() => []);
+          const shadowId = shadowRows?.[0]?.id;
+          if (shadowId) {
+            const rec = peekClinicalRecord(shadowId);
+            const nextRec = {
+              ...rec,
+              anamnesis: {
+                ...rec.anamnesis,
+                telefono: formData.telefono !== undefined ? formData.telefono : rec.anamnesis?.telefono,
+                fecha_nacimiento: formData.fecha_nacimiento !== undefined ? (formData.fecha_nacimiento || null) : rec.anamnesis?.fecha_nacimiento,
+                sexo: formData.genero ? (formData.genero.toLowerCase().startsWith("f") ? "F" : "M") : rec.anamnesis?.sexo,
+                updated_at: new Date().toISOString()
+              }
+            };
+            await saveClinicalRecord(shadowId, nextRec);
+          }
+        } catch (clinicalErr) {
+          console.warn("Aviso sincronizando perfil de nutriólogo con Mi Plan:", clinicalErr);
+        }
+      }
     } catch (e) {
       setErr("Error guardando datos personales: " + (e.message || ""));
     }
     setSavingPersonal(false);
+  };
+
+  const handleDeleteOwnAccount = async () => {
+    if (confirmDeleteText.trim().toUpperCase() !== "ELIMINAR" || isSuperadmin) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      const targetEmail = (personalForm?.email || "").trim();
+      if (isTeam) {
+        await deleteCollaboratorAccount({
+          profileId,
+          email: targetEmail
+        });
+      } else {
+        await deleteNutriologoAccount({
+          nutriologoId: profileId,
+          email: targetEmail
+        });
+      }
+      localStorage.clear();
+      setShowDeleteModal(false);
+      if (onLogout) {
+        onLogout();
+      } else {
+        window.location.href = "/app";
+      }
+    } catch (e) {
+      console.error("Error eliminando cuenta:", e);
+      setDeleteError("No se pudo completar la eliminación: " + (e.message || "Intenta de nuevo."));
+      setIsDeleting(false);
+    }
   };
 
   const handleSaveBusiness = async (formData) => {
@@ -260,9 +320,28 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                   <button onClick={async () => { await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, {estado:'rechazada'}); loadProfile(); }} className="px-4 py-2 text-sm font-medium border border-[#E2E8F0] text-[#6B7A8D] rounded-lg hover:bg-gray-50 flex-1">Rechazar</button>
                   <button onClick={async () => { 
-                    await dbPost("clientes", { nombre: personalForm.nombre ||"Colega", objetivo:"Entrenamiento entre colegas", email: personalForm.email, telefono: personalForm.telefono, nutriologo_id: req.from_nutriologo_id, auth_id: profileId, activo: true });
+                    await dbPost("clientes", {
+                      nombre: personalForm.nombre || "Colega",
+                      objetivo: "Entrenamiento entre colegas",
+                      email: personalForm.email,
+                      telefono: personalForm.telefono || null,
+                      fecha_nacimiento: personalForm.fecha_nacimiento || null,
+                      genero: personalForm.genero || null,
+                      pais: personalForm.pais || "México",
+                      estado_provincia: personalForm.estado_provincia || null,
+                      avatar_url: personalForm.avatar_url || null,
+                      nutriologo_id: req.from_nutriologo_id,
+                      auth_id: profileId,
+                      activo: true
+                    });
                     await dbPatch(`solicitudes_entrenamiento?id=eq.${req.id}`, {estado:'aceptada'}); 
-                    loadProfile(); 
+                    await loadProfile();
+                    const updatedRoles = await refreshUserRoles(profileId, personalForm.email).catch(() => []);
+                    if (updatedRoles && updatedRoles.length > 0) {
+                      setCurrentMultiRoles(updatedRoles);
+                      try { localStorage.setItem("flux_multi_roles", JSON.stringify(updatedRoles)); } catch {}
+                      if (typeof onRolesUpdated === "function") onRolesUpdated(updatedRoles);
+                    }
                   }} className="px-4 py-2 text-sm font-bold bg-[var(--brand-primary)] text-white rounded-lg hover:opacity-90 flex-1">Aceptar</button>
                 </div>
               </div>
@@ -347,6 +426,106 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           <LogOut size={18} /> Salir
         </button>
       </div>
+
+      {!isSuperadmin && (
+        <div className="px-4 md:px-0 mt-6 pt-4 border-t border-[#E2E8F0]/60 flex justify-center md:justify-start">
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmDeleteText("");
+              setDeleteError("");
+              setShowDeleteModal(true);
+            }}
+            className="text-xs font-medium text-[#94A3B8] hover:text-red-600 flex items-center gap-1.5 py-2 transition-colors cursor-pointer"
+          >
+            <Trash2 size={14} />
+            <span>Dar de baja mi cuenta permanentemente</span>
+          </button>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[200] bg-[#0B1929]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-[#E2E8F0] shadow-2xl">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans, sans-serif" }}>
+                    Eliminar cuenta definitivamente
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D]">Esta acción es permanente e irreversible</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-[#6B7A8D] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-red-50/70 border border-red-100 rounded-2xl p-3.5 text-xs text-red-900 space-y-1.5 mb-4 leading-relaxed">
+              <p>
+                Se eliminará tu perfil profesional, credenciales de acceso, configuración de consultorio y los expedientes clínicos vinculados a este consultorio. Los pacientes que cuenten con un perfil independiente o en otro consultorio conservarán esas cuentas intactas.
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-5">
+              <label className="block text-xs font-bold text-[#0B1929]">
+                Escribe <span className="font-mono text-red-600 bg-red-50 px-1.5 py-0.5 rounded">ELIMINAR</span> para confirmar la baja definitiva:
+              </label>
+              <input
+                type="text"
+                value={confirmDeleteText}
+                onChange={(e) => setConfirmDeleteText(e.target.value)}
+                placeholder="ELIMINAR"
+                disabled={isDeleting}
+                className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm font-mono text-[#0B1929] focus:outline-none focus:border-red-500"
+              />
+              {deleteError && (
+                <p className="text-xs text-red-600 font-medium mt-1">{deleteError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting || confirmDeleteText.trim().toUpperCase() !== "ELIMINAR"}
+                onClick={handleDeleteOwnAccount}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                  confirmDeleteText.trim().toUpperCase() === "ELIMINAR" && !isDeleting
+                    ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer shadow-md shadow-red-500/20"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Confirmar baja definitiva</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

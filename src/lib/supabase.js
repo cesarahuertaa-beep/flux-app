@@ -1508,7 +1508,9 @@ export const dbPostMinimal = (p, b) => q(p, { method: "POST", body: JSON.stringi
 
 /** Sincroniza datos personales universales en todas las identidades del usuario */
 export const syncPersonalData = async (email, data) => {
-  if (!email) return;
+  const cleanEmail = (email || "").trim();
+  if (!cleanEmail) return;
+  const encodedEmail = encodeURIComponent(cleanEmail);
 
   const profileFields = ["nombre", "telefono", "email", "avatar_url", "firma_url", "fecha_nacimiento", "genero", "pais", "estado_provincia"];
   const clienteFields = ["nombre", "telefono", "email", "avatar_url", "fecha_nacimiento", "genero", "pais", "estado_provincia", "objetivo"];
@@ -1528,10 +1530,10 @@ export const syncPersonalData = async (email, data) => {
 
   const promises = [];
   if (Object.keys(dataForProfile).length > 0) {
-    promises.push(dbPatch(`profiles?email=ilike.${email}`, dataForProfile));
+    promises.push(dbPatch(`profiles?email=ilike.${encodedEmail}`, dataForProfile));
   }
   if (Object.keys(dataForCliente).length > 0) {
-    promises.push(dbPatch(`clientes?email=ilike.${email}`, dataForCliente));
+    promises.push(dbPatch(`clientes?email=ilike.${encodedEmail}`, dataForCliente));
   }
 
   await Promise.all(promises);
