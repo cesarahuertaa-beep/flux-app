@@ -8,7 +8,7 @@ import {
   Stethoscope, Download, ArrowLeftRight, Check, Eye, Calendar,
   FileText, ArrowUp, ArrowDown, Flame, Target, Zap, CheckCircle2
 } from "lucide-react";
-import { parseFotos, compressImageIfNeeded } from "../../utils/helpers";
+import { parseFotos, compressImageIfNeeded, getCurrentCycleWeekInfo } from "../../utils/helpers";
 import { useBrand } from "../BrandContext";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -121,9 +121,30 @@ export default function Progreso({ cliente, isSelfManaged }) {
       const ciclosActivos = validCiclos.filter(c => c.activo);
 
       const ejMap = {};
-      rutinas.forEach(r => {
-        r.ejercicios?.forEach(e => { ejMap[e.id] = e.grupo_muscular; });
+      const pendingEjIds = [];
+      (rutinas || []).forEach(r => {
+        (r.ejercicios || []).forEach(e => {
+          if (e.id && e.grupo_muscular) {
+            ejMap[e.id] = e.grupo_muscular;
+          }
+        });
       });
+
+      // Si hay ejercicios en progreso cuyo grupo_muscular aún no está en ejMap, buscarlos por lote
+      (progs || []).forEach(p => {
+        if (p.ejercicio_id && !ejMap[p.ejercicio_id] && !pendingEjIds.includes(p.ejercicio_id)) {
+          pendingEjIds.push(p.ejercicio_id);
+        }
+      });
+
+      if (pendingEjIds.length > 0) {
+        try {
+          const directEjs = await dbGetFresh(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular`).catch(() => []);
+          (directEjs || []).forEach(e => {
+            if (e.id && e.grupo_muscular) ejMap[e.id] = e.grupo_muscular;
+          });
+        } catch {}
+      }
 
       // Identificar qué grupos musculares existen realmente en la rutina semanal activa del usuario
       const cicloActivoId = ciclosActivos?.[0]?.id || null;
@@ -134,7 +155,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
       const routineMuscleGroups = new Set();
       sourceRutinas.forEach(r => {
-        r.ejercicios?.forEach(e => {
+        (r.ejercicios || []).forEach(e => {
           const norm = normalizeGroup(e.grupo_muscular);
           if (EXACT_GROUPS.includes(norm)) {
             routineMuscleGroups.add(norm);
@@ -142,12 +163,21 @@ export default function Progreso({ cliente, isSelfManaged }) {
         });
       });
 
+      if (routineMuscleGroups.size === 0) {
+        Object.values(ejMap).forEach(g => {
+          const norm = normalizeGroup(g);
+          if (EXACT_GROUPS.includes(norm)) routineMuscleGroups.add(norm);
+        });
+      }
+
       const byEj = {};
-      progs.forEach(p => {
+      (progs || []).forEach(p => {
+        if (!p.ejercicio_id || p.semana == null) return;
         if (!byEj[p.ejercicio_id]) byEj[p.ejercicio_id] = {};
         if (!byEj[p.ejercicio_id][p.semana]) byEj[p.ejercicio_id][p.semana] = {};
-        if (!byEj[p.ejercicio_id][p.semana][p.serie]) byEj[p.ejercicio_id][p.semana][p.serie] = {};
-        byEj[p.ejercicio_id][p.semana][p.serie][p.tipo] = p.valor;
+        const serieKey = p.serie != null ? p.serie : 0;
+        if (!byEj[p.ejercicio_id][p.semana][serieKey]) byEj[p.ejercicio_id][p.semana][serieKey] = {};
+        byEj[p.ejercicio_id][p.semana][serieKey][p.tipo] = p.valor;
       });
 
       const muscleXP = {};
@@ -158,49 +188,72 @@ export default function Progreso({ cliente, isSelfManaged }) {
          Object.keys(byEj[ejId]).forEach(w => allWeeks.add(Number(w)));
       }
       const sortedWeeks = Array.from(allWeeks).sort((a,b)=>a-b);
-      const minWeek = sortedWeeks[0] || 1;
-      const maxWeek = sortedWeeks[sortedWeeks.length - 1] || 1;
 
-      const muscleStarted = {};
-      EXACT_GROUPS.forEach(g => { muscleStarted[g] = false; });
-      const last1RM = {}; 
+      if (sortedWeeks.length > 0) {
+        // Calcular la semana actual del ciclo en tiempo real
+        const cicloActivo = validCiclos.find(c => c.activo) || validCiclos[0];
+        const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || null;
+        const { currentCycleWeek } = getCurrentCycleWeekInfo(startStr);
+        const currentWeekIdx = Math.max(0, (currentCycleWeek || 1) - 1);
 
-      for (let w = minWeek; w <= maxWeek; w++) {
-         const musclesTrainedThisWeek = new Set();
-         
-         for (const ejId in byEj) {
-            const g = normalizeGroup(ejMap[ejId]);
-            if (!muscleXP.hasOwnProperty(g)) continue;
+        const minWeek = sortedWeeks[0];
+        const maxWeek = Math.max(sortedWeeks[sortedWeeks.length - 1], currentWeekIdx);
 
-            const weekData = byEj[ejId][w];
-            if (weekData) {
-               muscleStarted[g] = true;
-               musclesTrainedThisWeek.add(g);
-               
-               const s1 = weekData[1]; // serie 1
-               if (s1 && s1.peso && s1.reps) {
-                  const current1RM = calcular1RM(s1.peso, s1.reps);
-                  if (current1RM) {
-                     if (last1RM[ejId]) {
-                        const pctGrowth = ((current1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
-                        muscleXP[g] += Math.round(pctGrowth);
-                     }
-                     last1RM[ejId] = current1RM;
-                  }
-               }
-            }
-         }
+        const muscleStarted = {};
+        EXACT_GROUPS.forEach(g => { muscleStarted[g] = false; });
+        const last1RM = {}; 
 
-         // Puntos por consistencia
-         for (const g of EXACT_GROUPS) {
-            if (!muscleStarted[g]) continue;
-            if (musclesTrainedThisWeek.has(g)) {
-               muscleXP[g] += 10;
-            } else {
-               muscleXP[g] -= 15;
-            }
-            if (muscleXP[g] < 0) muscleXP[g] = 0;
-         }
+        for (let w = minWeek; w <= maxWeek; w++) {
+           const musclesTrainedThisWeek = new Set();
+           
+           for (const ejId in byEj) {
+              const rawG = ejMap[ejId];
+              if (!rawG) continue;
+              const g = normalizeGroup(rawG);
+              if (!muscleXP.hasOwnProperty(g)) continue;
+
+              const weekData = byEj[ejId][w];
+              if (weekData) {
+                 // Validar si al menos una serie tiene repeticiones completadas
+                 const hasValidSet = Object.values(weekData).some(
+                   s => s && s.reps && s.reps !== "Falta" && s.reps !== "-" && s.reps !== "0"
+                 );
+
+                 if (hasValidSet) {
+                    muscleStarted[g] = true;
+                    musclesTrainedThisWeek.add(g);
+                    
+                    // Primera serie (serie 0 en base de datos, con fallback a serie 1 o el primer set registrado)
+                    const s1 = weekData[0] || weekData[1] || Object.values(weekData)[0];
+                    if (s1 && s1.peso && s1.reps && s1.reps !== "Falta") {
+                       const current1RM = calcular1RM(s1.peso, s1.reps);
+                       if (current1RM) {
+                          if (last1RM[ejId]) {
+                             const pctGrowth = ((current1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
+                             if (pctGrowth > 0) {
+                                muscleXP[g] += Math.round(pctGrowth);
+                             }
+                          }
+                          last1RM[ejId] = current1RM;
+                       }
+                    }
+                 }
+              }
+           }
+
+           // Puntos por consistencia y penalizaciones
+           for (const g of EXACT_GROUPS) {
+              if (!muscleStarted[g]) continue;
+              if (musclesTrainedThisWeek.has(g)) {
+                 // Opción B (Gamificación Inmediata): +10 XP al entrenar el músculo en la semana
+                 muscleXP[g] += 10;
+              } else if (w < currentWeekIdx) {
+                 // Solo penaliza si la semana ya concluyó y no entrenó el músculo
+                 muscleXP[g] -= 15;
+              }
+              if (muscleXP[g] < 0) muscleXP[g] = 0;
+           }
+        }
       }
 
       // Filtrar inteligentemente: solo mostrar grupos que estén en la rutina semanal (o que ya tengan XP > 0)
