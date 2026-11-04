@@ -99,6 +99,7 @@ export function CitasCliente({ cliente }) {
     });
   });
   const [disponibilidad, setDisponibilidad] = useState(() => Array.isArray(_peekDisp) ? _peekDisp : []);
+  const [citasNutriologo, setCitasNutriologo] = useState([]);
   const [ratedCitas, setRatedCitas] = useState({});
   const [loading, setLoading] = useState(() => _peekCitas === null);
   const hasLoadedRef = useRef(_peekCitas !== null);
@@ -131,14 +132,21 @@ export function CitasCliente({ cliente }) {
   const loadData = useCallback(async () => {
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const [c, d, r, nProf] = await Promise.all([
+      const [c, d, r, nProf, cNutri] = await Promise.all([
         dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo,duracion_minutos`).catch(() => 
           dbGet(`citas?cliente_id=eq.${clienteId}&order=fecha_hora.desc&select=id,fecha_hora,modalidad,estado,motivo_rechazo`)
         ),
         dbGet(`disponibilidad?nutriologo_id=eq.${nutriologoId}&order=dia_semana.asc`),
         dbGet(`citas_ratings?cliente_id=eq.${clienteId}&select=cita_id,puntuacion`),
         dbGet(`profiles?id=eq.${nutriologoId}&select=id,nombre,duracion_cita`).catch(() => []),
+        dbGet(`citas?nutriologo_id=eq.${nutriologoId}&estado=in.(pendiente,confirmada)&select=id,fecha_hora,estado,duracion_minutos`).catch(() =>
+          dbGet(`citas?nutriologo_id=eq.${nutriologoId}&estado=in.(pendiente,confirmada)&select=id,fecha_hora,estado`).catch(() => [])
+        ),
       ]);
+
+      if (Array.isArray(cNutri)) {
+        setCitasNutriologo(cNutri);
+      }
 
       if (Array.isArray(nProf) && nProf.length > 0 && nProf[0].duracion_cita) {
         setNutriologoDuracion(Number(nProf[0].duracion_cita));
@@ -210,10 +218,13 @@ export function CitasCliente({ cliente }) {
   // Actualizar slots cuando cambia la fecha o la disponibilidad
   useEffect(() => {
     if (!selectedDate) { setSlots([]); setSelectedSlot(null); return; }
-    const s = generarSlots(disponibilidad, citas, selectedDate, nutriologoDuracion);
+    const occupiedMap = new Map();
+    (citas || []).forEach(c => { if (c?.id) occupiedMap.set(c.id, c); });
+    (citasNutriologo || []).forEach(c => { if (c?.id && !occupiedMap.has(c.id)) occupiedMap.set(c.id, c); });
+    const s = generarSlots(disponibilidad, Array.from(occupiedMap.values()), selectedDate, nutriologoDuracion);
     setSlots(s);
     setSelectedSlot(prev => (prev && s.some(slot => slot.iso === prev.iso && !slot.ocupado)) ? prev : null);
-  }, [selectedDate, disponibilidad, citas, nutriologoDuracion]);
+  }, [selectedDate, disponibilidad, citas, citasNutriologo, nutriologoDuracion]);
 
   const submitRating = async () => {
     if (!ratingModal.citaId || !ratingModal.puntuacion) return;
@@ -330,7 +341,7 @@ export function CitasCliente({ cliente }) {
 
       {/* Mensaje de Éxito Flotante */}
       {exito && (
-        <div className="mx-6 md:mx-8 mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4">
+        <div className="mx-4 md:mx-8 mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={24} />
           <div className="flex-1">
             <h4 className="text-sm font-bold text-emerald-800">¡Solicitud enviada con éxito!</h4>
@@ -352,7 +363,7 @@ export function CitasCliente({ cliente }) {
             <p className="text-sm font-medium">Cargando agenda...</p>
           </div>
         ) : citas.length === 0 && disponibilidad.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
+          <div className="mx-4 md:mx-0 flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
             <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
               <CalendarDays size={32} className="text-[#6B7A8D]" />
             </div>
@@ -458,7 +469,7 @@ export function CitasCliente({ cliente }) {
             )}
 
             {citas.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
+              <div className="mx-4 md:mx-0 flex flex-col items-center justify-center py-20 text-center bg-white border border-[#E2E8F0] rounded-2xl shadow-sm px-6">
                 <div className="w-16 h-16 bg-[#F0F4FA] rounded-full flex items-center justify-center mb-4">
                   <Plus size={32} className="text-[#CBD5E1]" />
                 </div>

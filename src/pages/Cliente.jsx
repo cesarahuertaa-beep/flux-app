@@ -146,7 +146,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   });
   
   
-  const [biblioteca, setBiblioteca] = useState(() => dbPeek("biblioteca_ejercicios?order=nombre.asc") || []);
   const [clinicalRec, setClinicalRec] = useState(() =>
     cliente?.id && cliente?.nutriologo_id ? peekClinicalRecord(cliente.id) : null
   );
@@ -403,8 +402,14 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     // Ocultar pestaña de citas si es usuario civil (no tiene nutriólogo)
   const isActuallyCivil = cliente?.nutriologo_id === null;
 
-  const hasNutriService = isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.nutricion !== false);
-  const hasEntrenamientoService = isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.entrenamiento !== false);
+  const cycleParts = String(cicloActivo?.nombre || "").split("|");
+  const cycleServicesList = cycleParts[2] ? cycleParts[2].split(",") : null;
+  const hasNutriService = cycleServicesList
+    ? cycleServicesList.includes("nutri")
+    : (isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.nutricion !== false));
+  const hasEntrenamientoService = cycleServicesList
+    ? cycleServicesList.includes("entreno")
+    : (isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.entrenamiento !== false));
 
   const SIDEBAR_ITEMS = [
     ...(hasNutriService ? [{ id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
@@ -437,34 +442,6 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   if (nutriologoBloqueado) {
     return <BloqueadoPaciente onLogout={onLogout} />;
   }
-
-  // Resumen automático de adherencia nutricional para el check-in
-  const adherenciaSummary = (() => {
-    const entries = Object.values(nutriProgreso || {}).filter(
-      (r) => Number(r.semana) === Number(currentCycleWeek)
-    );
-    if (entries.length === 0) return null;
-    const totalComidasDone = entries.reduce(
-      (s, r) => s + (Array.isArray(r.comidas_completadas) ? r.comidas_completadas.length : 0),
-      0
-    );
-    const avgComidasPerDay =
-      dias.length > 0
-        ? dias.reduce((s, d) => s + ((d.comidas || []).length || 0), 0) / dias.length
-        : 4;
-    const expectedTotal = Math.max(1, Math.round(avgComidasPerDay * entries.length));
-    const comidasPct = Math.min(100, Math.round((totalComidasDone / expectedTotal) * 100));
-    const aguaEntries = entries.filter((r) => Number(r.agua_ml) > 0);
-    const aguaPromedioL =
-      aguaEntries.length > 0
-        ? (
-            aguaEntries.reduce((s, r) => s + Number(r.agua_ml || 0), 0) /
-            aguaEntries.length /
-            1000
-          ).toFixed(1)
-        : null;
-    return { comidasPct, aguaPromedioL };
-  })();
 
   const hasActiveClinicalRequest =
     !isEmbedded &&

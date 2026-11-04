@@ -221,21 +221,43 @@ export async function checkAndCleanOrphanedEmail(rawEmail) {
  *   o perfil profesional), borra ÚNICAMENTE este expediente (`clienteId`) y conserva su acceso (`auth.users`).
  * - Si este era su único rol/expediente en FLUX, borra también su perfil en `profiles` y su cuenta en `auth.users`.
  */
-export async function deletePatientAccount({ clienteId, authId = null, email = "" }) {
+async function cleanupClientStorage(clienteId) {
   if (!clienteId) return;
-  const cleanEmail = (email || "").trim().toLowerCase();
-
-  // 1. Limpiar fotos de progreso y expediente clínico en Storage
   try {
-    const files = await storageListFolder("progress-photos", clienteId);
-    if (files && files.length > 0) {
-      const paths = files.map(f => `${clienteId}/${f.name}`);
-      await storageRemoveMany("progress-photos", paths);
+    const [rootFiles, personalFiles] = await Promise.all([
+      storageListFolder("progress-photos", clienteId).catch(() => []),
+      storageListFolder("progress-photos", `${clienteId}/personal`).catch(() => []),
+    ]);
+    const paths = [];
+    if (Array.isArray(rootFiles)) {
+      rootFiles.forEach((f) => {
+        if (f?.name && f.name !== "personal") paths.push(`${clienteId}/${f.name}`);
+      });
+    }
+    if (Array.isArray(personalFiles)) {
+      personalFiles.forEach((f) => {
+        if (f?.name) paths.push(`${clienteId}/personal/${f.name}`);
+      });
+    }
+    if (paths.length > 0) {
+      await storageRemoveMany("progress-photos", paths).catch(() => {});
     }
   } catch (storageErr) {
     console.warn("Aviso limpiando fotos del paciente:", storageErr);
   }
+  try {
+    await storageRemoveMany("logos", [`personal_photos_${clienteId}.json`]).catch(() => {});
+    localStorage.removeItem(`flux_personal_photos_${clienteId}`);
+  } catch {}
   await deleteClinicalRecord(clienteId).catch(() => {});
+}
+
+export async function deletePatientAccount({ clienteId, authId = null, email = "" }) {
+  if (!clienteId) return;
+  const cleanEmail = (email || "").trim().toLowerCase();
+
+  // 1. Limpiar fotos de progreso, galería privada y expediente clínico en Storage
+  await cleanupClientStorage(clienteId);
 
   // 2. Consultar todas las filas relacionadas al usuario para saber si conserva otros roles activos
   let allClientes = [];
@@ -277,7 +299,7 @@ export async function deletePatientAccount({ clienteId, authId = null, email = "
   // Limpiar cualquier cliente sombra huérfano adicional si no tiene rol profesional
   for (const orphan of orphanShadowClientes) {
     try {
-      await deleteClinicalRecord(orphan.id).catch(() => {});
+      await cleanupClientStorage(orphan.id);
       await dbPatch(`clientes?id=eq.${orphan.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: orphan.id, p_auth_id: null });
     } catch {}
@@ -354,14 +376,7 @@ export async function deleteNutriologoAccount({ nutriologoId, email = "" }) {
       (cleanEmail && (c.email || "").trim().toLowerCase() === cleanEmail);
 
     if (isNutriOwnClient) {
-      try {
-        const files = await storageListFolder("progress-photos", c.id);
-        if (files && files.length > 0) {
-          const paths = files.map(f => `${c.id}/${f.name}`);
-          await storageRemoveMany("progress-photos", paths);
-        }
-      } catch {}
-      await deleteClinicalRecord(c.id).catch(() => {});
+      await cleanupClientStorage(c.id);
       // Desvincular auth_id primero para que el cierre final en eliminar_nutriologo_definitivo limpie el auth.users del nutriólogo
       await dbPatch(`clientes?id=eq.${c.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: c.id, p_auth_id: null }).catch(() => {});
@@ -411,7 +426,7 @@ export async function deleteCollaboratorAccount({ profileId, email = "" }) {
   const shadowClients = allClientes.filter(c => c.objetivo === "Mi entrenamiento personal");
   for (const sc of shadowClients) {
     try {
-      await deleteClinicalRecord(sc.id).catch(() => {});
+      await cleanupClientStorage(sc.id);
       await dbPatch(`clientes?id=eq.${sc.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: sc.id, p_auth_id: null });
     } catch {}

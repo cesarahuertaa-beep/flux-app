@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { X, ShoppingBag, Check, Copy, CheckCheck, Search, Trash2, Filter, Utensils, Apple, Wheat, Milk, Package } from "lucide-react";
 import { useBackButton } from "../../lib/backButtonHandler";
+import { parseMealOptions } from "../../lib/mealOptions";
 
 // Categorías del supermercado
 const CATEGORIAS = {
@@ -165,10 +166,10 @@ function parseDietIngredients(dias, incluirAlternativas = false) {
 
   dias.forEach((dia) => {
     (dia?.comidas || []).forEach((meal) => {
-      const textsToParse = [meal.opcion1];
-      if (incluirAlternativas && meal.opcion2) {
-        textsToParse.push(meal.opcion2);
-      }
+      const parsedOptions = parseMealOptions(meal);
+      const textsToParse = incluirAlternativas
+        ? parsedOptions
+        : (parsedOptions.length > 0 ? [parsedOptions[0]] : []);
 
       textsToParse.forEach((fullText) => {
         if (!fullText || typeof fullText !== "string") return;
@@ -455,7 +456,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                 className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] w-3.5 h-3.5"
               />
               <span className="text-[11px] sm:text-xs font-medium text-[#0B1929]">
-                Incluir Opción 2
+                Incluir alternativas
               </span>
             </label>
           </div>
