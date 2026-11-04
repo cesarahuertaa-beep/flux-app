@@ -377,7 +377,7 @@ export function NuevoExpedienteForms({
   if (step === 0) {
     return (
       <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden p-4 sm:p-6 md:p-10 flex-1 flex flex-col justify-between">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm overflow-hidden p-4 pb-28 sm:p-6 md:p-10 flex-1 flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
@@ -473,7 +473,7 @@ export function NuevoExpedienteForms({
   if (step === "solicitud_enviada") {
     return (
       <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 pb-28 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-200 shadow-2xs">
             <Send className="w-8 h-8" />
           </div>
@@ -535,7 +535,7 @@ export function NuevoExpedienteForms({
   if (step === "pending_patient") {
     return (
       <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-0 md:py-12 px-0 md:px-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-4 pb-28 sm:p-6 md:p-10 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-2xs">
             <Clock className="w-8 h-8" />
           </div>
@@ -602,7 +602,7 @@ export function NuevoExpedienteForms({
   if (step === "patient_success") {
     return (
       <div className="max-w-2xl mx-auto w-full min-h-full flex-1 flex flex-col bg-white md:bg-transparent py-4 md:py-12 px-0 md:px-4 animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-6 md:p-12 text-center flex-1 flex flex-col justify-center">
+        <div className="bg-white rounded-none md:rounded-3xl border-0 md:border md:border-[#E2E8F0] shadow-none md:shadow-sm p-6 pb-28 md:p-12 text-center flex-1 flex flex-col justify-center">
           <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-5 border border-emerald-200 shadow-2xs">
             <CheckCircle2 className="w-9 h-9" />
           </div>
@@ -936,7 +936,7 @@ export function NuevoExpedienteForms({
       </div>
 
       {/* ── Footer de Navegación ── */}
-      <div className={`mt-4 sm:mt-6 flex items-center gap-3 px-4 ${step === 2 ? "pb-24 sm:pb-4" : "pb-8 sm:pb-4"} md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent`}>
+      <div className="mt-4 sm:mt-6 flex items-center gap-3 px-4 pb-28 sm:pb-6 md:px-0 md:py-0 md:pt-4 bg-white md:bg-transparent">
         <div className="w-2/5 sm:w-auto">
           {step === 2 ? (
             <button
