@@ -429,6 +429,9 @@ const RELATED_TABLES = {
   solicitudes_profesionales: ["solicitudes_profesionales", "profiles"],
   productos: ["productos"],
   notificaciones: ["notificaciones"],
+  "rpc/eliminar_paciente_definitivo": ["clientes", "profiles", "ciclos", "rutinas", "nutricion", "progreso", "metricas_progreso", "citas"],
+  "rpc/eliminar_nutriologo_definitivo": ["profiles", "clientes", "citas", "disponibilidad", "recibos_pago"],
+  "rpc/eliminar_colaborador_definitivo": ["profiles", "clientes"],
 };
 
 /** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms para dbPeek pero se refresca cuando se consulte. */
@@ -749,8 +752,11 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
       }
 
       if (ok === false) {
-        if (typeof _onSessionExpired === "function") _onSessionExpired();
-        throw new Error("SESSION_EXPIRED");
+        // Sesión permanente Local-First: si el refresh_token fue rotado en otro dispositivo o caducó,
+        // degradar a SUPA_KEY en lugar de cerrar la sesión automáticamente.
+        _authToken = null;
+        try { localStorage.removeItem("flux_token"); } catch { /* ignore */ }
+        return fetchNetwork();
       }
 
       if (ok === "OFFLINE" || !ok) {

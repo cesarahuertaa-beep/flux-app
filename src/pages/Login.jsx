@@ -9,7 +9,7 @@ import {
   setProfileId, dbGet, authSignUp, dbPost, dbPostMinimal, dbPatch,
   captureAuthHashSynchronously
 } from "../lib/supabase";
-import { refreshUserRoles } from "../lib/authRoles";
+import { refreshUserRoles, checkAndCleanOrphanedEmail } from "../lib/authRoles";
 import { useBackButton } from "../lib/backButtonHandler";
 import { Capacitor } from "@capacitor/core";
 
@@ -357,6 +357,7 @@ export default function Login({ onLogin }) {
     }
     setLoading(true); setErr(""); setInfo("");
     try {
+      await checkAndCleanOrphanedEmail(email.trim()).catch(() => {});
       await dbPostMinimal("solicitudes_profesionales", {
         nombre: nombre.trim(),
         email: email.trim(),
@@ -397,6 +398,7 @@ export default function Login({ onLogin }) {
     }
     setLoading(true); setErr(""); setInfo("");
     try {
+      await checkAndCleanOrphanedEmail(email.trim()).catch(() => {});
       const data = await authSignUp(email.trim(), pass, nombre.trim());
       const userId = data?.user?.id || data?.id;
       const sessionToken = data?.session?.access_token || data?.access_token;

@@ -13,6 +13,7 @@ import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
 import { peekClinicalRecord } from "../../lib/clinicalRecord";
+import { checkAndCleanOrphanedEmail, deleteNutriologoAccount } from "../../lib/authRoles";
 
 const getInitials = (name) => {
   if (!name) return "P";
@@ -179,12 +180,14 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const [resolvedOwnerId, setResolvedOwnerId] = useState(myId);
   const [myName, setMyName] = useState("");
   const [myRole, setMyRole] = useState("superadmin");
+  const deletingNutriIdsRef = useRef(new Set());
 
   const loadNutriologos = async ({ forceFresh = false } = {}) => {
     if (!hasLoadedRef.current) setLoading(true);
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
-      const data = await fetcher("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
+      const rawData = await fetcher("profiles?role=in.(nutriologo,nutriologo_estudiante)&order=created_at.desc").catch(() => []);
+      const data = (rawData || []).filter(n => !deletingNutriIdsRef.current.has(n.id));
       const currentUser = await fetcher(`profiles?id=eq.${myId}`).catch(() => []);
       
       if (currentUser && currentUser.length > 0) {
@@ -226,10 +229,13 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     loadNutriologos();
     let timer = null;
     const onCacheUpdated = (ev) => {
+      if (deletingNutriIdsRef.current.size > 0) return;
       const table = ev?.detail?.table;
       if (table && !["profiles", "clientes", "recibos_pago", "solicitudes_profesionales", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => loadNutriologos(), 250);
+      timer = setTimeout(() => {
+        if (deletingNutriIdsRef.current.size === 0) loadNutriologos();
+      }, 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
@@ -260,8 +266,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email requeridos"); return; }
     setSaving(true);
     try {
-      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const { existingProfiles, existingClientes } = await checkAndCleanOrphanedEmail(cleanEmail);
 
       if (existingProfiles.length > 0 && ["nutriologo", "nutriologo_estudiante"].includes(existingProfiles[0].role)) {
         try {
@@ -377,46 +382,30 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
   const deleteNutriologo = async () => {
     if (confirmDeleteNutriText !== "ELIMINAR" || !showEditNutri || showEditNutri.isSuperadmin) return;
     const targetId = showEditNutri.id;
+    const nutriEmail = (showEditNutri?.email || "").trim();
     const prevNutris = nutriologos;
 
     // 1. Cierre inmediato de modal y actualización optimista instantánea (0 ms)
+    deletingNutriIdsRef.current.add(targetId);
     setNutriologos(prev => prev.filter(n => n.id !== targetId));
+    if (selectedNutri?.id === targetId) setSelectedNutri(null);
     setShowEditNutri(null);
     setShowConfirmDeleteNutri(false);
     setConfirmDeleteNutriText("");
     updateQueryCache("profiles", (list) => Array.isArray(list) ? list.filter(n => n.id !== targetId) : list);
-    updateQueryCache("clientes", (list) => Array.isArray(list) ? list.filter(c => c.nutriologo_id !== targetId) : list);
-    invalidateCache("profiles");
-    invalidateCache("clientes");
+    updateQueryCache("clientes", (list) => Array.isArray(list) ? list.filter(c => c.nutriologo_id !== targetId && c.auth_id !== targetId) : list);
     setMsg("✅ Nutriólogo y sus expedientes eliminados permanentemente.");
 
     setSaving(true);
     try {
-      // 1. Limpiar fotos de progreso en Storage de todos los pacientes asignados a este nutriólogo
-      const nutriClients = await dbGet(`clientes?nutriologo_id=eq.${targetId}&select=id`);
-      for (const c of (nutriClients || [])) {
-        try {
-          const files = await storageListFolder("progress-photos", c.id);
-          if (files && files.length > 0) {
-            const paths = files.map(f => `${c.id}/${f.name}`);
-            await storageRemoveMany("progress-photos", paths);
-          }
-        } catch (storageErr) {
-          console.error("Error limpiando fotos del paciente:", storageErr);
-        }
-      }
-
-      // 2. Ejecutar borrado en cascada en BD vía RPC
-      await dbPost("rpc/eliminar_nutriologo_definitivo", { p_nutriologo_id: targetId });
-      const nutriEmail = (showEditNutri?.email || "").trim();
-      if (nutriEmail) {
-        try {
-          await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(nutriEmail)}`);
-        } catch (solErr) {}
-      }
-      loadNutriologos({ forceFresh: true });
-      loadClientes();
+      await deleteNutriologoAccount({ nutriologoId: targetId, email: nutriEmail });
+      deletingNutriIdsRef.current.delete(targetId);
+      invalidateCache("profiles");
+      invalidateCache("clientes");
+      await loadNutriologos({ forceFresh: true });
+      await loadClientes({ forceFresh: true });
     } catch (e) {
+      deletingNutriIdsRef.current.delete(targetId);
       setNutriologos(prevNutris);
       setMsg("❌ Error eliminando nutriólogo: " + e.message);
     }
@@ -429,8 +418,7 @@ export function DirectorioSuperadmin({ myId, clientes, loadClientes, setMsg, set
     if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
-      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const { existingProfiles, existingClientes } = await checkAndCleanOrphanedEmail(cleanEmail);
 
       // Evitar duplicado si ya es paciente de este mismo directorio corporativo
       const alreadyMine = existingClientes.find(c => c.nutriologo_id === resolvedOwnerId);

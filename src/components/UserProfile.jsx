@@ -9,7 +9,7 @@ import RoleSwitcher from "./RoleSwitcher";
 import { useBackButton } from "../lib/backButtonHandler";
 import { CachedImage } from "../lib/mediaCache";
 import { showFluxAlert } from "./ui/ConfirmModal";
-import { refreshUserRoles } from "../lib/authRoles";
+import { refreshUserRoles, deletePatientAccount, deleteNutriologoAccount, deleteCollaboratorAccount } from "../lib/authRoles";
 import { peekClinicalRecord, saveClinicalRecord } from "../lib/clinicalRecord";
 
 export default function UserProfile({ session, onLogout, onChangeRole, onRolesUpdated, multiRoles }) {
@@ -183,40 +183,23 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
     setIsDeleting(true);
     setDeleteError("");
     try {
+      const targetEmail = (user?.email || form?.email || "").trim();
       if (isCliente) {
-        try {
-          const files = await storageListFolder("progress-photos", user.id);
-          if (files && files.length > 0) {
-            const paths = files.map((f) => `${user.id}/${f.name}`);
-            await storageRemoveMany("progress-photos", paths);
-          }
-        } catch (storageErr) {
-          console.warn("Aviso limpiando fotos:", storageErr);
-        }
-        await dbPost("rpc/eliminar_paciente_definitivo", {
-          p_cliente_id: user.id,
-          p_auth_id: user.auth_id || null,
+        await deletePatientAccount({
+          clienteId: user.id,
+          authId: user.auth_id || null,
+          email: targetEmail
+        });
+      } else if (session?.role === "staff" || session?.role === "administrativo") {
+        await deleteCollaboratorAccount({
+          profileId: user.id,
+          email: targetEmail
         });
       } else {
-        // Desvincular primero a los pacientes para no eliminar sus cuentas personales
-        try {
-          await dbPatch(`clientes?nutriologo_id=eq.${user.id}`, { nutriologo_id: null });
-        } catch (unlinkErr) {
-          console.warn("Aviso desvinculando pacientes:", unlinkErr);
-        }
-        await dbPost("rpc/eliminar_nutriologo_definitivo", {
-          p_nutriologo_id: user.id,
+        await deleteNutriologoAccount({
+          nutriologoId: user.id,
+          email: targetEmail
         });
-      }
-
-      // Limpiar cualquier registro o solicitud profesional ligada a su correo (Cumplimiento Google Play)
-      const targetEmail = (user?.email || form?.email || "").trim();
-      if (targetEmail) {
-        try {
-          await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(targetEmail)}`);
-        } catch (solErr) {
-          console.warn("Aviso limpiando solicitudes_profesionales:", solErr);
-        }
       }
 
       localStorage.clear();

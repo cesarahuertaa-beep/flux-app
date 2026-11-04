@@ -32,6 +32,7 @@ import { peekClinicalRecord } from "../lib/clinicalRecord";
 import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
 import { calcEdadFromBirthdate } from "../lib/bodyComposition";
 import { CachedImage } from "../lib/mediaCache";
+import { checkAndCleanOrphanedEmail, deletePatientAccount } from "../lib/authRoles";
 
 const getInitials = (name) => {
   if (!name) return "P";
@@ -412,6 +413,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       const shadowIds = new Set(candidates.map(c => c.id));
       setClientes(
         r.filter(c => {
+          if (deletingClientIdsRef.current.has(c.id)) return false;
           if (shadowIds.has(c.id)) return false;
           if (c.objetivo === "Mi entrenamiento personal") return false;
           const cEmail = (c.email || "").trim().toLowerCase();
@@ -600,17 +602,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     } catch(e) { console.error("Error cargando biblioteca:", e); }
   }, [bibliotecaFilter]);
 
+  const deletingClientIdsRef = useRef(new Set());
+
   useEffect(() => { 
     loadClientes(); 
     loadBiblioteca(); 
     let syncDebounce = null;
     const onCacheUpdated = (ev) => {
+      if (deletingClientIdsRef.current.size > 0) return;
       const table = ev?.detail?.table;
       if (table && !["clientes", "profiles", "ciclos", "biblioteca_ejercicios"].includes(table)) return;
       if (syncDebounce) clearTimeout(syncDebounce);
       syncDebounce = setTimeout(() => {
-        loadClientes({ silent: true });
-        if (!table || table === "biblioteca_ejercicios") loadBiblioteca();
+        if (deletingClientIdsRef.current.size === 0) {
+          loadClientes({ silent: true });
+          if (!table || table === "biblioteca_ejercicios") loadBiblioteca();
+        }
       }, 450);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
@@ -652,9 +659,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
     setSaving(true);
     try {
-      // INTERCEPTOR: Detectar si el correo ya existe
-      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      // INTERCEPTOR: Detectar si el correo ya existe (limpiando huérfanos automáticamente)
+      const { existingProfiles, existingClientes } = await checkAndCleanOrphanedEmail(cleanEmail);
 
       // 1. Verificar si ya es paciente de ESTE mismo nutriólogo (evitar duplicados)
       const alreadyMyClient = existingClientes.find(c => c.nutriologo_id === myId);
@@ -866,35 +872,32 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     if (confirmDeleteText !=="ELIMINAR" || !editClient) return;
     const targetId = editClient.id;
     const targetAuthId = editClient.auth_id;
+    const cliEmail = (editClient?.email || "").trim();
     const prevClientes = clientes;
 
     // 1. Cierre inmediato y actualización optimista instantánea (0 ms)
+    deletingClientIdsRef.current.add(targetId);
     setClientes(prev => prev.filter(c => c.id !== targetId));
     if (selected?.id === targetId) setSelected(null);
     setEditClient(null);
     setShowConfirmDelete(false);
     setConfirmDeleteText("");
     updateQueryCache("clientes", (list) => Array.isArray(list) ? list.filter(c => c.id !== targetId) : list);
-    invalidateCache("clientes");
     setMsg("✓ Paciente eliminado permanentemente.");
 
     setSaving(true);
     try {
-      // Borrar fotos de storage (progress-photos)
-      const files = await storageListFolder("progress-photos", targetId);
-      if (files && files.length > 0) {
-        const paths = files.map(f => `${targetId}/${f.name}`);
-        await storageRemoveMany("progress-photos", paths);
-      }
-      
-      // Ejecutar borrado en BD vía RPC usando dbPost
-      await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: targetId, p_auth_id: targetAuthId });
-      const cliEmail = (editClient?.email || "").trim();
-      if (cliEmail) {
-        try { await dbDel(`solicitudes_profesionales?email=ilike.${encodeURIComponent(cliEmail)}`); } catch (solErr) {}
-      }
-      loadClientes({ silent: true, forceFresh: true });
+      await deletePatientAccount({
+        clienteId: targetId,
+        authId: targetAuthId,
+        email: cliEmail
+      });
+      deletingClientIdsRef.current.delete(targetId);
+      invalidateCache("clientes");
+      invalidateCache("profiles");
+      await loadClientes({ silent: true, forceFresh: true });
     } catch(e) {
+      deletingClientIdsRef.current.delete(targetId);
       setClientes(prevClientes);
       setMsg("❌ Error eliminando:" + e.message);
     }

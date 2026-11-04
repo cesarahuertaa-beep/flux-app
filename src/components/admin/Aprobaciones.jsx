@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { CheckCircle2, XCircle, FileText, UserCheck, AlertCircle, Trash2, RotateCcw } from "lucide-react";
-import { dbPeek, dbGet, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, dbPatch, dbDel, authInvite, authResetPassword, invalidateCache } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { checkAndCleanOrphanedEmail } from "../../lib/authRoles";
 
 export default function Aprobaciones({ setMsg }) {
   const [filtroEstado, setFiltroEstado] = useState("pendiente"); // "todos" | "pendiente" | "rechazada"
@@ -51,7 +52,7 @@ export default function Aprobaciones({ setMsg }) {
       onConfirm: async () => {
         try {
           const cleanEmail = sol.email.trim();
-          const existingProfs = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+          const { existingProfiles: existingProfs } = await checkAndCleanOrphanedEmail(cleanEmail);
 
           if (existingProfs && existingProfs.length > 0) {
             await dbPatch(`profiles?id=eq.${existingProfs[0].id}`, {
@@ -84,7 +85,7 @@ export default function Aprobaciones({ setMsg }) {
               }
             } catch (inviteErr) {
               if (inviteErr.message?.includes("already been registered") || inviteErr.message?.includes("already exists")) {
-                const profsRetry = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
+                const profsRetry = await dbGetFresh(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`).catch(() => []);
                 if (profsRetry.length > 0) {
                   await dbPatch(`profiles?id=eq.${profsRetry[0].id}`, {
                     role: sol.tipo,

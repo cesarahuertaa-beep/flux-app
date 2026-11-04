@@ -14,6 +14,7 @@ import {
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
 import { CustomSelect } from "../ui/CustomSelect";
+import { checkAndCleanOrphanedEmail, deleteCollaboratorAccount } from "../../lib/authRoles";
 
 // ─── TODAS LAS PESTAÑAS DISPONIBLES DE SUPERADMIN ────────────────────────────
 export const SUPERADMIN_TABS = [
@@ -221,14 +222,17 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   useBackButton(showInvite, () => setShowInvite(false), 20);
   useBackButton(!!editUser, () => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }, 15);
 
+  const deletingColabIdsRef = useRef(new Set());
+
   const load = useCallback(async ({ forceFresh = false } = {}) => {
     if (!hasLoadedRef.current) setLoading(true);
     const fetcher = forceFresh ? dbGetFresh : dbGet;
     try {
       const rows = await fetcher(`profiles?select=id,nombre,email,telefono,activo,role,nutriologo_id,especialidad&order=nombre.asc`);
-      const myTeam = rows.filter(r => 
-        (r.role === "administrativo" && r.nutriologo_id === myId) || 
-        (isSuperadmin && r.role === "staff")
+      const myTeam = (rows || []).filter(r => 
+        !deletingColabIdsRef.current.has(r.id) &&
+        ((r.role === "administrativo" && r.nutriologo_id === myId) || 
+        (isSuperadmin && r.role === "staff"))
       );
       setEquipo(myTeam);
 
@@ -280,12 +284,15 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
 
     let timer = null;
     const onCacheUpdated = (ev) => {
+      if (deletingColabIdsRef.current.size > 0) return;
       const table = ev?.detail?.table;
       if (table && !["profiles", "nomina_colaboradores", "recibos_pago", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        load();
-        if (isSuperadmin) loadNominasData();
+        if (deletingColabIdsRef.current.size === 0) {
+          load();
+          if (isSuperadmin) loadNominasData();
+        }
       }, 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
@@ -555,8 +562,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     }
     setSaving(true);
     try {
-      const existingProfiles = await dbGet(`profiles?email=ilike.${encodeURIComponent(cleanEmail)}`);
-      const existingClientes = await dbGet(`clientes?email=ilike.${encodeURIComponent(cleanEmail)}`);
+      const { existingProfiles, existingClientes } = await checkAndCleanOrphanedEmail(cleanEmail);
       
       if (existingProfiles.length > 0 || existingClientes.length > 0) {
         setConflictUser({ 
@@ -746,28 +752,24 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   const deleteCollaborator = async () => {
     if (confirmDeleteText !== "ELIMINAR" || !editUser) return;
     const targetId = editUser.id;
+    const colabEmail = (editUser.email || "").trim();
     const prevEquipo = equipo;
 
+    deletingColabIdsRef.current.add(targetId);
     setEquipo(prev => prev.filter(c => c.id !== targetId));
     closeEdit();
     updateQueryCache("profiles", (list) => Array.isArray(list) ? list.filter(p => p.id !== targetId) : list);
-    invalidateCache("profiles");
     setMsg("✅ Colaborador eliminado del equipo permanentemente.");
 
     setSaving(true);
     try {
-      try {
-        await dbPost("rpc/eliminar_colaborador_definitivo", { p_profile_id: targetId });
-      } catch {
-        await dbPatch(`profiles?id=eq.${targetId}`, {
-          role: "cliente",
-          nutriologo_id: null,
-          especialidad: null,
-          activo: true
-        });
-      }
-      load({ forceFresh: true });
+      await deleteCollaboratorAccount({ profileId: targetId, email: colabEmail });
+      deletingColabIdsRef.current.delete(targetId);
+      invalidateCache("profiles");
+      invalidateCache("clientes");
+      await load({ forceFresh: true });
     } catch (e) {
+      deletingColabIdsRef.current.delete(targetId);
       setEquipo(prevEquipo);
       setMsg("❌ Error eliminando colaborador: " + e.message);
     }

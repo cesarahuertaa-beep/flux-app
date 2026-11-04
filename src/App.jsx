@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { App as CapApp } from "@capacitor/app";
-import { setAuthToken, restoreSession, restoreProfileId, setProfileId, onSessionExpired, saveRefreshToken, dbGetFresh, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials, hydrateOfflineCache } from "./lib/supabase";
+import { setAuthToken, restoreSession, restoreProfileId, setProfileId, saveRefreshToken, dbGetFresh, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials, hydrateOfflineCache } from "./lib/supabase";
 import { syncQueue } from "./lib/offlineQueue";
 import { initSyncManager, runSync } from "./lib/syncManager";
 import { BrandProvider } from "./components/BrandContext";
@@ -21,15 +20,6 @@ const isNativePlatform = () => {
     window.location.protocol === "app:" ||
     Capacitor.isNativePlatform()
   );
-};
-
-const detectIsAppMode = () => {
-  if (typeof window === "undefined") return false;
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true ||
-    window.location.search.includes("pwa=true");
-  return isNativePlatform() || isStandalone;
 };
 
 // Si se abre la PWA o web con un hash antiguo (#/app o #/login), migrar limpiamente a ruta estándar
@@ -88,7 +78,7 @@ const saveSessionMeta = (s) => {
     }));
   } catch (e) { /* ignore */ }
   //"civil" y"cliente" ambos guardan su ID de cliente en flux_client_id
-  if ((s.role ==="cliente" || s.role ==="civil") && s.data?.id) {
+  if ((s.role === "cliente" || s.role === "civil") && s.data?.id) {
     localStorage.setItem("flux_client_id", s.data.id);
   } else {
     localStorage.removeItem("flux_client_id");
@@ -153,7 +143,7 @@ export default function App() {
     if (typeof navigator !== "undefined" && !navigator.onLine) return true;
     if (isValidatingLivenessRef.current) return true;
     const now = Date.now();
-    if (!force && now - lastLivenessCheckRef.current < 5 * 60 * 1000) return true;
+    if (!force && now - lastLivenessCheckRef.current < 15 * 60 * 1000) return true;
 
     isValidatingLivenessRef.current = true;
     lastLivenessCheckRef.current = now;
@@ -166,35 +156,24 @@ export default function App() {
     const currentProfileId = s.profileId || s.data?.auth_id || restoreProfileId() || (!isClientOrCivil ? s.data?.id : null);
 
     try {
-      let verifiedCurrentRoleActive = false;
-
       if (currentClientId) {
         const rows = await dbGetFresh(`clientes?id=eq.${currentClientId}&select=id,activo,nutriologo_id`);
-        if (!Array.isArray(rows) || rows.length === 0 || rows[0]?.activo === false) {
-          handleLogout("Esta cuenta ha sido eliminada o dada de baja. La sesión se cerró por seguridad.");
+        if (Array.isArray(rows) && rows.length > 0 && rows[0]?.activo === false) {
+          handleLogout("Esta cuenta ha sido dada de baja o desactivada.");
           return false;
         }
-        verifiedCurrentRoleActive = true;
       } else if (currentProfileId && ["superadmin", "nutriologo", "nutriologo_estudiante", "administrativo", "staff"].includes(currentRole)) {
         const profiles = await dbGetFresh(`profiles?id=eq.${currentProfileId}&select=id,activo,role`);
-        if (!Array.isArray(profiles) || profiles.length === 0 || (profiles[0]?.activo === false && profiles[0]?.role !== "superadmin")) {
-          handleLogout("Tu cuenta profesional ha sido eliminada o desactivada. La sesión se cerró.");
+        if (Array.isArray(profiles) && profiles.length > 0 && profiles[0]?.activo === false && profiles[0]?.role !== "superadmin") {
+          handleLogout("Tu cuenta profesional ha sido desactivada.");
           return false;
         }
-        verifiedCurrentRoleActive = true;
       }
 
       const emailToLookup = s.data?.email;
       if (currentProfileId || emailToLookup) {
         const latestRoles = await refreshUserRoles(currentProfileId, emailToLookup);
-        if (Array.isArray(latestRoles)) {
-          if (latestRoles.length === 0) {
-            if (!verifiedCurrentRoleActive) {
-              handleLogout("Esta cuenta ya no cuenta con perfiles activos asociados.");
-              return false;
-            }
-            return true;
-          }
+        if (Array.isArray(latestRoles) && latestRoles.length > 0) {
           localStorage.setItem("flux_multi_roles", JSON.stringify(latestRoles));
           setSession(prev => {
             if (!prev) return prev;
@@ -211,19 +190,15 @@ export default function App() {
             if (!dataChanged && !rolesChanged) return prev;
             const nextSession = { ...prev, data: nextData, multiRoles: latestRoles };
             try {
-              localStorage.setItem("flux_session_snapshot", JSON.stringify({ role: nextSession.role, data: nextSession.data, profileId: nextSession.profileId }));
+              localStorage.setItem("flux_session_snapshot", JSON.stringify({ role: nextSession.role, data: nextSession.data, profileId: nextSession.profileId, multiRoles: latestRoles }));
             } catch {}
             return nextSession;
           });
         }
       }
       return true;
-    } catch (e) {
-      const msg = String(e?.message || "").toLowerCase();
-      if (msg.includes("session_expired") || msg.includes("invalid_grant") || msg.includes("refresh_token_not_found")) {
-        handleLogout("Tu sesión ha expirado o la cuenta fue eliminada.");
-        return false;
-      }
+    } catch {
+      // Sesión permanente: nunca cerrar sesión por expiración de token, errores de red o timeouts
       return true;
     } finally {
       isValidatingLivenessRef.current = false;
@@ -241,7 +216,7 @@ export default function App() {
     };
     window.addEventListener("hashchange", handleHashChange);
 
-    // Temporizador de seguridad: Si la restauración se demora más de 3.5s, desbloquear la interfaz
+    // Temporizador de seguridad: Si la restauración se demora más de 1.8s, desbloquear la interfaz
     const safetyTimer = setTimeout(() => {
       console.warn("[Restore] Timeout de seguridad alcanzado: forzando fin de restoring.");
       setRestoring(false);
@@ -315,26 +290,26 @@ export default function App() {
             const hasAdminRole = Array.isArray(savedMultiRoles) &&
               savedMultiRoles.some(r => ["superadmin","nutriologo","nutriologo_estudiante","administrativo","staff"].includes(r.role));
 
-            if (!hasAdminRole && (savedRole ==="cliente" || savedRole ==="civil") && savedClientId) {
+            if (!hasAdminRole && (savedRole === "cliente" || savedRole === "civil") && savedClientId) {
               let rows = await dbGetFresh(`clientes?id=eq.${savedClientId}&activo=eq.true`).catch(() => []);
               if (!rows.length) rows = await dbGetFresh(`clientes?id=eq.${savedClientId}`).catch(() => []);
               if (rows.length && rows[0].activo !== false) {
-                const restoredRole = savedRole ==="civil" ?"civil" :
-                                     (rows[0].nutriologo_id ?"cliente" :"civil");
+                const restoredRole = savedRole === "civil" ? "civil" :
+                                     (rows[0].nutriologo_id ? "cliente" : "civil");
                 const sObj = { role: restoredRole, data: rows[0], token: token || "offline", profileId, multiRoles: savedMultiRoles };
                 saveSessionMeta(sObj);
                 setSession(sObj);
-              } else if (typeof navigator !== "undefined" && navigator.onLine) {
-                handleLogout("Esta cuenta ya no existe o fue dada de baja.");
+              } else if (rows.length && rows[0].activo === false) {
+                handleLogout("Esta cuenta fue dada de baja.");
               }
             } else if (profileId) {
               const profiles = await dbGetFresh(`profiles?id=eq.${profileId}`);
               let role = profiles.length ? profiles[0].role : null;
               
-              if (role ==="administrativo" && profiles[0].nutriologo_id) {
+              if (role === "administrativo" && profiles[0].nutriologo_id) {
                 const boss = await dbGetFresh(`profiles?id=eq.${profiles[0].nutriologo_id}&select=role`);
-                if (boss.length && boss[0].role ==="superadmin") {
-                  role ="staff";
+                if (boss.length && boss[0].role === "superadmin") {
+                  role = "staff";
                 }
               }
 
@@ -346,18 +321,10 @@ export default function App() {
                   saveSessionMeta(sObj);
                   setSession(sObj);
                 }
-              } else if (typeof navigator !== "undefined" && navigator.onLine) {
-                handleLogout("Esta cuenta profesional ya no existe.");
               }
-            } else {
-              clearSessionMeta();
             }
-          } catch (e) {
-            if (e.message ==="OFFLINE") {
-              // sin internet: conservar datos de sesión
-            } else if (typeof navigator !== "undefined" && navigator.onLine) {
-              clearSessionMeta();
-            }
+          } catch {
+            // Conservar datos de sesión ante errores de red o timeouts
           }
         } else {
           clearSessionMeta();
@@ -370,10 +337,6 @@ export default function App() {
       }
     };
     restore();
-
-    onSessionExpired(() => {
-      handleLogout("Tu sesión ha expirado o la cuenta fue eliminada.");
-    });
 
     const handleOnline = () => syncQueue(dbUpsert);
     window.addEventListener('online', handleOnline);
@@ -403,58 +366,6 @@ export default function App() {
       try { window.FluxAndroidBars.setBars("#FFFFFF", true); } catch (e) { /* ignore */ }
     }
   }, [session]);
-
-  useEffect(() => {
-    if (!session) return;
-
-    // 1. Monitoreo activo de sesión viva (Heartbeat periódico + reactivación por visibilidad/foco/nativo)
-    validateSessionLiveness(session);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        validateSessionLiveness();
-      }
-    };
-    const handleFocus = () => {
-      validateSessionLiveness();
-    };
-
-    const handleCacheSync = (ev) => {
-      const tbl = ev?.detail?.table;
-      if (ev?.detail?.path === "*" && (tbl === "profiles" || tbl === "clientes")) {
-        validateSessionLiveness();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("flux:cache-updated", handleCacheSync);
-
-    let capListener = null;
-    if (Capacitor.isNativePlatform()) {
-      try {
-        capListener = CapApp.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) validateSessionLiveness();
-        });
-      } catch {}
-    }
-
-    // Heartbeat cada 60 segundos solo cuando la pestaña esté visible
-    const heartbeatTimer = setInterval(() => {
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
-        validateSessionLiveness();
-      }
-    }, 5 * 60 * 1000);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("flux:cache-updated", handleCacheSync);
-      clearInterval(heartbeatTimer);
-      if (capListener && typeof capListener.remove === "function") {
-        capListener.remove();
-      }
-    };
-  }, [session?.role, session?.data?.id, session?.profileId, validateSessionLiveness]);
 
   const handleLogin = (s) => {
     if (s.token) setAuthToken(s.token);
