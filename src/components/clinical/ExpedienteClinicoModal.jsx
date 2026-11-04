@@ -24,7 +24,7 @@ import { dbPatch, dbPost } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
-import { generateClinicalAiSynopsis } from "../../lib/clinicalAi";
+import { extractClinicalHighlights } from "../../lib/clinicalAi";
 
 const GENERO_OPTIONS = [
   { value: "", label: "Selecciona..." },
@@ -146,19 +146,29 @@ export default function ExpedienteClinicoModal({
         completado_por: anamnesis.completado_por || mode,
       };
 
-      // Generación automática del análisis de IA cada vez que se guarda
-      try {
-        const aiDiag = await generateClinicalAiSynopsis(updatedAnamnesis, { ...cliente, ...patchData });
-        if (aiDiag?.texto) {
-          updatedAnamnesis.resumen_ia = {
-            texto: aiDiag.texto,
-            origen: aiDiag.origen,
-            generado_en: aiDiag.generadoEn,
-          };
-        }
-      } catch (e) {
-        console.warn("Diagnóstico IA automático:", e);
-      }
+      // Generación inmediata de síntesis analítica y encolar auditoría con IA en segundo plano
+      const highlights = extractClinicalHighlights(updatedAnamnesis, { ...cliente, ...patchData });
+      updatedAnamnesis.resumen_ia = {
+        texto: highlights.sintesisTexto,
+        diagnostico: highlights.sintesisTexto,
+        alertas: {
+          patologias_normalizadas: highlights.patologias.tags,
+          exclusiones_alimentarias: highlights.alergias.tags,
+          observacion_alergias: "Exclusión de alérgenos reportados",
+        },
+        medicacion_normalizada: highlights.medicacion.raw || "Sin medicación reportada",
+        heredo_normalizado: highlights.heredo.raw || "Sin antecedentes reportados",
+        contexto_normalizado: {
+          ocupacion: highlights.habitos.ocupacion || "No especificada",
+          digestion: highlights.digestivo.isNormal ? "Función digestiva conservada" : highlights.digestivo.raw,
+          alcohol_tabaco: highlights.habitos.alcoholTabaco || "No reportado",
+        },
+        directrices_nutricionales: [],
+        origen: "analitico",
+        pending_ai: true,
+        generado_en: new Date().toISOString(),
+        highlights,
+      };
 
       const next = {
         ...record,

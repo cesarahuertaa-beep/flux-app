@@ -29,7 +29,7 @@ import {
   EMPTY_ANAMNESIS
 } from "../../lib/clinicalRecord";
 import { dbPatch, dbPost, storageUpload } from "../../lib/supabase";
-import { extractClinicalHighlights, generateClinicalAiSynopsis } from "../../lib/clinicalAi";
+import { extractClinicalHighlights } from "../../lib/clinicalAi";
 import { CustomSelect } from "../ui/CustomSelect";
 
 const GENERO_OPTIONS = [
@@ -285,7 +285,30 @@ export function NuevoExpedienteForms({
       if (perfil.foto_url) clientPatch.foto_url = perfil.foto_url;
       await dbPatch(`clientes?id=eq.${clienteId}`, clientPatch).catch(() => {});
 
-      // 2. Guardar el expediente clínico como completado
+      // 2. Extraer síntesis analítica inmediata (< 1ms) y encolar auditoría con IA
+      const highlights = extractClinicalHighlights(anamnesis, { ...cliente, ...clientPatch });
+      const initialAiSynopsis = {
+        texto: highlights.sintesisTexto,
+        diagnostico: highlights.sintesisTexto,
+        alertas: {
+          patologias_normalizadas: highlights.patologias.tags,
+          exclusiones_alimentarias: highlights.alergias.tags,
+          observacion_alergias: "Exclusión de alérgenos reportados",
+        },
+        medicacion_normalizada: highlights.medicacion.raw || "Sin medicación reportada",
+        heredo_normalizado: highlights.heredo.raw || "Sin antecedentes reportados",
+        contexto_normalizado: {
+          ocupacion: highlights.habitos.ocupacion || "No especificada",
+          digestion: highlights.digestivo.isNormal ? "Función digestiva conservada" : highlights.digestivo.raw,
+          alcohol_tabaco: highlights.habitos.alcoholTabaco || "No reportado",
+        },
+        directrices_nutricionales: [],
+        origen: "analitico",
+        pending_ai: true, // Indica a ClinicalAiSummaryCard que audite con IA en segundo plano
+        generado_en: new Date().toISOString(),
+        highlights,
+      };
+
       const finalAnamnesis = {
         ...anamnesis,
         fecha_nacimiento: perfil.fecha_nacimiento || null,
@@ -294,24 +317,8 @@ export function NuevoExpedienteForms({
         objetivo_principal: targetObj,
         updated_at: new Date().toISOString(),
         completado_por: isPatientMode ? "paciente" : isMiPlan ? "propio" : "nutriologo",
+        resumen_ia: initialAiSynopsis,
       };
-
-      // Generar diagnóstico inicial potenciado por la IA
-      try {
-        const aiDiag = await generateClinicalAiSynopsis(finalAnamnesis, { ...cliente, ...clientPatch });
-        finalAnamnesis.resumen_ia = {
-          texto: aiDiag.texto,
-          origen: aiDiag.origen,
-          generado_en: aiDiag.generadoEn,
-        };
-      } catch {
-        const highlights = extractClinicalHighlights(finalAnamnesis, { ...cliente, ...clientPatch });
-        finalAnamnesis.resumen_ia = {
-          texto: highlights.sintesisTexto,
-          origen: "analitico",
-          generado_en: new Date().toISOString(),
-        };
-      }
 
       const next = {
         ...record,

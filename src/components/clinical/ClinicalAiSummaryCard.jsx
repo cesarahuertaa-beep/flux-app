@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Sparkles,
   ChevronDown,
@@ -30,6 +30,8 @@ export default function ClinicalAiSummaryCard({
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [aiReported, setAiReported] = useState(false);
+  const auditingRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   const [aiData, setAiData] = useState(() => {
     const raw = anamnesis?.resumen_ia;
@@ -43,6 +45,13 @@ export default function ClinicalAiSummaryCard({
   }, [anamnesis, cliente]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const raw = anamnesis?.resumen_ia;
     if (raw) {
       if (typeof raw === "object") {
@@ -54,8 +63,10 @@ export default function ClinicalAiSummaryCard({
   }, [anamnesis?.resumen_ia]);
 
   const handleRunAiAudit = async (e) => {
-    if (e) e.stopPropagation();
-    if (!cliente?.id || loadingAi) return;
+    if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+    const isManual = Boolean(e);
+    if (!cliente?.id || loadingAi || auditingRef.current) return;
+    auditingRef.current = true;
     setLoadingAi(true);
     setAiError(null);
     try {
@@ -78,7 +89,9 @@ export default function ClinicalAiSummaryCard({
           model: res.model,
           generado_en: res.generadoEn || new Date().toISOString(),
         };
-        setAiData(newAiData);
+        if (isMountedRef.current) {
+          setAiData(newAiData);
+        }
         const updatedAnamnesis = {
           ...anamnesis,
           resumen_ia: newAiData,
@@ -88,16 +101,45 @@ export default function ClinicalAiSummaryCard({
           anamnesis: updatedAnamnesis,
         };
         const saved = await saveClinicalRecord(cliente.id, nextRec);
-        if (onRecordUpdated) onRecordUpdated(saved);
-        setCollapsed(false); // auto-expand to show new results
+        if (isMountedRef.current && onRecordUpdated) onRecordUpdated(saved);
+        if (isManual && isMountedRef.current) {
+          setCollapsed(false); // auto-expand to show new results only on manual click
+        }
       }
     } catch (err) {
       console.error("Error auditando expediente con IA:", err);
-      setAiError(err.message || "Error al conectar con Google Gemini");
+      if (isMountedRef.current) {
+        setAiError(err.message || "Error al conectar con Google Gemini");
+      }
+      try {
+        const fallbackAiData = {
+          ...(clinicalRec?.anamnesis?.resumen_ia || {}),
+          pending_ai: false,
+        };
+        const nextRec = {
+          ...clinicalRec,
+          anamnesis: {
+            ...(clinicalRec?.anamnesis || {}),
+            resumen_ia: fallbackAiData,
+          },
+        };
+        saveClinicalRecord(cliente.id, nextRec).catch(() => {});
+      } catch {}
     } finally {
-      setLoadingAi(false);
+      if (isMountedRef.current) {
+        setLoadingAi(false);
+      }
+      auditingRef.current = false;
     }
   };
+
+  // Disparar auditoría IA en segundo plano si el expediente recién guardado lo requiere
+  useEffect(() => {
+    const isPending = Boolean(clinicalRec?.anamnesis?.resumen_ia?.pending_ai);
+    if (isPending && !loadingAi && !auditingRef.current && cliente?.id) {
+      handleRunAiAudit();
+    }
+  }, [clinicalRec?.anamnesis?.resumen_ia?.pending_ai, cliente?.id]);
 
   const hayAlertasMedicas =
     highlights.patologias.presente ||
@@ -139,12 +181,18 @@ export default function ClinicalAiSummaryCard({
         {/* Left: Icono y Título */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-[var(--brand-primary)] text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className={`w-4 h-4 ${loadingAi ? "animate-spin" : ""}`} />
           </div>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <h3 className="text-sm font-bold text-[#0B1929] tracking-tight">
               Resumen Clínico Inteligente
             </h3>
+            {loadingAi && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50/90 border border-indigo-200/80 px-2.5 py-0.5 rounded-full shadow-2xs animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
+                <span>Auditando con IA en segundo plano...</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -154,7 +202,11 @@ export default function ClinicalAiSummaryCard({
             type="button"
             onClick={handleRunAiAudit}
             disabled={loadingAi}
-            className="py-1 px-3 rounded-lg bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-2xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className={`py-1 px-3 rounded-lg text-white text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 ${
+              loadingAi
+                ? "bg-indigo-400 cursor-wait opacity-85"
+                : "bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] hover:opacity-95 cursor-pointer"
+            }`}
             title="Auditar y normalizar el expediente clínico con Google Gemini"
           >
             <Sparkles className={`w-3.5 h-3.5 ${loadingAi ? "animate-spin" : ""}`} />
