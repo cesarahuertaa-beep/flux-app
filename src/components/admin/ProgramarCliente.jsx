@@ -454,6 +454,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return Array.isArray(ms) && ms.length > 0 ? enrichMetrica(ms[0]) : null;
   });
   const [clinicalLoaded, setClinicalLoaded] = useState(false);
+  const [skipExpedienteForNow, setSkipExpedienteForNow] = useState(false);
   const [clinicalRec, setClinicalRec] = useState(() => {
     return selected?.id ? peekClinicalRecord(selected.id) : null;
   });
@@ -528,6 +529,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   useEffect(() => {
     let active = true;
     if (selected?.id) {
+      setSkipExpedienteForNow(false);
       setClinicalLoaded(false);
       setClinicalRec(peekClinicalRecord(selected.id));
       fetchClinicalRecord(selected.id).then(rec => {
@@ -3092,13 +3094,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     );
   }
 
-  // ── Verificación de Expediente Inicial para Pacientes Nuevos ──
+  // ── Verificación de Expediente Inicial para Pacientes Nuevos y Mi Plan ──
   // Si aún no termina de cargar el expediente remoto desde Supabase Storage, mostrar loader sutil para evitar parpadeos
-  if (!isMiPlan && !clinicalLoaded) {
+  if (!clinicalLoaded) {
     return (
       <div className="w-full flex-1 flex flex-col items-center justify-center py-24 gap-3 bg-[#F8FAFC]">
         <div className="w-8 h-8 rounded-full border-2 border-[var(--brand-primary)] border-t-transparent animate-spin" />
-        <span className="text-xs font-semibold text-[#6B7A8D]">Verificando expediente del paciente...</span>
+        <span className="text-xs font-semibold text-[#6B7A8D]">
+          {isMiPlan ? "Verificando tu expediente..." : "Verificando expediente del paciente..."}
+        </span>
       </div>
     );
   }
@@ -3108,14 +3112,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     clinicalRec?.anamnesis_completada ||
     clinicalRec?.anamnesis?.completado_por ||
     hasExistingPlan ||
-    isMiPlan
+    skipExpedienteForNow
   );
 
-  if (!isMiPlan && !isExpedienteCompletado) {
+  if (!isExpedienteCompletado) {
     return (
       <div className="w-full flex-1 flex flex-col min-h-full bg-white md:bg-transparent">
         <NuevoExpedienteForms
           cliente={selected}
+          mode={isMiPlan ? "mi_plan" : "nutriologo"}
           onFinished={(savedRec, updatedClient) => {
             setClinicalRec(savedRec);
             if (updatedClient) {
@@ -3123,8 +3128,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             }
           }}
           onBackToList={() => {
-            if (onBackToList) onBackToList();
-            else setSelected(null);
+            if (isMiPlan) {
+              setSkipExpedienteForNow(true);
+            } else if (onBackToList) {
+              onBackToList();
+            } else {
+              setSelected(null);
+            }
           }}
           setMsg={setMsg}
         />

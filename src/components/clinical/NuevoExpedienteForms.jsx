@@ -83,20 +83,22 @@ export function NuevoExpedienteForms({
   onFinished,
   onBackToList,
   setMsg,
-  mode = "nutriologo" // "nutriologo" | "paciente"
+  mode = "nutriologo" // "nutriologo" | "paciente" | "mi_plan"
 }) {
   const clienteId = cliente?.id;
   const isPatientMode = mode === "paciente";
+  const isMiPlan = mode === "mi_plan";
+  const isPersonal = isPatientMode || isMiPlan;
   const [record, setRecord] = useState(() => peekClinicalRecord(clienteId));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Determinar paso inicial:
-  // - Modo paciente: empieza en 1 o en su borrador previo guardado (nunca en 0).
-  // - Modo nutriólogo: si tiene borrador va a ese paso; si ya se solicitó al paciente va a "pending_patient"; sino va a 0 (decisión).
+  // - Modo paciente o Mi Plan: empieza directamente en 1 o en su borrador previo guardado (nunca en paso 0 de decisión).
+  // - Modo nutriólogo con paciente externo: si tiene borrador va a ese paso; si ya se solicitó al paciente va a "pending_patient"; sino va a 0 (decisión).
   const [step, setStep] = useState(() => {
     const rec = peekClinicalRecord(clienteId);
-    if (isPatientMode) {
+    if (isPersonal) {
       if (rec?.draft_step && [1, 2].includes(rec.draft_step)) {
         return rec.draft_step;
       }
@@ -138,7 +140,7 @@ export function NuevoExpedienteForms({
     if (!clienteId) return;
     fetchClinicalRecord(clienteId).then((fresh) => {
       setRecord(fresh);
-      if (isPatientMode) {
+      if (isPersonal) {
         if (fresh?.draft_step && [1, 2].includes(fresh.draft_step)) {
           setStep(fresh.draft_step);
         } else {
@@ -173,7 +175,7 @@ export function NuevoExpedienteForms({
         objetivo: cliente?.objetivo || fresh?.anamnesis?.objetivo_principal || prev.objetivo,
       }));
     });
-  }, [clienteId, cliente?.objetivo, isPatientMode]);
+  }, [clienteId, cliente?.objetivo, isPersonal]);
 
   const edadCalc = useMemo(() => calcAge(perfil.fecha_nacimiento), [perfil.fecha_nacimiento]);
 
@@ -291,7 +293,7 @@ export function NuevoExpedienteForms({
         telefono: perfil.telefono,
         objetivo_principal: targetObj,
         updated_at: new Date().toISOString(),
-        completado_por: isPatientMode ? "paciente" : "nutriologo",
+        completado_por: isPatientMode ? "paciente" : isMiPlan ? "propio" : "nutriologo",
       };
 
       // Generar diagnóstico inicial potenciado por la IA
@@ -340,7 +342,7 @@ export function NuevoExpedienteForms({
         if (setMsg) {
           setMsg(
             <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-green-500" /> Expediente inicial completado
+              <CheckCircle2 className="w-4 h-4 text-green-500" /> {isMiPlan ? "Expediente personal guardado" : "Expediente inicial completado"}
             </div>
           );
         }
@@ -647,8 +649,8 @@ export function NuevoExpedienteForms({
         </div>
 
         <h2 className="text-sm sm:text-base font-bold text-[#0B1929] mb-2 sm:mb-3">
-          {step === 1 && (isPatientMode ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
-          {step === 2 && (isPatientMode ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
+          {step === 1 && (isPersonal ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
+          {step === 2 && (isPersonal ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
         </h2>
 
         {/* Barra de progreso visual */}
@@ -666,14 +668,14 @@ export function NuevoExpedienteForms({
             onClick={() => setStep(1)}
             className={`hover:text-[#0B1929] transition-colors ${step === 1 ? "text-[var(--brand-primary)] font-bold" : ""}`}
           >
-            1. {isPatientMode ? "Datos Personales" : "Ficha de Identificación"}
+            1. {isPersonal ? "Datos Personales" : "Ficha de Identificación"}
           </button>
           <button
             type="button"
             onClick={() => setStep(2)}
             className={`hover:text-[#0B1929] transition-colors ${step === 2 ? "text-[var(--brand-primary)] font-bold" : ""}`}
           >
-            2. {isPatientMode ? "Historial Clínico" : "Antecedentes Médicos"}
+            2. {isPersonal ? "Historial Clínico" : "Antecedentes Médicos"}
           </button>
         </div>
       </div>
@@ -689,10 +691,10 @@ export function NuevoExpedienteForms({
             <div>
               <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mb-0.5 sm:mb-1 flex items-center gap-2">
                 <User className="w-4 h-4 text-[var(--brand-primary)]" />
-                {isPatientMode ? "Tus Datos de Contacto y Personales" : "Ficha de Identificación del Paciente"}
+                {isPersonal ? "Tus Datos de Contacto y Personales" : "Ficha de Identificación del Paciente"}
               </h3>
               <p className="text-[11px] sm:text-xs text-[#6B7A8D]">
-                {isPatientMode
+                {isPersonal
                   ? "Información básica y biológica que servirá de base permanente para tu seguimiento."
                   : "Información demográfica, de contacto y perfil biológico inmutable del paciente."}
               </p>
@@ -788,11 +790,13 @@ export function NuevoExpedienteForms({
             <div>
               <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mb-0.5 sm:mb-1 flex items-center gap-2">
                 <HeartPulse className="w-4 h-4 text-red-500" />
-                {isPatientMode ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos Inamovibles"}
+                {isPersonal ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos Inamovibles"}
               </h3>
               <p className="text-[11px] sm:text-xs text-[#6B7A8D]">
                 {isPatientMode
                   ? "Esta información le permite a tu especialista cuidar tu salud y adaptar tus requerimientos permanentemente."
+                  : isMiPlan
+                  ? "Esta información sirve de base permanente para cuidar tu salud y adaptar tus requerimientos permanentemente."
                   : "Condiciones de salud atemporales que guían la seguridad clínica en todos sus ciclos."}
               </p>
             </div>
@@ -800,20 +804,20 @@ export function NuevoExpedienteForms({
             <div className="space-y-3 sm:space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPatientMode ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o Diagnósticos Médicos"}
+                  {isPersonal ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o Diagnósticos Médicos"}
                 </label>
                 <textarea
                   rows={2}
                   value={anamnesis.patologias || ""}
                   onChange={(e) => updAnam("patologias", e.target.value)}
                   className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. Hipotiroidismo, resistencia a la insulina, hipertensión, ninguna..." : "Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."}
+                  placeholder={isPersonal ? "Ej. Hipotiroidismo, resistencia a la insulina, hipertensión, ninguna..." : "Ej. Resistencia a la insulina, hipotiroidismo, hipertensión..."}
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPatientMode ? "Antecedentes familiares de salud (Padres o abuelos con diabetes, hipertensión, etc.)" : "Antecedentes Heredo-Familiares"}
+                  {isPersonal ? "Antecedentes familiares de salud (Padres o abuelos con diabetes, hipertensión, etc.)" : "Antecedentes Heredo-Familiares"}
                 </label>
                 <textarea
                   rows={2}
@@ -826,75 +830,75 @@ export function NuevoExpedienteForms({
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPatientMode ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación Actual y/o Suplementos Prescritos"}
+                  {isPersonal ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación Actual y/o Suplementos Prescritos"}
                 </label>
                 <textarea
                   rows={2}
                   value={anamnesis.medicacion_suplementos || ""}
                   onChange={(e) => updAnam("medicacion_suplementos", e.target.value)}
                   className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. Levotiroxina 50mcg, Creatina monohidrato, ninguno..." : "Ej. Metformina 850mg, Levotiroxina 50mcg, Creatina monohidrato..."}
+                  placeholder={isPersonal ? "Ej. Levotiroxina 50mcg, Creatina monohidrato, ninguno..." : "Ej. Metformina 850mg, Levotiroxina 50mcg, Creatina monohidrato..."}
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPatientMode ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o Intolerancias Alimentarias Crónicas"}
+                    {isPersonal ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o Intolerancias Alimentarias Crónicas"}
                   </label>
                   <textarea
                     rows={2}
                     value={anamnesis.alergias_intolerancias || ""}
                     onChange={(e) => updAnam("alergias_intolerancias", e.target.value)}
                     className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
+                    placeholder={isPersonal ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPatientMode ? "¿Sueles presentar molestias digestivas crónicas?" : "Síntomas Gastrointestinales Crónicos"}
+                    {isPersonal ? "¿Sueles presentar molestias digestivas crónicas?" : "Síntomas Gastrointestinales Crónicos"}
                   </label>
                   <textarea
                     rows={2}
                     value={anamnesis.sintomas_gi || ""}
                     onChange={(e) => updAnam("sintomas_gi", e.target.value)}
                     className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Reflujo nocturno, distensión vespertina, estreñimiento frecuente..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
+                    placeholder={isPersonal ? "Ej. Reflujo nocturno, distensión vespertina, estreñimiento frecuente..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPatientMode ? "¿Has tenido cirugías previas o tienes alguna lesión física crónica?" : "Cirugías Previas o Lesiones Físicas Crónicas"}
+                  {isPersonal ? "¿Has tenido cirugías previas o tienes alguna lesión física crónica?" : "Cirugías Previas o Lesiones Físicas Crónicas"}
                 </label>
                 <input
                   type="text"
                   value={anamnesis.cirugias_lesiones || ""}
                   onChange={(e) => updAnam("cirugias_lesiones", e.target.value)}
                   className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPatientMode ? "Ej. Operación de menisco en rodilla derecha, molestia en hombro, ninguna..." : "Ej. Hernia discal L4-L5, operación de menisco rodilla derecha..."}
+                  placeholder={isPersonal ? "Ej. Operación de menisco en rodilla derecha, molestia en hombro, ninguna..." : "Ej. Hernia discal L4-L5, operación de menisco rodilla derecha..."}
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPatientMode ? "¿A qué te dedicas y cómo es tu actividad laboral habitual?" : "Ocupación y Nivel de Actividad Laboral"}
+                    {isPersonal ? "¿A qué te dedicas y cómo es tu actividad laboral habitual?" : "Ocupación y Nivel de Actividad Laboral"}
                   </label>
                   <input
                     type="text"
                     value={anamnesis.ocupacion_actividad || ""}
                     onChange={(e) => updAnam("ocupacion_actividad", e.target.value)}
                     className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPatientMode ? "Ej. Oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Trabajo activo"}
+                    placeholder={isPersonal ? "Ej. Oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Trabajo activo"}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPatientMode ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo Habitual de Alcohol / Tabaco"}
+                    {isPersonal ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo Habitual de Alcohol / Tabaco"}
                   </label>
                   <input
                     type="text"
@@ -908,14 +912,14 @@ export function NuevoExpedienteForms({
 
               <div>
                 <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPatientMode ? "¿Algún antecedente o comentario adicional importante para tu expediente?" : "Notas y Acuerdos Clínicos Permanentes"}
+                  {isPersonal ? "¿Algún antecedente o comentario adicional importante para tu expediente?" : "Notas y Acuerdos Clínicos Permanentes"}
                 </label>
                 <textarea
                   rows={2}
                   value={anamnesis.notas_consulta || ""}
                   onChange={(e) => updAnam("notas_consulta", e.target.value)}
                   className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder="Pautas permanentes a considerar a lo largo de toda su historia clínica..."
+                  placeholder={isPersonal ? "Pautas personales a considerar en tus planes y entrenamientos..." : "Pautas permanentes a considerar a lo largo de toda su historia clínica..."}
                 />
               </div>
             </div>
@@ -938,15 +942,15 @@ export function NuevoExpedienteForms({
               <span className="hidden sm:inline">Anterior: Datos Personales</span>
               <span className="sm:hidden">Anterior</span>
             </button>
-          ) : isPatientMode ? (
+          ) : isPersonal ? (
             <button
               type="button"
               onClick={onBackToList}
               className="w-full sm:w-auto h-11 sm:h-12 px-4 rounded-xl sm:rounded-2xl bg-[#F0F4FA] hover:bg-[#E2E8F0] active:scale-[0.98] text-[#0B1929] text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 border border-[#E2E8F0] shadow-2xs cursor-pointer"
-              title="Cerrar cuestionario"
+              title={isMiPlan ? "Continuar a Mi Plan y llenar después" : "Cerrar cuestionario"}
             >
               <X className="w-4 h-4 shrink-0 text-[#0B1929]" />
-              <span>Cerrar</span>
+              <span>{isMiPlan ? "Llenar después" : "Cerrar"}</span>
             </button>
           ) : (
             <button
@@ -984,13 +988,15 @@ export function NuevoExpedienteForms({
               {isPatientMode ? <Send className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
               <span>
                 {saving
-                  ? "Finalizando..."
+                  ? "Guardando..."
                   : isPatientMode
                   ? "Enviar"
+                  : isMiPlan
+                  ? "Guardar y Continuar"
                   : "Finalizar"}
               </span>
               <span className="hidden sm:inline">
-                {!saving && (isPatientMode ? " a mi Especialista" : " Expediente")}
+                {!saving && (isPatientMode ? " a mi Especialista" : isMiPlan ? " a Mi Plan" : " Expediente")}
               </span>
             </button>
           )}
