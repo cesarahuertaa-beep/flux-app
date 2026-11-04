@@ -960,155 +960,223 @@ export default function Training({
 
                   {/* Tabla de Series */}
                   <div>
-                    <div className="flex gap-2 mb-2 px-1 items-center">
-                      <div className="w-8 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
-                      <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
-                      <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Peso</div>
-                      <div className="w-14 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
-                    </div>
-
-                    {Array.from({ length: numSeries }).map((_, si) => {
-                      const repKey   = `${ex.id}-${wi}-${si}-reps-${activeVarId}`;
-                      const kgKey    = `${ex.id}-${wi}-${si}-peso-${activeVarId}`;
-                      const repVal   = progreso[repKey] ||"";
-                      const kgVal    = progreso[kgKey] ||"";
-                      
-                      const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si,"reps");
-                      const prevKg   = getPrevVal(ex.id, activeVarId, activeObj, si,"peso");
-                      
+                    {(() => {
                       const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || activeObj.unidad || 'kg';
-                      
-                      const displayKgVal  = parseDisplayWeight(kgVal, prefUnit);
-                      const displayPrevKg = parseDisplayWeight(prevKg, prefUnit);
-
-                      // Avance por 1RM estimado: comparar (peso+reps actuales) vs (peso+reps prev)
-                      const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
-                      const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
 
                       return (
-                        <div key={si} className="flex flex-col mb-3">
-                          <div className="flex gap-2 items-center">
-                            <div className="w-8 text-center text-xs font-mono text-[#0B1929] font-bold">
-                              {si + 1}
-                            </div>
-
-                            <div className="flex-1">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                placeholder={prevReps}
-                                value={repVal}
-                                disabled={isLocked}
-                                onFocus={() => setFocusedInput({ exId: ex.id, wi, si })}
-                                onBlur={() => setTimeout(() => setFocusedInput(null), 150)}
-                                onChange={(e) => onProgressChange(ex.id, wi, si,"reps", e.target.value, activeVarId)}
-                                className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
-                              />
-                            </div>
-
-                            <div className="flex-1 relative">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder={displayPrevKg}
-                                value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
-                                disabled={isLocked}
-                                onFocus={() => {
-                                  setFocusedInput({ exId: ex.id, wi, si });
-                                  // Seed local state with current display value so user starts from what they see
-                                  setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
-                                }}
-                                onBlur={() => {
-                                  setTimeout(() => setFocusedInput(null), 150);
-                                  const raw = localWeightInputs[kgKey];
-                                  if (raw !== undefined) {
-                                    // On blur, commit final conversion to progreso
-                                    const dbVal = parseDBWeight(raw, prefUnit);
-                                    onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
-                                    // Clear local state so value is driven by progreso again
-                                    setLocalWeightInputs(prev => {
-                                      const next = { ...prev };
-                                      delete next[kgKey];
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  // Only allow digits, dot, and minus
-                                  if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
-                                  // Update local display immediately — no conversion during typing
-                                  setLocalWeightInputs(prev => ({ ...prev, [kgKey]: raw }));
-                                  // Also save to progreso so debounce works (skip conversion for partial values)
-                                  if (!raw.endsWith('.')) {
-                                    const dbVal = parseDBWeight(raw, prefUnit);
-                                    onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
-                                  }
-                                }}
-                                className="w-full h-10 rounded-lg border border-[#E2E8F0] bg-white px-2 pr-6 text-center text-[15px] font-semibold text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none transition-shadow"
-                              />
-                              <button 
-                                onClick={() => setUnitPrefs(s => ({ ...s, [`${ex.id}_${activeVarId}`]: prefUnit === 'kg' ? 'lb' : 'kg' }))}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#6B7A8D] uppercase hover:text-[var(--brand-primary)]"
-                              >
-                                {prefUnit}
-                              </button>
-                            </div>
-
-                            <div className="w-14 flex flex-col justify-center items-center">
-                              {isSetPR ? (
-                                <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                  <Trophy size={10} className="text-amber-500" /> PR
-                                </span>
-                              ) : avancePct !== null ? (
-                                <div className="flex items-center gap-0.5">
-                                  {avancePct === 0
-                                    ? <Minus size={12} className="text-[#9BA5B0]" />
-                                    : avancePct > 0
-                                      ? <TrendingUp size={12} className="text-emerald-500" />
-                                      : <TrendingDown size={12} className="text-red-400" />
-                                  }
-                                  {avancePct !== 0 && (
-                                    <span className={`text-[10px] font-bold font-mono ${avancePct > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                      {Math.abs(avancePct).toFixed(0)}%
-                                    </span>
-                                  )}
-                                </div>
-                              ) : <span className="text-[10px] text-[#CBD5E1] font-mono">-</span>}
-                            </div>
-                          </div>
-                          
-                          {focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
-                            <div className="flex gap-2 mt-1 pl-10 pr-14 animate-in fade-in slide-in-from-top-1 duration-200">
-                              <button
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  onProgressChange(ex.id, wi, si,"reps","Falta", activeVarId);
-                                  onProgressChange(ex.id, wi, si,"peso","0", activeVarId);
-                                  setFocusedInput(null);
-                                }}
-                                className="flex-1 bg-[#FEE2E2] text-[#EF4444] text-[10px] font-bold py-1.5 rounded-md hover:bg-[#FCA5A5] transition-colors"
-                              >
-                                Falté
-                              </button>
-                              {ultimoPeso && (
+                        <>
+                          <div className="flex gap-2 mb-2 px-1 items-center">
+                            <div className="w-8 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Serie</div>
+                            <div className="flex-1 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Reps</div>
+                            <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono text-[#6B7A8D] uppercase">
+                              <span>Peso</span>
+                              {/* Selector Segmentado de Unidad en Cabecera */}
+                              <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-md border border-[#E2E8F0] shadow-2xs">
                                 <button
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    onProgressChange(ex.id, wi, si,"peso", ultimoPeso.toString(), activeVarId);
-                                    setFocusedInput(null);
-                                  }}
-                                  className="flex-1 bg-[#E0E7FF] text-[#4F46E5] text-[10px] font-bold py-1.5 rounded-md hover:bg-[#C7D2FE] transition-colors"
+                                  type="button"
+                                  onClick={() => setUnitPrefs(s => ({ ...s, [`${ex.id}_${activeVarId}`]: 'kg' }))}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
+                                    prefUnit === 'kg'
+                                      ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'
+                                      : 'text-[#64748B] hover:text-[#0B1929]'
+                                  }`}
+                                  title="Mostrar en Kilogramos"
                                 >
-                                  Corporal ({ultimoPeso}kg)
+                                  KG
                                 </button>
-                              )}
+                                <button
+                                  type="button"
+                                  onClick={() => setUnitPrefs(s => ({ ...s, [`${ex.id}_${activeVarId}`]: 'lb' }))}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
+                                    prefUnit === 'lb'
+                                      ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'
+                                      : 'text-[#64748B] hover:text-[#0B1929]'
+                                  }`}
+                                  title="Mostrar en Libras"
+                                >
+                                  LB
+                                </button>
+                              </div>
                             </div>
-                          )}
-                        </div>
+                            <div className="w-14 text-center text-[10px] font-mono text-[#6B7A8D] uppercase">Avance</div>
+                          </div>
+
+                          {Array.from({ length: numSeries }).map((_, si) => {
+                            const repKey   = `${ex.id}-${wi}-${si}-reps-${activeVarId}`;
+                            const kgKey    = `${ex.id}-${wi}-${si}-peso-${activeVarId}`;
+                            const repVal   = progreso[repKey] ||"";
+                            const kgVal    = progreso[kgKey] ||"";
+                            
+                            const prevReps = getPrevVal(ex.id, activeVarId, activeObj, si,"reps");
+                            const prevKg   = getPrevVal(ex.id, activeVarId, activeObj, si,"peso");
+                            
+                            const displayKgVal  = parseDisplayWeight(kgVal, prefUnit);
+                            const displayPrevKg = parseDisplayWeight(prevKg, prefUnit);
+
+                            // Avance por 1RM estimado: comparar (peso+reps actuales) vs (peso+reps prev)
+                            const avancePct = calcularAvance(kgVal, repVal, prevKg, prevReps);
+                            const isSetPR = exPR.isPR && exPR.bestSetIdx === si;
+                            const isFalta = repVal === "Falta";
+
+                            return (
+                              <div key={si} className="flex flex-col mb-3">
+                                <div className="flex gap-2 items-center">
+                                  <div className="w-8 text-center text-xs font-mono text-[#0B1929] font-bold">
+                                    {si + 1}
+                                  </div>
+
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      inputMode={isFalta ? "text" : "numeric"}
+                                      pattern={isFalta ? undefined : "[0-9]*"}
+                                      placeholder={prevReps}
+                                      value={repVal}
+                                      disabled={isLocked}
+                                      onFocus={() => setFocusedInput({ exId: ex.id, wi, si })}
+                                      onBlur={() => setTimeout(() => setFocusedInput(null), 250)}
+                                      onChange={(e) => onProgressChange(ex.id, wi, si,"reps", e.target.value, activeVarId)}
+                                      className={`w-full h-10 rounded-lg border px-2 text-center text-[15px] font-semibold transition-shadow ${
+                                        isFalta
+                                          ? "border-red-300 bg-red-50/70 text-red-600 font-bold"
+                                          : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                                      }`}
+                                    />
+                                  </div>
+
+                                  <div className="flex-1 relative">
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder={displayPrevKg}
+                                      value={localWeightInputs[kgKey] !== undefined ? localWeightInputs[kgKey] : displayKgVal}
+                                      disabled={isLocked || isFalta}
+                                      onFocus={() => {
+                                        setFocusedInput({ exId: ex.id, wi, si });
+                                        // Seed local state with current display value so user starts from what they see
+                                        setLocalWeightInputs(prev => ({ ...prev, [kgKey]: displayKgVal || "" }));
+                                      }}
+                                      onBlur={() => {
+                                        setTimeout(() => setFocusedInput(null), 250);
+                                        const raw = localWeightInputs[kgKey];
+                                        if (raw !== undefined) {
+                                          // On blur, commit final conversion to progreso
+                                          const dbVal = parseDBWeight(raw, prefUnit);
+                                          onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                                          // Clear local state so value is driven by progreso again
+                                          setLocalWeightInputs(prev => {
+                                            const next = { ...prev };
+                                            delete next[kgKey];
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        // Only allow digits, dot, and minus
+                                        if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
+                                        // Update local display immediately — no conversion during typing
+                                        setLocalWeightInputs(prev => ({ ...prev, [kgKey]: raw }));
+                                        // Also save to progreso so debounce works (skip conversion for partial values)
+                                        if (!raw.endsWith('.')) {
+                                          const dbVal = parseDBWeight(raw, prefUnit);
+                                          onProgressChange(ex.id, wi, si, "peso", dbVal, activeVarId);
+                                        }
+                                      }}
+                                      className={`w-full h-10 rounded-lg border px-2 pr-7 text-center text-[15px] font-semibold transition-shadow ${
+                                        isFalta
+                                          ? "border-red-200 bg-red-50/30 text-red-400"
+                                          : "border-[#E2E8F0] bg-white text-[#0B1929] placeholder-[#9BA5B0] focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] outline-none"
+                                      }`}
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#94A3B8] pointer-events-none uppercase">
+                                      {prefUnit}
+                                    </span>
+                                  </div>
+
+                                  <div className="w-14 flex flex-col justify-center items-center">
+                                    {isSetPR ? (
+                                      <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                        <Trophy size={10} className="text-amber-500" /> PR
+                                      </span>
+                                    ) : avancePct !== null ? (
+                                      <div className="flex items-center gap-0.5">
+                                        {avancePct === 0
+                                          ? <Minus size={12} className="text-[#9BA5B0]" />
+                                          : avancePct > 0
+                                            ? <TrendingUp size={12} className="text-emerald-500" />
+                                            : <TrendingDown size={12} className="text-red-400" />
+                                        }
+                                        {avancePct !== 0 && (
+                                          <span className={`text-[10px] font-bold font-mono ${avancePct > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                                            {Math.abs(avancePct).toFixed(0)}%
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : <span className="text-[10px] text-[#CBD5E1] font-mono">-</span>}
+                                  </div>
+                                </div>
+                                
+                                {/* Barra de Acciones Accesible (Falté / Corporal) */}
+                                {focusedInput?.exId === ex.id && focusedInput?.wi === wi && focusedInput?.si === si && (
+                                  <div className="flex gap-2 mt-1.5 pl-10 pr-14 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <button
+                                      type="button"
+                                      onPointerDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (isFalta) {
+                                          onProgressChange(ex.id, wi, si, "reps", "", activeVarId);
+                                          onProgressChange(ex.id, wi, si, "peso", "", activeVarId);
+                                        } else {
+                                          onProgressChange(ex.id, wi, si, "reps", "Falta", activeVarId);
+                                          onProgressChange(ex.id, wi, si, "peso", "0", activeVarId);
+                                        }
+                                        setLocalWeightInputs(prev => {
+                                          const next = { ...prev };
+                                          delete next[kgKey];
+                                          return next;
+                                        });
+                                        setFocusedInput(null);
+                                      }}
+                                      className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer ${
+                                        isFalta
+                                          ? "bg-slate-100 text-[#0B1929] hover:bg-slate-200 border border-slate-300"
+                                          : "bg-[#FEE2E2] text-[#EF4444] hover:bg-[#FCA5A5] border border-red-200"
+                                      }`}
+                                    >
+                                      <span>{isFalta ? "Reactivar serie" : "Falté a esta serie"}</span>
+                                    </button>
+
+                                    {ultimoPeso && (
+                                      <button
+                                        type="button"
+                                        onPointerDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onProgressChange(ex.id, wi, si, "peso", ultimoPeso.toString(), activeVarId);
+                                          setLocalWeightInputs(prev => {
+                                            const next = { ...prev };
+                                            delete next[kgKey];
+                                            return next;
+                                          });
+                                          setFocusedInput(null);
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-1.5 bg-[#E0E7FF] text-[#4F46E5] hover:bg-[#C7D2FE] border border-indigo-200 text-xs font-bold py-2 px-3 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer"
+                                      >
+                                        <span>
+                                          Corporal ({prefUnit === "lb" ? `${(Number(ultimoPeso) * 2.20462262).toFixed(1)} lb` : `${ultimoPeso} kg`})
+                                        </span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
 
                   {(() => {
