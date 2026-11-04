@@ -57,7 +57,7 @@ export default function MisComisiones({ myId, setMsg }) {
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["comisiones", "profiles", "clientes", "*"].includes(table)) return;
+      if (table && !["recibos_pago", "nomina_colaboradores", "configuracion_plataforma", "profiles", "clientes", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };
@@ -96,15 +96,32 @@ export default function MisComisiones({ myId, setMsg }) {
   // Total acumulado (monto bruto generado por los nutriólogos) y comisión por fecha de corte
   const totalGenerado = filtrados.reduce((acc, r) => acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)), 0);
   const miPago = useMemo(() => {
-    if (filtroMes !== "todos" && nominaActual?.transferido_por_admin && nominaActual?.monto != null) {
+    if (filtroMes !== "todos" && nominaActual?.monto != null) {
       return Number(nominaActual.monto);
     }
-    return filtrados.reduce((acc, r) => {
-      const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
-      const pct = (Number(rateForCut.comision_pct) || 35) / 100;
-      return acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;
-    }, 0);
-  }, [filtrados, rawCfg, filtroMes, nominaActual]);
+    let myComp = null;
+    try {
+      const savedComps = JSON.parse(localStorage.getItem("flux_staff_compensaciones_v1") || "{}");
+      if (myId && savedComps[myId]) myComp = savedComps[myId];
+    } catch { }
+
+    const modalidad = myComp?.modalidad || "solo_comision";
+    const tieneComision = modalidad === "solo_comision" || modalidad === "mixto";
+    const tieneSueldo = modalidad === "sueldo_fijo" || modalidad === "mixto" || modalidad === "honorarios";
+    const sueldoMonto = (filtroMes !== "todos" && tieneSueldo) ? (Number(myComp?.sueldoBase) || 0) : 0;
+    const bonoMonto = (filtroMes !== "todos") ? (Number(myComp?.bonoFijo) || 0) : 0;
+
+    const comisionesMonto = tieneComision
+      ? filtrados.reduce((acc, r) => {
+          const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
+          const customPct = myComp?.comisionPct != null ? Number(myComp.comisionPct) : (Number(rateForCut.comision_pct) || 35);
+          const pct = customPct / 100;
+          return acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;
+        }, 0)
+      : 0;
+
+    return sueldoMonto + comisionesMonto + bonoMonto;
+  }, [filtrados, rawCfg, filtroMes, nominaActual, myId]);
 
   const formatMes = (yyyyMm) => {
     if (yyyyMm === 'todos') return 'Todos los meses (Histórico)';

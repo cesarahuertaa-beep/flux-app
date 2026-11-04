@@ -104,7 +104,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["profiles", "clientes", "pagos_manuales", "configuracion_app", "*"].includes(table)) return;
+      if (table && !["profiles", "clientes", "recibos_pago", "configuracion_plataforma", "premium_patrocinado", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };

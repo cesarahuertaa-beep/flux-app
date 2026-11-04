@@ -996,7 +996,7 @@ export default function GestorTienda({ setMsg }) {
           </div>
 
           {/* Botón flotante para Guardar Ajustes */}
-          <div className="sticky bottom-4 z-20 flex justify-end">
+          <div className="sticky bottom-20 md:bottom-4 z-20 flex justify-end">
             <button
               onClick={handleSaveConfig}
               disabled={savingConfig}

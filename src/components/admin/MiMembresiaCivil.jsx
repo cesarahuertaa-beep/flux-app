@@ -141,7 +141,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["clientes", "pagos_manuales", "configuracion_app", "*"].includes(table)) return;
+      if (table && !["clientes", "recibos_pago_civil", "configuracion_plataforma", "premium_patrocinado", "profiles", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };
@@ -276,7 +276,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-6 md:pb-0 pt-0 md:pt-0">
+    <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-28 md:pb-8 pt-0 md:pt-0">
       <input
         type="file"
         id="comprobanteUploadCivil"
@@ -667,7 +667,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                     </td>
                     <td className="py-3 px-4 text-xs text-[#6B7A8D] whitespace-nowrap">
                       {r.fecha_corte_mes
-                        ? new Date(r.fecha_corte_mes).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+                        ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
                         : "—"}
                     </td>
                     <td className="py-3 px-4 font-bold text-xs text-[#0B1929] text-right whitespace-nowrap">
@@ -712,7 +712,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                   <div className="flex justify-between items-center text-[11px] text-[#6B7A8D]">
                     <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
                     <span>
-                      Hasta: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"}
+                      Hasta: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"}
                     </span>
                   </div>
                 </div>

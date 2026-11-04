@@ -688,11 +688,22 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       >
                         {e.gif_url ? (
                           <>
-                            <img
-                              src={e.gif_url}
-                              alt={e.nombre}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
+                            {/\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
+                              <video
+                                src={e.gif_url}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            ) : (
+                              <img
+                                src={e.gif_url}
+                                alt={e.nombre}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            )}
                             <div className="absolute inset-0 bg-[#0B1929]/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                               <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center text-[#0B1929] shadow-lg">
                                 <Play size={20} className="ml-0.5 fill-current" />
@@ -1070,7 +1081,11 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 <div className="border border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50">
                   {formEj.gif_url ? (
                     <div>
-                      <img src={formEj.gif_url} alt="preview" className="max-h-[140px] rounded-lg mx-auto mb-3 shadow-sm object-cover" />
+                      {/\.(mp4|webm|mov)($|\?)/i.test(formEj.gif_url) ? (
+                        <video src={formEj.gif_url} autoPlay loop muted playsInline className="max-h-[140px] rounded-lg mx-auto mb-3 shadow-sm object-cover" />
+                      ) : (
+                        <img src={formEj.gif_url} alt="preview" className="max-h-[140px] rounded-lg mx-auto mb-3 shadow-sm object-cover" />
+                      )}
                       <div>
                         <button onClick={() => setFormEj(p => ({ ...p, gif_url: "" }))} className="text-sm px-3 py-1.5 border border-[#E2E8F0] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 bg-white rounded-lg font-semibold transition-colors">
                           Cambiar
@@ -1491,11 +1506,23 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             onClick={e => e.stopPropagation()}
           >
             <button onClick={() => setPreviewEj(null)} className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20} /></button>
-            <img
-              src={previewEj.gif_url}
-              alt={previewEj.nombre}
-              className="w-full rounded-xl mb-4 shadow-sm"
-            />
+            {/\.(mp4|webm|mov)($|\?)/i.test(previewEj.gif_url) ? (
+              <video
+                src={previewEj.gif_url}
+                autoPlay
+                loop
+                muted
+                playsInline
+                controls
+                className="w-full rounded-xl mb-4 shadow-sm"
+              />
+            ) : (
+              <img
+                src={previewEj.gif_url}
+                alt={previewEj.nombre}
+                className="w-full rounded-xl mb-4 shadow-sm"
+              />
+            )}
             <div className="font-bold text-[18px] text-[#0B1929] mb-2 font-['Space_Grotesk',sans-serif]">
               {previewEj.nombre}
             </div>

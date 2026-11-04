@@ -599,7 +599,7 @@ export default function ControlPagos({ setMsg }) {
                                 </div>
                               </td>
                               <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
-                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
                                 ${Number(r.monto || 0).toFixed(2)}
@@ -679,7 +679,7 @@ export default function ControlPagos({ setMsg }) {
                               <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                             <div className="font-medium text-[#475569] capitalize">
-                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
                             </div>
                           </div>
 
@@ -782,7 +782,7 @@ export default function ControlPagos({ setMsg }) {
                                 <div className="text-xs text-[#6B7A8D]">{cli?.email || "Sin email"}</div>
                               </td>
                               <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
-                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
                                 ${Number(r.monto || 0).toFixed(2)}
@@ -862,7 +862,7 @@ export default function ControlPagos({ setMsg }) {
                               <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                             <div className="font-medium text-[#475569] capitalize">
-                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
                             </div>
                           </div>
 
@@ -1099,12 +1099,30 @@ export default function ControlPagos({ setMsg }) {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto bg-gray-100 flex-1 flex justify-center items-center min-h-[300px]">
-              <img 
-                src={modalImg} 
-                alt="Comprobante" 
-                className="max-w-full max-h-[70vh] rounded-xl shadow-sm border border-gray-200 object-contain" 
-              />
+            <div className="p-4 overflow-y-auto bg-gray-100 flex-1 flex flex-col justify-center items-center min-h-[300px] gap-3">
+              {/\.pdf($|\?)/i.test(modalImg) ? (
+                <>
+                  <iframe
+                    src={modalImg}
+                    title="Comprobante PDF"
+                    className="w-full h-[65vh] rounded-xl shadow-sm border border-gray-200 bg-white"
+                  />
+                  <a
+                    href={modalImg}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#0B1929] hover:bg-[#1E2D3D] text-white text-xs font-bold rounded-xl transition-colors"
+                  >
+                    Abrir PDF en pestaña nueva
+                  </a>
+                </>
+              ) : (
+                <img 
+                  src={modalImg} 
+                  alt="Comprobante" 
+                  className="max-w-full max-h-[70vh] rounded-xl shadow-sm border border-gray-200 object-contain" 
+                />
+              )}
             </div>
           </div>
         </div>
