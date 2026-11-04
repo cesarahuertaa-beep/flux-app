@@ -20,7 +20,7 @@ import {
   fetchClinicalRecord,
   saveClinicalRecord,
 } from "../../lib/clinicalRecord";
-import { dbPatch, dbPost } from "../../lib/supabase";
+import { dbPatch, dbPost, syncPersonalData } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
 import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
@@ -134,6 +134,14 @@ export default function ExpedienteClinicoModal({
         genero: perfil.sexo || "Masculino",
       };
       await dbPatch(`clientes?id=eq.${clienteId}`, patchData).catch(() => {});
+      if (cliente.email) {
+        await syncPersonalData(cliente.email, {
+          nombre: patchData.nombre,
+          telefono: patchData.telefono,
+          fecha_nacimiento: patchData.fecha_nacimiento,
+          genero: patchData.genero,
+        }).catch(() => {});
+      }
 
       // 2. Guardar en expediente clínico y actualizar diagnóstico con IA
       const updatedAnamnesis = {
@@ -236,6 +244,16 @@ export default function ExpedienteClinicoModal({
       };
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);
+      if (!isCurrentlyRequested && cliente?.auth_id) {
+        await dbPost("notificaciones", {
+          profile_id: cliente.auth_id,
+          titulo: "Completa tu expediente inicial",
+          mensaje: "Tu especialista te ha solicitado llenar o actualizar tus antecedentes y hábitos clínicos.",
+          tipo: "alerta",
+          link_url: "perfil",
+          entidad_id: cliente.id,
+        }).catch(() => {});
+      }
       if (onSaved) onSaved(saved);
     } finally {
       setSaving(false);
@@ -262,6 +280,14 @@ export default function ExpedienteClinicoModal({
               )}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7A8D] hover:bg-[#F1F5F9] hover:text-[#0B1929] transition-colors cursor-pointer shrink-0"
+            title="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Sub-tabs de navegación de las 2 áreas del Expediente Atemporal */}

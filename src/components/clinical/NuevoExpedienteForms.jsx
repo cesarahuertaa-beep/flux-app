@@ -28,7 +28,7 @@ import {
   saveClinicalRecord,
   EMPTY_ANAMNESIS
 } from "../../lib/clinicalRecord";
-import { dbPatch, dbPost, storageUpload } from "../../lib/supabase";
+import { dbPatch, dbPost, storageUpload, syncPersonalData } from "../../lib/supabase";
 import { extractClinicalHighlights } from "../../lib/clinicalAi";
 import { CustomSelect } from "../ui/CustomSelect";
 
@@ -239,6 +239,14 @@ export function NuevoExpedienteForms({
       if (targetObj && targetObj !== cliente.objetivo) clientPatch.objetivo = targetObj;
       if (Object.keys(clientPatch).length > 0) {
         await dbPatch(`clientes?id=eq.${clienteId}`, clientPatch).catch(() => {});
+        if (cliente.email) {
+          await syncPersonalData(cliente.email, {
+            nombre: clientPatch.nombre,
+            telefono: clientPatch.telefono,
+            fecha_nacimiento: clientPatch.fecha_nacimiento,
+            genero: clientPatch.genero,
+          }).catch(() => {});
+        }
       }
 
       // 2. Guardar borrador en el expediente
@@ -284,6 +292,15 @@ export function NuevoExpedienteForms({
       };
       if (perfil.foto_url) clientPatch.foto_url = perfil.foto_url;
       await dbPatch(`clientes?id=eq.${clienteId}`, clientPatch).catch(() => {});
+      if (cliente.email) {
+        await syncPersonalData(cliente.email, {
+          nombre: clientPatch.nombre,
+          telefono: clientPatch.telefono,
+          fecha_nacimiento: clientPatch.fecha_nacimiento,
+          genero: clientPatch.genero,
+          foto_url: clientPatch.foto_url,
+        }).catch(() => {});
+      }
 
       // 2. Extraer síntesis analítica inmediata (< 1ms) y encolar auditoría con IA
       const highlights = extractClinicalHighlights(anamnesis, { ...cliente, ...clientPatch });

@@ -422,7 +422,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       setMsg(
         <div className="flex items-center gap-1.5 text-purple-700">
           <Sparkles className="w-4 h-4 text-purple-600" />
-          <span>¡Platillo generado con IA para la Opción ${optLetter}!</span>
+          <span>{`¡Platillo generado con IA para la Opción ${optLetter}!`}</span>
         </div>
       );
     } catch (err) {
@@ -601,7 +601,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     };
   }, [selected?.id]);
 
-  // Sincronización automática transparente de macros con la evaluación más actual del plan
+  // Sincronización automática inicial de macros cuando el plan aún no tiene calorías prescritas
+  // (respeta los ajustes personalizados hechos desde el Simulador de Macros o Plantillas)
   useEffect(() => {
     if (!selected?.id || isReadOnly || !smartPrescription?.targetKcal || !cycleMetrica) return;
     const sKcal = Number(smartPrescription.targetKcal) || 0;
@@ -611,11 +612,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (sKcal <= 0) return;
 
     const curKcal = Number(macros.calorias) || 0;
-    const curP = Number(macros.proteina) || 0;
-    const curC = Number(macros.carbohidratos) || 0;
-    const curF = Number(macros.grasas) || 0;
 
-    if (curKcal !== sKcal || curP !== sP || curC !== sC || curF !== sF) {
+    if (curKcal === 0) {
       const nextMacros = {
         calorias: sKcal,
         proteina: sP,
@@ -627,7 +625,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const cycleQuery = targetCicloId ? `ciclo_id=eq.${targetCicloId}` : `ciclo_id=is.null`;
       dbGetFresh(`nutricion?cliente_id=eq.${selected.id}&${cycleQuery}&limit=1`).then(rows => {
         if (rows && rows.length > 0) {
-          dbPatch(`nutricion?id=eq.${rows[0].id}`, nextMacros).catch(() => {});
+          const dbKcal = Number(rows[0].calorias) || 0;
+          if (dbKcal === 0) {
+            dbPatch(`nutricion?id=eq.${rows[0].id}`, nextMacros).catch(() => {});
+          }
         } else {
           dbPost("nutricion", {
             cliente_id: selected.id,
@@ -637,7 +638,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }).catch(() => {});
     }
-  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly, cycleMetrica]);
+  }, [selected?.id, cicloSel?.id, smartPrescription?.targetKcal, smartPrescription?.proteinG, smartPrescription?.carbsG, smartPrescription?.fatsG, isReadOnly, cycleMetrica, macros.calorias]);
 
   const parsedActiveCycle = useMemo(() => {
     return parseCycleData(cicloSel, clinicalRec?.servicios_activos);
@@ -2098,11 +2099,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (Date.now() - lastSent > 3600000) {
           sessionStorage.setItem(throttleKey, String(Date.now()));
           dbPost("notificaciones", {
-            usuario_id: selected.auth_id,
-            tipo: "plan_nutri",
+            profile_id: selected.auth_id,
+            tipo: "plan",
             titulo: "Tu plan de nutrición ha sido actualizado",
             mensaje: `Tu nutriólogo actualizó tu plan nutricional para ${cicloSel?.nombre || "este ciclo"}. Revisa tus nuevas metas y opciones de comida.`,
-            leido: false,
+            link_url: "nutricion",
+            entidad_id: cicloSel?.id || selected.id,
           }).catch(() => {});
         }
       }
@@ -3228,7 +3230,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           </div>
 
           {/* Acciones (Histórico y Expediente): En móvil abajo del correo, en computadora a la derecha de la cabecera */}
-          <div className={`${isMiPlan ? "hidden sm:flex" : "flex"} items-center gap-2 pt-1 md:pt-0 shrink-0`}>
+          <div className="flex items-center gap-2 pt-1 md:pt-0 shrink-0">
             {!isMiPlan && (
               <button
                 type="button"

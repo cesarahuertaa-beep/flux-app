@@ -1,4 +1,5 @@
 import { dbGet, dbGetFresh, dbPeek, dbPatch, dbPost, dbDel, storageListFolder, storageRemoveMany } from "./supabase";
+import { deleteClinicalRecord } from "./clinicalRecord";
 
 const _linkedClientIds = new Set();
 const PRO_ROLES = ["superadmin", "staff", "nutriologo", "nutriologo_estudiante", "administrativo"];
@@ -224,7 +225,7 @@ export async function deletePatientAccount({ clienteId, authId = null, email = "
   if (!clienteId) return;
   const cleanEmail = (email || "").trim().toLowerCase();
 
-  // 1. Limpiar fotos de progreso en Storage
+  // 1. Limpiar fotos de progreso y expediente clínico en Storage
   try {
     const files = await storageListFolder("progress-photos", clienteId);
     if (files && files.length > 0) {
@@ -234,6 +235,7 @@ export async function deletePatientAccount({ clienteId, authId = null, email = "
   } catch (storageErr) {
     console.warn("Aviso limpiando fotos del paciente:", storageErr);
   }
+  await deleteClinicalRecord(clienteId).catch(() => {});
 
   // 2. Consultar todas las filas relacionadas al usuario para saber si conserva otros roles activos
   let allClientes = [];
@@ -275,6 +277,7 @@ export async function deletePatientAccount({ clienteId, authId = null, email = "
   // Limpiar cualquier cliente sombra huérfano adicional si no tiene rol profesional
   for (const orphan of orphanShadowClientes) {
     try {
+      await deleteClinicalRecord(orphan.id).catch(() => {});
       await dbPatch(`clientes?id=eq.${orphan.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: orphan.id, p_auth_id: null });
     } catch {}
@@ -358,6 +361,7 @@ export async function deleteNutriologoAccount({ nutriologoId, email = "" }) {
           await storageRemoveMany("progress-photos", paths);
         }
       } catch {}
+      await deleteClinicalRecord(c.id).catch(() => {});
       // Desvincular auth_id primero para que el cierre final en eliminar_nutriologo_definitivo limpie el auth.users del nutriólogo
       await dbPatch(`clientes?id=eq.${c.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: c.id, p_auth_id: null }).catch(() => {});
@@ -407,6 +411,7 @@ export async function deleteCollaboratorAccount({ profileId, email = "" }) {
   const shadowClients = allClientes.filter(c => c.objetivo === "Mi entrenamiento personal");
   for (const sc of shadowClients) {
     try {
+      await deleteClinicalRecord(sc.id).catch(() => {});
       await dbPatch(`clientes?id=eq.${sc.id}`, { auth_id: null, email: null }).catch(() => {});
       await dbPost("rpc/eliminar_paciente_definitivo", { p_cliente_id: sc.id, p_auth_id: null });
     } catch {}

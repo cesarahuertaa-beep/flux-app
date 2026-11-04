@@ -1,4 +1,4 @@
-import { storageUpload, broadcastTableChange, invalidateCache } from "./supabase";
+import { storageUpload, storageRemoveMany, broadcastTableChange, invalidateCache } from "./supabase";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -141,6 +141,25 @@ export async function saveClinicalRecord(clienteId, nextRecord) {
     // ignore
   }
   return normalized;
+}
+
+export async function deleteClinicalRecord(clienteId) {
+  if (!clienteId) return;
+  try {
+    localStorage.removeItem(getCacheKey(clienteId));
+  } catch {
+    // ignore
+  }
+  try {
+    await storageRemoveMany("logos", [`expediente_clinico_${clienteId}.json`]);
+  } catch {
+    // ignore
+  }
+  try {
+    invalidateCache("expediente_clinico", { clienteId });
+  } catch {
+    // ignore
+  }
 }
 
 export function hasAnamnesisData(anamnesis) {
