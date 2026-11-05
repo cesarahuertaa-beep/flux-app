@@ -1122,11 +1122,12 @@ export const storageUpload = async (bucket, path, file, opts = {}) => {
     const timer = setTimeout(() => controller.abort(), 25000);
     const token = getValidToken();
     try {
+      const isJsonConfig = String(path).endsWith(".json") || file?.type === "application/json";
       const headers = {
         apikey: SUPA_KEY,
         Authorization: `Bearer ${token || SUPA_KEY}`,
-        "Content-Type": file.type || "image/jpeg",
-        "Cache-Control": "public, max-age=31536000",
+        "Content-Type": file.type || (isJsonConfig ? "application/json" : "image/jpeg"),
+        "Cache-Control": isJsonConfig ? "no-cache, max-age=0" : "public, max-age=31536000",
       };
       if (useUpsert) {
         headers["x-upsert"] = "true";

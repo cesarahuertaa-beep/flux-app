@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
-import { dbGet, storageUpload } from "../../lib/supabase";
+import { dbGet, dbGetFresh, storageUpload } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
+import { parseMealOptions, formatMealOptions } from "../../lib/mealOptions";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -39,22 +40,65 @@ export default function TemplatesManagerModal({
     }
   }, [tab, cloneableClientes.length]);
 
-  // Resolver ID del creador/perfil para aislamiento estricto de plantillas
-  const creatorId = profileId ||
+  // Resolver ID del creador/perfil para aislamiento estricto de plantillas:
+  // Priorizar siempre el flux_profileId de la sesión activa para que el especialista conserve
+  // la misma biblioteca sin importar qué paciente tenga seleccionado.
+  const creatorId =
     (typeof window !== "undefined" && (localStorage.getItem("flux_profileId") || localStorage.getItem("flux_client_id"))) ||
+    profileId ||
     "default";
 
   const storageKey = `flux_plantillas_${type}_${creatorId}`;
+  const deletedStorageKey = `flux_plantillas_del_${type}_${creatorId}`;
   const cloudFileName = `plantillas_${type}_${creatorId}.json`;
+  const hasLocalChangesRef = useRef(false);
+
+  const getDeletedIds = () => {
+    try {
+      const raw = localStorage.getItem(deletedStorageKey);
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  };
 
   // Cargar plantillas de usuario aisladas por perfil
   const [userTemplates, setUserTemplates] = useState(() => {
     try {
+      const deletedSet = getDeletedIds();
+      let baseList = [];
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          baseList = parsed.filter((t) => t && !deletedSet.has(t.id));
+        }
       }
+
+      // Recuperar plantillas que se hayan guardado bajo un profileId alternativo (ej. fallback de paciente)
+      if (profileId && String(profileId) !== String(creatorId)) {
+        const altKey = `flux_plantillas_${type}_${profileId}`;
+        const altRaw = localStorage.getItem(altKey);
+        if (altRaw) {
+          try {
+            const altParsed = JSON.parse(altRaw);
+            if (Array.isArray(altParsed) && altParsed.length > 0) {
+              const seen = new Set(baseList.map((t) => t.id));
+              altParsed.forEach((t) => {
+                if (t && t.id && !seen.has(t.id) && !deletedSet.has(t.id)) {
+                  seen.add(t.id);
+                  baseList.push(t);
+                }
+              });
+              localStorage.setItem(storageKey, JSON.stringify(baseList));
+            }
+          } catch {}
+        }
+      }
+
+      if (baseList.length > 0) return baseList;
+
       // Solo migrar claves legacy no-espaciadas si NO es un atleta civil,
       // protegiendo a los atletas de ver plantillas del superadmin o pruebas.
       const userRole = typeof window !== "undefined" ? localStorage.getItem("flux_role") : null;
@@ -76,7 +120,7 @@ export default function TemplatesManagerModal({
     }
   });
 
-  // Sincronización en la nube (Supabase Storage) en segundo plano
+  // Sincronización en la nube (Supabase Storage) en segundo plano con fusión inteligente
   useEffect(() => {
     if (!SUPA_URL || !creatorId || creatorId === "default") return;
     let isMounted = true;
@@ -86,11 +130,29 @@ export default function TemplatesManagerModal({
         const r = await fetch(url, { cache: "no-store" });
         if (r.ok) {
           const cloudData = await r.json();
-          if (Array.isArray(cloudData) && isMounted) {
-            setUserTemplates(cloudData);
-            try {
-              localStorage.setItem(storageKey, JSON.stringify(cloudData));
-            } catch {}
+          if (Array.isArray(cloudData) && isMounted && !hasLocalChangesRef.current) {
+            const deletedSet = getDeletedIds();
+            setUserTemplates((prevLocal) => {
+              // Conservar plantillas locales recién creadas que aún no estaban en el archivo remoto
+              // y excluir cualquier plantilla que el usuario haya eliminado localmente
+              const localList = Array.isArray(prevLocal) ? prevLocal : [];
+              const mergedMap = new Map();
+              localList.forEach((t) => {
+                if (t && t.id && !deletedSet.has(t.id)) mergedMap.set(t.id, t);
+              });
+              cloudData.forEach((t) => {
+                if (t && t.id && !deletedSet.has(t.id) && !mergedMap.has(t.id)) {
+                  mergedMap.set(t.id, t);
+                }
+              });
+              const merged = Array.from(mergedMap.values()).sort(
+                (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+              );
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
           }
         }
       } catch (err) {
@@ -103,6 +165,7 @@ export default function TemplatesManagerModal({
 
   // Guardar en localStorage y respaldar en Supabase Storage
   const saveUserTemplates = (newList) => {
+    hasLocalChangesRef.current = true;
     setUserTemplates(newList);
     try {
       localStorage.setItem(storageKey, JSON.stringify(newList));
@@ -161,6 +224,18 @@ export default function TemplatesManagerModal({
       return;
     }
 
+    const validDias = (currentData?.dias || []).filter(d => (d.comidas || []).length > 0);
+    const validRutinas = (currentData?.rutinas || []).filter(r => (r.ejercicios || []).length > 0);
+
+    if (type === "nutri" && validDias.length === 0) {
+      showFluxAlert("Plan sin comidas", "El plan actual no tiene comidas registradas. Agrega al menos una comida antes de guardarlo como plantilla.");
+      return;
+    }
+    if (type === "rutina" && validRutinas.length === 0) {
+      showFluxAlert("Plan sin ejercicios", "El plan actual no tiene ejercicios registrados. Agrega al menos un ejercicio antes de guardarlo como plantilla.");
+      return;
+    }
+
     const newTemplate = {
       id: `tpl_${Date.now()}`,
       nombre: nuevoNombre.trim(),
@@ -169,38 +244,53 @@ export default function TemplatesManagerModal({
       created_at: new Date().toISOString(),
       ...(type === "nutri"
         ? {
-            macros: currentData?.macros || { calorias: 0, proteina: 0, carbohidratos: 0, grasas: 0 },
-            dias: (currentData?.dias || []).map((d) => ({
+            macros: {
+              calorias: Number(currentData?.macros?.calorias) || 0,
+              proteina: Number(currentData?.macros?.proteina) || 0,
+              carbohidratos: Number(currentData?.macros?.carbohidratos) || 0,
+              grasas: Number(currentData?.macros?.grasas) || 0,
+            },
+            dias: validDias.map((d, dIdx) => ({
               dia: d.dia,
-              orden: d.orden,
-              comidas: (d.comidas || []).map((c) => ({
-                hora: c.hora || "",
-                nombre: c.nombre || "",
-                opcion1: c.opcion1 || "",
-                opcion2: c.opcion2 || "",
-                calorias: c.calorias || 0,
-                proteina: c.proteina || 0,
-                carbohidratos: c.carbohidratos || 0,
-                grasas: c.grasas || 0,
-                foto_url: c.foto_url || c.imagen_url || ""
-              }))
+              orden: d.orden != null ? d.orden : dIdx,
+              comidas: (d.comidas || []).map((c, cIdx) => {
+                const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
+                  ? c.opciones
+                  : parseMealOptions(c);
+                const { opcion1, opcion2 } = formatMealOptions(optsList);
+                return {
+                  hora: c.hora || "",
+                  nombre: c.nombre || `Comida ${cIdx + 1}`,
+                  opcion1: opcion1 || c.opcion1 || "",
+                  opcion2: opcion2 || c.opcion2 || "",
+                  opciones: optsList,
+                  calorias: Number(c.calorias) || 0,
+                  proteina: Number(c.proteina) || 0,
+                  carbohidratos: Number(c.carbohidratos) || 0,
+                  grasas: Number(c.grasas) || 0,
+                  foto_url: c.foto_url || c.imagen_url || "",
+                  orden: c.orden != null ? c.orden : cIdx,
+                };
+              })
             }))
           }
         : {
-            semanas: currentData?.semanas || 4,
-            rutinas: (currentData?.rutinas || []).map((r) => ({
+            semanas: Number(currentData?.semanas) || 4,
+            rutinas: validRutinas.map((r, rIdx) => ({
               nombre: r.nombre,
-              semanas: r.semanas || 4,
-              ejercicios: (r.ejercicios || []).map((e) => ({
+              semanas: Number(r.semanas) || Number(currentData?.semanas) || 4,
+              orden: r.orden != null ? r.orden : rIdx,
+              ejercicios: (r.ejercicios || []).map((e, eIdx) => ({
                 biblioteca_id: e.biblioteca_id || null,
-                nombre: e.nombre,
+                nombre: e.nombre || "",
                 gif_url: e.gif_url || "",
                 grupo_muscular: e.grupo_muscular || "",
                 tipo_movimiento: e.tipo_movimiento || "",
-                num_series: e.num_series || 4,
-                reps_sugeridas: e.reps_sugeridas || 10,
+                num_series: Number(e.num_series) || 4,
+                reps_sugeridas: Number(e.reps_sugeridas) || 10,
                 peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
                 unidad: e.unidad || "kg",
+                orden: e.orden != null ? e.orden : eIdx,
                 alternativas: (e.alternativas || []).map((alt) => ({
                   ...alt,
                   peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
@@ -233,6 +323,11 @@ export default function TemplatesManagerModal({
       danger: true,
       icon: "trash",
       onConfirm: () => {
+        try {
+          const delSet = getDeletedIds();
+          delSet.add(id);
+          localStorage.setItem(deletedStorageKey, JSON.stringify(Array.from(delSet)));
+        } catch {}
         saveUserTemplates(userTemplates.filter((t) => t.id !== id));
         setConfirmAction(null);
       }
@@ -243,68 +338,85 @@ export default function TemplatesManagerModal({
     if (!selectedCicloId) return;
     try {
       if (type === "nutri") {
-        // Cargar nutrición de ese ciclo
-        const nRes = await dbGet(`nutricion?ciclo_id=eq.${selectedCicloId}`);
+        // Cargar nutrición fresca de ese ciclo con días y comidas anidados
+        const nRes = await dbGetFresh(`nutricion?ciclo_id=eq.${selectedCicloId}`);
         if (!nRes || nRes.length === 0) {
           showFluxAlert("Sin plan de nutrición", "El ciclo seleccionado no tiene plan de nutrición.");
           return;
         }
         const nut = nRes[0];
-        const diasRes = await dbGet(`nutricion_dias?nutricion_id=eq.${nut.id}&order=orden.asc`);
-        const dids = diasRes.map((d) => d.id).join(",");
-        const comsRes = dids ? await dbGet(`comidas?dia_id=in.(${dids})&order=orden.asc`) : [];
+        const diasRes = await dbGetFresh(`nutricion_dias?nutricion_id=eq.${nut.id}&select=*,comidas(*)&order=orden.asc`);
 
-        const clonedDias = diasRes.map((d) => ({
-          dia: d.dia,
-          orden: d.orden,
-          comidas: comsRes.filter((c) => c.dia_id === d.id).map((c) => ({
-            hora: c.hora || "",
-            nombre: c.nombre || "",
-            opcion1: c.opcion1 || "",
-            opcion2: c.opcion2 || "",
-            calorias: c.calorias || 0,
-            proteina: c.proteina || 0,
-            carbohidratos: c.carbohidratos || 0,
-            grasas: c.grasas || 0,
-            foto_url: c.foto_url || c.imagen_url || ""
-          }))
-        }));
+        const clonedDias = (diasRes || []).map((d, dIdx) => {
+          const sortedComs = (d.comidas || []).slice().sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+          return {
+            dia: d.dia,
+            orden: d.orden != null ? d.orden : dIdx,
+            comidas: sortedComs.map((c, cIdx) => {
+              const optsList = parseMealOptions(c);
+              const { opcion1, opcion2 } = formatMealOptions(optsList);
+              return {
+                hora: c.hora || "",
+                nombre: c.nombre || `Comida ${cIdx + 1}`,
+                opcion1: opcion1 || c.opcion1 || "",
+                opcion2: opcion2 || c.opcion2 || "",
+                opciones: optsList,
+                calorias: Number(c.calorias) || 0,
+                proteina: Number(c.proteina) || 0,
+                carbohidratos: Number(c.carbohidratos) || 0,
+                grasas: Number(c.grasas) || 0,
+                foto_url: c.foto_url || c.imagen_url || "",
+                orden: c.orden != null ? c.orden : cIdx,
+              };
+            })
+          };
+        });
 
         onApplyTemplate({
-          macros: { calorias: nut.calorias, proteina: nut.proteina, carbohidratos: nut.carbohidratos, grasas: nut.grasas },
+          nombre: "Plan clonado",
+          macros: {
+            calorias: Number(nut.calorias) || 0,
+            proteina: Number(nut.proteina) || 0,
+            carbohidratos: Number(nut.carbohidratos) || 0,
+            grasas: Number(nut.grasas) || 0,
+          },
           dias: clonedDias
         });
       } else {
-        // Cargar rutinas de ese ciclo
-        const rutRes = await dbGet(`rutinas?ciclo_id=eq.${selectedCicloId}&order=orden.asc`);
+        // Cargar rutinas frescas de ese ciclo con ejercicios anidados
+        const rutRes = await dbGetFresh(`rutinas?ciclo_id=eq.${selectedCicloId}&select=*,ejercicios(*)&order=orden.asc`);
         if (!rutRes || rutRes.length === 0) {
           showFluxAlert("Sin rutinas", "El ciclo seleccionado no tiene rutinas.");
           return;
         }
-        const rids = rutRes.map((r) => r.id).join(",");
-        const ejsRes = rids ? await dbGet(`ejercicios?rutina_id=in.(${rids})&order=orden.asc`) : [];
 
-        const clonedRutinas = rutRes.map((r) => ({
-          nombre: r.nombre,
-          semanas: r.semanas || 4,
-          ejercicios: ejsRes.filter((e) => e.rutina_id === r.id).map((e) => ({
-            biblioteca_id: e.biblioteca_id || null,
-            nombre: e.nombre,
-            gif_url: e.gif_url || "",
-            grupo_muscular: e.grupo_muscular || "",
-            tipo_movimiento: e.tipo_movimiento || "",
-            num_series: e.num_series || 4,
-            reps_sugeridas: e.reps_sugeridas || 10,
-            peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
-            unidad: e.unidad || "kg",
-            alternativas: (e.alternativas || []).map((alt) => ({
-              ...alt,
-              peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+        const clonedRutinas = (rutRes || []).map((r, rIdx) => {
+          const sortedEjs = (r.ejercicios || []).slice().sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+          return {
+            nombre: r.nombre,
+            semanas: Number(r.semanas) || 4,
+            orden: r.orden != null ? r.orden : rIdx,
+            ejercicios: sortedEjs.map((e, eIdx) => ({
+              biblioteca_id: e.biblioteca_id || null,
+              nombre: e.nombre || "",
+              gif_url: e.gif_url || "",
+              grupo_muscular: e.grupo_muscular || "",
+              tipo_movimiento: e.tipo_movimiento || "",
+              num_series: Number(e.num_series) || 4,
+              reps_sugeridas: Number(e.reps_sugeridas) || 10,
+              peso_sugerido: (e.peso_sugerido !== "" && e.peso_sugerido !== null && e.peso_sugerido !== undefined && !isNaN(e.peso_sugerido)) ? Number(e.peso_sugerido) : null,
+              unidad: e.unidad || "kg",
+              orden: e.orden != null ? e.orden : eIdx,
+              alternativas: (e.alternativas || []).map((alt) => ({
+                ...alt,
+                peso_sugerido: (alt.peso_sugerido !== "" && alt.peso_sugerido !== null && alt.peso_sugerido !== undefined && !isNaN(alt.peso_sugerido)) ? Number(alt.peso_sugerido) : null
+              }))
             }))
-          }))
-        }));
+          };
+        });
 
         onApplyTemplate({
+          nombre: "Programa clonado",
           rutinas: clonedRutinas
         });
       }
@@ -489,11 +601,11 @@ export default function TemplatesManagerModal({
                 <p className="font-bold mb-1">¿Qué se guardará en esta plantilla?</p>
                 {type === "nutri" ? (
                   <p className="text-[#6B7A8D]">
-                    Se guardará la configuración de macros y los <strong>{(currentData?.dias || []).length} días</strong> activos con todas sus comidas, horarios e ingredientes.
+                    Se guardará la configuración de macros y los <strong>{(currentData?.dias || []).filter(d => (d.comidas || []).length > 0).length} días con comidas</strong> activos con todas sus tomas, horarios e ingredientes.
                   </p>
                 ) : (
                   <p className="text-[#6B7A8D]">
-                    Se guardarán las <strong>{(currentData?.rutinas || []).length} rutinas</strong> activas con todos sus ejercicios, series sugeridas, repeticiones y alternativas.
+                    Se guardarán las <strong>{(currentData?.rutinas || []).filter(r => (r.ejercicios || []).length > 0).length} rutinas con ejercicios</strong> activas con todas sus series sugeridas, repeticiones y alternativas.
                   </p>
                 )}
               </div>
