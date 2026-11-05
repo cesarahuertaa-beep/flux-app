@@ -53,6 +53,26 @@ function isFemenino(val: any): boolean {
   return s.startsWith("F") || s === "MUJER" || s === "FEMALE";
 }
 
+const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash-lite"];
+
+function extractGeminiText(data: any): string {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts.map((p: any) => p?.text || "").join("").trim();
+}
+
+function getGenerationConfig(model: string, jsonMode: boolean = true, temp: number = 0.2) {
+  const cfg: any = {
+    temperature: temp,
+  };
+  if (jsonMode) {
+    cfg.responseMimeType = "application/json";
+  }
+  if (model.includes("3.1") || model.includes("3-flash")) {
+    cfg.thinkingConfig = { thinkingBudget: 0 };
+  }
+  return cfg;
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -189,7 +209,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
   "estrategiaMenu": "string con sugerencias directas y prácticas de menú integrando sus favoritos y reemplazando los malos hábitos de su R24H"
 }`;
 
-      for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+      for (const model of CANDIDATE_MODELS) {
         try {
           const res = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -201,17 +221,14 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
               },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: promptAudit }] }],
-                generationConfig: {
-                  temperature: 0.2,
-                  responseMimeType: "application/json",
-                },
+                generationConfig: getGenerationConfig(model, true, 0.2),
               }),
             }
           );
 
           if (res.ok) {
             const data = await res.json();
-            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            const textResponse = extractGeminiText(data);
             if (textResponse) {
               const parsed = JSON.parse(textResponse);
               return new Response(
@@ -294,7 +311,7 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
   "resumenNutricional": "string breve de 1 oración sobre la calidad de la toma"
 }`;
 
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -306,16 +323,13 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
                 },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptMeal }] }],
-                  generationConfig: {
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.2),
                 }),
               }
             );
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 return new Response(
@@ -375,7 +389,7 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
   "nombreNormalizado": "string breve del platillo alternativo"
 }`;
 
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -387,16 +401,13 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
                 },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptAlt }] }],
-                  generationConfig: {
-                    temperature: 0.3,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.3),
                 }),
               }
             );
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 return new Response(
@@ -481,7 +492,7 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
   "grasas": number
 }`;
 
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -493,16 +504,13 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
                 },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptDish }] }],
-                  generationConfig: {
-                    temperature: 0.3,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.3),
                 }),
               }
             );
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 const p = Math.round(Number(parsed.proteina) || 0);
@@ -566,7 +574,7 @@ Debes responder ÚNICAMENTE con un JSON:
   "grasas": number
 }`;
 
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -578,16 +586,13 @@ Debes responder ÚNICAMENTE con un JSON:
                 },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptPantry }] }],
-                  generationConfig: {
-                    temperature: 0.3,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.3),
                 }),
               }
             );
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 return new Response(
@@ -723,7 +728,7 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
   }
 }`;
 
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -735,16 +740,13 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
                 },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: {
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.2),
                 }),
               }
             );
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 return new Response(
@@ -955,7 +957,7 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
 
       let lastErrorDetail = "";
       if (geminiKey) {
-        for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
+        for (const model of CANDIDATE_MODELS) {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 9000);
@@ -970,17 +972,14 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
                 signal: controller.signal,
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptGrocery }] }],
-                  generationConfig: {
-                    temperature: 0.1,
-                    responseMimeType: "application/json",
-                  },
+                  generationConfig: getGenerationConfig(model, true, 0.1),
                 }),
               }
             );
             clearTimeout(timeoutId);
             if (res.ok) {
               const data = await res.json();
-              const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              const textRes = extractGeminiText(data);
               if (textRes) {
                 const parsed = JSON.parse(textRes);
                 return new Response(
@@ -1133,7 +1132,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
   ]
 }`;
 
-      for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]) {
+      for (const model of CANDIDATE_MODELS) {
         try {
           const res = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -1145,17 +1144,14 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
               },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                  temperature: 0.2,
-                  responseMimeType: "application/json",
-                },
+                generationConfig: getGenerationConfig(model, true, 0.2),
               }),
             }
           );
 
           if (res.ok) {
             const data = await res.json();
-            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            const textResponse = extractGeminiText(data);
             if (textResponse) {
               const parsed = JSON.parse(textResponse);
               return new Response(
