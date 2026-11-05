@@ -1886,6 +1886,45 @@ Responde ÚNICAMENTE con JSON:
   };
 }
 
+// Mapa de abreviaturas para nombres de días
+const MAPA_CODIGOS_DIA_SUPER = {
+  LUN: "Lunes", MAR: "Martes", MIE: "Miércoles", JUE: "Jueves", VIE: "Viernes", SAB: "Sábado", DOM: "Domingo", "S/D": "General"
+};
+
+export function analizarDiaMenuSuper(diaRaw, totalDiasEnPlan = 1) {
+  const original = String(diaRaw || "").trim();
+  const limpio = original.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  if (/^(lun|mar|mie|jue|vie|sab|dom|s\/d)\|/i.test(limpio)) {
+    const [codeRaw, ...resto] = original.split("|");
+    const code = codeRaw.toUpperCase();
+    const subtitulo = resto.join("|").trim();
+    const nombreBase = MAPA_CODIGOS_DIA_SUPER[code] || code;
+    return { diaBase: nombreBase, etiquetaDia: subtitulo ? `${nombreBase} (${subtitulo})` : nombreBase, multiplicador: 1 };
+  }
+  if (limpio.includes("lunes a domingo") || limpio.includes("toda la semana") || limpio.includes("diario") || limpio.includes("7 dias")) {
+    return { diaBase: original, etiquetaDia: original, multiplicador: 7 };
+  }
+  if (limpio.includes("lunes a sabado") || limpio.includes("lun a sab") || limpio.includes("6 dias")) {
+    return { diaBase: original, etiquetaDia: original, multiplicador: 6 };
+  }
+  if (limpio.includes("lunes a viernes") || limpio.includes("lun a vie") || limpio.includes("entre semana") || limpio.includes("5 dias")) {
+    return { diaBase: original, etiquetaDia: original, multiplicador: 5 };
+  }
+  if (limpio.includes("fin de semana") || limpio.includes("sabado y domingo") || limpio.includes("sab y dom")) {
+    return { diaBase: original, etiquetaDia: original, multiplicador: 2 };
+  }
+  const diasSemana = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+  const mencionados = diasSemana.filter((d) => limpio.includes(d));
+  if (mencionados.length > 1) {
+    return { diaBase: original, etiquetaDia: original, multiplicador: mencionados.length };
+  }
+  if (totalDiasEnPlan === 1 && mencionados.length === 0) {
+    return { diaBase: original, etiquetaDia: `${original} (Semana completa)`, multiplicador: 7 };
+  }
+  return { diaBase: original, etiquetaDia: original, multiplicador: 1 };
+}
+
 /**
  * Genera la lista de compras del súper consolidada y clasificada con IA (Gemini Edge -> Direct -> Analítico Local)
  */
@@ -1907,6 +1946,8 @@ export async function generateGroceryListWithAi({ dias = [], incluirAlternativas
     if (edgeRes?.success && Array.isArray(edgeRes.items) && edgeRes.items.length > 0) {
       return {
         items: edgeRes.items,
+        resumenDias: edgeRes.resumenDias || "",
+        totalDias: edgeRes.totalDias || null,
         origen: "gemini_edge",
         model: edgeRes.model || "gemini-3.5-flash-lite",
         success: true,
@@ -1916,78 +1957,80 @@ export async function generateGroceryListWithAi({ dias = [], incluirAlternativas
     console.warn("[FLUX AI] Edge function de lista de súper no disponible, intentando Gemini directo:", err?.message);
   }
 
-  // Preparar resumen del menú para Tier 2
-  const menuResumen = [];
-  dias.forEach((d, dIdx) => {
-    const diaNombre = d.dia || `Día ${dIdx + 1}`;
-    (d.comidas || []).forEach((c, cIdx) => {
-      const cNombre = c.nombre || `Comida ${cIdx + 1}`;
-      const p1 = (c.opcion1 || "").trim();
-      if (p1) {
-        menuResumen.push({ dia: diaNombre, comida: cNombre, receta: p1 });
-      }
-      if (incluirAlternativas) {
-        const p2 = (c.opcion2 || "").trim();
-        if (p2) {
-          const alts = p2.split("\n--- OTRA OPCIÓN ---\n");
-          alts.forEach((alt, aIdx) => {
-            const tr = (alt || "").trim();
-            if (tr) menuResumen.push({ dia: diaNombre, comida: `${cNombre} (Opción ${String.fromCharCode(66 + aIdx)})`, receta: tr });
-          });
-        }
-      }
-    });
-  });
+  // Preparar resumen del menú con multiplicadores por bloque para Tier 2
+  const diasAnalizados = dias.map((d) => {
+    const info = analizarDiaMenuSuper(d.dia, dias.length);
+    const comidasValidas = (d.comidas || []).filter(
+      (c) => (c.opcion1 && c.opcion1.trim()) || (incluirAlternativas && c.opcion2 && c.opcion2.trim())
+    );
+    return {
+      ...d,
+      etiquetaDia: info.etiquetaDia,
+      multiplicador: info.multiplicador,
+      comidas: comidasValidas,
+    };
+  }).filter((d) => d.comidas.length > 0);
 
-  if (menuResumen.length === 0) {
+  if (diasAnalizados.length === 0) {
     return { items: [], origen: "empty", success: true };
   }
+
+  const totalDiasReales = diasAnalizados.reduce((acc, d) => acc + (d.multiplicador || 1), 0);
+  const listaNombresDias = diasAnalizados.map((d) => `${d.etiquetaDia} (x${d.multiplicador} ${d.multiplicador === 1 ? "día" : "días"})`).join(", ");
+
+  const resumenDieta = diasAnalizados.map((d) => {
+    const comidasTexto = d.comidas.map((c, idx) => {
+      let t = `- ${c.nombre || `Comida ${idx + 1}`}: ${c.opcion1 || ""}`;
+      if (incluirAlternativas && c.opcion2 && c.opcion2.trim()) {
+        t += `\n  [Alternativa]: ${c.opcion2.trim()}`;
+      }
+      return t;
+    }).join("\n");
+    return `### DÍA: ${d.etiquetaDia} (MULTIPLICAR CANTIDADES DE ESTE BLOQUE POR: ${d.multiplicador} ${d.multiplicador === 1 ? "día" : "días"})\n${comidasTexto}`;
+  }).join("\n\n");
 
   // Tier 2: Gemini Direct si hay clave en navegador
   if (apiKey) {
     const promptGrocery = `Eres el asistente culinario y nutricional experto de FLUX Nutrición.
-Tu tarea es analizar el siguiente menú semanal de alimentación y generar la lista consolidada, sumada y clasificada de compras del supermercado para toda la semana.
+Tu tarea es analizar el siguiente menú de alimentación semanal y generar la lista consolidada de compras del supermercado para los días registrados.
 
-MENÚ SEMANAL A ANALIZAR:
-${JSON.stringify(menuResumen, null, 2)}
+DÍAS A CONSIDERAR: ${listaNombresDias} (Total acumulado: ${totalDiasReales} días).
 
-INSTRUCCIONES CLÍNICAS Y CULINARIAS:
-1. Extrae todos los alimentos e ingredientes reales de cada receta (ignora palabras de método culinario como "licuar", "hervir", "a la plancha", "al gusto").
-2. CONSOLIDA y SUMA las cantidades de ingredientes idénticos o equivalentes a lo largo de toda la semana.
-   - Ejemplo: Pechuga de pollo 150g en Comida 1 + 200g en Comida 3 -> Pechuga de pollo con cantidadNum: 350, unidad: "g".
-   - Si no se especifica cantidad (ej. canela, orégano, sal, pimienta, ajo en polvo), coloca cantidadNum: null y unidad: "".
-3. Identifica en cuántas tomas/comidas distintas se utiliza cada ingrediente ("veces").
-4. Normaliza la unidad a estándares limpios: "g", "kg", "ml", "L", "pzas", "taza", "cda", "cdita", "lata", "sobre", "rebanada", "scoop".
-5. Clasifica CADA ingrediente en exactamente una de estas 5 categorías de supermercado:
-   - "proteinas": Pollo, carnes rojas, pescados, mariscos, atún, huevos, claras, tofu, proteína en polvo (whey), queso cottage, jamón de pavo, etc.
-   - "verduras_frutas": Frutas frescas, bayas/berries, verduras, hojas verdes (espinaca, lechuga), jitomate, cebolla, calabacitas, aguacate, limón, etc.
-   - "cereales": Avena, arroz, tortillas, pan, tostadas, pasta, papa, camote, quinoa, harinas, galletas de arroz, etc.
-   - "lacteos_grasas": Leches (vaca o vegetales), yogur griego, quesos (panela, oaxaca), nueces, almendras, crema de cacahuate, aceite de oliva, chía, etc.
-   - "otros": Especias, hierbas, café, té, mostaza, vinagre, endulzantes, polvo para hornear, despensa general.
+MENÚ A ANALIZAR:
+${resumenDieta}
+
+REGLAS ESTRICTAS E INQUEBRANTABLES:
+1. MULTIPLICACIÓN MATEMÁTICA EXACTA:
+   - Multiplica las cantidades de cada comida por el número exacto indicado en su bloque: "(MULTIPLICAR CANTIDADES DE ESTE BLOQUE POR: X días)".
+   - Ejemplo: Si el bloque dice "POR: 5 días" y la comida tiene "180g de pechuga de pollo", la cantidad total es 180 * 5 = 900g.
+   - Si no tiene multiplicador (o es 1 día), déjalo tal cual (180g).
+2. CONSOLIDACIÓN DE INGREDIENTES IDÉNTICOS:
+   - Si un ingrediente se repite en varias comidas o días, suma sus cantidades totales en un solo ítem.
+   - Cuenta cuántas comidas distintas usan ese ingrediente ("veces").
+3. EXTRACCIÓN LIMPIA DE INGREDIENTES (CERO BASURA):
+   - Extrae únicamente el alimento real (ej. "Pechuga de pollo", "Claras de huevo", "Arroz blanco", "Espinacas", "Aguacate", "Manzana", "Aceite de oliva").
+   - ELIMINA métodos de cocción, adjetivos culinarios o frases como: "a la plancha", "hervido", "al vapor", "picadas", "al gusto", "opcional", "en ensalada", "acompañado de".
+4. UNIDADES LIMPIAS Y ESTÁNDAR:
+   - Usa unidades estándar: "g", "kg", "ml", "L", "pzas", "taza", "cda", "cdita", "lata", "sobre", "rebanada", "scoop".
+   - Si un ingrediente no tiene cantidad medible, coloca cantidadNum: null y unidad: "".
+5. CLASIFICACIÓN PRECISA EN 5 PASILLOS DE SUPERMERCADO:
+   - "proteinas": Pollo, carnes rojas, carne molida, pescados, atún, camarón, salmón, huevos, claras, jamón de pavo, tofu, proteína en polvo (whey), queso cottage.
+   - "verduras_frutas": Frutas frescas (plátano, manzana, fresas, moras), verduras (espinacas, jitomate, cebolla, calabacita, pepino, lechuga, zanahoria, brócoli, papa), aguacate, limón.
+   - "cereales": Avena, arroz, tortillas de maíz, pan tostado/integral, pasta, camote, tostadas horneadas, galletas de arroz, quinoa.
+   - "lacteos_grasas": Leches, yogur griego, quesos (panela, oaxaca), nueces, almendras, crema de cacahuate, aceite de oliva, semillas de chía.
+   - "otros": Café, té, canela, especias, mostaza, vinagre, endulzante, polvo para hornear, despensa.
 
 RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
 {
+  "resumenDias": "Lista calculada para ${totalDiasReales} días de menú (${listaNombresDias})",
+  "totalDias": ${totalDiasReales},
   "items": [
     {
       "nombre": "Pechuga de pollo",
       "categoria": "proteinas",
-      "cantidadNum": 750,
+      "cantidadNum": 900,
       "unidad": "g",
       "veces": 5
-    },
-    {
-      "nombre": "Espinacas",
-      "categoria": "verduras_frutas",
-      "cantidadNum": 200,
-      "unidad": "g",
-      "veces": 3
-    },
-    {
-      "nombre": "Canela en polvo",
-      "categoria": "otros",
-      "cantidadNum": null,
-      "unidad": "",
-      "veces": 4
     }
   ]
 }`;
@@ -2023,6 +2066,8 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
             if (Array.isArray(parsed.items) && parsed.items.length > 0) {
               return {
                 items: parsed.items,
+                resumenDias: parsed.resumenDias || `Lista calculada para ${totalDiasReales} días de menú`,
+                totalDias: parsed.totalDias || totalDiasReales,
                 success: true,
                 origen: "gemini_direct",
                 model,
@@ -2041,6 +2086,8 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
     const fallbackItems = fallbackFn(dias, incluirAlternativas);
     return {
       items: fallbackItems,
+      resumenDias: `Plan semanal • ${dias.length} días`,
+      totalDias: dias.length,
       origen: "fallback_local",
       success: true,
     };

@@ -303,6 +303,18 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
   });
 
   const [loadingAi, setLoadingAi] = useState(false);
+  const [resumenDias, setResumenDias] = useState(() => {
+    try {
+      const cached = localStorage.getItem(aiCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.hash === menuHash && parsed?.resumenDias) {
+          return parsed.resumenDias;
+        }
+      }
+    } catch {}
+    return "";
+  });
   const [isAiGenerated, setIsAiGenerated] = useState(() => {
     try {
       const cached = localStorage.getItem(aiCacheKey);
@@ -327,6 +339,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         const parsed = JSON.parse(cached);
         if (parsed?.hash === menuHash && Array.isArray(parsed?.items) && parsed.items.length > 0) {
           setAiItems(parsed.items.map(normalizeAiItem));
+          setResumenDias(parsed?.resumenDias || "");
           setIsAiGenerated(parsed?.origen !== "fallback_local");
           setLoadingAi(false);
           return;
@@ -338,6 +351,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
 
     if (!dias || dias.length === 0) {
       setAiItems([]);
+      setResumenDias("");
       setLoadingAi(false);
       return;
     }
@@ -353,12 +367,15 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         if (isCancelled) return;
         if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
           const cleaned = res.items.map(normalizeAiItem);
+          const rDias = res.resumenDias || "";
           setAiItems(cleaned);
+          setResumenDias(rDias);
           setIsAiGenerated(res.origen !== "fallback_local");
           try {
             localStorage.setItem(aiCacheKey, JSON.stringify({
               hash: menuHash,
               items: cleaned,
+              resumenDias: rDias,
               origen: res.origen,
               timestamp: Date.now()
             }));
@@ -368,6 +385,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         } else {
           const fallback = parseDietIngredients(dias, incluirAlt).map(normalizeAiItem);
           setAiItems(fallback);
+          setResumenDias("");
           setIsAiGenerated(false);
         }
       })
@@ -376,6 +394,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         if (!isCancelled) {
           const fallback = parseDietIngredients(dias, incluirAlt).map(normalizeAiItem);
           setAiItems(fallback);
+          setResumenDias("");
           setIsAiGenerated(false);
         }
       })
@@ -402,12 +421,15 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
       });
       if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
         const cleaned = res.items.map(normalizeAiItem);
+        const rDias = res.resumenDias || "";
         setAiItems(cleaned);
+        setResumenDias(rDias);
         setIsAiGenerated(res.origen !== "fallback_local");
         try {
           localStorage.setItem(aiCacheKey, JSON.stringify({
             hash: menuHash,
             items: cleaned,
+            resumenDias: rDias,
             origen: res.origen,
             timestamp: Date.now()
           }));
@@ -483,7 +505,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
 
   const handleCopy = () => {
     // Generar formato limpio agrupado por categorías para WhatsApp / Notas
-    let text = `🛒 *LISTA DEL SÚPER — SEMANA ${semanaActualCiclo}*\n`;
+    let text = `🛒 *LISTA DEL SÚPER — ${resumenDias ? resumenDias.toUpperCase() : `SEMANA ${semanaActualCiclo}`}*\n`;
     if (clienteNombre) text += `👤 Paciente: ${clienteNombre}\n`;
     text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
@@ -541,7 +563,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
                 )}
               </div>
               <p className="text-[11px] sm:text-xs text-[#6B7A8D] truncate">
-                Plan semanal • Semana {semanaActualCiclo}
+                {resumenDias || `Plan semanal • Semana ${semanaActualCiclo}`}
               </p>
             </div>
           </div>
