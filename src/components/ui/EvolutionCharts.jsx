@@ -58,7 +58,7 @@ function classifySomatotype(x, y) {
   return y >= 0 ? "Tendencia Mesomorfa" : x < 0 ? "Tendencia Endomorfa" : "Tendencia Ectomorfa";
 }
 
-export function EvolutionCharts({ metricas = [], isLocked = false, brandColor }) {
+export function EvolutionCharts({ metricas = [], isLocked = false, brandColor, onUnlock }) {
   // Sort oldest to newest for chronological plotting
   const chronological = useMemo(() => {
     return [...metricas]
@@ -174,7 +174,10 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
           className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-7"
         >
           {isLocked && (
-            <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
+            <div
+              onClick={onUnlock}
+              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
+            >
               <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2.5 shadow-xs">
                 <Lock size={24} className="text-amber-600" />
               </div>
@@ -183,7 +186,7 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
                 Desbloquea tus curvas históricas de peso, porcentaje de grasa, masa muscular y somatocarta.
               </p>
               <span className="text-[10px] uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-3.5 py-1.5 rounded-lg shadow-2xs">
-                Exclusivo Plan Premium
+                {onUnlock ? "Toca para desbloquear con FLUX Pro" : "Exclusivo Plan Premium"}
               </span>
             </div>
           )}
@@ -354,14 +357,22 @@ export function EvolutionCharts({ metricas = [], isLocked = false, brandColor })
         {/* ── 2. SOMATOCARTA DE HEATH-CARTER ── */}
         <div className="relative bg-white rounded-none md:rounded-3xl px-4 py-5 md:p-7 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden lg:col-span-5 flex flex-col justify-between">
           {isLocked && (
-            <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm">
+            <div
+              onClick={onUnlock}
+              className={`absolute inset-0 z-30 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm ${onUnlock ? "cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]" : ""}`}
+            >
               <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-2 shadow-xs">
                 <Lock size={20} className="text-amber-600" />
               </div>
               <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mb-1">Somatocarta Heath-Carter</h3>
-              <p className="text-[#6B7A8D] text-xs max-w-xs leading-relaxed">
+              <p className="text-[#6B7A8D] text-xs max-w-xs mb-3 leading-relaxed">
                 Visualiza tu biotipo corporal y su trayectoria hacia el mesomorfismo.
               </p>
+              {onUnlock && (
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-3 py-1 rounded-lg shadow-2xs">
+                  Toca para desbloquear con FLUX Pro
+                </span>
+              )}
             </div>
           )}
 

@@ -16,6 +16,7 @@ import { MetricsSkeleton } from "../ui/Skeleton";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage, precacheMediaList } from "../../lib/mediaCache";
 import { ConfirmModal, showFluxAlert } from "../ui/ConfirmModal";
+import UpgradeModal from "../ui/UpgradeModal";
 import {
   enrichMetrica,
   linkMetricasToCiclos,
@@ -82,6 +83,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium' && cliente.objetivo !== 'Mi entrenamiento personal';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
+
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("metricas");
+  const openPaywall = (feature = "metricas") => {
+    setPaywallFeature(feature);
+    setPaywallOpen(true);
+  };
   
   const [view, setView] = useState('metricas');
   const [personalPhotos, setPersonalPhotos] = useState([]);
@@ -718,11 +726,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               type="button"
               onClick={() => {
                 if (isEstandar) {
-                  showFluxAlert({
-                    title: "Reporte PDF Exclusivo Premium",
-                    message: "La exportación de reportes clínicos y ejecutivos en PDF es una función exclusiva del Plan Premium. Puedes adquirirlo en la sección Mi Membresía.",
-                    type: "warning",
-                  });
+                  openPaywall("metricas");
                   return;
                 }
                 generateProgresoPDF(cliente, metricas, brand);
@@ -933,7 +937,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
                           <span className="text-[11px] text-[#9BA5B0]">Registro base</span>
                         )}
                         {isEstandar && hasPrev && (
-                          <span className="text-[10px] text-amber-500 font-bold">Premium</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openPaywall("metricas"); }}
+                            className="text-[10px] text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-500" /> Premium
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1018,6 +1028,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
               metricas={allLinkedMetricas}
               isLocked={isEstandar}
               brandColor={brand?.color_primario}
+              onUnlock={() => openPaywall("metricas")}
             />
 
             {/* ── DESGLOSE HISTÓRICO PLAN A PLAN ── */}
@@ -1213,17 +1224,20 @@ export default function Progreso({ cliente, isSelfManaged }) {
         {/* EVALUACIÓN MUSCULAR (Simétrico) */}
         <div className="relative">
           {isEstandar && (
-            <div className="absolute inset-0 z-50 backdrop-blur-md bg-white/85 rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm animate-in fade-in">
+            <div
+              onClick={() => openPaywall("metricas")}
+              className="absolute inset-0 z-50 backdrop-blur-md bg-white/85 rounded-none md:rounded-3xl flex flex-col items-center justify-center p-6 text-center border border-[#E2E8F0] shadow-sm animate-in fade-in cursor-pointer hover:bg-white/95 transition-all active:scale-[0.99]"
+            >
               <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center mb-3 shadow-xs">
                 <Lock size={28} className="text-amber-600" />
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-[#0B1929] mb-1.5">Desarrollo Muscular Premium</h3>
-              <p className="text-[#6B7A8D] text-xs sm:text-sm max-w-sm mb-5 leading-relaxed">
+              <p className="text-[#6B7A8D] text-xs sm:text-sm max-w-sm mb-4 leading-relaxed">
                 Descubre qué músculos han crecido más, obtén tu rango de atleta y visualiza tu mapa de calor según tu entrenamiento real.
               </p>
-              <div className="text-[11px] uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-4 py-2 rounded-xl shadow-2xs">
-                Adquiere Premium en Mi Membresía
-              </div>
+              <span className="text-xs uppercase tracking-wider font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-4 py-2 rounded-xl shadow-2xs flex items-center gap-1.5 hover:bg-amber-100 transition-colors">
+                <Sparkles className="w-4 h-4 text-amber-600" /> Toca para desbloquear con FLUX Pro
+              </span>
             </div>
           )}
           <div className={`bg-white rounded-none md:rounded-3xl px-4 py-6 md:p-8 shadow-none md:shadow-sm border-y md:border border-[#E2E8F0] overflow-hidden relative ${isEstandar ? 'pointer-events-none select-none opacity-40 blur-sm' : ''}`}>
@@ -1709,6 +1723,17 @@ export default function Progreso({ cliente, isSelfManaged }) {
         cancelText={confirmDelete?.cancelText || "Cancelar"}
         danger={confirmDelete?.danger ?? true}
         icon={confirmDelete?.icon || "trash"}
+      />
+
+      <UpgradeModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        feature={paywallFeature}
+        clienteData={cliente}
+        onNavigateMembresia={() => {
+          setPaywallOpen(false);
+          window.dispatchEvent(new CustomEvent("flux:navigate-tab", { detail: { tab: "membresia" } }));
+        }}
       />
     </div>
   );

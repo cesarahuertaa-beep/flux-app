@@ -34,6 +34,7 @@ import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
 import { auditMacroPrescriptionWithAi } from "../../lib/clinicalAi";
+import UpgradeModal from "../ui/UpgradeModal";
 
 const FIELDS_BASICAS = [
   { key: "peso", label: "Peso (kg)", type: "number", step: "0.1" },
@@ -259,6 +260,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const _peekNutriProgreso = selected?.id ? dbPeek(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`) : null;
 
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("metricas");
+  const openPaywall = (feature = "metricas") => {
+    setPaywallFeature(feature);
+    setPaywallOpen(true);
+  };
   const [metricas,     setMetricas]     = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
   const [rutinas,      setRutinas]      = useState(() => {
     if (Array.isArray(initialRutinas) && initialRutinas.length > 0) return initialRutinas;
@@ -831,7 +838,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   const handleAuditMacrosWithAi = async () => {
     if (isFreemium) {
-      setAiAuditError("La auditoría clínica con Gemini IA es una función exclusiva del Plan Premium. Adquiérela en Mi Membresía.");
+      openPaywall("ia");
       return;
     }
     if (!liveSmartMacros || !liveSmartMacros.hasEnoughData) {
@@ -1610,15 +1617,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 <button
                   onClick={() => {
                     if (isFreemium) {
-                      setMsg(
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">⭐</span>
-                          <div>
-                            <strong>Reporte PDF Exclusivo Premium.</strong>
-                            <div className="text-xs opacity-90 mt-0.5">La descarga del reporte ejecutivo en PDF está disponible en el Plan Premium. Adquiérela en tu Membresía.</div>
-                          </div>
-                        </div>
-                      );
+                      openPaywall("metricas");
                       return;
                     }
                     generateProgresoPDF(selected, displayedMetricas, brand);
@@ -1676,10 +1675,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             return (
               <div key={m.id} className="relative bg-white rounded-none md:rounded-[14px] border-y md:border border-[#E2E8F0] p-3 sm:p-4 mb-2.5 sm:mb-3 shadow-none md:shadow-sm overflow-hidden">
                 {isLocked && (
-                  <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 flex flex-col items-center justify-center gap-2 rounded-[14px]">
+                  <div
+                    onClick={() => openPaywall("metricas")}
+                    className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 flex flex-col items-center justify-center gap-2 rounded-none md:rounded-[14px] cursor-pointer hover:bg-white/75 transition-all active:scale-[0.99]"
+                  >
                     <Lock className="w-6 h-6 text-amber-500" />
                     <p className="text-xs font-bold text-[#0B1929] text-center px-4">Historial exclusivo Premium</p>
-                    <p className="text-[11px] text-[#6B7A8D] text-center px-6">Actualiza tu plan para ver evaluaciones anteriores y comparar tu progreso.</p>
+                    <p className="text-[11px] text-[var(--brand-primary)] font-bold text-center px-6 underline">Toca para desbloquear con FLUX Pro</p>
                   </div>
                 )}
                 <div className={isLocked ?"blur-sm pointer-events-none select-none" :""}>
@@ -1782,9 +1784,13 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
                         )}
                         {isFreemium && idx===0 && prev && (
-                          <div className="text-[10px] mt-0.5 text-amber-500 font-bold flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openPaywall("metricas"); }}
+                            className="text-[10px] mt-0.5 text-amber-600 hover:text-amber-700 font-bold flex items-center justify-center gap-1 cursor-pointer mx-auto transition-colors"
+                          >
                             <Sparkles className="w-3 h-3 text-amber-500" /> Premium
-                          </div>
+                          </button>
                         )}
                       </div>
                     );
@@ -3891,6 +3897,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         cancelText={confirmDelete?.cancelText || "Cancelar"}
         danger={confirmDelete?.danger ?? true}
         icon={confirmDelete?.icon || "trash"}
+      />
+
+      <UpgradeModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        feature={paywallFeature}
+        clienteData={selected}
+        onNavigateMembresia={() => {
+          setPaywallOpen(false);
+          window.dispatchEvent(new CustomEvent("flux:navigate-tab", { detail: { tab: "membresia" } }));
+        }}
       />
 
     </div>

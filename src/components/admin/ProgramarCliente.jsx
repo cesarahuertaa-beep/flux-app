@@ -41,6 +41,7 @@ import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import NuevoExpedienteForms from "../clinical/NuevoExpedienteForms";
 import ClinicalAiSummaryCard from "../clinical/ClinicalAiSummaryCard";
 import ProgresoHistoricoModal from "./ProgresoHistoricoModal";
+import UpgradeModal from "../ui/UpgradeModal";
 
 const sanitizeWhatsAppPhone = (phone) => {
   if (!phone) return "";
@@ -233,6 +234,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [dishCatalogCatMap, setDishCatalogCatMap] = useState({});
 
   const [aiGeneratingDishMap, setAiGeneratingDishMap] = useState({});
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("general");
+  const openPaywall = (feature = "general") => {
+    setPaywallFeature(feature);
+    setPaywallOpen(true);
+  };
 
   const handleSelectDishFromCatalog = (mealIdx, dish, optIdx = 0) => {
     const optKey = `${mealIdx}_${optIdx}`;
@@ -326,6 +333,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const handleGenerateDishFromIngredients = async (mealIdx, optIdx = 0) => {
+    if (isEstandar) {
+      openPaywall("ia");
+      return;
+    }
     const meal = diaForm.comidas[mealIdx];
     const items = optIdx === 0
       ? (meal?.ingredientesSeleccionados || [])
@@ -1538,15 +1549,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const handleApplyNutriTemplate = async (tpl) => {
     if (!selected) return;
     if (isEstandar && (dias.length + (tpl.dias || []).length > 3)) {
-      setMsg(
-        <div className="flex items-center gap-2">
-          <span className="text-xl">⭐</span>
-          <div>
-            <strong>Límite de Plan Estándar.</strong>
-            <div className="text-xs opacity-90 mt-0.5">Esta plantilla excede el límite de 3 días del Plan Estándar. Pasa a Premium para aplicarla completa.</div>
-          </div>
-        </div>
-      );
+      openPaywall("dias");
       return;
     }
     setSaving(true);
@@ -1759,18 +1762,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return false;
   };
 
-  const isEstandarLimit = (listLength) => {
+  const isEstandarLimit = (listLength, feature = "dias") => {
     if (isEstandar) {
       if (listLength >= 3) {
-        setMsg(
-          <div className="flex items-center gap-2">
-            <span className="text-xl">⭐</span>
-            <div>
-              <strong>Límite de Plan Estándar.</strong>
-              <div className="text-xs opacity-90 mt-0.5">Ve a tu Membresía para adquirir Premium y crear días ilimitados.</div>
-            </div>
-          </div>
-        );
+        openPaywall(feature);
         return true;
       }
     }
@@ -2234,15 +2229,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const handleAuditDayWithAi = async () => {
     if (isEstandar) {
-      setMsg(
-        <div className="flex items-center gap-2">
-          <span className="text-xl">⭐</span>
-          <div>
-            <strong>Auditoría con IA Exclusiva de Premium.</strong>
-            <div className="text-xs opacity-90 mt-0.5">La auditoría clínica de menús con IA está reservada para el Plan Premium. Adquiérela en Mi Membresía.</div>
-          </div>
-        </div>
-      );
+      openPaywall("ia");
       return;
     }
     if (!diaForm.comidas || diaForm.comidas.length === 0) {
@@ -2589,7 +2576,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   // ── Operaciones de Rutinas ──
   const openNewRutina  = () => { 
     if (interceptNoPlan()) return; 
-    if (isEstandarLimit(rutinas.length)) return;
+    if (isEstandarLimit(rutinas.length, "rutinas")) return;
     loadHistorial();
     setEditRutina(null); 
     setActiveAltSlot(null);
@@ -3349,10 +3336,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
               <>
 
                 {showPastCycles && isEstandar ? (
-                  <div className="flex items-center px-4 py-2 text-[13px] border border-[#E2E8F0] rounded-xl bg-gray-50/50 relative overflow-hidden group min-w-[200px] cursor-not-allowed">
-                    <div className="absolute inset-0 backdrop-blur-[2px] bg-white/40 z-10 flex flex-col items-center justify-center p-2 text-center">
-                      <span className="font-bold text-[#0B1929] text-xs">Historial Bloqueado</span>
-                      <span className="text-[10px] text-[#6B7A8D] leading-tight">Adquiere Premium</span>
+                  <div 
+                    onClick={() => openPaywall("historial")}
+                    className="flex items-center px-4 py-2 text-[13px] border border-[#E2E8F0] rounded-xl bg-gray-50/50 relative overflow-hidden group min-w-[200px] cursor-pointer hover:bg-slate-100 transition-all active:scale-98"
+                    title="Desbloquear historial de ciclos con FLUX Pro"
+                  >
+                    <div className="absolute inset-0 backdrop-blur-[2px] bg-white/60 z-10 flex flex-col items-center justify-center p-2 text-center">
+                      <span className="font-bold text-[#0B1929] text-xs flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-amber-600" />
+                        Historial Bloqueado
+                      </span>
+                      <span className="text-[10px] text-[var(--brand-primary)] font-bold leading-tight underline">
+                        Desbloquear con Pro
+                      </span>
                     </div>
                     {/* Falsos botones de fondo */}
                     <div className="opacity-30 blur-[1px] flex gap-2">
@@ -3735,11 +3731,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
                 {!isReadOnly && (
                   <button
-                    className="w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold shadow-sm hover:opacity-90 transition-opacity flex items-center justify-center sm:gap-1.5 cursor-pointer"
+                    className={`w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center sm:gap-1.5 cursor-pointer ${
+                      isEstandar && dias.length >= 3
+                        ? "bg-slate-800 hover:bg-slate-900 text-white"
+                        : "bg-[var(--brand-primary)] text-white hover:opacity-90"
+                    }`}
                     onClick={openNewDia}
-                    title="Agregar Día"
+                    title={isEstandar && dias.length >= 3 ? "Límite gratuito alcanzado (Máx 3 días) - Desbloquea con FLUX Pro" : "Agregar Día"}
                   >
-                    <Plus className="w-4 h-4 shrink-0" />
+                    {isEstandar && dias.length >= 3 ? (
+                      <Lock className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                    ) : (
+                      <Plus className="w-4 h-4 shrink-0" />
+                    )}
                     <span className="hidden sm:inline">Día</span>
                   </button>
                 )}
@@ -4124,11 +4128,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 )}
                 {!isReadOnly && (
                   <button
-                    className="w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs sm:text-sm font-bold shadow-sm hover:opacity-90 transition-opacity flex items-center justify-center sm:gap-1.5 cursor-pointer"
+                    className={`w-8 h-8 sm:w-auto sm:px-3.5 sm:py-1.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center sm:gap-1.5 cursor-pointer ${
+                      isEstandar && rutinas.length >= 3
+                        ? "bg-slate-800 hover:bg-slate-900 text-white"
+                        : "bg-[var(--brand-primary)] text-white hover:opacity-90"
+                    }`}
                     onClick={openNewRutina}
-                    title="Agregar Rutina"
+                    title={isEstandar && rutinas.length >= 3 ? "Límite gratuito alcanzado (Máx 3 rutinas) - Desbloquea con FLUX Pro" : "Agregar Rutina"}
                   >
-                    <Plus className="w-4 h-4 shrink-0" />
+                    {isEstandar && rutinas.length >= 3 ? (
+                      <Lock className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                    ) : (
+                      <Plus className="w-4 h-4 shrink-0" />
+                    )}
                     <span className="hidden sm:inline">Rutina</span>
                   </button>
                 )}
@@ -4641,19 +4653,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 if (isEstandar) {
                                   const remaining = Math.max(0, 3 - dias.length);
                                   if (current.length >= remaining) {
-                                    setMsg(
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xl">⭐</span>
-                                        <div>
-                                          <strong>Límite de Plan Estándar.</strong>
-                                          <div className="text-xs opacity-90 mt-0.5">
-                                            {remaining <= 0
-                                              ? "Has alcanzado el límite de 3 días en el Plan Estándar."
-                                              : `Solo puedes seleccionar hasta ${remaining} día${remaining > 1 ? "s" : ""} (máximo 3 días en total).`}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
+                                    openPaywall("dias");
                                     return p;
                                   }
                                 }
@@ -4831,8 +4831,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     type="button"
                     onClick={handleAuditDayWithAi}
                     disabled={isAuditingDay || diaForm.comidas.length === 0}
-                    className="text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 transition-all disabled:opacity-50 shadow-xs cursor-pointer"
-                    title={isEstandar ? "Función exclusiva del Plan Premium" : "Auditar menú completo del día con IA Clínica"}
+                    className={`text-xs font-bold flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
+                      isEstandar
+                        ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 hover:text-slate-900"
+                        : "bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:text-purple-800 disabled:opacity-50"
+                    }`}
+                    title={isEstandar ? "Función exclusiva de FLUX Pro" : "Auditar menú completo del día con IA Clínica"}
                   >
                     {isAuditingDay ? (
                       <>
@@ -4841,10 +4845,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        {isEstandar ? (
+                          <Lock className="w-3.5 h-3.5 text-slate-500" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        )}
                         <span>Auditar con IA</span>
                         {isEstandar && (
-                          <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full font-extrabold ml-0.5">
+                          <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
                             PRO
                           </span>
                         )}
@@ -5374,8 +5382,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           <button
                                             type="button"
                                             onClick={() => handleGenerateDishFromIngredients(i)}
-                                            disabled={aiGeneratingDishIndex === i || (c.ingredientesSeleccionados || []).length === 0}
-                                            className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                                            disabled={aiGeneratingDishIndex === i || (!isEstandar && (c.ingredientesSeleccionados || []).length === 0)}
+                                            className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                              isEstandar
+                                                ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                                                : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
+                                            }`}
                                           >
                                             {aiGeneratingDishIndex === i ? (
                                               <>
@@ -5384,8 +5396,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               </>
                                             ) : (
                                               <>
-                                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                {isEstandar ? (
+                                                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                                ) : (
+                                                  <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                )}
                                                 <span>Generar Platillo con IA {(c.ingredientesSeleccionados || []).length > 0 ? `(${c.ingredientesSeleccionados.length})` : ""}</span>
+                                                {isEstandar && (
+                                                  <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                                    PRO
+                                                  </span>
+                                                )}
                                               </>
                                             )}
                                           </button>
@@ -5848,8 +5869,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   <button
                                                     type="button"
                                                     onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
-                                                    disabled={isGen || selectedIngs.length === 0}
-                                                    className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                                                    disabled={isGen || (!isEstandar && selectedIngs.length === 0)}
+                                                    className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                                      isEstandar
+                                                        ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                                                        : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
+                                                    }`}
                                                   >
                                                     {isGen ? (
                                                       <>
@@ -5858,8 +5883,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       </>
                                                     ) : (
                                                       <>
-                                                        <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                        {isEstandar ? (
+                                                          <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                                        ) : (
+                                                          <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                        )}
                                                         <span>Generar Platillo con IA {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                        {isEstandar && (
+                                                          <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                                            PRO
+                                                          </span>
+                                                        )}
                                                       </>
                                                     )}
                                                   </button>
@@ -6177,19 +6211,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               if (isEstandar) {
                                 const remaining = Math.max(0, 3 - rutinas.length);
                                 if (current.length >= remaining) {
-                                  setMsg(
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xl">⭐</span>
-                                      <div>
-                                        <strong>Límite de Plan Estándar.</strong>
-                                        <div className="text-xs opacity-90 mt-0.5">
-                                          {remaining <= 0
-                                            ? "Has alcanzado el límite de 3 rutinas en el Plan Estándar."
-                                            : `Solo puedes seleccionar hasta ${remaining} rutina${remaining > 1 ? "s" : ""} (máximo 3 en total).`}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
+                                  openPaywall("rutinas");
                                   return p;
                                 }
                               }
@@ -6522,6 +6544,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         cancelText={confirmDelete?.cancelText || "Cancelar"}
         danger={confirmDelete?.danger ?? true}
         icon={confirmDelete?.icon || "trash"}
+      />
+
+      {/* ── Modal de Upgrade / Paywall FLUX Pro ── */}
+      <UpgradeModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        feature={paywallFeature}
+        clienteData={selected}
+        onNavigateMembresia={() => {
+          setPaywallOpen(false);
+          if (onBackToList) onBackToList();
+          window.dispatchEvent(new CustomEvent("flux:navigate-tab", { detail: { tab: "membresia" } }));
+        }}
+        onSuccessPurchase={() => {
+          setPaywallOpen(false);
+          if (selected) {
+            setSelected(prev => ({ ...prev, plan_tipo: "premium" }));
+          }
+        }}
       />
     </div>
   );
