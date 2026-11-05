@@ -109,7 +109,7 @@ export default function ClinicalAiSummaryCard({
     } catch (err) {
       console.error("Error auditando expediente con IA:", err);
       if (isMountedRef.current) {
-        setAiError(err.message || "Error al conectar con Google Gemini");
+        setAiError(err.message || "Error al conectar con FLUX IA");
       }
       try {
         const fallbackAiData = {
@@ -207,7 +207,7 @@ export default function ClinicalAiSummaryCard({
                 ? "bg-indigo-400 cursor-wait opacity-85"
                 : "bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] hover:opacity-95 cursor-pointer"
             }`}
-            title="Auditar y normalizar el expediente clínico con Google Gemini"
+            title="Auditar y normalizar el expediente clínico con FLUX IA"
           >
             <Sparkles className={`w-3.5 h-3.5 ${loadingAi ? "animate-spin" : ""}`} />
             <span>{loadingAi ? "Auditando..." : isGeminiOrigin ? "Reauditar" : "Auditar"}</span>
@@ -416,7 +416,7 @@ export default function ClinicalAiSummaryCard({
                     {loadingAi
                       ? "Analizando con IA..."
                       : isGeminiOrigin
-                      ? `Auditado IA · ${aiData?.model || "Gemini"}`
+                      ? "Auditado con FLUX IA"
                       : "Análisis IA"}
                   </span>
                 </div>

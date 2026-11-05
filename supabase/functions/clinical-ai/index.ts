@@ -95,7 +95,7 @@ serve(async (req) => {
           JSON.stringify({
             error: "NO_GEMINI_KEY",
             message:
-              "No se ha configurado la API Key de Google Gemini. Configura GEMINI_API_KEY en Supabase Secrets o en las variables de entorno.",
+              "No se ha configurado la API Key de FLUX IA. Configura GEMINI_API_KEY en Supabase Secrets o en las variables de entorno.",
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -249,7 +249,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
               return new Response(
                 JSON.stringify({
                   error: "GEMINI_AUTH_ERROR",
-                  message: `La API Key de Gemini fue rechazada por Google (${msg}). Verifica que sea una clave válida de Google AI Studio.`,
+                  message: `La clave de FLUX IA no es válida (${msg}). Verifica la configuración en Supabase Secrets.`,
                 }),
                 { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
@@ -263,7 +263,7 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
       return new Response(
         JSON.stringify({
           error: "GEMINI_UNAVAILABLE",
-          message: "No se pudo obtener respuesta de Google Gemini en este momento. Inténtalo nuevamente.",
+          message: "No se pudo obtener respuesta de FLUX IA en este momento. Inténtalo nuevamente.",
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1008,7 +1008,7 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
         JSON.stringify({
           success: false,
           error: "FALLBACK_NEEDED",
-          message: "No se pudo conectar con Gemini Edge, se sugiere fallback local",
+          message: "No se pudo conectar con FLUX IA, se sugiere fallback local",
           detail: lastErrorDetail,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }

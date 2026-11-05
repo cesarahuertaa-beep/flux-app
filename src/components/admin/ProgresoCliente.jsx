@@ -920,7 +920,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       setPrescriptionMode("ia");
     } catch (err) {
       console.error("Error auditando con IA:", err);
-      setAiAuditError(err.message || "Error al conectar con Google Gemini");
+      setAiAuditError(err.message || "Error al conectar con FLUX IA");
     } finally {
       setIsAuditingAi(false);
     }
@@ -3388,14 +3388,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       </div>
 
-                      {/* Bloque de Auditoría Clínica con Google Gemini IA (Genuina, bajo demanda) */}
+                      {/* Bloque de Auditoría Clínica con FLUX IA (Genuina, bajo demanda) */}
                       {prescriptionMode !== "manual" && (
                         <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5">
                               <Sparkles className="w-4 h-4 text-indigo-600" />
                               <span className="text-xs font-bold text-[#0B1929]">
-                                Auditoría Clínica con IA (Gemini)
+                                Auditoría Clínica con FLUX IA
                               </span>
                             </div>
                             {aiAuditResult?.badgeMotivo ? (
@@ -3414,7 +3414,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             <div className="p-3 rounded-lg bg-white/90 border border-indigo-100 flex items-center gap-2.5 text-xs text-indigo-900 shadow-xs">
                               <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
                               <span className="font-medium">
-                                Google Gemini está analizando el expediente médico, R24H y antropometría...
+                                FLUX IA está analizando el expediente médico, R24H y antropometría...
                               </span>
                             </div>
                           )}
@@ -3434,7 +3434,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           {!aiAuditResult && !isAuditingAi && (
                             <div className="space-y-2">
                               <p className="text-[11px] text-[#475569] leading-relaxed">
-                                Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante Google Gemini para obtener una recomendación adaptada a la realidad del paciente.
+                                Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante FLUX IA para obtener una recomendación adaptada a la realidad del paciente.
                               </p>
                               <button
                                 type="button"
@@ -3443,7 +3443,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                               >
                                 <Sparkles className="w-3.5 h-3.5" />
-                                <span>Auditar Prescripción con Gemini IA</span>
+                                <span>Auditar Prescripción con FLUX IA</span>
                               </button>
                             </div>
                           )}
@@ -3454,7 +3454,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               {aiAuditResult.analisisClinico && (
                                 <p className="text-[11px] text-[#334155] leading-relaxed bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
                                   <strong className="text-[#0B1929] block mb-0.5 font-bold">
-                                    Criterio clínico emitido por Gemini:
+                                    Criterio clínico emitido por FLUX IA:
                                   </strong>
                                   {aiAuditResult.analisisClinico}
                                 </p>
