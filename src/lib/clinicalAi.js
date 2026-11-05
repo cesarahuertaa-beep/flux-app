@@ -1885,3 +1885,166 @@ Responde ÚNICAMENTE con JSON:
     },
   };
 }
+
+/**
+ * Genera la lista de compras del súper consolidada y clasificada con IA (Gemini Edge -> Direct -> Analítico Local)
+ */
+export async function generateGroceryListWithAi({ dias = [], incluirAlternativas = false, fallbackFn = null }) {
+  if (!dias || dias.length === 0) {
+    return { items: [], origen: "empty", success: true };
+  }
+
+  const apiKey = getGeminiApiKey();
+
+  // Tier 1: Supabase Edge Function con Gemini en servidor
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "grocery-list",
+      dias,
+      incluirAlternativas,
+      geminiKey: apiKey,
+    });
+    if (edgeRes?.success && Array.isArray(edgeRes.items) && edgeRes.items.length > 0) {
+      return {
+        items: edgeRes.items,
+        origen: "gemini_edge",
+        model: edgeRes.model || "gemini-3.5-flash-lite",
+        success: true,
+      };
+    }
+  } catch (err) {
+    console.warn("[FLUX AI] Edge function de lista de súper no disponible, intentando Gemini directo:", err?.message);
+  }
+
+  // Preparar resumen del menú para Tier 2
+  const menuResumen = [];
+  dias.forEach((d, dIdx) => {
+    const diaNombre = d.dia || `Día ${dIdx + 1}`;
+    (d.comidas || []).forEach((c, cIdx) => {
+      const cNombre = c.nombre || `Comida ${cIdx + 1}`;
+      const p1 = (c.opcion1 || "").trim();
+      if (p1) {
+        menuResumen.push({ dia: diaNombre, comida: cNombre, receta: p1 });
+      }
+      if (incluirAlternativas) {
+        const p2 = (c.opcion2 || "").trim();
+        if (p2) {
+          const alts = p2.split("\n--- OTRA OPCIÓN ---\n");
+          alts.forEach((alt, aIdx) => {
+            const tr = (alt || "").trim();
+            if (tr) menuResumen.push({ dia: diaNombre, comida: `${cNombre} (Opción ${String.fromCharCode(66 + aIdx)})`, receta: tr });
+          });
+        }
+      }
+    });
+  });
+
+  if (menuResumen.length === 0) {
+    return { items: [], origen: "empty", success: true };
+  }
+
+  // Tier 2: Gemini Direct si hay clave en navegador
+  if (apiKey) {
+    const promptGrocery = `Eres el asistente culinario y nutricional experto de FLUX Nutrición.
+Tu tarea es analizar el siguiente menú semanal de alimentación y generar la lista consolidada, sumada y clasificada de compras del supermercado para toda la semana.
+
+MENÚ SEMANAL A ANALIZAR:
+${JSON.stringify(menuResumen, null, 2)}
+
+INSTRUCCIONES CLÍNICAS Y CULINARIAS:
+1. Extrae todos los alimentos e ingredientes reales de cada receta (ignora palabras de método culinario como "licuar", "hervir", "a la plancha", "al gusto").
+2. CONSOLIDA y SUMA las cantidades de ingredientes idénticos o equivalentes a lo largo de toda la semana.
+   - Ejemplo: Pechuga de pollo 150g en Comida 1 + 200g en Comida 3 -> Pechuga de pollo con cantidadNum: 350, unidad: "g".
+   - Si no se especifica cantidad (ej. canela, orégano, sal, pimienta, ajo en polvo), coloca cantidadNum: null y unidad: "".
+3. Identifica en cuántas tomas/comidas distintas se utiliza cada ingrediente ("veces").
+4. Normaliza la unidad a estándares limpios: "g", "kg", "ml", "L", "pzas", "taza", "cda", "cdita", "lata", "sobre", "rebanada", "scoop".
+5. Clasifica CADA ingrediente en exactamente una de estas 5 categorías de supermercado:
+   - "proteinas": Pollo, carnes rojas, pescados, mariscos, atún, huevos, claras, tofu, proteína en polvo (whey), queso cottage, jamón de pavo, etc.
+   - "verduras_frutas": Frutas frescas, bayas/berries, verduras, hojas verdes (espinaca, lechuga), jitomate, cebolla, calabacitas, aguacate, limón, etc.
+   - "cereales": Avena, arroz, tortillas, pan, tostadas, pasta, papa, camote, quinoa, harinas, galletas de arroz, etc.
+   - "lacteos_grasas": Leches (vaca o vegetales), yogur griego, quesos (panela, oaxaca), nueces, almendras, crema de cacahuate, aceite de oliva, chía, etc.
+   - "otros": Especias, hierbas, café, té, mostaza, vinagre, endulzantes, polvo para hornear, despensa general.
+
+RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
+{
+  "items": [
+    {
+      "nombre": "Pechuga de pollo",
+      "categoria": "proteinas",
+      "cantidadNum": 750,
+      "unidad": "g",
+      "veces": 5
+    },
+    {
+      "nombre": "Espinacas",
+      "categoria": "verduras_frutas",
+      "cantidadNum": 200,
+      "unidad": "g",
+      "veces": 3
+    },
+    {
+      "nombre": "Canela en polvo",
+      "categoria": "otros",
+      "cantidadNum": null,
+      "unidad": "",
+      "veces": 4
+    }
+  ]
+}`;
+
+    for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptGrocery }] }],
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+              return {
+                items: parsed.items,
+                success: true,
+                origen: "gemini_direct",
+                model,
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[FLUX AI] Error llamando a Gemini directo (${model}):`, err?.message);
+      }
+    }
+  }
+
+  // Tier 3: Fallback local analítico si offline
+  if (typeof fallbackFn === "function") {
+    const fallbackItems = fallbackFn(dias, incluirAlternativas);
+    return {
+      items: fallbackItems,
+      origen: "fallback_local",
+      success: true,
+    };
+  }
+
+  return { items: [], origen: "none", success: false };
+}

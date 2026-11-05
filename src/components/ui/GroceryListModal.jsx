@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { X, ShoppingBag, Check, Copy, CheckCheck, Search, Trash2, Filter, Utensils, Apple, Wheat, Milk, Package } from "lucide-react";
+import { X, ShoppingBag, Check, Copy, CheckCheck, Search, Trash2, Filter, Utensils, Apple, Wheat, Milk, Package, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { parseMealOptions } from "../../lib/mealOptions";
+import { generateGroceryListWithAi } from "../../lib/clinicalAi";
 
 // Categorías del supermercado
 const CATEGORIAS = {
@@ -223,12 +224,48 @@ function parseDietIngredients(dias, incluirAlternativas = false) {
   return Array.from(map.values());
 }
 
+// Normalización de items AI
+function normalizeAiItem(item) {
+  const rawCat = (item?.categoria || "").toLowerCase().trim();
+  const cat = CATEGORIAS[rawCat] ? rawCat : "otros";
+  const rawNombre = (item?.nombre || "Alimento").trim();
+  const displayNombre = rawNombre.charAt(0).toUpperCase() + rawNombre.slice(1);
+  const normName = normalizeStr(rawNombre);
+  const un = (item?.unidad || "").toLowerCase().trim();
+  const id = item?.id || `${cat}_${normName}_${un}`;
+  const cant = typeof item?.cantidadNum === "number" && !isNaN(item.cantidadNum) && item.cantidadNum > 0
+    ? Math.round(item.cantidadNum * 10) / 10
+    : null;
+
+  return {
+    id,
+    nombre: displayNombre,
+    categoria: cat,
+    cantidadNum: cant,
+    unidad: item?.unidad || "",
+    veces: typeof item?.veces === "number" && item.veces > 0 ? item.veces : 1
+  };
+}
+
 export default function GroceryListModal({ dias = [], onClose, clienteNombre, semanaActualCiclo = 1 }) {
   useBackButton(true, onClose, 60);
   const [incluirAlt, setIncluirAlt] = useState(false);
   const [activeFilter, setActiveFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Hash del contenido de los días para invalidar caché automáticamente si cambia la dieta
+  const menuHash = useMemo(() => {
+    try {
+      return JSON.stringify(
+        (dias || []).map((d) => (d?.comidas || []).map((c) => [c?.opcion1 || "", c?.opcion2 || ""]))
+      );
+    } catch {
+      return "";
+    }
+  }, [dias]);
+
+  const aiCacheKey = `flux_grocery_ai_${clienteNombre || "global"}_s${semanaActualCiclo}_${incluirAlt ? "alt" : "main"}`;
 
   // Clave de almacenamiento local para persistir los checks de compra
   const storageKey = `flux_grocery_checked_${clienteNombre || "global"}_s${semanaActualCiclo}`;
@@ -249,10 +286,147 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
     }
   }, [checkedItems, storageKey]);
 
-  // Lista de ingredientes parseados
+  // Estado para ingredientes calculados por IA
+  const [aiItems, setAiItems] = useState(() => {
+    try {
+      const cached = localStorage.getItem(aiCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.hash === menuHash && Array.isArray(parsed?.items) && parsed.items.length > 0) {
+          return parsed.items.map(normalizeAiItem);
+        }
+      }
+    } catch (e) {
+      console.warn("Error leyendo cache IA de lista de super:", e);
+    }
+    return null;
+  });
+
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState(() => {
+    try {
+      const cached = localStorage.getItem(aiCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.hash === menuHash && parsed?.origen !== "fallback_local";
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  });
+
+  // Carga inteligente con IA y cache local instantáneo
+  useEffect(() => {
+    let isCancelled = false;
+
+    // Si ya tenemos items en cache válidos, usarlos de inmediato
+    try {
+      const cached = localStorage.getItem(aiCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.hash === menuHash && Array.isArray(parsed?.items) && parsed.items.length > 0) {
+          setAiItems(parsed.items.map(normalizeAiItem));
+          setIsAiGenerated(parsed?.origen !== "fallback_local");
+          setLoadingAi(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Error validando cache:", e);
+    }
+
+    if (!dias || dias.length === 0) {
+      setAiItems([]);
+      setLoadingAi(false);
+      return;
+    }
+
+    setLoadingAi(true);
+
+    generateGroceryListWithAi({
+      dias,
+      incluirAlternativas: incluirAlt,
+      fallbackFn: parseDietIngredients
+    })
+      .then((res) => {
+        if (isCancelled) return;
+        if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+          const cleaned = res.items.map(normalizeAiItem);
+          setAiItems(cleaned);
+          setIsAiGenerated(res.origen !== "fallback_local");
+          try {
+            localStorage.setItem(aiCacheKey, JSON.stringify({
+              hash: menuHash,
+              items: cleaned,
+              origen: res.origen,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.warn(e);
+          }
+        } else {
+          const fallback = parseDietIngredients(dias, incluirAlt).map(normalizeAiItem);
+          setAiItems(fallback);
+          setIsAiGenerated(false);
+        }
+      })
+      .catch((err) => {
+        console.warn("Fallo IA en lista de súper, activando fallback local:", err);
+        if (!isCancelled) {
+          const fallback = parseDietIngredients(dias, incluirAlt).map(normalizeAiItem);
+          setAiItems(fallback);
+          setIsAiGenerated(false);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setLoadingAi(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [dias, incluirAlt, menuHash, aiCacheKey]);
+
+  // Regeneración manual con IA
+  const handleRegenerate = async () => {
+    if (loadingAi) return;
+    setLoadingAi(true);
+    try {
+      const res = await generateGroceryListWithAi({
+        dias,
+        incluirAlternativas: incluirAlt,
+        fallbackFn: parseDietIngredients
+      });
+      if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+        const cleaned = res.items.map(normalizeAiItem);
+        setAiItems(cleaned);
+        setIsAiGenerated(res.origen !== "fallback_local");
+        try {
+          localStorage.setItem(aiCacheKey, JSON.stringify({
+            hash: menuHash,
+            items: cleaned,
+            origen: res.origen,
+            timestamp: Date.now()
+          }));
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+    } catch (err) {
+      console.warn("Error regenerando lista de súper con IA:", err);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  // Lista de ingredientes consolidada
   const ingredients = useMemo(() => {
-    return parseDietIngredients(dias, incluirAlt);
-  }, [dias, incluirAlt]);
+    if (aiItems !== null) return aiItems;
+    return parseDietIngredients(dias, incluirAlt).map(normalizeAiItem);
+  }, [aiItems, dias, incluirAlt]);
 
   // Filtrado de ingredientes por categoría y búsqueda
   const filteredIngredients = useMemo(() => {
@@ -355,9 +529,17 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
               <ShoppingBag size={20} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug truncate" style={{ fontFamily: "DM Sans" }}>
-                Lista de Compras del Súper
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-[#0B1929] leading-snug truncate" style={{ fontFamily: "DM Sans" }}>
+                  Lista de Compras del Súper
+                </h2>
+                {isAiGenerated && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                    <Sparkles size={10} className="text-purple-600" />
+                    IA Activa
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] sm:text-xs text-[#6B7A8D] truncate">
                 Plan semanal • Semana {semanaActualCiclo}
               </p>
@@ -424,7 +606,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
             </div>
           </div>
 
-          {/* Row 2: Compact Progress Bar + Alternative Options Toggle */}
+          {/* Row 2: Compact Progress Bar + Alternative Options Toggle + Regenerate AI */}
           <div className="flex items-center justify-between gap-2 pt-0.5 text-xs text-[#6B7A8D]">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="font-bold text-[#0B1929] whitespace-nowrap text-[11px] sm:text-xs">
@@ -448,17 +630,31 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
               )}
             </div>
 
-            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer select-none shrink-0 shadow-2xs">
-              <input
-                type="checkbox"
-                checked={incluirAlt}
-                onChange={(e) => setIncluirAlt(e.target.checked)}
-                className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] w-3.5 h-3.5"
-              />
-              <span className="text-[11px] sm:text-xs font-medium text-[#0B1929]">
-                Incluir alternativas
-              </span>
-            </label>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={loadingAi}
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
+                title="Reanalizar y consolidar la lista nuevamente con IA"
+              >
+                <Sparkles size={12} className={loadingAi ? "animate-spin text-purple-600" : "text-purple-600"} />
+                <span className="hidden sm:inline">{loadingAi ? "Analizando..." : "Reanalizar con IA"}</span>
+                <span className="sm:hidden">{loadingAi ? "..." : "IA"}</span>
+              </button>
+
+              <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer select-none shrink-0 shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={incluirAlt}
+                  onChange={(e) => setIncluirAlt(e.target.checked)}
+                  className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] w-3.5 h-3.5"
+                />
+                <span className="text-[11px] sm:text-xs font-medium text-[#0B1929]">
+                  Incluir alternativas
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Row 3: Category Filter Pills */}
@@ -497,7 +693,19 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
 
         {/* ── Ingredients Checklist Body ── */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-2">
-          {filteredIngredients.length === 0 ? (
+          {loadingAi && ingredients.length === 0 ? (
+            <div className="py-20 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto shadow-xs animate-pulse">
+                <Sparkles className="w-6 h-6 animate-spin text-purple-600" />
+              </div>
+              <p className="font-bold text-[#0B1929] text-sm" style={{ fontFamily: "DM Sans" }}>
+                Consolidando lista inteligente con IA...
+              </p>
+              <p className="text-xs text-[#6B7A8D] max-w-xs mx-auto">
+                Analizando recetas, sumando ingredientes idénticos y organizando por pasillos del súper.
+              </p>
+            </div>
+          ) : filteredIngredients.length === 0 ? (
             <div className="py-12 text-center text-[#6B7A8D]">
               <ShoppingBag size={36} className="mx-auto mb-2 text-[#CBD5E1]" />
               <p className="font-semibold text-[#0B1929]">No se encontraron ingredientes</p>
