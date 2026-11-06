@@ -3386,8 +3386,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
           </div>
 
-          {/* Acciones (Histórico y Expediente): En móvil abajo del correo, en computadora a la derecha de la cabecera */}
-          <div className="flex items-center gap-2 pt-1 md:pt-0 shrink-0">
+          {/* Acciones (Histórico y Expediente): En móvil abajo del correo (solo para pacientes; en Mi Plan móvil ya se muestra arriba a la derecha), en computadora a la derecha de la cabecera */}
+          <div className={`items-center gap-2 pt-1 md:pt-0 shrink-0 ${isMiPlan ? "hidden sm:flex" : "flex"}`}>
             {!isMiPlan && (
               <button
                 type="button"
