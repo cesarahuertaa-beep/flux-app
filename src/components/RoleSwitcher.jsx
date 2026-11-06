@@ -19,7 +19,7 @@ export default function RoleSwitcher({ currentRole, currentData, multiRoles, onC
     setSwitchingTo(r);
     setTimeout(() => {
         try {
-          onChangeRole(r);
+          onChangeRole(r, multiRoles);
         } catch (error) {
           console.error('Error switching role:', error);
           showFluxAlert('Error al cambiar de perfil', error.message);

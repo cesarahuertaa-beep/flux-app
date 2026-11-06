@@ -110,6 +110,9 @@ export async function refreshUserRoles(authUserId, userEmail) {
 
   // Si algún registro de cliente no tenía auth_id vinculado, enlazarlo automáticamente (máximo 1 vez por sesión)
   if (authUserId) {
+    if (cleanEmail && clientRows.some(c => !c.auth_id)) {
+      dbPost("rpc/vincular_auth_pacientes", { p_auth_id: authUserId, p_email: cleanEmail }).catch(() => {});
+    }
     for (const c of clientRows) {
       if (!c.auth_id && c.id && !_linkedClientIds.has(c.id)) {
         _linkedClientIds.add(c.id);

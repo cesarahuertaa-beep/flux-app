@@ -563,7 +563,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
           {(tab === "perfil" || visitedTabs.has("perfil")) && (
             <div className={tab === "perfil" ? "flex-1 flex flex-col" : "hidden"}>
               {isAtletaMode ? (
-                <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} />
+                <PerfilNutriologo profileId={session.profileId} onLogout={onLogout} role={session.adminRole} onChangeRole={onChangeRole} onRolesUpdated={onRolesUpdated} multiRoles={multiRoles} />
               ) : (
                 <UserProfile session={session} onLogout={onLogout} onChangeRole={onChangeRole} onRolesUpdated={onRolesUpdated} multiRoles={multiRoles} />
               )}

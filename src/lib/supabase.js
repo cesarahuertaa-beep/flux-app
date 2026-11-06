@@ -432,6 +432,8 @@ const RELATED_TABLES = {
   "rpc/eliminar_paciente_definitivo": ["clientes", "profiles", "ciclos", "rutinas", "nutricion", "progreso", "metricas_progreso", "citas"],
   "rpc/eliminar_nutriologo_definitivo": ["profiles", "clientes", "citas", "disponibilidad", "recibos_pago"],
   "rpc/eliminar_colaborador_definitivo": ["profiles", "clientes"],
+  "rpc/sincronizar_perfil_universal": ["profiles", "clientes"],
+  "rpc/vincular_auth_pacientes": ["clientes"],
 };
 
 /** Marca como obsoleta (NO borra): así el dato sigue disponible en 0 ms para dbPeek pero se refresca cuando se consulte. */
@@ -1529,12 +1531,31 @@ export const syncPersonalData = async (email, data) => {
     if (clienteFields.includes(k)) dataForCliente[k] = sanitizedData[k];
   });
 
+  // 1. Intentar sincronización atómica universal en Postgres (SECURITY DEFINER, actualiza profiles y todos los clientes asociados)
+  try {
+    await dbPost("rpc/sincronizar_perfil_universal", {
+      p_email: cleanEmail,
+      p_nombre: sanitizedData.nombre !== undefined ? sanitizedData.nombre : null,
+      p_telefono: sanitizedData.telefono !== undefined ? sanitizedData.telefono : null,
+      p_avatar_url: sanitizedData.avatar_url !== undefined ? sanitizedData.avatar_url : null,
+      p_fecha_nacimiento: sanitizedData.fecha_nacimiento !== undefined ? sanitizedData.fecha_nacimiento : null,
+      p_genero: sanitizedData.genero !== undefined ? sanitizedData.genero : null,
+      p_pais: sanitizedData.pais !== undefined ? sanitizedData.pais : null,
+      p_estado_provincia: sanitizedData.estado_provincia !== undefined ? sanitizedData.estado_provincia : null
+    });
+    invalidateCache("profiles");
+    invalidateCache("clientes");
+    return;
+  } catch {
+    // Si la función RPC aún no está creada en la BD o falla la conexión directa al RPC, fallback inmediato a dbPatch
+  }
+
   const promises = [];
   if (Object.keys(dataForProfile).length > 0) {
-    promises.push(dbPatch(`profiles?email=ilike.${encodedEmail}`, dataForProfile));
+    promises.push(dbPatch(`profiles?email=ilike.${encodedEmail}`, dataForProfile).catch(() => {}));
   }
   if (Object.keys(dataForCliente).length > 0) {
-    promises.push(dbPatch(`clientes?email=ilike.${encodedEmail}`, dataForCliente));
+    promises.push(dbPatch(`clientes?email=ilike.${encodedEmail}`, dataForCliente).catch(() => {}));
   }
 
   await Promise.all(promises);

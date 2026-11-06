@@ -90,10 +90,10 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
             nombre: p.nombre || prev.nombre,
             telefono: p.telefono || prev.telefono,
             avatar_url: p.avatar_url || prev.avatar_url,
-            fecha_nacimiento: p.fecha_nacimiento || "",
-            genero: p.genero || "",
+            fecha_nacimiento: p.fecha_nacimiento || prev.fecha_nacimiento || "",
+            genero: p.genero || prev.genero || "",
             pais: p.pais || prev.pais || "México",
-            estado_provincia: p.estado_provincia || "",
+            estado_provincia: p.estado_provincia || prev.estado_provincia || "",
           }));
           if (isCliente && p.objetivo !== undefined) setObjetivo(p.objetivo || "");
         }
@@ -127,6 +127,9 @@ export default function UserProfile({ session, onLogout, onChangeRole, onRolesUp
           if (r.data) Object.assign(r.data, formData);
         });
         localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
+        if (typeof onRolesUpdated === "function") {
+          onRolesUpdated(currentMultiRoles);
+        }
       }
 
       // Sincronizar también con el expediente clínico si es paciente

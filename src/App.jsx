@@ -367,6 +367,36 @@ export default function App() {
     }
   }, [session]);
 
+  // Sincronizar cambios de perfil en tiempo real en la sesión activa y en todas las identidades de multiRoles
+  useEffect(() => {
+    const onProfileUpdated = (e) => {
+      const updated = e?.detail;
+      if (!updated || typeof updated !== "object") return;
+      setSession(prev => {
+        if (!prev) return prev;
+        const nextData = prev.data ? { ...prev.data, ...updated } : prev.data;
+        const nextMultiRoles = Array.isArray(prev.multiRoles)
+          ? prev.multiRoles.map(r => ({
+              ...r,
+              data: r.data ? { ...r.data, ...updated } : r.data
+            }))
+          : prev.multiRoles;
+        try {
+          localStorage.setItem("flux_multi_roles", JSON.stringify(nextMultiRoles));
+          localStorage.setItem("flux_session_snapshot", JSON.stringify({
+            role: prev.role,
+            data: nextData,
+            profileId: prev.profileId,
+            multiRoles: nextMultiRoles
+          }));
+        } catch {}
+        return { ...prev, data: nextData, multiRoles: nextMultiRoles };
+      });
+    };
+    window.addEventListener("flux:profile-updated", onProfileUpdated);
+    return () => window.removeEventListener("flux:profile-updated", onProfileUpdated);
+  }, []);
+
   const handleLogin = (s) => {
     if (s.token) setAuthToken(s.token);
     saveSessionMeta(s);
@@ -380,10 +410,33 @@ export default function App() {
   const handleRoleSelect = (roleObj, latestRoles) => {
     const isCivilUser = roleObj.role === 'cliente' && !roleObj.data?.nutriologo_id;
     const finalRole = isCivilUser ? 'civil' : roleObj.role;
-    const rolesToKeep = latestRoles || session?.multiRoles || [];
+
+    // Obtener los roles más recientes (de parámetro, de sesión o de localStorage)
+    let freshMultiRoles = latestRoles;
+    if (!freshMultiRoles) {
+      try {
+        const stored = localStorage.getItem("flux_multi_roles");
+        if (stored) freshMultiRoles = JSON.parse(stored);
+      } catch {}
+    }
+    const rolesToKeep = freshMultiRoles || session?.multiRoles || [];
+
+    // Asegurar que roleObj.data tenga la información más actualizada si ya fue sincronizada
+    let activeData = roleObj.data;
+    if (rolesToKeep && rolesToKeep.length > 0) {
+      const matchInRoles = rolesToKeep.find(r => {
+        if (r.role !== roleObj.role) return false;
+        if (roleObj.data?.id && r.data?.id) return String(r.data.id) === String(roleObj.data.id);
+        return true;
+      });
+      if (matchInRoles?.data) {
+        activeData = { ...roleObj.data, ...matchInRoles.data };
+      }
+    }
+
     const s = {
       role: finalRole,
-      data: roleObj.data,
+      data: activeData,
       token: session?.token,
       profileId: session?.profileId,
       multiRoles: rolesToKeep

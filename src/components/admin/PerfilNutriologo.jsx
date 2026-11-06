@@ -109,16 +109,17 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             }
           } catch {}
         }
-        setPersonalForm({
-          nombre: p.nombre ||"",
-          telefono: p.telefono ||"",
-          email: resolvedEmail,
-          avatar_url: p.avatar_url ||"",
-          fecha_nacimiento: p.fecha_nacimiento ||"",
-          genero: p.genero ||"",
-          pais: p.pais ||"México",
-          estado_provincia: p.estado_provincia ||""
-        });
+        setPersonalForm(prev => ({
+          ...prev,
+          nombre: p.nombre || prev.nombre,
+          telefono: p.telefono || prev.telefono,
+          email: resolvedEmail || prev.email,
+          avatar_url: p.avatar_url || prev.avatar_url,
+          fecha_nacimiento: p.fecha_nacimiento || prev.fecha_nacimiento || "",
+          genero: p.genero || prev.genero || "",
+          pais: p.pais || prev.pais || "México",
+          estado_provincia: p.estado_provincia || prev.estado_provincia || ""
+        }));
 
         const targetBusinessId = (isTeam && p.nutriologo_id) ? p.nutriologo_id : profileId;
         setBossId(targetBusinessId);
@@ -188,6 +189,9 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
           if (r.data) Object.assign(r.data, formData);
         });
         localStorage.setItem("flux_multi_roles", JSON.stringify(currentMultiRoles));
+        if (typeof onRolesUpdated === "function") {
+          onRolesUpdated(currentMultiRoles);
+        }
       }
 
       // Sincronizar también con el expediente clínico de su propio "Mi Plan" (cliente sombra) si existe
