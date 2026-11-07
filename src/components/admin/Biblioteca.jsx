@@ -38,13 +38,6 @@ import {
   CATEGORIAS_INGREDIENTES
 } from "../../lib/customCatalogs";
 
-export const TIPOS_MOVIMIENTO = [
-  { value: "Empuje", label: "Empuje" },
-  { value: "Jale", label: "Jale" },
-  { value: "Bisagra", label: "Bisagra" },
-  { value: "Aislamiento", label: "Aislamiento" }
-];
-
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ── Sub-pestaña activa ("ejercicios" | "platillos" | "ingredientes") ──
   const [subtab, setSubtab] = useState("ejercicios");
@@ -55,12 +48,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [showEjModal, setShowEjModal]     = useState(false);
   const [editEj, setEditEj]               = useState(null);
   const [deleteEjModal, setDeleteEjModal] = useState(null);
-  const [formEj, setFormEj]               = useState({
-    nombre: "",
-    grupo_muscular: "pecho",
-    tipo_movimiento: "Empuje",
-    gif_url: ""
-  });
+  const [formEj, setFormEj]               = useState({ nombre: "", grupo_muscular: "pecho", gif_url: "" });
   const [savingEj, setSavingEj]           = useState(false);
   const [uploadingEj, setUploadingEj]     = useState(false);
   const [filtroGrupoEj, setFiltroGrupoEj] = useState("Todos");
@@ -193,7 +181,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ─────────────────────────────────────────────────────────────────────────────
   const openNewEj = () => {
     setEditEj(null);
-    setFormEj({ nombre: "", grupo_muscular: "pecho", tipo_movimiento: "Empuje", gif_url: "" });
+    setFormEj({ nombre: "", grupo_muscular: "pecho", gif_url: "" });
     setShowEjModal(true);
   };
 
@@ -202,7 +190,6 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     setFormEj({
       nombre: e.nombre,
       grupo_muscular: e.grupo_muscular || "pecho",
-      tipo_movimiento: e.tipo_movimiento || "Empuje",
       gif_url: e.gif_url || ""
     });
     setShowEjModal(true);
@@ -216,8 +203,9 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
     setSavingEj(true);
     try {
       const payload = {
-        ...formEj,
-        tipo_movimiento: formEj.tipo_movimiento || "Empuje"
+        nombre: formEj.nombre.trim(),
+        grupo_muscular: formEj.grupo_muscular || "pecho",
+        gif_url: formEj.gif_url || ""
       };
       if (editEj) await dbPatch(`biblioteca_ejercicios?id=eq.${editEj.id}`, payload);
       else await dbPost("biblioteca_ejercicios", payload);
@@ -748,7 +736,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         <div className="absolute top-2.5 right-2.5">
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
                             <Dumbbell className="w-3 h-3 text-sky-400" />
-                            <span>{e.tipo_movimiento || (e.gif_url ? "Video / GIF" : "Ejercicio")}</span>
+                            <span>{e.gif_url ? "Video / GIF" : "Ejercicio"}</span>
                           </span>
                         </div>
                       </div>
@@ -1094,15 +1082,6 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                   value={formEj.grupo_muscular}
                   onChange={v => setFormEj(p => ({ ...p, grupo_muscular: v }))}
                   options={GRUPOS_MUSCULARES.map(g => ({ value: g.id, label: g.nombre }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[#0B1929] mb-1.5">Tipo de movimiento</label>
-                <CustomSelect
-                  value={formEj.tipo_movimiento || "Empuje"}
-                  onChange={v => setFormEj(p => ({ ...p, tipo_movimiento: v }))}
-                  options={TIPOS_MOVIMIENTO}
                 />
               </div>
 
@@ -1560,11 +1539,6 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <span className="px-2.5 py-1 rounded-md text-xs font-medium" style={{ backgroundColor: `${groupColors[normalizeMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8"}20`, color: groupColors[normalizeMuscleGroup(previewEj.grupo_muscular)] || "#38bdf8" }}>
                 {GRUPO_LABELS[normalizeMuscleGroup(previewEj.grupo_muscular)] || previewEj.grupo_muscular}
               </span>
-              {previewEj.tipo_movimiento && (
-                <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                  {previewEj.tipo_movimiento}
-                </span>
-              )}
             </div>
             <button
               onClick={() => setPreviewEj(null)}

@@ -3113,7 +3113,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     if (activeAltSlot === null) {
       setRutinaForm(p => ({ ...p, ejercicios:[...p.ejercicios, { 
         _dndId: Math.random().toString(36).slice(2,9), 
-        biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, tipo_movimiento:ej.tipo_movimiento, 
+        biblioteca_id:ej.id, nombre:ej.nombre, grupo_muscular:ej.grupo_muscular, 
         gif_url:ej.gif_url||"", num_series:4, reps_sugeridas:10, peso_sugerido:"", unidad:"kg", alternativas:[] 
       }] }));
     } else {
