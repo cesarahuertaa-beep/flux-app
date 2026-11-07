@@ -56,17 +56,20 @@ const normalizeGroup = (g) => {
 };
 
 const RANKS = [
-  { name: "Clase G", min: 0, color: "#94A3B8", level: 1 }, // Gris claro
+  { name: "Clase G", min: 0, color: "#94A3B8", level: 0 }, // Gris claro (Base)
   { name: "Clase F", min: 100, color: "#64748B", level: 1 }, // Gris oscuro
   { name: "Clase E", min: 300, color: "#4ADE80", level: 2 }, // Verde claro
-  { name: "Clase D", min: 600, color: "#16A34A", level: 2 }, // Verde oscuro
-  { name: "Clase C", min: 1000, color: "#60A5FA", level: 3 }, // Azul claro
-  { name: "Clase B", min: 1500, color: "#2563EB", level: 3 }, // Azul oscuro
-  { name: "Clase A", min: 2100, color: "#A855F7", level: 4 }, // Morado
-  { name: "Clase S", min: 2800, color: "#FBBF24", level: 5 }, // Amarillo
-  { name: "Clase SS", min: 3600, color: "#F97316", level: 5 }, // Naranja
-  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 6 } // Rojo
+  { name: "Clase D", min: 600, color: "#16A34A", level: 3 }, // Verde oscuro
+  { name: "Clase C", min: 1000, color: "#60A5FA", level: 4 }, // Azul claro
+  { name: "Clase B", min: 1500, color: "#2563EB", level: 5 }, // Azul oscuro
+  { name: "Clase A", min: 2100, color: "#A855F7", level: 6 }, // Morado
+  { name: "Clase S", min: 2800, color: "#FBBF24", level: 7 }, // Amarillo
+  { name: "Clase SS", min: 3600, color: "#F97316", level: 8 }, // Naranja
+  { name: "Clase SSS", min: 4500, color: "#EF4444", level: 9 } // Rojo
 ];
+
+const MODEL_BODY_COLOR = "#94A3B8";
+const MODEL_HIGHLIGHT_COLORS = RANKS.slice(1).map(r => r.color);
 
 const getRank = (xp) => {
   return [...RANKS].reverse().find(r => xp >= r.min) || RANKS[0];
@@ -676,30 +679,37 @@ export default function Progreso({ cliente, isSelfManaged }) {
     const data = [];
     
     const getFrequency = (val) => {
-      if (!val || val <= 0) return 0;
+      if (!val || val < 100) return 0;
       const r = getRank(val);
       return r.level;
     };
 
-    if (groups.pecho) data.push({ name: 'Pecho', muscles: ['chest'], frequency: getFrequency(groups.pecho) });
-    if (groups.abdomen) data.push({ name: 'Abdomen', muscles: ['abs'], frequency: getFrequency(groups.abdomen) });
-    if (groups.oblicuos) data.push({ name: 'Oblicuos', muscles: ['obliques'], frequency: getFrequency(groups.oblicuos) });
-    if (groups.deltoide_anterior) data.push({ name: 'Deltoide Ant.', muscles: ['front-deltoids'], frequency: getFrequency(groups.deltoide_anterior) });
-    if (groups.deltoide_posterior) data.push({ name: 'Deltoide Post.', muscles: ['back-deltoids'], frequency: getFrequency(groups.deltoide_posterior) });
-    if (groups.trapecio) data.push({ name: 'Trapecio', muscles: ['trapezius'], frequency: getFrequency(groups.trapecio) });
-    if (groups.dorsal) data.push({ name: 'Dorsal', muscles: ['upper-back'], frequency: getFrequency(groups.dorsal) });
-    if (groups.lumbar) data.push({ name: 'Lumbar', muscles: ['lower-back'], frequency: getFrequency(groups.lumbar) });
-    if (groups.biceps) data.push({ name: 'Bíceps', muscles: ['biceps'], frequency: getFrequency(groups.biceps) });
-    if (groups.triceps) data.push({ name: 'Tríceps', muscles: ['triceps'], frequency: getFrequency(groups.triceps) });
-    if (groups.antebrazo) data.push({ name: 'Antebrazo', muscles: ['forearm'], frequency: getFrequency(groups.antebrazo) });
-    if (groups.gluteo) data.push({ name: 'Glúteo', muscles: ['gluteal'], frequency: getFrequency(groups.gluteo) });
-    if (groups.cuadriceps) data.push({ name: 'Cuádriceps', muscles: ['quadriceps'], frequency: getFrequency(groups.cuadriceps) });
-    if (groups.isquiotibial) data.push({ name: 'Isquiotibial', muscles: ['hamstring'], frequency: getFrequency(groups.isquiotibial) });
-    if (groups.pantorrilla) data.push({ name: 'Pantorrilla', muscles: ['calves'], frequency: getFrequency(groups.pantorrilla) });
-    if (groups.aductor) data.push({ name: 'Aductor', muscles: ['adductor'], frequency: getFrequency(groups.aductor) });
-    if (groups.abductor) data.push({ name: 'Abductor', muscles: ['abductors'], frequency: getFrequency(groups.abductor) });
-    if (groups.soleo) data.push({ name: 'Sóleo', muscles: ['left-soleus', 'right-soleus'], frequency: getFrequency(groups.soleo) });
-    if (groups.cuello) data.push({ name: 'Cuello', muscles: ['neck'], frequency: getFrequency(groups.cuello) });
+    const addMuscle = (key, name, muscles) => {
+      const freq = getFrequency(groups[key]);
+      if (freq > 0) {
+        data.push({ name, muscles, frequency: freq });
+      }
+    };
+
+    addMuscle('pecho', 'Pecho', ['chest']);
+    addMuscle('abdomen', 'Abdomen', ['abs']);
+    addMuscle('oblicuos', 'Oblicuos', ['obliques']);
+    addMuscle('deltoide_anterior', 'Deltoide Ant.', ['front-deltoids']);
+    addMuscle('deltoide_posterior', 'Deltoide Post.', ['back-deltoids']);
+    addMuscle('trapecio', 'Trapecio', ['trapezius']);
+    addMuscle('dorsal', 'Dorsal', ['upper-back']);
+    addMuscle('lumbar', 'Lumbar', ['lower-back']);
+    addMuscle('biceps', 'Bíceps', ['biceps']);
+    addMuscle('triceps', 'Tríceps', ['triceps']);
+    addMuscle('antebrazo', 'Antebrazo', ['forearm']);
+    addMuscle('gluteo', 'Glúteo', ['gluteal']);
+    addMuscle('cuadriceps', 'Cuádriceps', ['quadriceps']);
+    addMuscle('isquiotibial', 'Isquiotibial', ['hamstring']);
+    addMuscle('pantorrilla', 'Pantorrilla', ['calves']);
+    addMuscle('aductor', 'Aductor', ['adductor']);
+    addMuscle('abductor', 'Abductor', ['abductors']);
+    addMuscle('soleo', 'Sóleo', ['left-soleus', 'right-soleus']);
+    addMuscle('cuello', 'Cuello', ['neck']);
 
     return data;
   };
@@ -1252,8 +1262,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <Model 
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
+                      bodyColor={MODEL_BODY_COLOR}
+                      highlightedColors={MODEL_HIGHLIGHT_COLORS}
                       style={{ width: '100%', maxWidth: '10.5rem', padding: '0.25rem' }} 
-                      highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="anterior"
                     />
                   </div>
@@ -1261,8 +1272,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     <Model 
                       bodyType={currentBodyType}
                       data={getBodyData(groupAvg)} 
+                      bodyColor={MODEL_BODY_COLOR}
+                      highlightedColors={MODEL_HIGHLIGHT_COLORS}
                       style={{ width: '100%', maxWidth: '10.5rem', padding: '0.25rem' }} 
-                      highlightedColors={["#9BA5B0","#10B981","#3B82F6","#8B5CF6","#F59E0B","#EF4444"]}
                       type="posterior"
                     />
                   </div>
