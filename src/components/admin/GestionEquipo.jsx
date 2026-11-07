@@ -585,6 +585,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       });
       
       const patchData = {
+        nombre: cleanNombre,
+        telefono: form.telefono || null,
         nutriologo_id: myId,
         role: targetRole
       };
@@ -593,6 +595,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       }
 
       await dbPatch(`profiles?id=eq.${authUser.id}`, patchData);
+      await syncPersonalData(cleanEmail, { nombre: cleanNombre, telefono: form.telefono || null }).catch(() => {});
 
       setMsg(`✅ Invitación enviada — el ${isSuperadmin ? 'colaborador de staff' : 'administrativo'} recibirá un correo para crear su contraseña`);
       setShowInvite(false);

@@ -1551,6 +1551,23 @@ export const syncPersonalData = async (email, data) => {
   }
 
   const promises = [];
+  try {
+    const [profs, clis] = await Promise.all([
+      dbGetFresh(`profiles?email=ilike.${encodedEmail}&select=id`).catch(() => []),
+      dbGetFresh(`clientes?email=ilike.${encodedEmail}&select=id`).catch(() => [])
+    ]);
+    (profs || []).forEach(p => {
+      if (p?.id && Object.keys(dataForProfile).length > 0) {
+        promises.push(dbPatch(`profiles?id=eq.${p.id}`, dataForProfile).catch(() => {}));
+      }
+    });
+    (clis || []).forEach(c => {
+      if (c?.id && Object.keys(dataForCliente).length > 0) {
+        promises.push(dbPatch(`clientes?id=eq.${c.id}`, dataForCliente).catch(() => {}));
+      }
+    });
+  } catch {}
+
   if (Object.keys(dataForProfile).length > 0) {
     promises.push(dbPatch(`profiles?email=ilike.${encodedEmail}`, dataForProfile).catch(() => {}));
   }
@@ -1559,4 +1576,6 @@ export const syncPersonalData = async (email, data) => {
   }
 
   await Promise.all(promises);
+  invalidateCache("profiles");
+  invalidateCache("clientes");
 };

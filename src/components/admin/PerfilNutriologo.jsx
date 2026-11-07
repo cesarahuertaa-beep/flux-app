@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { dbPeek, dbGet, dbPatch, dbPost } from"../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, dbPatch, dbPost } from "../../lib/supabase";
 import { peekClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
 import { User, LogOut, CheckCircle2, RefreshCw, ShoppingBag, CreditCard, Loader2, XCircle, Trash2, AlertTriangle, X } from"lucide-react";
 import { useBrand } from"../BrandContext";
@@ -90,7 +90,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
 
   const loadProfile = async () => {
     try {
-      const rows = await dbGet(`profiles?id=eq.${profileId}`);
+      const rows = await dbGetFresh(`profiles?id=eq.${profileId}`);
       if (rows.length > 0) {
         const p = rows[0];
         let resolvedEmail = p.email || "";
@@ -109,12 +109,28 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
             }
           } catch {}
         }
+
+        let tel = p.telefono || "";
+        let nom = p.nombre || "";
+        let av = p.avatar_url || "";
+
+        // Fallback cruzado con tabla clientes si algún dato básico no estaba en profiles
+        if ((!tel || !nom || !av) && resolvedEmail) {
+          const cliRows = await dbGetFresh(`clientes?email=ilike.${encodeURIComponent(resolvedEmail)}`).catch(() => []);
+          if (cliRows && cliRows.length > 0) {
+            const cp = cliRows[0];
+            if (!tel && cp.telefono) tel = cp.telefono;
+            if (!nom && cp.nombre) nom = cp.nombre;
+            if (!av && cp.avatar_url) av = cp.avatar_url;
+          }
+        }
+
         setPersonalForm(prev => ({
           ...prev,
-          nombre: p.nombre || prev.nombre,
-          telefono: p.telefono || prev.telefono,
+          nombre: nom || prev.nombre,
+          telefono: tel || prev.telefono,
           email: resolvedEmail || prev.email,
-          avatar_url: p.avatar_url || prev.avatar_url,
+          avatar_url: av || prev.avatar_url,
           fecha_nacimiento: p.fecha_nacimiento || prev.fecha_nacimiento || "",
           genero: p.genero || prev.genero || "",
           pais: p.pais || prev.pais || "México",

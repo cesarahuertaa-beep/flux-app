@@ -122,6 +122,49 @@ export async function refreshUserRoles(authUserId, userEmail) {
     }
   }
 
+  // Sincronización cruzada automática bidireccional entre profiles y clientes (teléfono, nombre, avatar)
+  if (profiles.length > 0 && clientRows.length > 0) {
+    const prof = profiles[0];
+    for (const c of clientRows) {
+      const cliPatch = {};
+      const profPatch = {};
+
+      // Teléfono: Si existe en uno pero no en el otro, sincronizar
+      if (prof.telefono && (!c.telefono || c.telefono.trim() === "")) {
+        cliPatch.telefono = prof.telefono;
+        c.telefono = prof.telefono;
+      } else if (c.telefono && (!prof.telefono || prof.telefono.trim() === "")) {
+        profPatch.telefono = c.telefono;
+        prof.telefono = c.telefono;
+      }
+
+      // Avatar: Si existe en uno pero no en el otro, sincronizar
+      if (prof.avatar_url && !c.avatar_url) {
+        cliPatch.avatar_url = prof.avatar_url;
+        c.avatar_url = prof.avatar_url;
+      } else if (c.avatar_url && !prof.avatar_url) {
+        profPatch.avatar_url = c.avatar_url;
+        prof.avatar_url = c.avatar_url;
+      }
+
+      // Nombre: Si el cliente tiene "Atleta" o está vacío, heredar de profile
+      if (prof.nombre && (!c.nombre || c.nombre.trim() === "" || c.nombre === "Atleta")) {
+        cliPatch.nombre = prof.nombre;
+        c.nombre = prof.nombre;
+      } else if (c.nombre && c.nombre !== "Atleta" && (!prof.nombre || prof.nombre.trim() === "")) {
+        profPatch.nombre = c.nombre;
+        prof.nombre = c.nombre;
+      }
+
+      if (Object.keys(cliPatch).length > 0 && c.id) {
+        dbPatch(`clientes?id=eq.${c.id}`, cliPatch).catch(() => {});
+      }
+      if (Object.keys(profPatch).length > 0 && prof.id) {
+        dbPatch(`profiles?id=eq.${prof.id}`, profPatch).catch(() => {});
+      }
+    }
+  }
+
   // Enriquecer registros de pacientes con la clínica y nombre del especialista
   for (const clientData of clientRows) {
     if (clientData.activo === false) continue;
