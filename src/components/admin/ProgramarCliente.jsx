@@ -2597,6 +2597,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const handleGenerateAltWithAi = async (mealIdx) => {
+    if (isEstandar) {
+      openPaywall("ia");
+      return;
+    }
     const meal = diaForm.comidas[mealIdx];
     const mainText = meal?.opciones?.[0] || meal?.opcion1 || "";
     if (!mainText.trim()) {
@@ -6098,9 +6102,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     <button
                                       type="button"
                                       onClick={() => handleGenerateAltWithAi(i)}
-                                      disabled={aiAltIndex === i}
-                                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-semibold border border-purple-200 disabled:opacity-50"
-                                      title="Genera automáticamente una alternativa que iguala con precisión los mismos macros de la Opción A"
+                                      disabled={!isEstandar && aiAltIndex === i}
+                                      className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-semibold border ${
+                                        isEstandar
+                                          ? "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 cursor-pointer"
+                                          : "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 disabled:opacity-50 cursor-pointer"
+                                      }`}
+                                      title={isEstandar ? "Función exclusiva de FLUX Pro" : "Genera automáticamente una alternativa que iguala con precisión los mismos macros de la Opción A"}
                                     >
                                       {aiAltIndex === i ? (
                                         <>
@@ -6109,8 +6117,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </>
                                       ) : (
                                         <>
-                                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                          {isEstandar ? (
+                                            <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                          ) : (
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                          )}
                                           <span>Generar Alternativa con IA</span>
+                                          {isEstandar && (
+                                            <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                              PRO
+                                            </span>
+                                          )}
                                         </>
                                       )}
                                     </button>
