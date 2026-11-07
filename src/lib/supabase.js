@@ -1404,6 +1404,41 @@ export const authUpdatePassword = async (token, password) => {
   return await r.json().catch(() => ({}));
 };
 
+export const authUpdateUserMetadata = async (metadata) => {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ data: metadata }),
+    });
+    if (!r.ok) return null;
+    return await r.json().catch(() => null);
+  } catch {
+    return null;
+  }
+};
+
+export const authGetUserMetadata = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const u = await r.json().catch(() => null);
+    return u?.user_metadata || null;
+  } catch {
+    return null;
+  }
+};
+
 export const captureAuthHashSynchronously = (isAppMode = false) => {
   if (typeof window === "undefined") return false;
 

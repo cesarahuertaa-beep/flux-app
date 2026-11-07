@@ -1,7 +1,9 @@
 // Global workout rest timer store (singleton)
 // Persists across tab switches and syncs with the Android Native Floating Overlay Bubble (DiDi-style)
+import { authGetUserMetadata, authUpdateUserMetadata } from "./supabase";
 
 const PRESET_STORAGE_KEY = "flux_timer_quick_preset";
+const LAST_SECONDS_STORAGE_KEY = "flux_timer_last_seconds";
 const STATE_STORAGE_KEY = "flux_timer_active_state";
 
 let audioCtx = null;
@@ -21,9 +23,23 @@ function loadInitialPreset() {
   return null; // null means no preset configured yet -> shows "+"
 }
 
+function loadInitialSeconds() {
+  try {
+    const raw = localStorage.getItem(LAST_SECONDS_STORAGE_KEY);
+    if (raw !== null && raw !== "") {
+      const n = parseInt(raw, 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+  } catch (e) {}
+  const preset = loadInitialPreset();
+  return preset && preset > 0 ? preset : 90;
+}
+
+const initialSecs = loadInitialSeconds();
+
 let state = {
-  seconds: 90,
-  initialSeconds: 90,
+  seconds: initialSecs,
+  initialSeconds: initialSecs,
   status: "IDLE", // "IDLE" | "RUNNING" | "ALARMING"
   endTime: null,  // timestamp in ms when RUNNING
   brandColor: "#00B4D8",
@@ -179,6 +195,29 @@ export const timerStore = {
       state.inTrainingView = inView;
       notify();
     }
+    if (inView) {
+      timerStore.syncCloudPreset();
+    }
+  },
+
+  syncCloudPreset: async () => {
+    try {
+      const meta = await authGetUserMetadata();
+      if (meta && typeof meta.timer_preset === "number" && meta.timer_preset > 0) {
+        const cloudVal = meta.timer_preset;
+        if (cloudVal !== state.presetSeconds) {
+          state.presetSeconds = cloudVal;
+          try {
+            localStorage.setItem(PRESET_STORAGE_KEY, String(cloudVal));
+          } catch (e) {}
+          if (!localStorage.getItem(LAST_SECONDS_STORAGE_KEY) && state.status === "IDLE") {
+            state.seconds = cloudVal;
+            state.initialSeconds = cloudVal;
+          }
+          notify();
+        }
+      }
+    } catch (e) {}
   },
 
   setSeconds: (newSeconds, updateInitial = true) => {
@@ -186,6 +225,9 @@ export const timerStore = {
     state.seconds = clamped;
     if (updateInitial && !state.isProgrammingPreset) {
       state.initialSeconds = clamped;
+      try {
+        localStorage.setItem(LAST_SECONDS_STORAGE_KEY, String(clamped));
+      } catch (e) {}
     }
     notify();
   },
@@ -246,7 +288,11 @@ export const timerStore = {
     state.initialSeconds = val;
     try {
       localStorage.setItem(PRESET_STORAGE_KEY, String(val));
+      localStorage.setItem(LAST_SECONDS_STORAGE_KEY, String(val));
     } catch (e) {}
+    if (typeof window !== "undefined") {
+      authUpdateUserMetadata({ timer_preset: val }).catch(() => {});
+    }
     notify();
   },
 
@@ -267,6 +313,9 @@ export const timerStore = {
     state.isProgrammingPreset = false;
     state.seconds = state.presetSeconds;
     state.initialSeconds = state.presetSeconds;
+    try {
+      localStorage.setItem(LAST_SECONDS_STORAGE_KEY, String(state.presetSeconds));
+    } catch (e) {}
     notify();
   },
 };
