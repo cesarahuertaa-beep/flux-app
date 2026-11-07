@@ -618,12 +618,6 @@ export default function Training({
       }
     }
 
-    // Si estamos en semana 1 (wi === 0), usar peso/reps sugeridos como base si existen
-    if (bestHistorical1RM === 0 && activeObj?.peso_sugerido && activeObj?.reps_sugeridas) {
-      const base1RM = calcular1RM(activeObj.peso_sugerido, activeObj.reps_sugeridas);
-      if (base1RM) bestHistorical1RM = base1RM;
-    }
-
     let bestCurrent1RM = 0;
     let bestSetIdx = -1;
     let bestWeight = 0;

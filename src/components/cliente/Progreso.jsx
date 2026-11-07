@@ -234,19 +234,25 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     muscleStarted[g] = true;
                     musclesTrainedThisWeek.add(g);
                     
-                    // Primera serie (serie 0 en base de datos, con fallback a serie 1 o el primer set registrado)
-                    const s1 = weekData[0] || weekData[1] || Object.values(weekData)[0];
-                    if (s1 && s1.peso && s1.reps && s1.reps !== "Falta") {
-                       const current1RM = calcular1RM(s1.peso, s1.reps);
-                       if (current1RM) {
-                          if (last1RM[ejId]) {
-                             const pctGrowth = ((current1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
-                             if (pctGrowth > 0) {
-                                muscleXP[g] += Math.round(pctGrowth);
-                             }
-                          }
-                          last1RM[ejId] = current1RM;
-                       }
+                    // Evaluar la mejor serie de la semana para el 1RM (en lugar de solo la primera serie)
+                    let bestCurrent1RM = 0;
+                    Object.values(weekData).forEach(s => {
+                      if (s && s.peso && s.reps && s.reps !== "Falta" && s.reps !== "-" && s.reps !== "0") {
+                        const e1rm = calcular1RM(s.peso, s.reps);
+                        if (e1rm && e1rm > bestCurrent1RM) {
+                          bestCurrent1RM = e1rm;
+                        }
+                      }
+                    });
+
+                    if (bestCurrent1RM > 0) {
+                      if (last1RM[ejId]) {
+                        const pctGrowth = ((bestCurrent1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
+                        if (pctGrowth > 0) {
+                          muscleXP[g] += Math.round(pctGrowth);
+                        }
+                      }
+                      last1RM[ejId] = bestCurrent1RM;
                     }
                  }
               }
