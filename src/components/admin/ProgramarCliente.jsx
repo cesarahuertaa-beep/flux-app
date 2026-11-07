@@ -5139,6 +5139,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         Comida {i + 1}
                                       </span>
 
+                                      {mealKcal > 0 && (
+                                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1 animate-in fade-in" title={`${mealPct}% de la meta calórica diaria`}>
+                                          <Flame className="w-3.5 h-3.5 text-amber-500" />
+                                          <span>{mealKcal} kcal</span>
+                                          {metaKcal > 0 && <span className="text-[10px] text-amber-600 font-semibold">({mealPct}%)</span>}
+                                        </span>
+                                      )}
+
                                       {c.macrosCalculadosPorIa && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/70 flex items-center gap-1 animate-in fade-in">
                                           <Sparkles className="w-3 h-3 text-purple-600" />
@@ -5167,7 +5175,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </div>
                                   </div>
 
-                                  {/* Row 1: Hora sugerida, Calorías de la toma (% restante) y Nombre de la toma */}
+                                  {/* Row 1: Hora sugerida y Nombre de la toma */}
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                                     {/* 1. Hora sugerida */}
                                     <div>
@@ -5190,44 +5198,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       />
                                     </div>
 
-                                    {/* 2. Calorías de la toma (Definidas por el nutriólogo con indicador de % restante) */}
-                                    <div>
-                                      <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <Flame className="w-3.5 h-3.5 text-amber-500" />
-                                        Calorías de la toma
-                                      </label>
-                                      <div className="relative">
-                                        <input 
-                                          type="number"
-                                          min="0"
-                                          step="10"
-                                          className="w-full pl-3.5 pr-12 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-sm text-[#0B1929] font-bold focus:outline-none focus:border-[var(--brand-primary)] hover:border-[#CBD5E1] transition-colors" 
-                                          value={c.calorias || ""} 
-                                          onChange={e => updComida(i, "calorias", e.target.value)} 
-                                          placeholder={metaKcal > 0 ? String(Math.round(metaKcal / Math.max(diaForm.comidas.length, 3))) : "0"} 
-                                        />
-                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#94A3B8] pointer-events-none">
-                                          kcal
-                                        </span>
-                                      </div>
-                                      {metaKcal > 0 && (
-                                        <div className="mt-1 flex items-center justify-between text-[10.5px] px-0.5">
-                                          <span className="text-[#6B7A8D]">
-                                            {mealKcal > 0 ? `${mealPct}% del día` : "Sin definir"}
-                                          </span>
-                                          <span className={remainingKcalAfterThis < 0 ? "text-amber-700 font-bold" : remainingKcalAfterThis === 0 ? "text-emerald-600 font-bold" : "text-blue-600 font-medium"}>
-                                            {remainingKcalAfterThis < 0 
-                                              ? `+${Math.abs(remainingKcalAfterThis)} kcal excedido` 
-                                              : remainingKcalAfterThis === 0 
-                                              ? "✓ Meta del día cubierta" 
-                                              : `Quedan ${remainingKcalAfterThis} kcal (${remainingPctAfterThis}%)`}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* 3. Nombre de la toma */}
-                                    <div>
+                                    {/* 2. Nombre de la toma */}
+                                    <div className="sm:col-span-2">
                                       <label className="block text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider mb-1.5">
                                         Nombre de la toma (opcional)
                                       </label>
@@ -5542,18 +5514,46 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })()}
                                         </div>
 
-                                        {/* Pie del Constructor: Botón Generar con IA */}
-                                        <div className="pt-1 flex items-center justify-between gap-3 flex-wrap">
-                                          <span className="text-[11px] text-[#6B7A8D]">
-                                            {(c.ingredientesSeleccionados || []).length >= 2 
-                                              ? "Combina tus ingredientes en un platillo real del mundo."
-                                              : "Selecciona al menos 2 ingredientes para generar el platillo."}
-                                          </span>
+                                        {/* Pie del Constructor: Meta calórica objetivo + Botón Generar con IA */}
+                                        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                          {/* A la izquierda: Input de Meta Calórica para la IA */}
+                                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-[#0B1929]">
+                                              <Flame className="w-4 h-4 text-amber-500 shrink-0" />
+                                              <span>Meta calórica:</span>
+                                            </div>
+                                            <div className="relative w-28 sm:w-32 shrink-0">
+                                              <input 
+                                                type="number"
+                                                min="0"
+                                                step="10"
+                                                className="w-full pl-3 pr-9 py-1.5 rounded-lg border border-[#CBD5E1] bg-[#F8FAFC] focus:bg-white text-xs font-bold text-[#0B1929] text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                                value={c.calorias || ""} 
+                                                onChange={e => updComida(i, "calorias", e.target.value)} 
+                                                placeholder={metaKcal > 0 ? String(Math.round(metaKcal / Math.max(diaForm.comidas.length, 3))) : "500"} 
+                                                title="Calorías objetivo para la receta formulada con estos ingredientes"
+                                              />
+                                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#94A3B8] pointer-events-none">
+                                                kcal
+                                              </span>
+                                            </div>
+                                            {metaKcal > 0 && (
+                                              <span className="text-[11px] text-[#6B7A8D] truncate hidden sm:inline">
+                                                {remainingKcalAfterThis < 0 
+                                                  ? `(${Math.abs(remainingKcalAfterThis)} kcal excedido)` 
+                                                  : remainingKcalAfterThis === 0 
+                                                  ? "(✓ Meta cubierta)" 
+                                                  : `(Quedan ${remainingKcalAfterThis} kcal del día)`}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          {/* A la derecha: Botón Generar con IA */}
                                           <button
                                             type="button"
                                             onClick={() => handleGenerateDishFromIngredients(i)}
                                             disabled={aiGeneratingDishIndex === i || (!isEstandar && (c.ingredientesSeleccionados || []).length === 0)}
-                                            className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                            className={`text-xs font-bold flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer shrink-0 ${
                                               isEstandar
                                                 ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
                                                 : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
