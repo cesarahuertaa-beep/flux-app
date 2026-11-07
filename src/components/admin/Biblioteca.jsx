@@ -207,8 +207,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         grupo_muscular: formEj.grupo_muscular || "pecho",
         gif_url: formEj.gif_url || ""
       };
-      if (editEj) await dbPatch(`biblioteca_ejercicios?id=eq.${editEj.id}`, payload);
-      else await dbPost("biblioteca_ejercicios", payload);
+      if (editEj) {
+        await dbPatch(`biblioteca_ejercicios?id=eq.${editEj.id}`, payload);
+        await dbPatch(`ejercicios?biblioteca_id=eq.${editEj.id}`, payload).catch(() => {});
+      } else {
+        await dbPost("biblioteca_ejercicios", payload);
+      }
       setShowEjModal(false);
       setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ejercicio guardado</div>);
       onUpdate();

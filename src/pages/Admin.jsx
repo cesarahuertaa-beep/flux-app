@@ -174,6 +174,13 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     }
   }, [myShadowClient, myId]);
 
+  const [civilClientState, setCivilClientState] = useState(clienteData || null);
+  useEffect(() => {
+    if (clienteData) {
+      setCivilClientState(prev => ({ ...(prev || {}), ...clienteData }));
+    }
+  }, [clienteData]);
+
   const [bloqueado, setBloqueado] = useState(false);
   const [diasGracia, setDiasGracia] = useState(false); // true = días 11-12, mostrar alerta
 
@@ -418,21 +425,25 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       }
 
       const shadowIds = new Set(candidates.map(c => c.id));
-      setClientes(
-        r.filter(c => {
-          if (deletingClientIdsRef.current.has(c.id)) return false;
-          if (shadowIds.has(c.id)) return false;
-          if (c.objetivo === "Mi entrenamiento personal") return false;
-          if (c.auth_id && c.nutriologo_id && c.auth_id === c.nutriologo_id) return false;
-          const cEmail = (c.email || "").trim().toLowerCase();
-          if (myEmailNorm && cEmail === myEmailNorm) return false;
-          if (cEmail && nutriIdByEmail.has(cEmail)) {
-            const ownerNutriId = nutriIdByEmail.get(cEmail);
-            if (!c.nutriologo_id || c.nutriologo_id === ownerNutriId) return false;
-          }
-          return true;
-        })
-      );
+      const filteredList = r.filter(c => {
+        if (deletingClientIdsRef.current.has(c.id)) return false;
+        if (shadowIds.has(c.id)) return false;
+        if (c.objetivo === "Mi entrenamiento personal") return false;
+        if (c.auth_id && c.nutriologo_id && c.auth_id === c.nutriologo_id) return false;
+        const cEmail = (c.email || "").trim().toLowerCase();
+        if (myEmailNorm && cEmail === myEmailNorm) return false;
+        if (cEmail && nutriIdByEmail.has(cEmail)) {
+          const ownerNutriId = nutriIdByEmail.get(cEmail);
+          if (!c.nutriologo_id || c.nutriologo_id === ownerNutriId) return false;
+        }
+        return true;
+      });
+      setClientes(filteredList);
+      setSelected(prev => {
+        if (!prev?.id) return prev;
+        const freshMatch = r.find(c => c.id === prev.id);
+        return freshMatch ? { ...prev, ...freshMatch } : prev;
+      });
     };
 
     const fetcher = forceFresh ? dbGetFresh : dbGet;
@@ -1580,7 +1591,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             action={
               <button
                 type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente"))}
+                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente", { detail: { isMiPlan: true, clienteId: myShadowClient?.id } }))}
                 className="sm:hidden flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
                 title="Abrir Expediente Clínico Integral"
               >
@@ -1594,7 +1605,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 key={`mi_plan_${myShadowClient.id}`}
                 clientes={clientes && clientes.length > 0 ? clientes : [myShadowClient]}
                 selected={myShadowClient}
-                setSelected={() => {}}
+                setSelected={(updater) => setMyShadowClient(prev => typeof updater === "function" ? updater(prev) : updater)}
                 setMsg={setMsg}
                 biblioteca={biblioteca}
                 isMiPlan={true}
@@ -2102,7 +2113,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             action={
               <button
                 type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente"))}
+                onClick={() => window.dispatchEvent(new CustomEvent("flux:open-expediente", { detail: { isMiPlan: true, clienteId: (civilClientState || clienteData)?.id } }))}
                 className="sm:hidden flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0B1929] transition-all shadow-2xs cursor-pointer shrink-0"
                 title="Abrir Expediente Clínico Integral"
               >
@@ -2111,16 +2122,16 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
               </button>
             }
           >
-            {clienteData ? (
+            {(civilClientState || clienteData) ? (
               <ProgramarCliente
-                key={`civil_plan_${clienteData?.id || "civil"}`}
-                clientes={[clienteData]}
-                selected={clienteData}
-                setSelected={() => {}}
+                key={`civil_plan_${(civilClientState || clienteData)?.id || "civil"}`}
+                clientes={[civilClientState || clienteData]}
+                selected={civilClientState || clienteData}
+                setSelected={setCivilClientState}
                 setMsg={setMsg}
                 biblioteca={biblioteca}
                 isMiPlan={true}
-                profileId={myId || clienteData?.auth_id || clienteData?.id}
+                profileId={myId || (civilClientState || clienteData)?.auth_id || (civilClientState || clienteData)?.id}
               />
             ) : (
               <ListSkeleton rows={4} />

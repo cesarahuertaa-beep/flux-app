@@ -32,7 +32,7 @@ import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnes
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
-import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
+import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
 import TemplatesManagerModal from "../ui/TemplatesManagerModal";
@@ -598,19 +598,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         }
       }
     };
-    const onOpenHistorico = () => setShowHistorico(true);
-    const onOpenExpediente = () => setShowExpediente(true);
+    const onOpenHistorico = (ev) => {
+      const targetId = ev?.detail?.clienteId;
+      const targetMiPlan = ev?.detail?.isMiPlan;
+      if (targetId && selected?.id && String(targetId) !== String(selected.id)) return;
+      if (typeof targetMiPlan === "boolean" && targetMiPlan !== Boolean(isMiPlan)) return;
+      setShowHistorico(true);
+    };
+    const onOpenExpediente = (ev) => {
+      const targetId = ev?.detail?.clienteId;
+      const targetMiPlan = ev?.detail?.isMiPlan;
+      if (targetId && selected?.id && String(targetId) !== String(selected.id)) return;
+      if (typeof targetMiPlan === "boolean" && targetMiPlan !== Boolean(isMiPlan)) return;
+      setShowExpediente(true);
+    };
+    const onCustomCatalogsUpdated = () => {
+      setDishCatalogSearchMap(prev => ({ ...prev }));
+    };
     window.addEventListener("flux:expediente-updated", onExpedienteUpdated);
     window.addEventListener("flux:metricas-updated", onMetricasUpdated);
     window.addEventListener("flux:open-historico", onOpenHistorico);
     window.addEventListener("flux:open-expediente", onOpenExpediente);
+    window.addEventListener("flux:platillos-updated", onCustomCatalogsUpdated);
+    window.addEventListener("flux:ingredientes-updated", onCustomCatalogsUpdated);
     return () => {
       window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
       window.removeEventListener("flux:metricas-updated", onMetricasUpdated);
       window.removeEventListener("flux:open-historico", onOpenHistorico);
       window.removeEventListener("flux:open-expediente", onOpenExpediente);
+      window.removeEventListener("flux:platillos-updated", onCustomCatalogsUpdated);
+      window.removeEventListener("flux:ingredientes-updated", onCustomCatalogsUpdated);
     };
-  }, [selected?.id]);
+  }, [selected?.id, isMiPlan]);
 
   // Sincronización automática inicial de macros cuando el plan aún no tiene calorías prescritas
   // (respeta los ajustes personalizados hechos desde el Simulador de Macros o Plantillas)
@@ -1520,8 +1539,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         setSubtab("progreso");
         setTimeout(() => {
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("flux:open-new-evaluation", { detail: { ciclo: newCiclo } }));
-            window.dispatchEvent(new CustomEvent("flux:open-checkin", { detail: { ciclo: newCiclo } }));
+            window.dispatchEvent(new CustomEvent("flux:open-new-evaluation", { detail: { ciclo: newCiclo, clienteId: selected?.id } }));
+            window.dispatchEvent(new CustomEvent("flux:open-checkin", { detail: { ciclo: newCiclo, clienteId: selected?.id } }));
           }
         }, 150);
         setMsg(
@@ -3123,8 +3142,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (!main) return p;
         if ((main.alternativas || []).length >= 2) return p;
         const newAlt = {
-          biblioteca_id: ej.id, nombre: ej.nombre, gif_url: ej.gif_url||"",
-          reps_sugeridas: main.reps_sugeridas || 10, peso_sugerido: main.peso_sugerido ||"", unidad: main.unidad ||"kg"
+          biblioteca_id: ej.id,
+          nombre: ej.nombre,
+          grupo_muscular: ej.grupo_muscular || main.grupo_muscular || "",
+          gif_url: ej.gif_url || "",
+          reps_sugeridas: main.reps_sugeridas || 10,
+          peso_sugerido: main.peso_sugerido || "",
+          unidad: main.unidad || "kg"
         };
         es[activeAltSlot] = { ...main, alternativas: [...(main.alternativas || []), newAlt] };
         return { ...p, ejercicios: es };
@@ -6237,7 +6261,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
             {/* Dish Cards Grid */}
             <div className="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {CATALOGO_PLATILLOS_BASE.filter(item => {
+              {getPlatillosCatalog().filter(item => {
                 const matchesCat = catalogCategory === "Todos" || item.categoria?.toLowerCase().includes(catalogCategory.toLowerCase());
                 const q = catalogSearch.toLowerCase().trim();
                 const itemLabel = item.nombre || item.titulo || "";
@@ -6493,7 +6517,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 <div className={`grid grid-cols-[24px_40px_1fr_auto] sm:grid-cols-[24px_40px_1fr_65px_65px_80px_70px] gap-2 sm:gap-1.5 items-center`}>
                                   <div className="flex items-center justify-center">{dragHandle}</div>
                                   <div className="w-9 h-9 rounded-md overflow-hidden bg-white sm:bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                                    {e.gif_url ? <img src={e.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
+                                    {e.gif_url ? (
+                                      /\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
+                                        <video src={e.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                                      ) : (
+                                        <img src={e.gif_url} alt="" className="w-full h-full object-cover"/>
+                                      )
+                                    ) : <Dumbbell className="w-[18px] h-[18px] text-[#6B7A8D]" />}
                                   </div>
                                   <div className="text-[13px] font-semibold text-[#0B1929] leading-tight min-w-0 pr-1">
                                     <div className="truncate">{e.nombre}</div>
@@ -6557,7 +6587,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 {(e.alternativas || []).map((alt, altIdx) => (
                                   <div key={`alt-${altIdx}`} className="mt-2 ml-3 sm:ml-[64px] grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_65px_80px_36px] gap-2 sm:gap-1.5 items-center p-2 sm:py-1.5 sm:px-2 bg-white sm:bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                                     <div className="w-7 h-7 rounded-md overflow-hidden bg-gray-50 border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                                      {alt.gif_url ? <img src={alt.gif_url} alt="" className="w-full h-full object-cover"/> : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
+                                      {alt.gif_url ? (
+                                        /\.(mp4|webm|mov)($|\?)/i.test(alt.gif_url) ? (
+                                          <video src={alt.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                                        ) : (
+                                          <img src={alt.gif_url} alt="" className="w-full h-full object-cover"/>
+                                        )
+                                      ) : <Dumbbell className="w-[14px] h-[14px] text-[#6B7A8D]" />}
                                     </div>
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <span className="px-1.5 py-0.5 bg-blue-50 text-[var(--brand-primary)] border border-blue-200 rounded text-[9px] font-bold shrink-0">ALT {altIdx + 1}</span>

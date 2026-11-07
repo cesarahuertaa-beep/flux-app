@@ -288,6 +288,24 @@ export function CachedImage({
     return fallback ? <>{fallback}</> : null;
   }
 
+  const isVideo = /\.(mp4|webm|mov)($|\?)/i.test(src);
+
+  if (isVideo) {
+    return (
+      <video
+        src={displaySrc || src}
+        className={className}
+        style={style}
+        autoPlay
+        loop
+        muted
+        playsInline
+        onError={handleError}
+        onClick={onClick}
+      />
+    );
+  }
+
   return (
     <img
       src={displaySrc || src}

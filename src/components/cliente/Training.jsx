@@ -500,7 +500,15 @@ export default function Training({
     const variantId = activeVariant[ex.id] ||"original";
     if (variantId ==="original") return { obj: ex, variantId:"original" };
     const altIdx = parseInt(variantId.replace("alt_",""));
-    return { obj: (ex.alternativas || [])[altIdx] || ex, variantId };
+    const altObj = (ex.alternativas || [])[altIdx];
+    if (!altObj) return { obj: ex, variantId };
+    return {
+      obj: {
+        ...altObj,
+        grupo_muscular: altObj.grupo_muscular || ex.grupo_muscular || "",
+      },
+      variantId,
+    };
   };
 
   const totalSemanas = parseInt(rutinaActiva?.semanas) ||

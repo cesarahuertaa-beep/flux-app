@@ -123,7 +123,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
       // 2. Calcular progreso muscular con datos de rutinas y progreso en vivo
       const [allCiclos, rutinas, progs] = await Promise.all([
         dbGetFresh(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
-        dbGetFresh(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`).catch(() => []),
+        dbGetFresh(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular,alternativas)`).catch(() => []),
         dbGetFresh(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => [])
       ]);
 
@@ -138,6 +138,12 @@ export default function Progreso({ cliente, isSelfManaged }) {
           if (e.id && e.grupo_muscular) {
             ejMap[e.id] = e.grupo_muscular;
           }
+          if (e.id && Array.isArray(e.alternativas)) {
+            e.alternativas.forEach((alt, altIdx) => {
+              const altGroup = alt?.grupo_muscular || e.grupo_muscular;
+              if (altGroup) ejMap[`${e.id}__alt_${altIdx}`] = altGroup;
+            });
+          }
         });
       });
 
@@ -150,9 +156,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
       if (pendingEjIds.length > 0) {
         try {
-          const directEjs = await dbGetFresh(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular`).catch(() => []);
+          const directEjs = await dbGetFresh(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular,alternativas`).catch(() => []);
           (directEjs || []).forEach(e => {
             if (e.id && e.grupo_muscular) ejMap[e.id] = e.grupo_muscular;
+            if (e.id && Array.isArray(e.alternativas)) {
+              e.alternativas.forEach((alt, altIdx) => {
+                const altGroup = alt?.grupo_muscular || e.grupo_muscular;
+                if (altGroup) ejMap[`${e.id}__alt_${altIdx}`] = altGroup;
+              });
+            }
           });
         } catch {}
       }
@@ -184,19 +196,21 @@ export default function Progreso({ cliente, isSelfManaged }) {
       const byEj = {};
       (progs || []).forEach(p => {
         if (!p.ejercicio_id || p.semana == null) return;
-        if (!byEj[p.ejercicio_id]) byEj[p.ejercicio_id] = {};
-        if (!byEj[p.ejercicio_id][p.semana]) byEj[p.ejercicio_id][p.semana] = {};
+        const varId = p.variante_id || "original";
+        const ejVarKey = varId === "original" ? String(p.ejercicio_id) : `${p.ejercicio_id}__${varId}`;
+        if (!byEj[ejVarKey]) byEj[ejVarKey] = {};
+        if (!byEj[ejVarKey][p.semana]) byEj[ejVarKey][p.semana] = {};
         const serieKey = p.serie != null ? p.serie : 0;
-        if (!byEj[p.ejercicio_id][p.semana][serieKey]) byEj[p.ejercicio_id][p.semana][serieKey] = {};
-        byEj[p.ejercicio_id][p.semana][serieKey][p.tipo] = p.valor;
+        if (!byEj[ejVarKey][p.semana][serieKey]) byEj[ejVarKey][p.semana][serieKey] = {};
+        byEj[ejVarKey][p.semana][serieKey][p.tipo] = p.valor;
       });
 
       const muscleXP = {};
       EXACT_GROUPS.forEach(g => { muscleXP[g] = 0; });
 
       const allWeeks = new Set();
-      for (const ejId in byEj) {
-         Object.keys(byEj[ejId]).forEach(w => allWeeks.add(Number(w)));
+      for (const ejVarKey in byEj) {
+         Object.keys(byEj[ejVarKey]).forEach(w => allWeeks.add(Number(w)));
       }
       const sortedWeeks = Array.from(allWeeks).sort((a,b)=>a-b);
 
@@ -217,13 +231,14 @@ export default function Progreso({ cliente, isSelfManaged }) {
         for (let w = minWeek; w <= maxWeek; w++) {
            const musclesTrainedThisWeek = new Set();
            
-           for (const ejId in byEj) {
-              const rawG = ejMap[ejId];
+           for (const ejVarKey in byEj) {
+              const baseEjId = ejVarKey.split("__")[0];
+              const rawG = ejMap[ejVarKey] || ejMap[baseEjId];
               if (!rawG) continue;
               const g = normalizeGroup(rawG);
               if (!muscleXP.hasOwnProperty(g)) continue;
 
-              const weekData = byEj[ejId][w];
+              const weekData = byEj[ejVarKey][w];
               if (weekData) {
                  // Validar si al menos una serie tiene repeticiones completadas
                  const hasValidSet = Object.values(weekData).some(
@@ -246,13 +261,13 @@ export default function Progreso({ cliente, isSelfManaged }) {
                     });
 
                     if (bestCurrent1RM > 0) {
-                      if (last1RM[ejId]) {
-                        const pctGrowth = ((bestCurrent1RM - last1RM[ejId]) / last1RM[ejId]) * 100;
+                      if (last1RM[ejVarKey]) {
+                        const pctGrowth = ((bestCurrent1RM - last1RM[ejVarKey]) / last1RM[ejVarKey]) * 100;
                         if (pctGrowth > 0) {
                           muscleXP[g] += Math.round(pctGrowth);
                         }
                       }
-                      last1RM[ejId] = bestCurrent1RM;
+                      last1RM[ejVarKey] = bestCurrent1RM;
                     }
                  }
               }
@@ -327,16 +342,20 @@ export default function Progreso({ cliente, isSelfManaged }) {
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["metricas_progreso", "progreso", "rutinas", "ciclos", "*"].includes(table)) return;
+      if (table && !["metricas_progreso", "progreso", "rutinas", "ejercicios", "ciclos", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };
     window.addEventListener("flux:cache-updated", onCacheUpdated);
     window.addEventListener("flux:synced", onCacheUpdated);
+    window.addEventListener("flux:metricas-updated", onCacheUpdated);
+    window.addEventListener("flux:plan-updated", onCacheUpdated);
     return () => {
       if (timer) clearTimeout(timer);
       window.removeEventListener("flux:cache-updated", onCacheUpdated);
       window.removeEventListener("flux:synced", onCacheUpdated);
+      window.removeEventListener("flux:metricas-updated", onCacheUpdated);
+      window.removeEventListener("flux:plan-updated", onCacheUpdated);
     };
   }, [loadData]);
   useEffect(() => { if (view === 'galeria') loadPersonalPhotos(); }, [view, loadPersonalPhotos]);

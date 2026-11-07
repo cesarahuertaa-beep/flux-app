@@ -95,7 +95,11 @@ export function EjercicioSelector({ biblioteca = [], onSelect, selected = [] }) 
             >
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0F4FA] flex-shrink-0 flex items-center justify-center border border-[#E2E8F0]">
                 {e.gif_url ? (
-                  <img src={e.gif_url} alt="" className="w-full h-full object-cover" />
+                  /\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
+                    <video src={e.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={e.gif_url} alt="" className="w-full h-full object-cover" />
+                  )
                 ) : (
                   <ImageIcon size={16} className="text-[#9BA5B0]" />
                 )}

@@ -647,6 +647,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   useEffect(() => {
     const handleOpen = (ev) => {
       const explicitCiclo = ev?.detail?.ciclo;
+      const targetClienteId = ev?.detail?.clienteId || explicitCiclo?.cliente_id;
+      if (targetClienteId && selected?.id && String(targetClienteId) !== String(selected.id)) return;
       openNewEvaluation(explicitCiclo);
     };
     window.addEventListener("flux:open-new-evaluation", handleOpen);
@@ -655,7 +657,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       window.removeEventListener("flux:open-new-evaluation", handleOpen);
       window.removeEventListener("flux:open-checkin", handleOpen);
     };
-  }, [openNewEvaluation]);
+  }, [openNewEvaluation, selected?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -664,7 +666,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     const onCacheUpdated = (ev) => {
       if (saving || showModal) return;
       const table = ev?.detail?.table;
-      if (table && !["metricas_progreso", "progreso", "nutricion_progreso", "rutinas", "nutricion_dias", "ciclos"].includes(table)) return;
+      if (table && !["metricas_progreso", "progreso", "nutricion_progreso", "rutinas", "ejercicios", "nutricion_dias", "ciclos"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (table === "metricas_progreso" || table === "*") {
