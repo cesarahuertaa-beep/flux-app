@@ -9,14 +9,31 @@ import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X } from "lucide-react";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
-import { CitasCliente } from "../components/CitasCliente";
-import Nutrition from "../components/cliente/Nutrition";
-import Training from "../components/cliente/Training";
-import Progreso from "../components/cliente/Progreso";
-import UserProfile from "../components/UserProfile";
-import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import NuevoExpedienteForms from "../components/clinical/NuevoExpedienteForms";
 import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
+
+const lazyRetry = (importer) =>
+  lazy(() =>
+    importer().catch((err) => {
+      try {
+        const key = "flux_chunk_retry";
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 15000 && navigator.onLine !== false) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      } catch {}
+      throw err;
+    })
+  );
+
+const CitasCliente = lazyRetry(() => import("../components/CitasCliente").then((m) => ({ default: m.CitasCliente })));
+const Nutrition = lazyRetry(() => import("../components/cliente/Nutrition"));
+const Training = lazyRetry(() => import("../components/cliente/Training"));
+const Progreso = lazyRetry(() => import("../components/cliente/Progreso"));
+const UserProfile = lazyRetry(() => import("../components/UserProfile"));
+const PerfilNutriologo = lazyRetry(() => import("../components/admin/PerfilNutriologo"));
+const NuevoExpedienteForms = lazyRetry(() => import("../components/clinical/NuevoExpedienteForms"));
 
 // dbUpsert ya guarda offline (cola + copia local) y envía al volver la conexión con retorno mínimo para máxima velocidad
 const offlineAwareUpsert = async (records) => {
@@ -91,6 +108,19 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     window.addEventListener("flux:navigate-tab", onNavigateTab);
     return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
   }, [isEmbedded]);
+
+  // Precargar pasivamente en segundo plano los módulos de las pestañas del atleta tras el primer pintado
+  // para que el cambio de pestañas (y el uso en sótanos/gimnasios sin señal) sea en 0 ms
+  useEffect(() => {
+    const t = setTimeout(() => {
+      import("../components/cliente/Nutrition").catch(() => {});
+      import("../components/cliente/Training").catch(() => {});
+      import("../components/cliente/Progreso").catch(() => {});
+      import("../components/CitasCliente").catch(() => {});
+      import("../components/UserProfile").catch(() => {});
+    }, 900);
+    return () => clearTimeout(t);
+  }, []);
 
   const _peekCiclos = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`) : null;
   const _peekCiclo = Array.isArray(_peekCiclos) && _peekCiclos.length ? _peekCiclos[0] : null;
@@ -550,7 +580,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
           {(tab === "progreso" || visitedTabs.has("progreso")) && (
             <div className={tab === "progreso" ? "flex-1 flex flex-col" : "hidden"}>
-              <Progreso cliente={cliente} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
+              <Progreso cliente={cliente} isActive={tab === "progreso"} isSelfManaged={cliente?.nutriologo_id === null || isAtletaMode || isEmbedded} />
             </div>
           )}
 
@@ -583,15 +613,17 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
               <span>Cerrar</span>
             </button>
           </div>
-          <NuevoExpedienteForms
-            cliente={cliente}
-            mode="paciente"
-            onFinished={(savedRec) => {
-              if (savedRec) setClinicalRec(savedRec);
-              setShowIntakeForms(false);
-            }}
-            onBackToList={() => setShowIntakeForms(false)}
-          />
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-3xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <NuevoExpedienteForms
+              cliente={cliente}
+              mode="paciente"
+              onFinished={(savedRec) => {
+                if (savedRec) setClinicalRec(savedRec);
+                setShowIntakeForms(false);
+              }}
+              onBackToList={() => setShowIntakeForms(false)}
+            />
+          </Suspense>
         </div>
       )}
     </>

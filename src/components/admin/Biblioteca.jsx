@@ -27,6 +27,7 @@ import {
 import { useBackButton } from "../../lib/backButtonHandler";
 import { CustomSelect } from "../ui/CustomSelect";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { CachedImage } from "../../lib/mediaCache";
 import {
   peekCustomPlatillos,
   peekCustomIngredientes,
@@ -701,22 +702,17 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       >
                         {e.gif_url ? (
                           <>
-                            {/\.(mp4|webm|mov)($|\?)/i.test(e.gif_url) ? (
-                              <video
-                                src={e.gif_url}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
-                            ) : (
-                              <img
-                                src={e.gif_url}
-                                alt={e.nombre}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
-                            )}
+                            <CachedImage
+                              src={e.gif_url}
+                              alt={e.nombre}
+                              loading="lazy"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              fallback={
+                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1 bg-slate-50">
+                                  <Dumbbell size={36} />
+                                </div>
+                              }
+                            />
                             <div className="absolute inset-0 bg-[#0B1929]/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                               <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center text-[#0B1929] shadow-lg">
                                 <Play size={20} className="ml-0.5 fill-current" />
@@ -848,10 +844,16 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         className="h-[145px] bg-slate-100 relative overflow-hidden cursor-pointer"
                       >
                         {p.foto_url ? (
-                          <img
+                          <CachedImage
                             src={p.foto_url}
                             alt={p.nombre}
+                            loading="lazy"
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            fallback={
+                              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
+                                <Utensils size={36} />
+                              </div>
+                            }
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
@@ -974,6 +976,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                           <img
                             src={ing.foto}
                             alt={ing.nombre}
+                            loading="lazy"
+                            decoding="async"
                             className="max-h-[105px] max-w-[105px] object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               e.currentTarget.onerror = null;

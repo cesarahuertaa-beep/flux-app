@@ -14,25 +14,50 @@ import { useBrand } from "../components/BrandContext";
 import { CardGridSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 import { useBackButton } from "../lib/backButtonHandler";
 
-import { Biblioteca } from "../components/admin/Biblioteca";
-import { ProgramarCliente } from "../components/admin/ProgramarCliente";
-import MiMembresiaCivil from "../components/admin/MiMembresiaCivil";
-import { GestionEquipo, DEFAULT_STAFF_ROLES } from "../components/admin/GestionEquipo";
-import { AgendaAdmin } from "../components/admin/AgendaAdmin";
-import ClienteView from "./Cliente";
-import UserProfile from "../components/UserProfile";
-import PerfilNutriologo from "../components/admin/PerfilNutriologo";
-import Aprobaciones from "../components/admin/Aprobaciones";
-import GestorTienda from "../components/admin/GestorTienda";
-import MiMembresia from "../components/admin/MiMembresia";
-import ControlPagos from "../components/admin/ControlPagos";
-import MisComisiones from "../components/admin/MisComisiones";
-import { DirectorioSuperadmin } from "../components/admin/DirectorioSuperadmin";
 import { peekClinicalRecord } from "../lib/clinicalRecord";
-import ExpedienteClinicoModal from "../components/clinical/ExpedienteClinicoModal";
 import { calcEdadFromBirthdate } from "../lib/bodyComposition";
 import { CachedImage } from "../lib/mediaCache";
 import { checkAndCleanOrphanedEmail, deletePatientAccount } from "../lib/authRoles";
+
+const lazyRetry = (importer) =>
+  lazy(() =>
+    importer().catch((err) => {
+      try {
+        const key = "flux_chunk_retry";
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 15000 && navigator.onLine !== false) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      } catch {}
+      throw err;
+    })
+  );
+
+const Biblioteca = lazyRetry(() => import("../components/admin/Biblioteca").then((m) => ({ default: m.Biblioteca })));
+const ProgramarCliente = lazyRetry(() => import("../components/admin/ProgramarCliente").then((m) => ({ default: m.ProgramarCliente })));
+const MiMembresiaCivil = lazyRetry(() => import("../components/admin/MiMembresiaCivil"));
+const GestionEquipo = lazyRetry(() => import("../components/admin/GestionEquipo").then((m) => ({ default: m.GestionEquipo })));
+const AgendaAdmin = lazyRetry(() => import("../components/admin/AgendaAdmin").then((m) => ({ default: m.AgendaAdmin })));
+const ClienteView = lazyRetry(() => import("./Cliente"));
+const UserProfile = lazyRetry(() => import("../components/UserProfile"));
+const PerfilNutriologo = lazyRetry(() => import("../components/admin/PerfilNutriologo"));
+const Aprobaciones = lazyRetry(() => import("../components/admin/Aprobaciones"));
+const GestorTienda = lazyRetry(() => import("../components/admin/GestorTienda"));
+const MiMembresia = lazyRetry(() => import("../components/admin/MiMembresia"));
+const ControlPagos = lazyRetry(() => import("../components/admin/ControlPagos"));
+const MisComisiones = lazyRetry(() => import("../components/admin/MisComisiones"));
+const DirectorioSuperadmin = lazyRetry(() => import("../components/admin/DirectorioSuperadmin").then((m) => ({ default: m.DirectorioSuperadmin })));
+const ExpedienteClinicoModal = lazyRetry(() => import("../components/clinical/ExpedienteClinicoModal"));
+
+const DEFAULT_STAFF_ROLES = [
+  { id: "staff_general", modulos: ["clientes", "biblioteca", "tienda"] },
+  { id: "staff_ventas", modulos: ["clientes", "aprobaciones", "tienda"] },
+  { id: "staff_finanzas", modulos: ["pagos", "clientes"] },
+  { id: "staff_marketing", modulos: ["tienda", "biblioteca"] },
+  { id: "staff_soporte", modulos: ["clientes", "aprobaciones"] },
+];
 
 const getInitials = (name) => {
   if (!name) return "P";
@@ -102,6 +127,27 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     window.addEventListener("flux:navigate-tab", onNavigateTab);
     return () => window.removeEventListener("flux:navigate-tab", onNavigateTab);
   }, []);
+
+  // Precargar pasivamente en segundo plano los módulos correspondientes al rol tras el primer pintado
+  useEffect(() => {
+    const t = setTimeout(() => {
+      import("../components/admin/ProgramarCliente").catch(() => {});
+      import("./Cliente").catch(() => {});
+      if (isCivil) {
+        import("../components/UserProfile").catch(() => {});
+        import("../components/admin/MiMembresiaCivil").catch(() => {});
+      } else {
+        import("../components/admin/PerfilNutriologo").catch(() => {});
+        import("../components/clinical/ExpedienteClinicoModal").catch(() => {});
+        import("../components/admin/AgendaAdmin").catch(() => {});
+        if (isSuperadmin || role === "staff") {
+          import("../components/admin/DirectorioSuperadmin").catch(() => {});
+          import("../components/admin/Biblioteca").catch(() => {});
+        }
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [isCivil, isSuperadmin, role]);
   
   const myId = profileId || getProfileId();
   const _peekMe = myId ? (dbPeek(`profiles?id=eq.${myId}&select=id,nombre,email,nombre_marca,telefono,ubicacion_texto,mapa_url,avatar_url,nutriologo_id,especialidad`) || dbPeek(`profiles?id=eq.${myId}`)) : null;
@@ -1579,7 +1625,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {/* Sub-Components */}
       {(role === "superadmin" || role === "staff") && (tab === "biblioteca" || visitedTabs.has("biblioteca")) && (
         <div className={tab === "biblioteca" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
-          <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <Biblioteca biblioteca={biblioteca} onUpdate={loadBiblioteca} setMsg={setMsg} isSuperadmin={true}/>
+          </Suspense>
         </div>
       )}
       
@@ -1672,7 +1720,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {(isSuperadmin || (role === "staff" && staffModules.includes("pagos"))) && (tab === "pagos" || visitedTabs.has("pagos")) && (
         <div className={tab === "pagos" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
-          <ControlPagos setMsg={setMsg} />
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <ControlPagos setMsg={setMsg} />
+          </Suspense>
         </div>
       )}
 
@@ -2099,7 +2149,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
       {(isSuperadmin || role === "staff") && (tab === "tienda" || visitedTabs.has("tienda")) && (
         <div className={tab === "tienda" ? "flex-1 flex flex-col bg-white md:bg-[#F7F9FC]" : "hidden"}>
-          <GestorTienda setMsg={setMsg}/>
+          <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
+            <GestorTienda setMsg={setMsg}/>
+          </Suspense>
         </div>
       )}
     
@@ -2190,20 +2242,22 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       )}
       {/* Modal de Expediente Clínico Integral desde Lista de Pacientes */}
       {expedienteClient && (
-        <ExpedienteClinicoModal
-          cliente={expedienteClient}
-          isOpen={!!expedienteClient}
-          onClose={() => setExpedienteClient(null)}
-          onSaved={(savedRec, updatedClient) => {
-            if (updatedClient) {
-              setClientes((prev) =>
-                prev.map((cli) => (cli.id === updatedClient.id ? { ...cli, ...updatedClient } : cli))
-              );
-            }
-            setMsg("Expediente clínico guardado correctamente");
-            setTimeout(() => setMsg(""), 3000);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ExpedienteClinicoModal
+            cliente={expedienteClient}
+            isOpen={!!expedienteClient}
+            onClose={() => setExpedienteClient(null)}
+            onSaved={(savedRec, updatedClient) => {
+              if (updatedClient) {
+                setClientes((prev) =>
+                  prev.map((cli) => (cli.id === updatedClient.id ? { ...cli, ...updatedClient } : cli))
+                );
+              }
+              setMsg("Expediente clínico guardado correctamente");
+              setTimeout(() => setMsg(""), 3000);
+            }}
+          />
+        </Suspense>
       )}
 
 </AppLayout>

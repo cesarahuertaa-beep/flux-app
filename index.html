@@ -61,7 +61,9 @@
             }
             if (window.caches) {
               caches.keys().then(function(ks) {
-                ks.forEach(function(k) { caches.delete(k); });
+                ks.forEach(function(k) {
+                  if (k !== 'flux-media-v1') caches.delete(k);
+                });
               });
             }
           } catch(e) {}
@@ -87,7 +89,9 @@
                 }
                 if (window.caches) {
                   caches.keys().then(function(ks) {
-                    ks.forEach(function(k) { caches.delete(k); });
+                    ks.forEach(function(k) {
+                      if (k !== 'flux-media-v1') caches.delete(k);
+                    });
                   });
                 }
                 sessionStorage.clear();
@@ -97,7 +101,7 @@
             document.body.appendChild(btn);
           }
         }
-      }, 3500);
+      }, 8000);
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

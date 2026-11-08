@@ -277,6 +277,8 @@ const applyOptimisticUpsert = (path, rows) => {
       else data.push(row);
     }
     entry.data = data;
+    entry.timestamp = Date.now();
+    entry.invalidated = false;
     persistEntry(key);
   }
 };
@@ -423,8 +425,8 @@ const RELATED_TABLES = {
   profiles: ["profiles", "directorio_nutriologos_publicos"],
   clientes: ["clientes", "ciclos", "metricas_progreso", "progreso", "nutricion_progreso"],
   metricas_progreso: ["metricas_progreso", "clientes"],
-  progreso: ["progreso", "rutinas", "ejercicios"],
-  nutricion_progreso: ["nutricion_progreso", "nutricion_dias", "nutricion"],
+  progreso: ["progreso"],
+  nutricion_progreso: ["nutricion_progreso"],
   pagos_manuales: ["pagos_manuales", "profiles", "clientes", "comisiones"],
   solicitudes_profesionales: ["solicitudes_profesionales", "profiles"],
   productos: ["productos"],
@@ -777,7 +779,13 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
 
     if ((opts.headers?.Prefer?.includes("return=minimal") || headers.Prefer?.includes("return=minimal")) && r.ok) {
       if (!isGet) {
-        invalidateCache(table);
+        if (method === "POST" && (table === "progreso" || table === "nutricion_progreso")) {
+          // applyOptimisticUpsert ya inyectó las filas en queryCache con invalidated=false;
+          // solo notificamos localmente (0 bytes de GET extra) y por WebSocket a otros dispositivos
+          emitCacheUpdate("*", table, null);
+        } else {
+          invalidateCache(table);
+        }
         broadcastTableChange(table);
       }
       return [];
@@ -879,16 +887,23 @@ const q = async (path, opts = {}, onBackgroundUpdate = null) => {
     _inflightGets.set(path, netPromise);
     return netPromise;
   } else {
-    // En mutaciones (PATCH / DELETE), actualizar optimísticamente la caché local de inmediato (online y offline)
+    // En mutaciones (PATCH / DELETE / Upsert de progreso), actualizar optimísticamente la caché local de inmediato
     if (method === "PATCH" || method === "DELETE") {
       applyOptimistic(method, path, opts.body);
+    } else if (method === "POST" && (table === "progreso" || table === "nutricion_progreso")) {
+      try {
+        const b = typeof opts.body === "string" ? JSON.parse(opts.body) : opts.body;
+        applyOptimisticUpsert(path, Array.isArray(b) ? b : [b]);
+      } catch { /* ignore */ }
     }
-    // Marcar entradas relacionadas como obsoletas sin disparar evento aún (el evento se emite al concluir la petición)
-    const targets = table ? (RELATED_TABLES[table] || [table]) : null;
-    for (const [key, entry] of queryCache.entries()) {
-      const keyTable = key.split("?")[0];
-      if (!targets || targets.includes(keyTable)) {
-        entry.invalidated = true;
+    // Marcar entradas relacionadas como obsoletas (salvo progreso/nutricion_progreso que ya quedaron actualizadas en memoria)
+    if (!(method === "POST" && (table === "progreso" || table === "nutricion_progreso"))) {
+      const targets = table ? (RELATED_TABLES[table] || [table]) : null;
+      for (const [key, entry] of queryCache.entries()) {
+        const keyTable = key.split("?")[0];
+        if (!targets || targets.includes(keyTable)) {
+          entry.invalidated = true;
+        }
       }
     }
   }

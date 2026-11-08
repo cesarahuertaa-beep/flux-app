@@ -75,7 +75,7 @@ const getRank = (xp) => {
   return [...RANKS].reverse().find(r => xp >= r.min) || RANKS[0];
 };
 
-export default function Progreso({ cliente, isSelfManaged }) {
+export default function Progreso({ cliente, isSelfManaged, isActive = true }) {
   const _peekMetricas = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`) : null;
   const [metricas, setMetricas] = useState(() => Array.isArray(_peekMetricas) ? _peekMetricas.map(enrichMetrica) : []);
   const _peekCiclos = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`) : null;
@@ -83,6 +83,9 @@ export default function Progreso({ cliente, isSelfManaged }) {
   const [groupAvg, setGroupAvg] = useState({});
   const [loading, setLoading] = useState(() => _peekMetricas === null);
   const hasLoadedRef = useRef(_peekMetricas !== null);
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  const pendingRefreshRef = useRef(false);
   const brand = useBrand();
   const isEstandar = cliente && !cliente.nutriologo_id && cliente.plan_tipo !== 'premium' && cliente.objetivo !== 'Mi entrenamiento personal';
   const currentBodyType = cliente?.genero === 'Femenino' ? 'female' : 'male';
@@ -116,15 +119,15 @@ export default function Progreso({ cliente, isSelfManaged }) {
       setLoading(true);
     }
     try {
-      // 1. Cargar métricas de composición frescas de la base de datos
-      const ms = await dbGetFresh(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`).catch(() => []);
+      // 1. Cargar métricas de composición desde la caché inteligente Local-First (0 ms y 0 egress si no fue invalidada)
+      const ms = await dbGet(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc`).catch(() => []);
       setMetricas(Array.isArray(ms) ? ms.map(enrichMetrica) : []);
 
-      // 2. Calcular progreso muscular con datos de rutinas y progreso en vivo
+      // 2. Calcular progreso muscular con datos de rutinas y progreso desde la caché inteligente
       const [allCiclos, rutinas, progs] = await Promise.all([
-        dbGetFresh(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
-        dbGetFresh(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular,alternativas)`).catch(() => []),
-        dbGetFresh(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => [])
+        dbGet(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`).catch(() => []),
+        dbGet(`rutinas?cliente_id=eq.${cliente.id}&select=id,ciclo_id,ejercicios(id,grupo_muscular,alternativas)`).catch(() => []),
+        dbGet(`progreso?cliente_id=eq.${cliente.id}&limit=3000`).catch(() => [])
       ]);
 
       const validCiclos = Array.isArray(allCiclos) ? allCiclos : [];
@@ -156,7 +159,7 @@ export default function Progreso({ cliente, isSelfManaged }) {
 
       if (pendingEjIds.length > 0) {
         try {
-          const directEjs = await dbGetFresh(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular,alternativas`).catch(() => []);
+          const directEjs = await dbGet(`ejercicios?id=in.(${pendingEjIds.join(",")})&select=id,grupo_muscular,alternativas`).catch(() => []);
           (directEjs || []).forEach(e => {
             if (e.id && e.grupo_muscular) ejMap[e.id] = e.grupo_muscular;
             if (e.id && Array.isArray(e.alternativas)) {
@@ -338,11 +341,22 @@ export default function Progreso({ cliente, isSelfManaged }) {
   }, [cliente?.id]);
 
   useEffect(() => {
+    if (isActive && pendingRefreshRef.current) {
+      pendingRefreshRef.current = false;
+      loadData();
+    }
+  }, [isActive, loadData]);
+
+  useEffect(() => {
     loadData();
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
       if (table && !["metricas_progreso", "progreso", "rutinas", "ejercicios", "ciclos", "*"].includes(table)) return;
+      if (!isActiveRef.current) {
+        pendingRefreshRef.current = true;
+        return;
+      }
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };

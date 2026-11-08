@@ -181,7 +181,7 @@ export const prefetchCliente = async (cliente) => {
   await prefetchPlanCliente(id, mediaUrls);
 
   // Pestaña Progreso
-  await safe(`rutinas?cliente_id=eq.${id}&select=id,ciclo_id,ejercicios(id,grupo_muscular)`);
+  await safe(`rutinas?cliente_id=eq.${id}&select=id,ciclo_id,ejercicios(id,grupo_muscular,alternativas)`);
   await safe(`progreso?cliente_id=eq.${id}&limit=3000`);
 
   // Pestaña Membresía Civil y Citas

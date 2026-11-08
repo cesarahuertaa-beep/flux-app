@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { setAuthToken, restoreSession, restoreProfileId, setProfileId, saveRefreshToken, dbGetFresh, dbUpsert, captureAuthHashSynchronously, clearOfflineData, syncNativeCredentials, hydrateOfflineCache } from "./lib/supabase";
@@ -33,17 +33,33 @@ if (typeof window !== "undefined" && !isNativePlatform() && window.location.hash
 // Interceptar cualquier token de invitación / recuperación ANTES de montar el Router
 captureAuthHashSynchronously(isNativePlatform());
 
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import ClienteView from "./pages/Cliente";
-import Privacidad from "./pages/Privacidad";
-import Terminos from "./pages/Terminos";
+const lazyWithRetry = (importer) =>
+  lazy(() =>
+    importer().catch((err) => {
+      try {
+        const key = "flux_chunk_retry";
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 15000 && navigator.onLine !== false) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      } catch {}
+      throw err;
+    })
+  );
+
+const Landing = lazyWithRetry(() => import("./pages/Landing"));
+const Login = lazyWithRetry(() => import("./pages/Login"));
+const Admin = lazyWithRetry(() => import("./pages/Admin"));
+const ClienteView = lazyWithRetry(() => import("./pages/Cliente"));
+const Privacidad = lazyWithRetry(() => import("./pages/Privacidad"));
+const Terminos = lazyWithRetry(() => import("./pages/Terminos"));
 
 const FullScreenLoader = () => {
   const [showRecover, setShowRecover] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setShowRecover(true), 3000);
+    const t = setTimeout(() => setShowRecover(true), 5000);
     return () => clearTimeout(t);
   }, []);
   return (
@@ -55,7 +71,13 @@ const FullScreenLoader = () => {
           onClick={() => {
             try {
               navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
-              if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
+              if (window.caches) {
+                caches.keys().then((ks) =>
+                  ks.forEach((k) => {
+                    if (k !== "flux-media-v1") caches.delete(k);
+                  })
+                );
+              }
             } catch {}
             window.location.replace(window.location.pathname + "?_cb=" + Date.now());
           }}
