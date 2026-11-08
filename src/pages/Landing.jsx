@@ -185,35 +185,46 @@ function Navbar({ session, onLogout }) {
 function HeroPhoneMockup({ config }) {
   const screenshots = config?.app_screenshots || [];
   const [selectedScreenIdx, setSelectedScreenIdx] = useState(0);
+  const [videoAspect, setVideoAspect] = useState(null);
 
   const hasScreenshots = screenshots.length > 0;
   const videoUrl = config?.app_video_url;
+
+  const handleLoadedMetadata = (e) => {
+    const { videoWidth, videoHeight } = e.target;
+    if (videoWidth && videoHeight) {
+      setVideoAspect(videoWidth / videoHeight);
+    }
+  };
+
+  // Si hay video detectado adopta su proporción exacta, sino usa el estándar moderno 9:19.5
+  const effectiveAspect = videoAspect || 9 / 19.5;
 
   return (
     <div className="relative mx-auto flex items-center justify-center w-full">
       {/* Resplandor decorativo de fondo */}
       <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/20 via-sky-400/20 to-emerald-400/20 rounded-[48px] blur-2xl -z-10 pointer-events-none" />
 
-      {/* Marco del Smartphone 9:16 responsivo vertical (siempre visible completo) */}
+      {/* Marco del Smartphone adaptativo (toma la proporción real del video y la altura de pantalla) */}
       <div
-        className="relative bg-[#0B1929] rounded-[38px] sm:rounded-[44px] p-2.5 sm:p-3 shadow-2xl border-[3.5px] sm:border-4 border-[#1E2D3D] ring-1 ring-white/10 flex flex-col overflow-hidden"
+        className="relative bg-[#0B1929] rounded-[38px] sm:rounded-[44px] p-2.5 sm:p-3 shadow-2xl border-[3.5px] sm:border-4 border-[#1E2D3D] ring-1 ring-white/10 flex flex-col overflow-hidden transition-all duration-300"
         style={{
-          height: "min(560px, calc(100dvh - 140px))",
-          maxHeight: "min(560px, calc(100dvh - 140px))",
-          aspectRatio: "9 / 16",
-          maxWidth: "min(325px, 85vw)",
+          height: "min(580px, calc(100dvh - 140px))",
+          maxHeight: "min(580px, calc(100dvh - 140px))",
+          aspectRatio: effectiveAspect,
+          maxWidth: "min(340px, 85vw)",
           width: "auto"
         }}
       >
-        {/* Pantalla del Teléfono 9:16 */}
-        <div className="flex-1 w-full h-full bg-black rounded-[28px] sm:rounded-[34px] overflow-hidden flex flex-col relative shadow-inner">
-          {/* Notch / Dynamic Island flotante y discreto */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 w-16 sm:w-20 h-3 sm:h-3.5 bg-black/85 backdrop-blur-md rounded-full flex items-center justify-end px-2 pointer-events-none shadow-xs border border-white/5">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#1E2D3D]" />
-          </div>
+        {/* Auricular / Cámara en el bisel exterior (deja la pantalla 100% limpia sin tapar textos) */}
+        <div className="w-16 h-1.5 bg-[#1E2D3D] rounded-full mx-auto mb-2 shrink-0 flex items-center justify-end px-1">
+          <div className="w-1 h-1 rounded-full bg-[#0B1929]" />
+        </div>
 
+        {/* Pantalla del Teléfono */}
+        <div className="flex-1 w-full h-full bg-black rounded-[26px] sm:rounded-[32px] overflow-hidden flex flex-col relative shadow-inner">
           {videoUrl ? (
-            // Modo Video 9:16 en bucle continuo limpio
+            // Modo Video en bucle continuo limpio adaptado al 100%
             <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
               <video
                 key={videoUrl}
@@ -223,7 +234,8 @@ function HeroPhoneMockup({ config }) {
                 loop
                 playsInline
                 preload="auto"
-                className="w-full h-full object-cover select-none pointer-events-none"
+                onLoadedMetadata={handleLoadedMetadata}
+                className="w-full h-full object-contain select-none pointer-events-none"
               />
             </div>
           ) : hasScreenshots ? (

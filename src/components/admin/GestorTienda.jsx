@@ -987,16 +987,16 @@ export default function GestorTienda({ setMsg }) {
                   <Video size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#0B1929]">Video de la App (Showcase en Celular 9:16)</h3>
+                  <h3 className="text-base font-bold text-[#0B1929]">Video de la App (Showcase en Celular)</h3>
                   <p className="text-xs text-[#6B7A8D] mt-0.5">
-                    Video vertical que se reproduce en bucle continuo dentro del smartphone del landing.
+                    Video vertical de tu app que se reproduce en bucle en el Hero (el marco del teléfono se adapta automáticamente a las medidas de tu video).
                   </p>
                 </div>
               </div>
 
               <label className={`flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs hover:opacity-90 transition-opacity cursor-pointer ${uploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={14} />
-                <span>{uploadingVideo ? "Subiendo video..." : "Subir Video (9:16)"}</span>
+                <span>{uploadingVideo ? "Subiendo video..." : "Subir Video"}</span>
                 <input
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime,video/mov"
@@ -1008,15 +1008,15 @@ export default function GestorTienda({ setMsg }) {
 
             {config.app_video_url ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 bg-[#F7F9FC] p-4 rounded-2xl border border-[#E2E8F0]">
-                {/* Mini preview del video 9:16 */}
-                <div className="relative w-24 sm:w-28 aspect-[9/16] bg-black rounded-2xl overflow-hidden shrink-0 shadow-md border-2 border-slate-800">
+                {/* Mini preview del video */}
+                <div className="relative w-24 sm:w-28 aspect-[9/19.5] bg-black rounded-2xl overflow-hidden shrink-0 shadow-md border-2 border-slate-800">
                   <video
                     src={config.app_video_url}
                     autoPlay
                     muted
                     loop
                     playsInline
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-6 h-1 bg-white/40 rounded-full" />
                 </div>
@@ -1024,7 +1024,7 @@ export default function GestorTienda({ setMsg }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <h4 className="text-xs sm:text-sm font-bold text-[#0B1929]">Video Activo en el Landing (Proporción 9:16)</h4>
+                    <h4 className="text-xs sm:text-sm font-bold text-[#0B1929]">Video Activo en el Landing (Auto-adaptable)</h4>
                   </div>
                   <p className="text-[11px] text-[#6B7A8D] break-all line-clamp-2 mb-3 bg-white px-3 py-1.5 rounded-lg border border-[#E2E8F0]">
                     {config.app_video_url}
