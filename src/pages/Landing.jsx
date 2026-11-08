@@ -365,20 +365,16 @@ function HeroPhoneMockup({ config }) {
 }
 
 // ── HERO ──
-function Hero({ config }) {
+function Hero({ config, session }) {
   return (
     <section id="app-showcase" className="pt-20 sm:pt-24 lg:pt-20 pb-10 sm:pb-14 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 min-h-[calc(100dvh-4rem)]">
       <div className="flex-1 max-w-2xl text-center lg:text-left">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-[#1A6FD4] text-xs font-bold tracking-wider uppercase mb-6 shadow-2xs">
-          <Zap size={13} className="fill-[#1A6FD4]" /> Ecosistema FLUX Health &amp; Sport
-        </div>
-
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0B1929] leading-[1.1] mb-6 tracking-tight" style={{ fontFamily: "DM Sans, sans-serif" }}>
-          Revoluciona tu <span className="text-[#1A6FD4]">salud y entrenamiento</span>
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0B1929] leading-[1.1] mb-5 tracking-tight" style={{ fontFamily: "DM Sans, sans-serif" }}>
+          Evoluciona la forma en que <span className="text-[#1A6FD4]">cuidas tu salud</span>
         </h1>
 
         <p className="text-[#6B7A8D] text-base sm:text-lg mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0">
-          La plataforma definitiva que combina nutrición clínica personalizada, entrenamiento guiado con temporizador de descanso inteligente y monitoreo científico de tu composición corporal.
+          Dieta clínica, entrenamientos y evolución física, perfectamente sincronizados en la palma de tu mano; el asistente inteligente FLUX te ayudará a hacer la lista de compras y a resolver cualquier duda.
         </p>
 
         {/* Botones Principales de Conversión */}
@@ -388,14 +384,17 @@ function Hero({ config }) {
             onClick={() => sessionStorage.setItem('flux_login_mode', 'signup_type')}
             className="bg-[var(--brand-primary)] hover:opacity-95 text-white px-7 py-3.5 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 text-sm sm:text-base cursor-pointer"
           >
-            Comenzar Gratis <ChevronRight size={18} />
+            Prueba FLUX gratis <ChevronRight size={18} />
           </Link>
 
           <Link
-            to="/app"
+            to={session ? "/app" : "/login"}
+            onClick={() => {
+              if (!session) sessionStorage.setItem('flux_login_mode', 'login');
+            }}
             className="bg-white hover:bg-gray-50 text-[#0B1929] border border-[#E2E5EA] px-6 py-3.5 rounded-xl font-bold transition-all shadow-xs flex items-center gap-2 text-sm sm:text-base cursor-pointer"
           >
-            <Globe size={17} className="text-[#1A6FD4]" /> Usar App Web (PWA)
+            <LogIn size={17} className="text-[#1A6FD4]" /> Ingresa
           </Link>
         </div>
 
@@ -418,9 +417,6 @@ function Hero({ config }) {
               <span>Google Play: <strong className="text-[#0B1929]">Fase Beta / Próximamente</strong></span>
             </div>
           )}
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
-            <CheckCircle size={14} /> 100% Funcional en Navegador Web
-          </div>
         </div>
       </div>
 
@@ -1156,7 +1152,7 @@ export default function Landing({ session, onLogout }) {
   return (
     <div className="min-h-screen bg-white text-[#0B1929] font-['Inter',sans-serif]">
       <Navbar session={session} onLogout={onLogout} />
-      <Hero config={config} />
+      <Hero config={config} session={session} />
       <Features />
       <SupplementsSection supplements={activeSupplements} config={config} />
       <ApparelSection apparel={activeApparel} config={config} />
