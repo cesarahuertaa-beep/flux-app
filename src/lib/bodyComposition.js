@@ -238,6 +238,7 @@ export function enrichMetrica(m) {
     checkin_ajustes: meta.checkin_ajustes ?? m.checkin_ajustes ?? "",
     eval_objetivo: meta.eval_objetivo ?? m.eval_objetivo ?? "",
     eval_faf: meta.eval_faf ?? m.eval_faf ?? "",
+    eval_faf_notas: meta.eval_faf_notas ?? m.eval_faf_notas ?? "",
     preferencias_alimentos: meta.preferencias_alimentos ?? m.preferencias_alimentos ?? "",
     aversiones_alimentos: meta.aversiones_alimentos ?? m.aversiones_alimentos ?? "",
     r24h_desayuno: meta.r24h_desayuno ?? m.r24h_desayuno ?? "",
@@ -331,6 +332,9 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.checkin_digestion !== undefined && rawData.checkin_digestion !== "") extraMeta.checkin_digestion = rawData.checkin_digestion;
   if (rawData.eval_objetivo !== undefined && rawData.eval_objetivo !== "") extraMeta.eval_objetivo = rawData.eval_objetivo;
   if (rawData.eval_faf !== undefined && rawData.eval_faf !== "") extraMeta.eval_faf = rawData.eval_faf;
+  if (rawData.eval_faf_notas !== undefined && rawData.eval_faf_notas !== "") extraMeta.eval_faf_notas = rawData.eval_faf_notas;
+  if (rawData.dias_ejercicio_actual !== undefined && rawData.dias_ejercicio_actual !== "") extraMeta.dias_ejercicio_actual = rawData.dias_ejercicio_actual;
+  if (rawData.horario_ejercicio !== undefined && rawData.horario_ejercicio !== "") extraMeta.horario_ejercicio = rawData.horario_ejercicio;
   if (rawData.preferencias_alimentos !== undefined && rawData.preferencias_alimentos !== "") extraMeta.preferencias_alimentos = rawData.preferencias_alimentos;
   if (rawData.aversiones_alimentos !== undefined && rawData.aversiones_alimentos !== "") extraMeta.aversiones_alimentos = rawData.aversiones_alimentos;
   if (rawData.r24h_desayuno !== undefined && rawData.r24h_desayuno !== "") extraMeta.r24h_desayuno = rawData.r24h_desayuno;
@@ -1286,8 +1290,8 @@ export function generateSmartTrainingPrescription({
   // 1.2: Sedentario (0-1 d/sem) -> prescripción base 2 días
   // 1.375: Ligero (1-3 d/sem) -> prescripción 3 días
   // 1.55: Moderado (3-5 d/sem) -> prescripción 4 días (rango 3 a 5 días)
-  // 1.725: Activo (6-7 d/sem) -> prescripción 5-6 días
-  // 1.9: Atleta (Doble sesión) -> prescripción 6 días
+  // 1.725: Activo (6-7 d/sem) -> prescripción 6 días (rango 6 a 7 días)
+  // 1.9: Atleta (Doble sesión) -> prescripción 6-7 días
   let diasSugeridos = 4;
   let frecuenciaLabel = "4 días / semana (3–5 d/sem)";
   if (fafVal <= 1.25) {
@@ -1300,22 +1304,38 @@ export function generateSmartTrainingPrescription({
     diasSugeridos = 4;
     frecuenciaLabel = "4 días / semana (3–5 d/sem)";
   } else if (fafVal <= 1.8) {
-    diasSugeridos = 5;
-    frecuenciaLabel = "5–6 días / semana (6–7 d/sem)";
+    diasSugeridos = 6;
+    frecuenciaLabel = "6–7 días / semana (Activo)";
   } else {
     diasSugeridos = 6;
-    frecuenciaLabel = "6 días / semana (Atleta)";
+    frecuenciaLabel = "6–7 días / semana (Atleta / Doble sesión)";
   }
 
-  // Si en las notas del FAF se especificó un número explícito de días (ej. "entrena 4 días", "3 días por semana")
-  const fafNotas = (enriched?.eval_faf_notas || "").trim();
-  const matchDiasNotas = fafNotas.match(/(\d+)\s*(?:d[ií]as|sesiones)/i);
+  // Normalizar erratas comunes en las notas de actividad física del Paso 4
+  const rawFafNotas = (enriched?.eval_faf_notas || "").trim();
+  const fafNotas = rawFafNotas
+    .replace(/\bvirnes\b/gi, "viernes")
+    .replace(/\bmiercoles\b/gi, "miércoles")
+    .replace(/\bsabado\b/gi, "sábado")
+    .replace(/\bdias\b/gi, "días");
+
+  // Si en las notas del FAF se especificó un número explícito de días (ej. "entrena 7 días", "6 sesiones", "todos los días")
+  const matchDiasNotas = fafNotas.match(/(\d+)\s*(?:d[ií]as|sesiones|veces)/i);
   if (matchDiasNotas) {
     const num = parseInt(matchDiasNotas[1], 10);
     if (!isNaN(num) && num >= 1 && num <= 7) {
       diasSugeridos = num;
       frecuenciaLabel = `${num} días / semana (${fafInfo?.label || "Proyectado"})`;
     }
+  } else if (/(todos los d[ií]as|lunes a domingo|diario|siete d[ií]as)/i.test(fafNotas)) {
+    diasSugeridos = 7;
+    frecuenciaLabel = `7 días / semana (${fafInfo?.label || "Proyectado"})`;
+  } else if (/(lunes a s[aá]bado|seis d[ií]as)/i.test(fafNotas)) {
+    diasSugeridos = 6;
+    frecuenciaLabel = `6 días / semana (${fafInfo?.label || "Proyectado"})`;
+  } else if (/(lunes a viernes|cinco d[ií]as)/i.test(fafNotas)) {
+    diasSugeridos = 5;
+    frecuenciaLabel = `5 días / semana (${fafInfo?.label || "Proyectado"})`;
   }
 
   // 4. Objetivo de Etapa (Paso 4 de Evaluación)
@@ -1332,10 +1352,7 @@ export function generateSmartTrainingPrescription({
   const goalTitle = goalShortTitle;
 
   // 5. Inferencia de los 4 Bloques Prescriptivos de Entrenamiento
-  // A. Frecuencia
-  // (diasSugeridos y frecuenciaLabel calculados arriba con el FAF de etapa)
-
-  // B. Split / División Sugerida
+  // B. Split / División Sugerida (Priorizando las Notas del Paso 4 si el especialista o paciente indicó estructura)
   let splitSugerido = "Torso / Pierna (Upper / Lower)";
   let splitSubtext = "Distribución óptima de estímulo y descanso";
   if (diasSugeridos <= 2) {
@@ -1350,9 +1367,65 @@ export function generateSmartTrainingPrescription({
   } else if (diasSugeridos === 5) {
     splitSugerido = "Push / Pull / Legs + Torso / Pierna";
     splitSubtext = "Frecuencia híbrida con alta especificidad";
-  } else {
+  } else if (diasSugeridos === 6) {
     splitSugerido = "Push / Pull / Legs (Rotación 2x)";
     splitSubtext = "Microciclo de 6 días para avanzados";
+  } else {
+    splitSugerido = "Rotación Estructurada + Sesiones Específicas";
+    splitSubtext = `Microciclo de ${diasSugeridos} días con modulación de carga`;
+  }
+
+  // Analizar si fafNotas (Paso 4) define explícitamente el split o días de enfoque especial
+  if (fafNotas) {
+    const hasUpperLower = /(upper\s*\/?\s*lower|torso\s*\/?\s*pierna)/i.test(fafNotas);
+    const hasPPL = /(push\s*\/?\s*pull|ppl|empuje\s*y?\s*tir[oó]n)/i.test(fafNotas);
+    const hasFullBody = /(full\s*body|cuerpo\s*completo)/i.test(fafNotas);
+    const hasArnold = /\barnold\b/i.test(fafNotas);
+    const hasCore = /\b(core|abdomen|abdominales|abs)\b/i.test(fafNotas);
+    const hasCardio = /\b(cardio|hiit|correr|running|aer[oó]bico)\b/i.test(fafNotas);
+    const hasGluteo = /\b(gl[uú]teos?|femoral|isquios)\b/i.test(fafNotas);
+
+    // Extraer días específicos mencionados en la nota (ej. "lunes y viernes")
+    const diasMencionados = [];
+    ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"].forEach((d) => {
+      const rx = new RegExp(`\\b${d.normalize("NFD").replace(/[\u0300-\u036f]/g, "")}\\b`, "i");
+      const rxAcc = new RegExp(`\\b${d}\\b`, "i");
+      if (rx.test(fafNotas) || rxAcc.test(fafNotas)) {
+        diasMencionados.push(d);
+      }
+    });
+    const diasTag = diasMencionados.length > 0 ? ` (${diasMencionados.map((d) => d.slice(0, 3)).join("/")})` : "";
+
+    if (hasUpperLower) {
+      if (hasCore) {
+        splitSugerido = `Upper / Lower + Core${diasTag}`;
+        splitSubtext =
+          diasMencionados.length > 0
+            ? `${diasMencionados.join(" y ")}: Core • Resto (${Math.max(1, diasSugeridos - diasMencionados.length)}d): Upper / Lower`
+            : "Rotación Torso / Pierna + sesiones específicas de Core";
+      } else if (hasCardio) {
+        splitSugerido = `Upper / Lower + Cardio${diasTag}`;
+        splitSubtext = fafNotas;
+      } else {
+        splitSugerido = "Torso / Pierna (Upper / Lower)";
+        splitSubtext = fafNotas.length <= 75 ? fafNotas : `Rotación Upper / Lower en ${diasSugeridos} sesiones`;
+      }
+    } else if (hasPPL) {
+      splitSugerido = hasCore ? `Push / Pull / Legs + Core${diasTag}` : "Push / Pull / Legs (PPL)";
+      splitSubtext = fafNotas.length <= 75 ? fafNotas : `Distribución PPL adaptada a ${diasSugeridos} días`;
+    } else if (hasFullBody) {
+      splitSugerido = hasCore ? `Full Body + Core${diasTag}` : "Full Body (Cuerpo Completo)";
+      splitSubtext = fafNotas.length <= 75 ? fafNotas : `Sesiones globales en ${diasSugeridos} días`;
+    } else if (hasArnold) {
+      splitSugerido = "Arnold Split";
+      splitSubtext = fafNotas.length <= 75 ? fafNotas : "Pecho/Espalda • Hombro/Brazo • Pierna";
+    } else if (hasCore || hasCardio || hasGluteo) {
+      const extraLabel = [hasCore ? "Core" : "", hasGluteo ? "Glúteo" : "", hasCardio ? "Cardio" : ""]
+        .filter(Boolean)
+        .join(" / ");
+      splitSugerido = `${splitSugerido.split("(")[0].trim()} + ${extraLabel}${diasTag}`;
+      splitSubtext = fafNotas;
+    }
   }
 
   // C. Enfoque Fisiológico

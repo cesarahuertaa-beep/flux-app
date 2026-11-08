@@ -2112,26 +2112,47 @@ export function computeDualSummarySourceHash({
     String(anamnesis?.medicacion_suplementos || "").trim(),
     String(anamnesis?.cirugias_lesiones || "").trim(),
     String(anamnesis?.ocupacion_actividad || "").trim(),
+    String(anamnesis?.tipo_entrenamiento || "").trim(),
     String(anamnesis?.consumo_alcohol_tabaco || "").trim(),
     String(anamnesis?.notas_consulta || "").trim(),
     String(anamnesis?.preferencias_alimentos || "").trim(),
     String(anamnesis?.aversiones_alimentos || "").trim(),
-    // Fuente 2: Evaluación de Etapa / Métricas
+    // Fuente 2: Evaluación de Etapa (Pasos 1 al 5)
     String(metrica?.id || "").trim(),
     String(metrica?.fecha || "").trim(),
+    // Paso 1: Check-in y estado actual
+    String(metrica?.checkin_energia || "").trim(),
+    String(metrica?.checkin_saciedad || "").trim(),
+    String(metrica?.checkin_digestion || "").trim(),
+    String(metrica?.checkin_descanso || "").trim(),
+    String(metrica?.checkin_observaciones || "").trim(),
+    String(metrica?.checkin_ajustes || "").trim(),
+    String(metrica?.horas_sueno || "").trim(),
+    String(metrica?.consumo_agua_estimado || "").trim(),
+    String(metrica?.nivel_estres || "").trim(),
+    String(metrica?.dias_ejercicio_actual || "").trim(),
+    String(metrica?.horario_ejercicio || "").trim(),
+    // Paso 2: Preferencias y aversiones
+    String(metrica?.preferencias_alimentos || smartPrescription?.preferencias || "").trim(),
+    String(metrica?.aversiones_alimentos || smartPrescription?.aversiones || "").trim(),
+    // Paso 3: R24H completo
+    String(metrica?.r24h_desayuno || "").trim(),
+    String(metrica?.r24h_colacion_m || "").trim(),
+    String(metrica?.r24h_comida || "").trim(),
+    String(metrica?.r24h_colacion_v || "").trim(),
+    String(metrica?.r24h_cena || "").trim(),
+    String(metrica?.r24h_picoteos || "").trim(),
+    // Paso 4: Enfoque, FAF y Notas de actividad física y disponibilidad
+    String(metrica?.eval_objetivo || smartPrescription?.goalId || "").trim(),
+    String(metrica?.eval_faf || smartPrescription?.faf || "").trim(),
+    String(metrica?.eval_faf_notas || smartPrescription?.fafNotas || smartTrainingPrescription?.fafNotas || "").trim(),
+    // Paso 5: Antropometría y Prescripción
     String(metrica?.peso || smartPrescription?.peso || "").trim(),
     String(metrica?.grasa_pct || smartPrescription?.grasaPct || "").trim(),
     String(metrica?.masa_libre_grasa || smartPrescription?.mlg || "").trim(),
-    String(metrica?.eval_objetivo || smartPrescription?.goalId || "").trim(),
-    String(metrica?.eval_faf || smartPrescription?.faf || "").trim(),
-    String(metrica?.eval_faf_notas || smartPrescription?.fafNotas || "").trim(),
-    String(metrica?.preferencias_alimentos || smartPrescription?.preferencias || "").trim(),
-    String(metrica?.aversiones_alimentos || smartPrescription?.aversiones || "").trim(),
-    String(metrica?.dias_ejercicio_actual || "").trim(),
-    String(metrica?.horario_ejercicio || "").trim(),
-    String(metrica?.r24h_desayuno || "").trim(),
-    String(metrica?.r24h_comida || "").trim(),
-    String(metrica?.r24h_cena || "").trim(),
+    String(metrica?.inbody_smm || metrica?.calc_masa_muscular || "").trim(),
+    String(metrica?.cintura || "").trim(),
+    String(metrica?.notas || "").trim(),
     String(smartPrescription?.targetKcal || "").trim(),
     String(smartPrescription?.proteinG || "").trim(),
     String(smartPrescription?.carbsG || "").trim(),
@@ -2144,12 +2165,12 @@ export function computeDualSummarySourceHash({
   for (let i = 0; i < payload.length; i++) {
     hash = ((hash << 5) + hash) ^ payload.charCodeAt(i);
   }
-  return `v2_${(hash >>> 0).toString(36)}`;
+  return `v3_${(hash >>> 0).toString(36)}`;
 }
 
 /**
  * Síntesis determinística local (100% exclusiva por dominio y breve)
- * usada de forma instantánea mientras la IA responde en segundo plano o si no hay red.
+ * que analiza los Pasos 1 a 5 de la Evaluación + Expediente Clínico de forma instantánea.
  */
 export function buildFallbackDualSummaries({
   anamnesis = {},
@@ -2159,9 +2180,11 @@ export function buildFallbackDualSummaries({
 }) {
   const highlights = extractClinicalHighlights(anamnesis);
 
-  // ─── 1. DOMINIO EXCLUSIVO: DIETA ───
+  // ─── 1. DOMINIO EXCLUSIVO: DIETA (Pasos 1, 2, 3, 4 y 5 + Expediente) ───
   const patologiasTags = highlights.patologias?.tags || [];
   const alergiasTags = highlights.alergias?.tags || [];
+  const medicacionRaw = String(anamnesis?.medicacion_suplementos || "").trim();
+  const tieneMedicacion = Boolean(medicacionRaw) && !/^(no|ningun[ao]?|nada|n\/a)/i.test(medicacionRaw);
   const aversionesRaw = String(
     smartPrescription?.aversiones || metrica?.aversiones_alimentos || anamnesis?.aversiones_alimentos || ""
   ).trim();
@@ -2169,7 +2192,12 @@ export function buildFallbackDualSummaries({
     smartPrescription?.preferencias || metrica?.preferencias_alimentos || anamnesis?.preferencias_alimentos || ""
   ).trim();
   const giRaw = String(anamnesis?.sintomas_gi || "").trim();
-  const tieneGI = Boolean(giRaw) && !/^(normal|ningun[ao]?|bien|sin|no|n\/a)/i.test(giRaw);
+  const checkinDigestion = Number(metrica?.checkin_digestion) || 4;
+  const checkinSaciedad = Number(metrica?.checkin_saciedad) || 4;
+  const aguaRaw = String(metrica?.consumo_agua_estimado || "").trim();
+  const picoteosRaw = String(metrica?.r24h_picoteos || smartPrescription?.r24h?.picoteos || "").trim();
+  const tienePicoteos = Boolean(picoteosRaw) && !/^(no|ningun[ao]?|nada|n\/a|agua)/i.test(picoteosRaw);
+  const tieneGI = (Boolean(giRaw) && !/^(normal|ningun[ao]?|bien|sin|no|n\/a)/i.test(giRaw)) || checkinDigestion <= 2;
   const goalTitle = smartPrescription?.goalInfo?.title || "Recomposición Corporal";
 
   const exclusionesParts = [];
@@ -2189,46 +2217,81 @@ export function buildFallbackDualSummaries({
     dietaBadge = "Control Clínico-Metabólico";
     dietaSintesis = `Estrategia nutricional de ${goalTitle.toLowerCase()} adaptada a ${joinSpanishList(
       patologiasTags
-    )}, priorizando densidad nutricional, control glucémico y saciedad sostenida en cada toma.`;
+    )}${tieneMedicacion ? ` (${medicacionRaw})` : ""}, priorizando densidad nutricional, control glucémico y saciedad sostenida.`;
     dietaDirectrices.push(`Selección de alimentos adaptada a ${patologiasTags[0]}`);
   } else if (/p[eé]rdida|definici[oó]n|grasa/i.test(goalTitle)) {
-    dietaBadge = "Alta Saciedad y Retención";
-    dietaSintesis = `Plan hipocalórico orientado a preservar masa magra mediante reparto proteico uniforme en cada comida principal y alto volumen de vegetales fibrosos.`;
-    dietaDirectrices.push("Priorizar proteína magra y fibra soluble en cada tiempo de comida");
+    dietaBadge = checkinSaciedad <= 2 ? "Control de Apetito y Saciedad" : "Alta Saciedad y Retención";
+    dietaSintesis = `Plan hipocalórico orientado a preservar masa magra mediante fraccionamiento proteico uniforme en cada comida principal y alta densidad de fibra soluble.`;
+    dietaDirectrices.push(
+      checkinSaciedad <= 2
+        ? "Aumentar volumen vegetal y proteína sólida para controlar apetito"
+        : "Priorizar proteína magra y fibra soluble en cada tiempo de comida"
+    );
   } else if (/aumento|masa|volumen|hipertrofia/i.test(goalTitle)) {
     dietaBadge = "Superávit Limpio";
-    dietaSintesis = `Superávit energético estructurado con carbohidratos complejos de fácil digestión y fraccionamiento proteico para optimizar la síntesis tisular.`;
+    dietaSintesis = `Superávit energético estructurado con carbohidratos complejos de fácil digestión y fraccionamiento proteico para optimizar la síntesis de tejido magro.`;
     dietaDirectrices.push("Concentrar carbohidratos complejos de fácil asimilación y grasas saludables");
   } else {
     dietaBadge = "Optimización Nutricional";
-    dietaSintesis = `Distribución isocalórica de macronutrientes enfocada en estabilidad energética diaria, calidad de micronutrientes y adherencia culinaria.`;
+    dietaSintesis = `Distribución equilibrada de macronutrientes enfocada en estabilidad energética diaria, calidad de micronutrientes y adherencia práctica al menú.`;
     dietaDirectrices.push("Fraccionar la proteína en 3 a 4 tomas equilibradas durante el día");
   }
 
   if (tieneGI) {
-    dietaDirectrices.push(`Cuidado digestivo (${giRaw}): preferir cocciones suaves y evitar irritantes`);
+    dietaDirectrices.push(
+      `Cuidado digestivo${giRaw ? ` (${giRaw})` : ""}: preferir cocciones suaves y evitar irritantes`
+    );
+  } else if (tienePicoteos) {
+    dietaDirectrices.push(`Sustituir picoteos reportados (${picoteosRaw.slice(0, 35)}) por colaciones saciantes`);
+  } else if (aguaRaw && /1|poca|menos|bajo/i.test(aguaRaw)) {
+    dietaDirectrices.push(`Incrementar hidratación progresivamente (actual: ${aguaRaw})`);
   }
+
   if (exclusionesStr) {
     dietaDirectrices.push(`Omitir estrictamente: ${exclusionesStr}`);
   } else if (favoritosStr) {
     dietaDirectrices.push(`Integrar favoritos en menú base: ${favoritosStr}`);
   }
 
-  // ─── 2. DOMINIO EXCLUSIVO: RUTINA ───
+  // ─── 2. DOMINIO EXCLUSIVO: RUTINA (Paso 4 Notas Rectoras + Paso 1 Recuperación + Paso 5 + Expediente) ───
   const p = smartTrainingPrescription || {};
   const tieneLesiones = Boolean(p.tieneLesiones);
   const lesionesRaw = p.lesionesRaw || "";
   const diasSug = p.diasSugeridos || 4;
   const splitSug = p.splitSugerido || "Torso / Pierna";
-  const fafNotas = String(p.fafNotas || metrica?.eval_faf_notas || "").trim();
+  const rawFafNotas = String(p.fafNotas || metrica?.eval_faf_notas || "").trim();
+  const fafNotas = rawFafNotas
+    .replace(/\bvirnes\b/gi, "viernes")
+    .replace(/\bmiercoles\b/gi, "miércoles")
+    .replace(/\bsabado\b/gi, "sábado")
+    .replace(/\bdias\b/gi, "días");
   const horario = String(p.horario || metrica?.horario_ejercicio || "").trim();
   const deportePref = String(p.deportePref || "Entrenamiento de fuerza").trim();
+  const checkinEnergia = Number(metrica?.checkin_energia) || 4;
+  const horasSueno = parseFloat(metrica?.horas_sueno) || 7;
+  const nivelEstres = Number(metrica?.nivel_estres) || 3;
 
   let rutinaBadge = tieneLesiones ? "Protección Articular" : "Sobrecarga Progresiva";
   let rutinaSintesis = "";
   const rutinaDirectrices = [];
 
-  if (tieneLesiones) {
+  if (fafNotas) {
+    // Prioridad #1: Las notas de actividad física y disponibilidad del Paso 4 rigen el resumen de rutina
+    rutinaBadge = tieneLesiones ? "Adaptación + Plan Específico" : splitSug.length <= 26 ? splitSug : "Estructura Personalizada";
+    const cleanNote = fafNotas.endsWith(".") ? fafNotas.slice(0, -1) : fafNotas;
+    rutinaSintesis = `Directriz de programación: ${cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1)}.${
+      tieneLesiones
+        ? ` Adaptar selección de ejercicios por antecedente de ${lesionesRaw.toLowerCase()} evitando sobrecarga articular.`
+        : ` Dosificar el volumen e intensidad entre las ${diasSug} sesiones para asegurar recuperación neuromuscular óptima.`
+    }`;
+
+    if (/\b(core|abdomen|abs)\b/i.test(fafNotas) && /(upper\s*\/?\s*lower|torso\s*\/?\s*pierna)/i.test(fafNotas)) {
+      rutinaDirectrices.push("Aislar trabajo de estabilidad/Core en sus días asignados para liberar tiempo en días de fuerza");
+      rutinaDirectrices.push("Alternar sesiones de Torso (Upper) y Pierna (Lower) evitando fatiga lumbar cruzada");
+    } else {
+      rutinaDirectrices.push(`Estructurar microciclo de ${diasSug} días respetando la distribución: ${splitSug}`);
+    }
+  } else if (tieneLesiones) {
     rutinaSintesis = `Programación biomecánica adaptada por antecedente de ${lesionesRaw.toLowerCase()}, priorizando estabilidad articular, variantes en máquinas o poleas y rangos indoloros.`;
     if (p.precaucionesLesion) {
       rutinaDirectrices.push(p.precaucionesLesion.split(".")[0]);
@@ -2243,6 +2306,17 @@ export function buildFallbackDualSummaries({
     rutinaSintesis = `Estructura enfocada en tensión mecánica progresiva sobre ejercicios multiarticulares base y trabajo accesorio controlado con recuperación óptima entre sesiones.`;
     rutinaDirectrices.push("Aplicar sobrecarga progresiva en básicos manteniendo RIR 1-2");
     rutinaDirectrices.push("Respetar descansos de 90-120s en compuestos y 60-90s en analíticos");
+  }
+
+  if (tieneLesiones && fafNotas && p.precaucionesLesion) {
+    rutinaDirectrices.push(p.precaucionesLesion.split(".")[0]);
+  }
+  if ((horasSueno > 0 && horasSueno < 6.5) || checkinEnergia <= 2 || nivelEstres >= 4) {
+    rutinaDirectrices.push(
+      `Modular volumen cerca del fallo por indicadores de recuperación (sueño ${horasSueno}h, energía ${checkinEnergia}/5)`
+    );
+  } else if (rutinaDirectrices.length < 2) {
+    rutinaDirectrices.push("Mantener progresión de cargas con RIR 1-2 en ejercicios principales");
   }
 
   const dispParts = [deportePref];
@@ -2274,7 +2348,8 @@ export function buildFallbackDualSummaries({
 
 /**
  * Genera con IA (Edge Function -> Gemini Direct -> Fallback Determinístico)
- * los dos resúmenes ejecutivos breves y 100% exclusivos de su dominio (Dieta vs Rutina).
+ * los dos resúmenes ejecutivos breves y 100% exclusivos de su dominio (Dieta vs Rutina),
+ * analizando los Pasos 1 a 5 de la Evaluación + el Expediente Clínico.
  */
 export async function generateDualDomainSummariesWithAi({
   cliente = {},
@@ -2307,13 +2382,26 @@ export async function generateDualDomainSummariesWithAi({
     fatsG: smartPrescription?.fatsG || 0,
     preferencias: smartPrescription?.preferencias || metrica?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: smartPrescription?.aversiones || metrica?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
-    r24h: smartPrescription?.r24h || {},
+    r24h: smartPrescription?.r24h || {
+      desayuno: metrica?.r24h_desayuno || "",
+      colacion_m: metrica?.r24h_colacion_m || "",
+      comida: metrica?.r24h_comida || "",
+      colacion_v: metrica?.r24h_colacion_v || "",
+      cena: metrica?.r24h_cena || "",
+      picoteos: metrica?.r24h_picoteos || "",
+    },
+    checkinSaciedad: metrica?.checkin_saciedad || 4,
+    checkinDigestion: metrica?.checkin_digestion || 4,
+    consumoAgua: metrica?.consumo_agua_estimado || "",
+    checkinObservaciones: metrica?.checkin_observaciones || "",
+    checkinAjustes: metrica?.checkin_ajustes || "",
   };
 
   const rutinaCtx = {
     goalShortTitle: (smartTrainingPrescription?.goalTitle || "Recomposición Corporal").replace(/\s*\([+-]?\d+%\)/, ""),
     diasSugeridos: smartTrainingPrescription?.diasSugeridos || 4,
     splitSugerido: smartTrainingPrescription?.splitSugerido || "Torso / Pierna",
+    splitSubtext: smartTrainingPrescription?.splitSubtext || "",
     enfoqueFisiologico: smartTrainingPrescription?.enfoqueFisiologico || "Hipertrofia",
     volumenRpe: smartTrainingPrescription?.volumenRpe || "RPE 7-8",
     nivelPrevio: smartTrainingPrescription?.nivelPrevio || "Intermedio",
@@ -2321,6 +2409,10 @@ export async function generateDualDomainSummariesWithAi({
     deportePref: smartTrainingPrescription?.deportePref || "Fuerza en gimnasio",
     horario: smartTrainingPrescription?.horario || "",
     fafNotas: smartTrainingPrescription?.fafNotas || metrica?.eval_faf_notas || "",
+    checkinEnergia: metrica?.checkin_energia || 4,
+    horasSueno: metrica?.horas_sueno || 7,
+    nivelEstres: metrica?.nivel_estres || 3,
+    masaMuscular: metrica?.inbody_smm || metrica?.calc_masa_muscular || metrica?.masa_libre_grasa || "",
   };
 
   const apiKey = getGeminiApiKey();
@@ -2374,56 +2466,49 @@ export async function generateDualDomainSummariesWithAi({
     const sexoLabel = esMujer ? "Femenino" : "Masculino";
 
     const promptDual = `Eres el sistema experto de síntesis clínica y biomecánica de FLUX IA.
-Tu tarea es generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA) cruzando el Expediente Clínico y la Evaluación de Etapa del paciente.
+Tu tarea es analizar CADA PASO de la Evaluación de Etapa (Pasos 1 al 5) junto con el Expediente Clínico y generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA).
 
 PACIENTE: ${cliente?.nombre || "Paciente"} | Sexo: ${sexoLabel} | Edad: ${metrica?.edad || cliente?.edad || "N/A"} años
 
 ═══════════════════════════════════════════════════════════
 FUENTES EXCLUSIVAS PARA EL RESUMEN DE DIETA (NUTRICIÓN):
 ═══════════════════════════════════════════════════════════
-- Objetivo nutricional: ${dietaCtx.goalTitle} (${dietaCtx.goalPct}%)
-- Meta calculada (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS): ${dietaCtx.targetKcal} kcal | P: ${dietaCtx.proteinG}g (${dietaCtx.protGKg} g/kg) | C: ${dietaCtx.carbsG}g | G: ${dietaCtx.fatsG}g
-- Composición corporal: Peso ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg
-- Patologías / Diagnósticos médicos: ${anamnesis?.patologias || "Ninguna"}
-- Medicación / Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"}
-- Función digestiva / Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"}
-- Alergias e intolerancias alimentarias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
-- Aversiones alimentarias (no incluir): ${dietaCtx.aversiones || "Ninguna"}
-- Alimentos favoritos (priorizar): ${dietaCtx.preferencias || "No especificados"}
-- R24H / Hábitos actuales: Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos: ${dietaCtx?.r24h?.picoteos || "N/A"}
-- Saciedad (${metrica?.checkin_saciedad || 4}/5) | Digestión (${metrica?.checkin_digestion || 4}/5) | Agua: ${metrica?.consumo_agua_estimado || "No especificada"}
+- [EXPEDIENTE] Patologías: ${anamnesis?.patologias || "Ninguna"} | Medicación/Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"} | Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"} | Alergias/Intolerancias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
+- [PASO 1 - CHECK-IN NUTRICIONAL] Saciedad: ${dietaCtx.checkinSaciedad}/5 | Digestión: ${dietaCtx.checkinDigestion}/5 | Agua diaria: ${dietaCtx.consumoAgua || "No especificada"} | Observaciones/Ajustes: ${dietaCtx.checkinObservaciones || "N/A"} ${dietaCtx.checkinAjustes || ""}
+- [PASO 2 - GUSTOS DE ETAPA] Alimentos favoritos (priorizar): ${dietaCtx.preferencias || "No especificados"} | Aversiones (no incluir): ${dietaCtx.aversiones || "Ninguna"}
+- [PASO 3 - R24H COMPLETO] Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Colación M: ${dietaCtx?.r24h?.colacion_m || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Colación V: ${dietaCtx?.r24h?.colacion_v || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos/Bebidas: ${dietaCtx?.r24h?.picoteos || "N/A"}
+- [PASO 4 - OBJETIVO NUTRICIONAL] ${dietaCtx.goalTitle} (${dietaCtx.goalPct}%)
+- [PASO 5 - ANTROPOMETRÍA Y META (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS)] Peso: ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg | Meta: ${dietaCtx.targetKcal} kcal (P:${dietaCtx.proteinG}g, C:${dietaCtx.carbsG}g, G:${dietaCtx.fatsG}g)
 
 ═══════════════════════════════════════════════════════════
 FUENTES EXCLUSIVAS PARA EL RESUMEN DE RUTINA (ENTRENAMIENTO):
 ═══════════════════════════════════════════════════════════
-- Objetivo físico de etapa: ${rutinaCtx.goalShortTitle}
-- Programación base (YA VISIBLE EN TARJETAS, NO REPETIR LITERALMENTE): ${rutinaCtx.diasSugeridos} días/sem | Split: ${rutinaCtx.splitSugerido} | Enfoque: ${rutinaCtx.enfoqueFisiologico} | ${rutinaCtx.volumenRpe}
-- Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"}
-- Nivel / Historial previo: ${rutinaCtx.nivelPrevio} (${rutinaCtx.frecuenciaPrevia} días previos)
-- Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"}
-- Modalidad / Deporte preferido: ${rutinaCtx.deportePref} | Horario: ${rutinaCtx.horario || "Flexible"}
-- Notas de disponibilidad / Actividad física de evaluación: ${rutinaCtx.fafNotas || "Sin notas adicionales"}
-- Energía (${metrica?.checkin_energia || 4}/5) | Sueño: ${metrica?.horas_sueno || 7}h | Estrés: ${metrica?.nivel_estres || 3}/5
+- [PASO 4 - DIRECTRIZ RECTORA #1: NOTAS DE ACTIVIDAD FÍSICA Y DISPONIBILIDAD]: "${rutinaCtx.fafNotas || "Sin notas especiales; usar estructura estándar por frecuencia"}"
+  *INSTRUCCIÓN CRÍTICA PARA RUTINA:* Si en estas notas del Paso 4 se especifica cuántos días exactos entrenará (ej. 6 vs 7 días), qué días hará cierto enfoque (ej. Lunes y Viernes Core) o qué división prefiere (ej. Upper/Lower), tu síntesis y directrices de rutina DEBEN construirse obligatoriamente alrededor de esa instrucción exacta (corrigiendo faltas de ortografía como 'virnes' -> 'viernes').
+- [PASO 4 - FRECUENCIA Y ENFOQUE] Objetivo físico: ${rutinaCtx.goalShortTitle} | Frecuencia: ${rutinaCtx.diasSugeridos} días/sem | Split: ${rutinaCtx.splitSugerido} (${rutinaCtx.splitSubtext}) | Enfoque: ${rutinaCtx.enfoqueFisiologico} | ${rutinaCtx.volumenRpe}
+- [PASO 1 - RECUPERACIÓN Y PUNTO DE PARTIDA] Energía: ${rutinaCtx.checkinEnergia}/5 | Sueño: ${rutinaCtx.horasSueno}h | Estrés: ${rutinaCtx.nivelEstres}/5 | Historial previo: ${rutinaCtx.nivelPrevio} (${rutinaCtx.frecuenciaPrevia} días previos) | Horario habitual: ${rutinaCtx.horario || "Flexible"}
+- [PASO 5 - MASA MUSCULAR] MLG / SMM: ${rutinaCtx.masaMuscular || "N/A"} kg | Peso: ${metrica?.peso || "N/A"} kg
+- [EXPEDIENTE BIOMECÁNICO] Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"} | Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"} | Modalidad preferida: ${rutinaCtx.deportePref}
 
 ═══════════════════════════════════════════════════════════
 REGLAS INQUEBRANTABLES DE EXCLUSIVIDAD Y BREVEDAD:
 ═══════════════════════════════════════════════════════════
 1. EXCLUSIVIDAD TOTAL DE DOMINIO:
-   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, saciedad y selección de alimentos.
-   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de biomecánica, selección de ejercicios, control de cargas/fatiga, prevención articular y adaptación al nivel/disponibilidad.
+   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, R24H, saciedad y selección de alimentos.
+   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de programación física, distribución de las sesiones (especialmente lo indicado en las notas del Paso 4), biomecánica, gestión de fatiga y prevención articular.
 2. CERO REPETICIÓN REDUNDANTE:
-   - Las tarjetas superiores ya muestran las kcal, gramos de macros, días/semana y nombre del split. NO desperdicies espacio repitiendo "La fórmula establece 2482 kcal con 185g de proteína...". Ve directo al CÓMO instrumentar el plan según el paciente.
+   - Las tarjetas superiores ya muestran las kcal y gramos de macros. NO desperdicies espacio repitiendo esos números.
 3. BREVEDAD EJECUTIVA Y NORMALIZACIÓN:
    - Corrige faltas de ortografía o texto coloquial del paciente.
-   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 190 caracteres).
-   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 70 caracteres por viñeta).
+   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 195 caracteres).
+   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 75 caracteres por viñeta).
    - Concordancia de género estricta para paciente ${sexoLabel}.
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
 {
   "dieta": {
     "badge": "etiqueta clínica corta (máx 26 caracteres, ej: Control Glucémico / Alta Saciedad)",
-    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico y metabólico para diseñar el menú (sin repetir números de las tarjetas ni hablar de entreno)",
+    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico integrando Paso 1, 2, 3, 4 y Expediente",
     "directrices": [
       "directriz nutricional breve 1",
       "directriz nutricional breve 2"
@@ -2432,14 +2517,14 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
     "favoritos": "string breve normalizado con alimentos favoritos a priorizar (o null si no hay)"
   },
   "rutina": {
-    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Protección Articular / Sobrecarga Progresiva)",
-    "sintesis": "1-2 oraciones breves con el criterio biomecánico, selección de ejercicios y gestión de fatiga (sin hablar de calorías ni dieta)",
+    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Upper/Lower + Core o Protección Articular)",
+    "sintesis": "1-2 oraciones breves con la directriz de entrenamiento priorizando las Notas del Paso 4, recuperación del Paso 1 y lesiones del Expediente",
     "directrices": [
       "directriz de entrenamiento breve 1",
       "directriz de entrenamiento breve 2"
     ],
     "precauciones": "string breve normalizado sobre lesiones o cuidado articular (o 'Sin restricciones articulares reportadas')",
-    "disponibilidad": "string breve integrando modalidad, horario, transición de días y notas de disponibilidad"
+    "disponibilidad": "string breve normalizado integrando modalidad, horario, transición de días y notas de disponibilidad del Paso 4"
   }
 }`;
 

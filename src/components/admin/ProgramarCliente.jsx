@@ -524,8 +524,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     });
   }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription, isMiPlan]);
 
-  // ── Síntesis secundaria automática en segundo plano (Dieta y Rutina exclusivas por dominio) ──
-  const [syncingDualSummaries, setSyncingDualSummaries] = useState(false);
+  // ── Síntesis secundaria automática y 100% silenciosa en segundo plano (Dieta y Rutina exclusivas por dominio) ──
   const triedDualHashesRef = useRef(new Set());
 
   const dualSummaryHash = useMemo(() => {
@@ -562,7 +561,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [cachedDualSummaries, fallbackDualSummaries]);
 
   useEffect(() => {
-    if (!selected?.id || !clinicalLoaded) return;
+    const targetClienteId = selected?.id;
+    if (!targetClienteId || !clinicalLoaded) return;
     const hasSources =
       Boolean(smartPrescription?.hasEvaluation) ||
       Boolean(smartTrainingPrescription?.hasEvaluation) ||
@@ -576,14 +576,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       cachedDualSummaries.origen !== "analitico_local";
     if (isAlreadyAiSynced) return;
 
-    const attemptKey = `${selected.id}::${dualSummaryHash}`;
+    const attemptKey = `${targetClienteId}::${dualSummaryHash}`;
     if (triedDualHashesRef.current.has(attemptKey)) return;
     triedDualHashesRef.current.add(attemptKey);
 
-    let cancelled = false;
-    setSyncingDualSummaries(true);
     syncDualDomainSummariesInBackground({
-      clienteId: selected.id,
+      clienteId: targetClienteId,
       cliente: selected,
       clinicalRec,
       metrica: cycleMetrica,
@@ -591,7 +589,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       smartTrainingPrescription,
     })
       .then((res) => {
-        if (!cancelled && res?.dieta && res?.rutina) {
+        if (res?.dieta && res?.rutina) {
           setClinicalRec((prev) => {
             if (!prev) return prev;
             const prevByHash = prev?.resumenes_programacion?.byHash || {};
@@ -612,14 +610,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           });
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setSyncingDualSummaries(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => {});
   }, [
     selected?.id,
     clinicalLoaded,
@@ -3793,13 +3784,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   const refWeight = smartPrescription.weight || Number(selected?.peso) || 0;
                   const prescMode = smartPrescription.prescriptionMode || "matematico";
                   const dietaSum = activeDualSummaries?.dieta || {};
-                  const dietaSintesis =
-                    prescMode === "ia" && smartPrescription.analisisClinico
-                      ? smartPrescription.analisisClinico
-                      : dietaSum.sintesis || smartPrescription.rationale;
+                  const dietaSintesis = dietaSum.sintesis || smartPrescription.rationale;
                   const dietaBadge =
-                    (prescMode === "ia" && smartPrescription.badgeMotivo) ||
                     dietaSum.badge ||
+                    (prescMode === "ia" && smartPrescription.badgeMotivo) ||
                     "Estrategia Nutricional";
                   const dietaDirectrices = Array.isArray(dietaSum.directrices) ? dietaSum.directrices : [];
                   const dietaExclusiones = dietaSum.exclusiones || smartPrescription.aversiones || "";
@@ -3851,12 +3839,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                               <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#6B7A8D]">
                                 {smartPrescription.formulaShort || smartPrescription.formula}
                               </span>
-                              {syncingDualSummaries && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-[#6B7A8D]">
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-600" />
-                                  <span>Sincronizando síntesis...</span>
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -4249,13 +4231,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                               <Sparkles className="w-3 h-3 shrink-0 text-indigo-600" />
                               <span>{rutinaBadge}</span>
-                            </span>
-                          )}
-
-                          {syncingDualSummaries && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-[#6B7A8D]">
-                              <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-600" />
-                              <span>Sincronizando síntesis...</span>
                             </span>
                           )}
                         </div>

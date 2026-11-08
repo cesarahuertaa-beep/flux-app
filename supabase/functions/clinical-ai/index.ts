@@ -1252,56 +1252,49 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
 
       if (geminiKey && geminiKey.trim().length >= 20) {
         const promptDual = `Eres el sistema experto de síntesis clínica y biomecánica de FLUX IA.
-Tu tarea es generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA) cruzando el Expediente Clínico y la Evaluación de Etapa del paciente.
+Tu tarea es analizar CADA PASO de la Evaluación de Etapa (Pasos 1 al 5) junto con el Expediente Clínico y generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA).
 
 PACIENTE: ${cliente?.nombre || "Paciente"} | Sexo: ${sexoLabel} | Edad: ${metrica?.edad || cliente?.edad || "N/A"} años
 
 ═══════════════════════════════════════════════════════════
 FUENTES EXCLUSIVAS PARA EL RESUMEN DE DIETA (NUTRICIÓN):
 ═══════════════════════════════════════════════════════════
-- Objetivo nutricional: ${dietaCtx.goalTitle || "Recomposición Corporal"} (${dietaCtx.goalPct || 0}%)
-- Meta calculada (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS): ${dietaCtx.targetKcal || 0} kcal | P: ${dietaCtx.proteinG || 0}g (${dietaCtx.protGKg || 0} g/kg) | C: ${dietaCtx.carbsG || 0}g | G: ${dietaCtx.fatsG || 0}g
-- Composición corporal: Peso ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg
-- Patologías / Diagnósticos médicos: ${anamnesis?.patologias || "Ninguna"}
-- Medicación / Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"}
-- Función digestiva / Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"}
-- Alergias e intolerancias alimentarias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
-- Aversiones alimentarias (no incluir): ${dietaCtx.aversiones || anamnesis?.aversiones_alimentos || "Ninguna"}
-- Alimentos favoritos (priorizar): ${dietaCtx.preferencias || anamnesis?.preferencias_alimentos || "No especificados"}
-- R24H / Hábitos actuales: Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos: ${dietaCtx?.r24h?.picoteos || "N/A"}
-- Saciedad (${metrica?.checkin_saciedad || 4}/5) | Digestión (${metrica?.checkin_digestion || 4}/5) | Agua: ${metrica?.consumo_agua_estimado || "No especificada"}
+- [EXPEDIENTE] Patologías: ${anamnesis?.patologias || "Ninguna"} | Medicación/Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"} | Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"} | Alergias/Intolerancias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
+- [PASO 1 - CHECK-IN NUTRICIONAL] Saciedad: ${dietaCtx.checkinSaciedad || metrica?.checkin_saciedad || 4}/5 | Digestión: ${dietaCtx.checkinDigestion || metrica?.checkin_digestion || 4}/5 | Agua diaria: ${dietaCtx.consumoAgua || metrica?.consumo_agua_estimado || "No especificada"} | Observaciones/Ajustes: ${dietaCtx.checkinObservaciones || metrica?.checkin_observaciones || "N/A"} ${dietaCtx.checkinAjustes || metrica?.checkin_ajustes || ""}
+- [PASO 2 - GUSTOS DE ETAPA] Alimentos favoritos (priorizar): ${dietaCtx.preferencias || anamnesis?.preferencias_alimentos || "No especificados"} | Aversiones (no incluir): ${dietaCtx.aversiones || anamnesis?.aversiones_alimentos || "Ninguna"}
+- [PASO 3 - R24H COMPLETO] Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Colación M: ${dietaCtx?.r24h?.colacion_m || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Colación V: ${dietaCtx?.r24h?.colacion_v || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos/Bebidas: ${dietaCtx?.r24h?.picoteos || "N/A"}
+- [PASO 4 - OBJETIVO NUTRICIONAL] ${dietaCtx.goalTitle || "Recomposición Corporal"} (${dietaCtx.goalPct || 0}%)
+- [PASO 5 - ANTROPOMETRÍA Y META (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS)] Peso: ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg | Meta: ${dietaCtx.targetKcal || 0} kcal (P:${dietaCtx.proteinG || 0}g, C:${dietaCtx.carbsG || 0}g, G:${dietaCtx.fatsG || 0}g)
 
 ═══════════════════════════════════════════════════════════
 FUENTES EXCLUSIVAS PARA EL RESUMEN DE RUTINA (ENTRENAMIENTO):
 ═══════════════════════════════════════════════════════════
-- Objetivo físico de etapa: ${rutinaCtx.goalShortTitle || "Recomposición Corporal"}
-- Programación base (YA VISIBLE EN TARJETAS, NO REPETIR LITERALMENTE): ${rutinaCtx.diasSugeridos || 4} días/sem | Split: ${rutinaCtx.splitSugerido || "Torso / Pierna"} | Enfoque: ${rutinaCtx.enfoqueFisiologico || "Hipertrofia"} | ${rutinaCtx.volumenRpe || "RPE 7-8"}
-- Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"}
-- Nivel / Historial previo: ${rutinaCtx.nivelPrevio || "Intermedio"} (${rutinaCtx.frecuenciaPrevia || "0"} días previos)
-- Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"}
-- Modalidad / Deporte preferido: ${rutinaCtx.deportePref || "Fuerza en gimnasio"} | Horario: ${rutinaCtx.horario || "Flexible"}
-- Notas de disponibilidad / Actividad física de evaluación: ${rutinaCtx.fafNotas || "Sin notas adicionales"}
-- Energía (${metrica?.checkin_energia || 4}/5) | Sueño: ${metrica?.horas_sueno || 7}h | Estrés: ${metrica?.nivel_estres || 3}/5
+- [PASO 4 - DIRECTRIZ RECTORA #1: NOTAS DE ACTIVIDAD FÍSICA Y DISPONIBILIDAD]: "${rutinaCtx.fafNotas || "Sin notas especiales; usar estructura estándar por frecuencia"}"
+  *INSTRUCCIÓN CRÍTICA PARA RUTINA:* Si en estas notas del Paso 4 se especifica cuántos días exactos entrenará (ej. 6 vs 7 días), qué días hará cierto enfoque (ej. Lunes y Viernes Core) o qué división prefiere (ej. Upper/Lower), tu síntesis y directrices de rutina DEBEN construirse obligatoriamente alrededor de esa instrucción exacta (corrigiendo faltas de ortografía como 'virnes' -> 'viernes').
+- [PASO 4 - FRECUENCIA Y ENFOQUE] Objetivo físico: ${rutinaCtx.goalShortTitle || "Recomposición Corporal"} | Frecuencia: ${rutinaCtx.diasSugeridos || 4} días/sem | Split: ${rutinaCtx.splitSugerido || "Torso / Pierna"} (${rutinaCtx.splitSubtext || ""}) | Enfoque: ${rutinaCtx.enfoqueFisiologico || "Hipertrofia"} | ${rutinaCtx.volumenRpe || "RPE 7-8"}
+- [PASO 1 - RECUPERACIÓN Y PUNTO DE PARTIDA] Energía: ${rutinaCtx.checkinEnergia || metrica?.checkin_energia || 4}/5 | Sueño: ${rutinaCtx.horasSueno || metrica?.horas_sueno || 7}h | Estrés: ${rutinaCtx.nivelEstres || metrica?.nivel_estres || 3}/5 | Historial previo: ${rutinaCtx.nivelPrevio || "Intermedio"} (${rutinaCtx.frecuenciaPrevia || "0"} días previos) | Horario habitual: ${rutinaCtx.horario || "Flexible"}
+- [PASO 5 - MASA MUSCULAR] MLG / SMM: ${rutinaCtx.masaMuscular || metrica?.masa_libre_grasa || "N/A"} kg | Peso: ${metrica?.peso || "N/A"} kg
+- [EXPEDIENTE BIOMECÁNICO] Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"} | Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"} | Modalidad preferida: ${rutinaCtx.deportePref || "Fuerza en gimnasio"}
 
 ═══════════════════════════════════════════════════════════
 REGLAS INQUEBRANTABLES DE EXCLUSIVIDAD Y BREVEDAD:
 ═══════════════════════════════════════════════════════════
 1. EXCLUSIVIDAD TOTAL DE DOMINIO:
-   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, saciedad y selección de alimentos.
-   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de biomecánica, selección de ejercicios, control de cargas/fatiga, prevención articular y adaptación al nivel/disponibilidad.
+   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, R24H, saciedad y selección de alimentos.
+   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de programación física, distribución de las sesiones (especialmente lo indicado en las notas del Paso 4), biomecánica, gestión de fatiga y prevención articular.
 2. CERO REPETICIÓN REDUNDANTE:
-   - Las tarjetas superiores ya muestran las kcal, gramos de macros, días/semana y nombre del split. NO desperdicies espacio repitiendo "La fórmula establece 2482 kcal con 185g de proteína...". Ve directo al CÓMO instrumentar el plan según el paciente.
+   - Las tarjetas superiores ya muestran las kcal y gramos de macros. NO desperdicies espacio repitiendo esos números.
 3. BREVEDAD EJECUTIVA Y NORMALIZACIÓN:
    - Corrige faltas de ortografía o texto coloquial del paciente.
-   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 190 caracteres).
-   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 70 caracteres por viñeta).
+   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 195 caracteres).
+   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 75 caracteres por viñeta).
    - Concordancia de género estricta para paciente ${sexoLabel}.
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
 {
   "dieta": {
     "badge": "etiqueta clínica corta (máx 26 caracteres, ej: Control Glucémico / Alta Saciedad)",
-    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico y metabólico para diseñar el menú (sin repetir números de las tarjetas ni hablar de entreno)",
+    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico integrando Paso 1, 2, 3, 4 y Expediente",
     "directrices": [
       "directriz nutricional breve 1",
       "directriz nutricional breve 2"
@@ -1310,14 +1303,14 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
     "favoritos": "string breve normalizado con alimentos favoritos a priorizar (o null si no hay)"
   },
   "rutina": {
-    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Protección Articular / Sobrecarga Progresiva)",
-    "sintesis": "1-2 oraciones breves con el criterio biomecánico, selección de ejercicios y gestión de fatiga (sin hablar de calorías ni dieta)",
+    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Upper/Lower + Core o Protección Articular)",
+    "sintesis": "1-2 oraciones breves con la directriz de entrenamiento priorizando las Notas del Paso 4, recuperación del Paso 1 y lesiones del Expediente",
     "directrices": [
       "directriz de entrenamiento breve 1",
       "directriz de entrenamiento breve 2"
     ],
     "precauciones": "string breve normalizado sobre lesiones o cuidado articular (o 'Sin restricciones articulares reportadas')",
-    "disponibilidad": "string breve integrando modalidad, horario, transición de días y notas de disponibilidad"
+    "disponibilidad": "string breve normalizado integrando modalidad, horario, transición de días y notas de disponibilidad del Paso 4"
   }
 }`;
 
