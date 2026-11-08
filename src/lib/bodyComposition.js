@@ -1029,7 +1029,7 @@ export function generateSmartMacroPrescription({
   let finalFatPct = calcMatematico.fatPct;
   const mathRationale =
     peso > 0
-      ? `Prescripción calculada mediante ${formulaLabel} (TMB ${calcMatematico.tmb} kcal × FAF ${fafInfo.short} = ${calcMatematico.get} kcal GET). Para el objetivo de ${goalInfo.title} (${goalInfo.pct > 0 ? `+${goalInfo.pct}` : goalInfo.pct}%), la fórmula matemática establece ${calcMatematico.targetKcal} kcal con ${calcMatematico.protGKg} g/kg de proteína (${calcMatematico.proteinasG}g) y ${calcMatematico.fatGKg} g/kg de grasas (${calcMatematico.grasasG}g).`
+      ? `Distribución energética para ${goalInfo.title.toLowerCase()} enfocada en preservar masa magra, mantener saciedad sostenida y fraccionar proteína de alto valor biológico en cada tiempo de comida.`
       : "Registra el peso del paciente en la pestaña Evaluación para generar automáticamente la prescripción energética y de macronutrientes.";
 
   let finalRationale = mathRationale;
@@ -1328,10 +1328,8 @@ export function generateSmartTrainingPrescription({
     "cut_10";
 
   const goalPreset = getGoalPresetInfo(rawGoalId) || smartPrescription?.goalInfo || GOAL_PRESETS[2];
-  const goalTitle = goalPreset?.title
-    ? `${goalPreset.title} (${goalPreset.pct > 0 ? `+${goalPreset.pct}%` : `${goalPreset.pct}%`})`
-    : "Recomposición Corporal (-10%)";
   const goalShortTitle = goalPreset?.title || "Recomposición Corporal";
+  const goalTitle = goalShortTitle;
 
   // 5. Inferencia de los 4 Bloques Prescriptivos de Entrenamiento
   // A. Frecuencia

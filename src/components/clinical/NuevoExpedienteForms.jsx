@@ -28,8 +28,9 @@ import {
   saveClinicalRecord,
   EMPTY_ANAMNESIS
 } from "../../lib/clinicalRecord";
-import { dbPatch, dbPost, storageUpload, syncPersonalData } from "../../lib/supabase";
-import { extractClinicalHighlights } from "../../lib/clinicalAi";
+import { dbPeek, dbPatch, dbPost, storageUpload, syncPersonalData } from "../../lib/supabase";
+import { extractClinicalHighlights, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { enrichMetrica, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { CustomSelect } from "../ui/CustomSelect";
 
 const GENERO_OPTIONS = [
@@ -347,6 +348,34 @@ export function NuevoExpedienteForms({
       };
 
       const saved = await saveClinicalRecord(clienteId, next);
+
+      // Proceso secundario en segundo plano: generar resúmenes exclusivos de Dieta y Rutina al finalizar el expediente
+      try {
+        const ms = dbPeek(`metricas_progreso?cliente_id=eq.${clienteId}&order=fecha.desc`);
+        const latestMetrica = Array.isArray(ms) && ms.length > 0 ? enrichMetrica(ms[0]) : null;
+        const mergedCliente = { ...cliente, ...clientPatch };
+        const sp = generateSmartMacroPrescription({
+          cliente: mergedCliente,
+          metrica: latestMetrica,
+          clinicalRec: saved,
+        });
+        const stp = generateSmartTrainingPrescription({
+          cliente: mergedCliente,
+          metrica: latestMetrica,
+          clinicalRec: saved,
+          smartPrescription: sp,
+          isMiPlan,
+        });
+        syncDualDomainSummariesInBackground({
+          clienteId,
+          cliente: mergedCliente,
+          clinicalRec: saved,
+          metrica: latestMetrica,
+          smartPrescription: sp,
+          smartTrainingPrescription: stp,
+          force: true,
+        }).catch(() => {});
+      } catch {}
 
       // Si fue completado por el paciente, notificar al nutriólogo
       if (isPatientMode && cliente.nutriologo_id) {

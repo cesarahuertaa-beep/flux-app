@@ -1236,6 +1236,132 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura:
     );
     }
 
+    // =========================================================================
+    // ACCIÓN: RESÚMENES EJECUTIVOS DUALES (DIETA Y RUTINA EXCLUSIVOS POR DOMINIO)
+    // =========================================================================
+    if (action === "dual-domain-summaries") {
+      const cliente = body.cliente || {};
+      const anamnesis = body.anamnesis || {};
+      const metrica = body.metrica || {};
+      const dietaCtx = body.dietaCtx || {};
+      const rutinaCtx = body.rutinaCtx || {};
+
+      const rawSexo = cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo || "";
+      const esMujer = isFemenino(rawSexo);
+      const sexoLabel = esMujer ? "Femenino" : "Masculino";
+
+      if (geminiKey && geminiKey.trim().length >= 20) {
+        const promptDual = `Eres el sistema experto de síntesis clínica y biomecánica de FLUX IA.
+Tu tarea es generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA) cruzando el Expediente Clínico y la Evaluación de Etapa del paciente.
+
+PACIENTE: ${cliente?.nombre || "Paciente"} | Sexo: ${sexoLabel} | Edad: ${metrica?.edad || cliente?.edad || "N/A"} años
+
+═══════════════════════════════════════════════════════════
+FUENTES EXCLUSIVAS PARA EL RESUMEN DE DIETA (NUTRICIÓN):
+═══════════════════════════════════════════════════════════
+- Objetivo nutricional: ${dietaCtx.goalTitle || "Recomposición Corporal"} (${dietaCtx.goalPct || 0}%)
+- Meta calculada (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS): ${dietaCtx.targetKcal || 0} kcal | P: ${dietaCtx.proteinG || 0}g (${dietaCtx.protGKg || 0} g/kg) | C: ${dietaCtx.carbsG || 0}g | G: ${dietaCtx.fatsG || 0}g
+- Composición corporal: Peso ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg
+- Patologías / Diagnósticos médicos: ${anamnesis?.patologias || "Ninguna"}
+- Medicación / Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"}
+- Función digestiva / Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"}
+- Alergias e intolerancias alimentarias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
+- Aversiones alimentarias (no incluir): ${dietaCtx.aversiones || anamnesis?.aversiones_alimentos || "Ninguna"}
+- Alimentos favoritos (priorizar): ${dietaCtx.preferencias || anamnesis?.preferencias_alimentos || "No especificados"}
+- R24H / Hábitos actuales: Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos: ${dietaCtx?.r24h?.picoteos || "N/A"}
+- Saciedad (${metrica?.checkin_saciedad || 4}/5) | Digestión (${metrica?.checkin_digestion || 4}/5) | Agua: ${metrica?.consumo_agua_estimado || "No especificada"}
+
+═══════════════════════════════════════════════════════════
+FUENTES EXCLUSIVAS PARA EL RESUMEN DE RUTINA (ENTRENAMIENTO):
+═══════════════════════════════════════════════════════════
+- Objetivo físico de etapa: ${rutinaCtx.goalShortTitle || "Recomposición Corporal"}
+- Programación base (YA VISIBLE EN TARJETAS, NO REPETIR LITERALMENTE): ${rutinaCtx.diasSugeridos || 4} días/sem | Split: ${rutinaCtx.splitSugerido || "Torso / Pierna"} | Enfoque: ${rutinaCtx.enfoqueFisiologico || "Hipertrofia"} | ${rutinaCtx.volumenRpe || "RPE 7-8"}
+- Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"}
+- Nivel / Historial previo: ${rutinaCtx.nivelPrevio || "Intermedio"} (${rutinaCtx.frecuenciaPrevia || "0"} días previos)
+- Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"}
+- Modalidad / Deporte preferido: ${rutinaCtx.deportePref || "Fuerza en gimnasio"} | Horario: ${rutinaCtx.horario || "Flexible"}
+- Notas de disponibilidad / Actividad física de evaluación: ${rutinaCtx.fafNotas || "Sin notas adicionales"}
+- Energía (${metrica?.checkin_energia || 4}/5) | Sueño: ${metrica?.horas_sueno || 7}h | Estrés: ${metrica?.nivel_estres || 3}/5
+
+═══════════════════════════════════════════════════════════
+REGLAS INQUEBRANTABLES DE EXCLUSIVIDAD Y BREVEDAD:
+═══════════════════════════════════════════════════════════
+1. EXCLUSIVIDAD TOTAL DE DOMINIO:
+   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, saciedad y selección de alimentos.
+   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de biomecánica, selección de ejercicios, control de cargas/fatiga, prevención articular y adaptación al nivel/disponibilidad.
+2. CERO REPETICIÓN REDUNDANTE:
+   - Las tarjetas superiores ya muestran las kcal, gramos de macros, días/semana y nombre del split. NO desperdicies espacio repitiendo "La fórmula establece 2482 kcal con 185g de proteína...". Ve directo al CÓMO instrumentar el plan según el paciente.
+3. BREVEDAD EJECUTIVA Y NORMALIZACIÓN:
+   - Corrige faltas de ortografía o texto coloquial del paciente.
+   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 190 caracteres).
+   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 70 caracteres por viñeta).
+   - Concordancia de género estricta para paciente ${sexoLabel}.
+
+Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+{
+  "dieta": {
+    "badge": "etiqueta clínica corta (máx 26 caracteres, ej: Control Glucémico / Alta Saciedad)",
+    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico y metabólico para diseñar el menú (sin repetir números de las tarjetas ni hablar de entreno)",
+    "directrices": [
+      "directriz nutricional breve 1",
+      "directriz nutricional breve 2"
+    ],
+    "exclusiones": "string breve normalizado con alergias, intolerancias y aversiones a excluir (o null si no hay)",
+    "favoritos": "string breve normalizado con alimentos favoritos a priorizar (o null si no hay)"
+  },
+  "rutina": {
+    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Protección Articular / Sobrecarga Progresiva)",
+    "sintesis": "1-2 oraciones breves con el criterio biomecánico, selección de ejercicios y gestión de fatiga (sin hablar de calorías ni dieta)",
+    "directrices": [
+      "directriz de entrenamiento breve 1",
+      "directriz de entrenamiento breve 2"
+    ],
+    "precauciones": "string breve normalizado sobre lesiones o cuidado articular (o 'Sin restricciones articulares reportadas')",
+    "disponibilidad": "string breve integrando modalidad, horario, transición de días y notas de disponibilidad"
+  }
+}`;
+
+        for (const model of CANDIDATE_MODELS) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiKey,
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptDual }] }],
+                  generationConfig: getGenerationConfig(model, true, 0.2),
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const textRes = extractGeminiText(data);
+              if (textRes) {
+                const parsed = JSON.parse(textRes);
+                if (parsed?.dieta && parsed?.rutina) {
+                  return new Response(
+                    JSON.stringify({
+                      success: true,
+                      dieta: parsed.dieta,
+                      rutina: parsed.rutina,
+                      origen: "gemini_edge",
+                      model,
+                      generadoEn: new Date().toISOString(),
+                    }),
+                    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                  );
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ error: "UNKNOWN_ACTION", message: `Acción no reconocida: ${action}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

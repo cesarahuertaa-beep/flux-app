@@ -20,11 +20,11 @@ import {
   fetchClinicalRecord,
   saveClinicalRecord,
 } from "../../lib/clinicalRecord";
-import { dbPatch, dbPost, syncPersonalData } from "../../lib/supabase";
+import { dbPeek, dbPatch, dbPost, syncPersonalData } from "../../lib/supabase";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { CustomSelect } from "../ui/CustomSelect";
-import { calcEdadFromBirthdate } from "../../lib/bodyComposition";
-import { extractClinicalHighlights } from "../../lib/clinicalAi";
+import { calcEdadFromBirthdate, enrichMetrica, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
+import { extractClinicalHighlights, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 
 const GENERO_OPTIONS = [
   { value: "", label: "Selecciona..." },
@@ -189,6 +189,33 @@ export default function ExpedienteClinicoModal({
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);
 
+      // Proceso secundario en segundo plano: actualizar resúmenes exclusivos de Dieta y Rutina al modificar el expediente
+      try {
+        const ms = dbPeek(`metricas_progreso?cliente_id=eq.${clienteId}&order=fecha.desc`);
+        const latestMetrica = Array.isArray(ms) && ms.length > 0 ? enrichMetrica(ms[0]) : null;
+        const mergedCliente = { ...cliente, ...patchData };
+        const sp = generateSmartMacroPrescription({
+          cliente: mergedCliente,
+          metrica: latestMetrica,
+          clinicalRec: saved,
+        });
+        const stp = generateSmartTrainingPrescription({
+          cliente: mergedCliente,
+          metrica: latestMetrica,
+          clinicalRec: saved,
+          smartPrescription: sp,
+        });
+        syncDualDomainSummariesInBackground({
+          clienteId,
+          cliente: mergedCliente,
+          clinicalRec: saved,
+          metrica: latestMetrica,
+          smartPrescription: sp,
+          smartTrainingPrescription: stp,
+          force: true,
+        }).catch(() => {});
+      } catch {}
+
       // Si el paciente completó la historia inicial, notificar a su especialista
       if (mode === "paciente" && cliente?.nutriologo_id) {
         dbPost("notificaciones", {
@@ -220,6 +247,7 @@ export default function ExpedienteClinicoModal({
         solicitud_activa: null,
         solicitud_fecha: null,
         anamnesis: { ...EMPTY_ANAMNESIS },
+        resumenes_programacion: null,
       };
       const saved = await saveClinicalRecord(clienteId, next);
       setRecord(saved);

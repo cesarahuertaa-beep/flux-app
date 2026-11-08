@@ -14,6 +14,7 @@ import {
   inferGoalFromText,
   inferFafFromAnamnesis,
   generateSmartMacroPrescription,
+  generateSmartTrainingPrescription,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
 import { dbPeek, dbGet, dbGetFresh, updateQueryCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
@@ -33,7 +34,7 @@ import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
-import { auditMacroPrescriptionWithAi } from "../../lib/clinicalAi";
+import { auditMacroPrescriptionWithAi, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import UpgradeModal from "../ui/UpgradeModal";
 
 const FIELDS_BASICAS = [
@@ -1285,6 +1286,36 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             prescribedMacros: macrosToSync,
           }
         }));
+        // Proceso secundario en segundo plano: regenerar resúmenes exclusivos de Dieta y Rutina con la nueva evaluación
+        try {
+          const recActual = clinicalRecord || peekClinicalRecord(selected.id);
+          const cicloRef = cicloActivo || cicloSel || null;
+          const sp = generateSmartMacroPrescription({
+            cliente: selected,
+            metrica: enrichedItem,
+            clinicalRec: recActual,
+            ciclo: cicloRef,
+            cicloNombre: cicloRef?.nombre || "",
+          });
+          const stp = generateSmartTrainingPrescription({
+            cliente: selected,
+            metrica: enrichedItem,
+            clinicalRec: recActual,
+            ciclo: cicloRef,
+            cicloNombre: cicloRef?.nombre || "",
+            smartPrescription: sp,
+            isMiPlan,
+          });
+          syncDualDomainSummariesInBackground({
+            clienteId: selected.id,
+            cliente: selected,
+            clinicalRec: recActual,
+            metrica: enrichedItem,
+            smartPrescription: sp,
+            smartTrainingPrescription: stp,
+            force: true,
+          }).catch(() => {});
+        } catch {}
       }
     } catch(e) { setMsg(<div className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-500" /> {e.message}</div>); }
     setSaving(false);

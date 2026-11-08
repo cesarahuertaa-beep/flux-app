@@ -3,6 +3,7 @@
 // and produces actionable clinical diagnoses for nutritionists and coaches.
 
 import { invokeEdgeFunction } from "./supabase";
+import { peekClinicalRecord, saveClinicalRecord } from "./clinicalRecord";
 
 /**
  * Splits comma-, semicolon-, slash-, or conjunction-separated strings into clean, deduplicated tags.
@@ -2089,4 +2090,504 @@ RESPONDE EXCLUSIVAMENTE CON UN JSON CON ESTA ESTRUCTURA EXACTA:
   }
 
   return { items: [], origen: "none", success: false };
+}
+
+/**
+ * Calcula una huella determinística (fingerprint) de las dos fuentes:
+ * 1) Expediente Clínico (Anamnesis)
+ * 2) Evaluación de Etapa (Métrica + Prescripción de Dieta y Rutina)
+ * Si cualquiera de las dos fuentes se actualiza, el hash cambia y dispara la síntesis secundaria en segundo plano.
+ */
+export function computeDualSummarySourceHash({
+  anamnesis = {},
+  metrica = {},
+  smartPrescription = {},
+  smartTrainingPrescription = {},
+}) {
+  const payload = [
+    // Fuente 1: Expediente Clínico
+    String(anamnesis?.patologias || "").trim(),
+    String(anamnesis?.alergias_intolerancias || "").trim(),
+    String(anamnesis?.sintomas_gi || "").trim(),
+    String(anamnesis?.medicacion_suplementos || "").trim(),
+    String(anamnesis?.cirugias_lesiones || "").trim(),
+    String(anamnesis?.ocupacion_actividad || "").trim(),
+    String(anamnesis?.consumo_alcohol_tabaco || "").trim(),
+    String(anamnesis?.notas_consulta || "").trim(),
+    String(anamnesis?.preferencias_alimentos || "").trim(),
+    String(anamnesis?.aversiones_alimentos || "").trim(),
+    // Fuente 2: Evaluación de Etapa / Métricas
+    String(metrica?.id || "").trim(),
+    String(metrica?.fecha || "").trim(),
+    String(metrica?.peso || smartPrescription?.peso || "").trim(),
+    String(metrica?.grasa_pct || smartPrescription?.grasaPct || "").trim(),
+    String(metrica?.masa_libre_grasa || smartPrescription?.mlg || "").trim(),
+    String(metrica?.eval_objetivo || smartPrescription?.goalId || "").trim(),
+    String(metrica?.eval_faf || smartPrescription?.faf || "").trim(),
+    String(metrica?.eval_faf_notas || smartPrescription?.fafNotas || "").trim(),
+    String(metrica?.preferencias_alimentos || smartPrescription?.preferencias || "").trim(),
+    String(metrica?.aversiones_alimentos || smartPrescription?.aversiones || "").trim(),
+    String(metrica?.dias_ejercicio_actual || "").trim(),
+    String(metrica?.horario_ejercicio || "").trim(),
+    String(metrica?.r24h_desayuno || "").trim(),
+    String(metrica?.r24h_comida || "").trim(),
+    String(metrica?.r24h_cena || "").trim(),
+    String(smartPrescription?.targetKcal || "").trim(),
+    String(smartPrescription?.proteinG || "").trim(),
+    String(smartPrescription?.carbsG || "").trim(),
+    String(smartPrescription?.fatsG || "").trim(),
+    String(smartTrainingPrescription?.diasSugeridos || "").trim(),
+    String(smartTrainingPrescription?.splitSugerido || "").trim(),
+  ].join("||");
+
+  let hash = 5381;
+  for (let i = 0; i < payload.length; i++) {
+    hash = ((hash << 5) + hash) ^ payload.charCodeAt(i);
+  }
+  return `v2_${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * Síntesis determinística local (100% exclusiva por dominio y breve)
+ * usada de forma instantánea mientras la IA responde en segundo plano o si no hay red.
+ */
+export function buildFallbackDualSummaries({
+  anamnesis = {},
+  metrica = {},
+  smartPrescription = {},
+  smartTrainingPrescription = {},
+}) {
+  const highlights = extractClinicalHighlights(anamnesis);
+
+  // ─── 1. DOMINIO EXCLUSIVO: DIETA ───
+  const patologiasTags = highlights.patologias?.tags || [];
+  const alergiasTags = highlights.alergias?.tags || [];
+  const aversionesRaw = String(
+    smartPrescription?.aversiones || metrica?.aversiones_alimentos || anamnesis?.aversiones_alimentos || ""
+  ).trim();
+  const favoritosRaw = String(
+    smartPrescription?.preferencias || metrica?.preferencias_alimentos || anamnesis?.preferencias_alimentos || ""
+  ).trim();
+  const giRaw = String(anamnesis?.sintomas_gi || "").trim();
+  const tieneGI = Boolean(giRaw) && !/^(normal|ningun[ao]?|bien|sin|no|n\/a)/i.test(giRaw);
+  const goalTitle = smartPrescription?.goalInfo?.title || "Recomposición Corporal";
+
+  const exclusionesParts = [];
+  if (alergiasTags.length > 0) exclusionesParts.push(...alergiasTags);
+  if (aversionesRaw && !/^(no|ningun[ao]?|nada|n\/a)/i.test(aversionesRaw)) {
+    exclusionesParts.push(aversionesRaw);
+  }
+  const exclusionesStr = exclusionesParts.length > 0 ? exclusionesParts.join(" • ") : null;
+  const favoritosStr =
+    favoritosRaw && !/^(no|ningun[ao]?|nada|n\/a)/i.test(favoritosRaw) ? favoritosRaw : null;
+
+  let dietaBadge = "Balance Metabólico";
+  const dietaDirectrices = [];
+  let dietaSintesis = "";
+
+  if (patologiasTags.length > 0) {
+    dietaBadge = "Control Clínico-Metabólico";
+    dietaSintesis = `Estrategia nutricional de ${goalTitle.toLowerCase()} adaptada a ${joinSpanishList(
+      patologiasTags
+    )}, priorizando densidad nutricional, control glucémico y saciedad sostenida en cada toma.`;
+    dietaDirectrices.push(`Selección de alimentos adaptada a ${patologiasTags[0]}`);
+  } else if (/p[eé]rdida|definici[oó]n|grasa/i.test(goalTitle)) {
+    dietaBadge = "Alta Saciedad y Retención";
+    dietaSintesis = `Plan hipocalórico orientado a preservar masa magra mediante reparto proteico uniforme en cada comida principal y alto volumen de vegetales fibrosos.`;
+    dietaDirectrices.push("Priorizar proteína magra y fibra soluble en cada tiempo de comida");
+  } else if (/aumento|masa|volumen|hipertrofia/i.test(goalTitle)) {
+    dietaBadge = "Superávit Limpio";
+    dietaSintesis = `Superávit energético estructurado con carbohidratos complejos de fácil digestión y fraccionamiento proteico para optimizar la síntesis tisular.`;
+    dietaDirectrices.push("Concentrar carbohidratos complejos de fácil asimilación y grasas saludables");
+  } else {
+    dietaBadge = "Optimización Nutricional";
+    dietaSintesis = `Distribución isocalórica de macronutrientes enfocada en estabilidad energética diaria, calidad de micronutrientes y adherencia culinaria.`;
+    dietaDirectrices.push("Fraccionar la proteína en 3 a 4 tomas equilibradas durante el día");
+  }
+
+  if (tieneGI) {
+    dietaDirectrices.push(`Cuidado digestivo (${giRaw}): preferir cocciones suaves y evitar irritantes`);
+  }
+  if (exclusionesStr) {
+    dietaDirectrices.push(`Omitir estrictamente: ${exclusionesStr}`);
+  } else if (favoritosStr) {
+    dietaDirectrices.push(`Integrar favoritos en menú base: ${favoritosStr}`);
+  }
+
+  // ─── 2. DOMINIO EXCLUSIVO: RUTINA ───
+  const p = smartTrainingPrescription || {};
+  const tieneLesiones = Boolean(p.tieneLesiones);
+  const lesionesRaw = p.lesionesRaw || "";
+  const diasSug = p.diasSugeridos || 4;
+  const splitSug = p.splitSugerido || "Torso / Pierna";
+  const fafNotas = String(p.fafNotas || metrica?.eval_faf_notas || "").trim();
+  const horario = String(p.horario || metrica?.horario_ejercicio || "").trim();
+  const deportePref = String(p.deportePref || "Entrenamiento de fuerza").trim();
+
+  let rutinaBadge = tieneLesiones ? "Protección Articular" : "Sobrecarga Progresiva";
+  let rutinaSintesis = "";
+  const rutinaDirectrices = [];
+
+  if (tieneLesiones) {
+    rutinaSintesis = `Programación biomecánica adaptada por antecedente de ${lesionesRaw.toLowerCase()}, priorizando estabilidad articular, variantes en máquinas o poleas y rangos indoloros.`;
+    if (p.precaucionesLesion) {
+      rutinaDirectrices.push(p.precaucionesLesion.split(".")[0]);
+    }
+    rutinaDirectrices.push("Controlar tempo excéntrico (2-3s) evitando cargas axiales máximas");
+  } else if (String(p.nivelPrevio || "").includes("Sedentario")) {
+    rutinaBadge = "Adaptación Neuromuscular";
+    rutinaSintesis = `Progresión gradual desde nivel ${String(p.nivelPrevio).toLowerCase()} hacia ${diasSug} sesiones semanales, priorizando técnica en patrones compuestos y control de fatiga periférica.`;
+    rutinaDirectrices.push("Priorizar dominio técnico con RIR 2-3 antes de incrementar cargas");
+    rutinaDirectrices.push("Incluir movilidad articular dinámica al inicio de cada sesión");
+  } else {
+    rutinaSintesis = `Estructura enfocada en tensión mecánica progresiva sobre ejercicios multiarticulares base y trabajo accesorio controlado con recuperación óptima entre sesiones.`;
+    rutinaDirectrices.push("Aplicar sobrecarga progresiva en básicos manteniendo RIR 1-2");
+    rutinaDirectrices.push("Respetar descansos de 90-120s en compuestos y 60-90s en analíticos");
+  }
+
+  const dispParts = [deportePref];
+  if (horario) dispParts.push(`Horario: ${horario}`);
+  if (p.frecuenciaPrevia && p.frecuenciaPrevia !== "No reportada") {
+    dispParts.push(`Transición: ${p.frecuenciaPrevia} d ➔ ${diasSug} d/sem`);
+  }
+  if (fafNotas) dispParts.push(fafNotas);
+
+  return {
+    dieta: {
+      badge: dietaBadge,
+      sintesis: dietaSintesis,
+      directrices: dietaDirectrices.slice(0, 3),
+      exclusiones: exclusionesStr,
+      favoritos: favoritosStr,
+    },
+    rutina: {
+      badge: rutinaBadge,
+      sintesis: rutinaSintesis,
+      directrices: rutinaDirectrices.slice(0, 3),
+      precauciones: tieneLesiones
+        ? `${lesionesRaw}${p.precaucionesLesion ? ` — ${p.precaucionesLesion}` : ""}`
+        : "Sin restricciones ni lesiones articulares reportadas",
+      disponibilidad: dispParts.join(" • "),
+    },
+  };
+}
+
+/**
+ * Genera con IA (Edge Function -> Gemini Direct -> Fallback Determinístico)
+ * los dos resúmenes ejecutivos breves y 100% exclusivos de su dominio (Dieta vs Rutina).
+ */
+export async function generateDualDomainSummariesWithAi({
+  cliente = {},
+  anamnesis = {},
+  metrica = {},
+  smartPrescription = {},
+  smartTrainingPrescription = {},
+}) {
+  const sourceHash = computeDualSummarySourceHash({
+    anamnesis,
+    metrica,
+    smartPrescription,
+    smartTrainingPrescription,
+  });
+
+  const fallback = buildFallbackDualSummaries({
+    anamnesis,
+    metrica,
+    smartPrescription,
+    smartTrainingPrescription,
+  });
+
+  const dietaCtx = {
+    goalTitle: smartPrescription?.goalInfo?.title || "Recomposición Corporal",
+    goalPct: smartPrescription?.goalPct || 0,
+    targetKcal: smartPrescription?.targetKcal || 0,
+    proteinG: smartPrescription?.proteinG || 0,
+    protGKg: smartPrescription?.protGKg || 0,
+    carbsG: smartPrescription?.carbsG || 0,
+    fatsG: smartPrescription?.fatsG || 0,
+    preferencias: smartPrescription?.preferencias || metrica?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
+    aversiones: smartPrescription?.aversiones || metrica?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
+    r24h: smartPrescription?.r24h || {},
+  };
+
+  const rutinaCtx = {
+    goalShortTitle: (smartTrainingPrescription?.goalTitle || "Recomposición Corporal").replace(/\s*\([+-]?\d+%\)/, ""),
+    diasSugeridos: smartTrainingPrescription?.diasSugeridos || 4,
+    splitSugerido: smartTrainingPrescription?.splitSugerido || "Torso / Pierna",
+    enfoqueFisiologico: smartTrainingPrescription?.enfoqueFisiologico || "Hipertrofia",
+    volumenRpe: smartTrainingPrescription?.volumenRpe || "RPE 7-8",
+    nivelPrevio: smartTrainingPrescription?.nivelPrevio || "Intermedio",
+    frecuenciaPrevia: smartTrainingPrescription?.frecuenciaPrevia || "No reportada",
+    deportePref: smartTrainingPrescription?.deportePref || "Fuerza en gimnasio",
+    horario: smartTrainingPrescription?.horario || "",
+    fafNotas: smartTrainingPrescription?.fafNotas || metrica?.eval_faf_notas || "",
+  };
+
+  const apiKey = getGeminiApiKey();
+
+  // Tier 1: Supabase Edge Function
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "dual-domain-summaries",
+      cliente,
+      anamnesis,
+      metrica,
+      dietaCtx,
+      rutinaCtx,
+      geminiKey: apiKey,
+    });
+
+    if (edgeRes?.success && edgeRes?.dieta && edgeRes?.rutina) {
+      return {
+        sourceHash,
+        dieta: {
+          badge: edgeRes.dieta.badge || fallback.dieta.badge,
+          sintesis: edgeRes.dieta.sintesis || fallback.dieta.sintesis,
+          directrices: Array.isArray(edgeRes.dieta.directrices) && edgeRes.dieta.directrices.length > 0
+            ? edgeRes.dieta.directrices.slice(0, 3)
+            : fallback.dieta.directrices,
+          exclusiones: edgeRes.dieta.exclusiones ?? fallback.dieta.exclusiones,
+          favoritos: edgeRes.dieta.favoritos ?? fallback.dieta.favoritos,
+        },
+        rutina: {
+          badge: edgeRes.rutina.badge || fallback.rutina.badge,
+          sintesis: edgeRes.rutina.sintesis || fallback.rutina.sintesis,
+          directrices: Array.isArray(edgeRes.rutina.directrices) && edgeRes.rutina.directrices.length > 0
+            ? edgeRes.rutina.directrices.slice(0, 3)
+            : fallback.rutina.directrices,
+          precauciones: edgeRes.rutina.precauciones || fallback.rutina.precauciones,
+          disponibilidad: edgeRes.rutina.disponibilidad || fallback.rutina.disponibilidad,
+        },
+        origen: edgeRes.origen || "gemini_edge",
+        model: edgeRes.model || "gemini-3.1-flash-lite",
+        generadoEn: edgeRes.generadoEn || new Date().toISOString(),
+      };
+    }
+  } catch {
+    // Continuar a llamada directa a Gemini
+  }
+
+  // Tier 2: Llamada directa a Gemini
+  if (apiKey) {
+    const rawSexo = cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo || "";
+    const esMujer = isFemenino(rawSexo);
+    const sexoLabel = esMujer ? "Femenino" : "Masculino";
+
+    const promptDual = `Eres el sistema experto de síntesis clínica y biomecánica de FLUX IA.
+Tu tarea es generar DOS resúmenes ejecutivos ultra-breves, directos y ESTRICTAMENTE SEPARADOS POR DOMINIO (uno exclusivo para DIETA y otro exclusivo para RUTINA) cruzando el Expediente Clínico y la Evaluación de Etapa del paciente.
+
+PACIENTE: ${cliente?.nombre || "Paciente"} | Sexo: ${sexoLabel} | Edad: ${metrica?.edad || cliente?.edad || "N/A"} años
+
+═══════════════════════════════════════════════════════════
+FUENTES EXCLUSIVAS PARA EL RESUMEN DE DIETA (NUTRICIÓN):
+═══════════════════════════════════════════════════════════
+- Objetivo nutricional: ${dietaCtx.goalTitle} (${dietaCtx.goalPct}%)
+- Meta calculada (YA VISIBLE EN TARJETAS, NO REPETIR NÚMEROS): ${dietaCtx.targetKcal} kcal | P: ${dietaCtx.proteinG}g (${dietaCtx.protGKg} g/kg) | C: ${dietaCtx.carbsG}g | G: ${dietaCtx.fatsG}g
+- Composición corporal: Peso ${metrica?.peso || "N/A"} kg | % Grasa: ${metrica?.grasa_pct || "N/A"}% | MLG: ${metrica?.masa_libre_grasa || "N/A"} kg
+- Patologías / Diagnósticos médicos: ${anamnesis?.patologias || "Ninguna"}
+- Medicación / Suplementos: ${anamnesis?.medicacion_suplementos || "Ninguna"}
+- Función digestiva / Síntomas GI: ${anamnesis?.sintomas_gi || "Normal"}
+- Alergias e intolerancias alimentarias: ${anamnesis?.alergias_intolerancias || "Ninguna"}
+- Aversiones alimentarias (no incluir): ${dietaCtx.aversiones || "Ninguna"}
+- Alimentos favoritos (priorizar): ${dietaCtx.preferencias || "No especificados"}
+- R24H / Hábitos actuales: Desayuno: ${dietaCtx?.r24h?.desayuno || "N/A"} | Comida: ${dietaCtx?.r24h?.comida || "N/A"} | Cena: ${dietaCtx?.r24h?.cena || "N/A"} | Picoteos: ${dietaCtx?.r24h?.picoteos || "N/A"}
+- Saciedad (${metrica?.checkin_saciedad || 4}/5) | Digestión (${metrica?.checkin_digestion || 4}/5) | Agua: ${metrica?.consumo_agua_estimado || "No especificada"}
+
+═══════════════════════════════════════════════════════════
+FUENTES EXCLUSIVAS PARA EL RESUMEN DE RUTINA (ENTRENAMIENTO):
+═══════════════════════════════════════════════════════════
+- Objetivo físico de etapa: ${rutinaCtx.goalShortTitle}
+- Programación base (YA VISIBLE EN TARJETAS, NO REPETIR LITERALMENTE): ${rutinaCtx.diasSugeridos} días/sem | Split: ${rutinaCtx.splitSugerido} | Enfoque: ${rutinaCtx.enfoqueFisiologico} | ${rutinaCtx.volumenRpe}
+- Cirugías y lesiones osteomusculares: ${anamnesis?.cirugias_lesiones || "Ninguna"}
+- Nivel / Historial previo: ${rutinaCtx.nivelPrevio} (${rutinaCtx.frecuenciaPrevia} días previos)
+- Ocupación laboral / NEAT: ${anamnesis?.ocupacion_actividad || "No especificada"}
+- Modalidad / Deporte preferido: ${rutinaCtx.deportePref} | Horario: ${rutinaCtx.horario || "Flexible"}
+- Notas de disponibilidad / Actividad física de evaluación: ${rutinaCtx.fafNotas || "Sin notas adicionales"}
+- Energía (${metrica?.checkin_energia || 4}/5) | Sueño: ${metrica?.horas_sueno || 7}h | Estrés: ${metrica?.nivel_estres || 3}/5
+
+═══════════════════════════════════════════════════════════
+REGLAS INQUEBRANTABLES DE EXCLUSIVIDAD Y BREVEDAD:
+═══════════════════════════════════════════════════════════
+1. EXCLUSIVIDAD TOTAL DE DOMINIO:
+   - En "dieta": PROHIBIDO mencionar ejercicio, gimnasio, pesas, días de entreno, factor FAF, splits, series o lesiones articulares. Habla 100% de estrategia alimentaria, clínica-nutricional, digestiva, saciedad y selección de alimentos.
+   - En "rutina": PROHIBIDO mencionar calorías (kcal), porcentajes de déficit/superávit (-15%, +10%), proteínas, carbohidratos, grasas, comidas o digestión. Habla 100% de biomecánica, selección de ejercicios, control de cargas/fatiga, prevención articular y adaptación al nivel/disponibilidad.
+2. CERO REPETICIÓN REDUNDANTE:
+   - Las tarjetas superiores ya muestran las kcal, gramos de macros, días/semana y nombre del split. NO desperdicies espacio repitiendo "La fórmula establece 2482 kcal con 185g de proteína...". Ve directo al CÓMO instrumentar el plan según el paciente.
+3. BREVEDAD EJECUTIVA Y NORMALIZACIÓN:
+   - Corrige faltas de ortografía o texto coloquial del paciente.
+   - "sintesis": Máximo 1 a 2 oraciones cortas y directas (máx 190 caracteres).
+   - "directrices": Array de 2 a 3 viñetas puntuales y accionables (máx 70 caracteres por viñeta).
+   - Concordancia de género estricta para paciente ${sexoLabel}.
+
+Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+{
+  "dieta": {
+    "badge": "etiqueta clínica corta (máx 26 caracteres, ej: Control Glucémico / Alta Saciedad)",
+    "sintesis": "1-2 oraciones breves con el criterio dietoterapéutico y metabólico para diseñar el menú (sin repetir números de las tarjetas ni hablar de entreno)",
+    "directrices": [
+      "directriz nutricional breve 1",
+      "directriz nutricional breve 2"
+    ],
+    "exclusiones": "string breve normalizado con alergias, intolerancias y aversiones a excluir (o null si no hay)",
+    "favoritos": "string breve normalizado con alimentos favoritos a priorizar (o null si no hay)"
+  },
+  "rutina": {
+    "badge": "etiqueta biomecánica corta (máx 26 caracteres, ej: Protección Articular / Sobrecarga Progresiva)",
+    "sintesis": "1-2 oraciones breves con el criterio biomecánico, selección de ejercicios y gestión de fatiga (sin hablar de calorías ni dieta)",
+    "directrices": [
+      "directriz de entrenamiento breve 1",
+      "directriz de entrenamiento breve 2"
+    ],
+    "precauciones": "string breve normalizado sobre lesiones o cuidado articular (o 'Sin restricciones articulares reportadas')",
+    "disponibilidad": "string breve integrando modalidad, horario, transición de días y notas de disponibilidad"
+  }
+}`;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9500);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptDual }] }],
+              generationConfig: getGenerationConfig(model, true, 0.2),
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = extractGeminiText(data);
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            if (parsed?.dieta && parsed?.rutina) {
+              return {
+                sourceHash,
+                dieta: {
+                  badge: parsed.dieta.badge || fallback.dieta.badge,
+                  sintesis: parsed.dieta.sintesis || fallback.dieta.sintesis,
+                  directrices: Array.isArray(parsed.dieta.directrices) && parsed.dieta.directrices.length > 0
+                    ? parsed.dieta.directrices.slice(0, 3)
+                    : fallback.dieta.directrices,
+                  exclusiones: parsed.dieta.exclusiones ?? fallback.dieta.exclusiones,
+                  favoritos: parsed.dieta.favoritos ?? fallback.dieta.favoritos,
+                },
+                rutina: {
+                  badge: parsed.rutina.badge || fallback.rutina.badge,
+                  sintesis: parsed.rutina.sintesis || fallback.rutina.sintesis,
+                  directrices: Array.isArray(parsed.rutina.directrices) && parsed.rutina.directrices.length > 0
+                    ? parsed.rutina.directrices.slice(0, 3)
+                    : fallback.rutina.directrices,
+                  precauciones: parsed.rutina.precauciones || fallback.rutina.precauciones,
+                  disponibilidad: parsed.rutina.disponibilidad || fallback.rutina.disponibilidad,
+                },
+                origen: "gemini_direct",
+                model,
+                generadoEn: new Date().toISOString(),
+              };
+            }
+          }
+        }
+      } catch {
+        // Intentar siguiente modelo candidato
+      }
+    }
+  }
+
+  return {
+    sourceHash,
+    ...fallback,
+    origen: "analitico_local",
+    generadoEn: new Date().toISOString(),
+  };
+}
+
+const inFlightDualSummaries = new Map();
+
+/**
+ * Proceso secundario en segundo plano que actualiza los resúmenes ejecutivos de Dieta y Rutina
+ * cada vez que cambia cualquiera de sus 2 fuentes (Expediente Clínico o Evaluación de Etapa).
+ */
+export async function syncDualDomainSummariesInBackground({
+  clienteId,
+  cliente = {},
+  clinicalRec = null,
+  metrica = null,
+  smartPrescription = null,
+  smartTrainingPrescription = null,
+  force = false,
+}) {
+  if (!clienteId) return null;
+  const record = clinicalRec || peekClinicalRecord(clienteId);
+  const anamnesis = record?.anamnesis || {};
+
+  const sourceHash = computeDualSummarySourceHash({
+    anamnesis,
+    metrica: metrica || {},
+    smartPrescription: smartPrescription || {},
+    smartTrainingPrescription: smartTrainingPrescription || {},
+  });
+
+  const existingByHash = record?.resumenes_programacion?.byHash?.[sourceHash];
+  if (!force && existingByHash && existingByHash.dieta && existingByHash.rutina && existingByHash.origen !== "analitico_local") {
+    return existingByHash;
+  }
+
+  const inflightKey = `${clienteId}::${sourceHash}`;
+  if (inFlightDualSummaries.has(inflightKey)) {
+    return inFlightDualSummaries.get(inflightKey);
+  }
+
+  const task = (async () => {
+    try {
+      const result = await generateDualDomainSummariesWithAi({
+        cliente,
+        anamnesis,
+        metrica: metrica || {},
+        smartPrescription: smartPrescription || {},
+        smartTrainingPrescription: smartTrainingPrescription || {},
+      });
+
+      const latestRec = peekClinicalRecord(clienteId) || record;
+      const prevByHash = latestRec?.resumenes_programacion?.byHash || {};
+      // Mantener solo los últimos 6 hashes para no crecer indefinidamente el JSON
+      const hashKeys = Object.keys(prevByHash).slice(-5);
+      const trimmedByHash = {};
+      for (const k of hashKeys) {
+        trimmedByHash[k] = prevByHash[k];
+      }
+      trimmedByHash[sourceHash] = result;
+
+      const updatedRecord = {
+        ...latestRec,
+        resumenes_programacion: {
+          latestHash: sourceHash,
+          updatedAt: result.generadoEn,
+          dieta: result.dieta,
+          rutina: result.rutina,
+          origen: result.origen,
+          byHash: trimmedByHash,
+        },
+      };
+
+      await saveClinicalRecord(clienteId, updatedRecord);
+      return result;
+    } catch (err) {
+      console.warn("[FLUX IA] Error en sincronización secundaria de resúmenes:", err?.message);
+      return null;
+    } finally {
+      inFlightDualSummaries.delete(inflightKey);
+    }
+  })();
+
+  inFlightDualSummaries.set(inflightKey, task);
+  return task;
 }

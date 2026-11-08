@@ -30,7 +30,7 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi } from "../../lib/clinicalAi";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
@@ -523,6 +523,114 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       isMiPlan,
     });
   }, [selected, cycleMetrica, clinicalRec, cicloSel, smartPrescription, isMiPlan]);
+
+  // ── Síntesis secundaria automática en segundo plano (Dieta y Rutina exclusivas por dominio) ──
+  const [syncingDualSummaries, setSyncingDualSummaries] = useState(false);
+  const triedDualHashesRef = useRef(new Set());
+
+  const dualSummaryHash = useMemo(() => {
+    return computeDualSummarySourceHash({
+      anamnesis: clinicalRec?.anamnesis,
+      metrica: cycleMetrica,
+      smartPrescription,
+      smartTrainingPrescription,
+    });
+  }, [clinicalRec?.anamnesis, cycleMetrica, smartPrescription, smartTrainingPrescription]);
+
+  const fallbackDualSummaries = useMemo(() => {
+    return buildFallbackDualSummaries({
+      anamnesis: clinicalRec?.anamnesis,
+      metrica: cycleMetrica,
+      smartPrescription,
+      smartTrainingPrescription,
+    });
+  }, [clinicalRec?.anamnesis, cycleMetrica, smartPrescription, smartTrainingPrescription]);
+
+  const cachedDualSummaries = useMemo(() => {
+    const rp = clinicalRec?.resumenes_programacion;
+    if (!rp) return null;
+    if (rp.byHash && rp.byHash[dualSummaryHash]) return rp.byHash[dualSummaryHash];
+    if (rp.latestHash === dualSummaryHash && rp.dieta && rp.rutina) return rp;
+    return null;
+  }, [clinicalRec?.resumenes_programacion, dualSummaryHash]);
+
+  const activeDualSummaries = useMemo(() => {
+    if (cachedDualSummaries?.dieta && cachedDualSummaries?.rutina) {
+      return cachedDualSummaries;
+    }
+    return fallbackDualSummaries;
+  }, [cachedDualSummaries, fallbackDualSummaries]);
+
+  useEffect(() => {
+    if (!selected?.id || !clinicalLoaded) return;
+    const hasSources =
+      Boolean(smartPrescription?.hasEvaluation) ||
+      Boolean(smartTrainingPrescription?.hasEvaluation) ||
+      hasAnamnesisData(clinicalRec?.anamnesis);
+    if (!hasSources) return;
+
+    const isAlreadyAiSynced =
+      cachedDualSummaries?.dieta &&
+      cachedDualSummaries?.rutina &&
+      cachedDualSummaries?.origen &&
+      cachedDualSummaries.origen !== "analitico_local";
+    if (isAlreadyAiSynced) return;
+
+    const attemptKey = `${selected.id}::${dualSummaryHash}`;
+    if (triedDualHashesRef.current.has(attemptKey)) return;
+    triedDualHashesRef.current.add(attemptKey);
+
+    let cancelled = false;
+    setSyncingDualSummaries(true);
+    syncDualDomainSummariesInBackground({
+      clienteId: selected.id,
+      cliente: selected,
+      clinicalRec,
+      metrica: cycleMetrica,
+      smartPrescription,
+      smartTrainingPrescription,
+    })
+      .then((res) => {
+        if (!cancelled && res?.dieta && res?.rutina) {
+          setClinicalRec((prev) => {
+            if (!prev) return prev;
+            const prevByHash = prev?.resumenes_programacion?.byHash || {};
+            return {
+              ...prev,
+              resumenes_programacion: {
+                latestHash: dualSummaryHash,
+                updatedAt: res.generadoEn,
+                dieta: res.dieta,
+                rutina: res.rutina,
+                origen: res.origen,
+                byHash: {
+                  ...prevByHash,
+                  [dualSummaryHash]: res,
+                },
+              },
+            };
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSyncingDualSummaries(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selected?.id,
+    clinicalLoaded,
+    dualSummaryHash,
+    cachedDualSummaries,
+    smartPrescription,
+    smartTrainingPrescription,
+    cycleMetrica,
+    clinicalRec,
+    selected,
+  ]);
 
   // Sincronización inmediata de métricas cuando cambia el cliente seleccionado
   useEffect(() => {
@@ -3684,6 +3792,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   const fPct = targetKcal > 0 ? Math.round((activeF * 9 / targetKcal) * 100) : 0;
                   const refWeight = smartPrescription.weight || Number(selected?.peso) || 0;
                   const prescMode = smartPrescription.prescriptionMode || "matematico";
+                  const dietaSum = activeDualSummaries?.dieta || {};
+                  const dietaSintesis =
+                    prescMode === "ia" && smartPrescription.analisisClinico
+                      ? smartPrescription.analisisClinico
+                      : dietaSum.sintesis || smartPrescription.rationale;
+                  const dietaBadge =
+                    (prescMode === "ia" && smartPrescription.badgeMotivo) ||
+                    dietaSum.badge ||
+                    "Estrategia Nutricional";
+                  const dietaDirectrices = Array.isArray(dietaSum.directrices) ? dietaSum.directrices : [];
+                  const dietaExclusiones = dietaSum.exclusiones || smartPrescription.aversiones || "";
+                  const dietaFavoritos = dietaSum.favoritos || smartPrescription.preferencias || "";
 
                   return (
                     <div className="mb-3.5 md:mb-4 bg-white border-y md:border border-[#E2E8F0] rounded-none md:rounded-2xl shadow-none md:shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
@@ -3722,15 +3842,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   <span>{smartPrescription.goalInfo.title} ({smartPrescription.goalInfo.pct > 0 ? `+${smartPrescription.goalInfo.pct}%` : `${smartPrescription.goalInfo.pct}%`})</span>
                                 </span>
                               )}
-                              {smartPrescription.fafInfo?.label && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
-                                  <Flame className="w-3 h-3 shrink-0" />
-                                  <span>FAF {smartPrescription.faf}</span>
+                              {dietaBadge && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                  <Sparkles className="w-3 h-3 shrink-0 text-indigo-600" />
+                                  <span>{dietaBadge}</span>
                                 </span>
                               )}
                               <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#6B7A8D]">
                                 {smartPrescription.formulaShort || smartPrescription.formula}
                               </span>
+                              {syncingDualSummaries && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-[#6B7A8D]">
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-600" />
+                                  <span>Sincronizando síntesis...</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3754,7 +3880,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         </div>
                       </div>
 
-                      {/* Cuerpo de la Tarjeta (Desplegable, cerrado por defecto) */}
+                      {/* Cuerpo de la Tarjeta (Desplegable) */}
                       {!metaPrescritaCollapsed && (
                         <div className="p-4 pt-1">
                           {/* Cuadrícula de Macronutrientes */}
@@ -3800,76 +3926,54 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             </div>
                           </div>
 
-                          {/* Explicación clínica IA / Criterio */}
-                          {smartPrescription.rationale && (
-                            <div className={`mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl ${
-                              prescMode === "ia"
-                                ? "bg-indigo-50/60 border border-indigo-100 text-indigo-950"
-                                : "bg-slate-50 border border-slate-200/70 text-[#6B7A8D]"
-                            }`}>
-                              {prescMode === "ia" ? (
-                                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                              ) : (
-                                <Activity className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" />
-                              )}
-                              <div className="leading-relaxed flex-1">
-                                {prescMode === "ia" && (
-                                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                                    <strong className="text-indigo-900 font-bold">
-                                      Dictamen de Auditoría Clínica IA:
-                                    </strong>
-                                    {smartPrescription.badgeMotivo && (
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
-                                        {smartPrescription.badgeMotivo}
+                          {/* Síntesis Nutricional Breve y Exclusiva de Dieta */}
+                          {dietaSintesis && (
+                            <div className="mt-2.5 flex items-start gap-2.5 text-xs p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-100/80 text-[#334155]">
+                              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                              <div className="leading-snug flex-1 min-w-0">
+                                <p className="text-[#1E293B] font-medium leading-snug">{dietaSintesis}</p>
+                                {dietaDirectrices.length > 0 && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {dietaDirectrices.map((dir, dIdx) => (
+                                      <span
+                                        key={dIdx}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/90 border border-indigo-200/60 text-[11px] text-indigo-950 font-medium"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                        <span>{dir}</span>
                                       </span>
-                                    )}
+                                    ))}
                                   </div>
                                 )}
-                                <p className="text-[#334155] leading-relaxed">{smartPrescription.rationale}</p>
-                                {smartPrescription.estrategiaMenu && (
-                                  <p className="mt-1.5 text-indigo-900 text-[11px] leading-relaxed">
-                                    <span className="font-bold text-indigo-950">Estrategia de menú sugerida: </span>
-                                    {smartPrescription.estrategiaMenu}
-                                  </p>
-                                )}
                               </div>
                             </div>
                           )}
 
-                          {/* Preferencias y Aversiones evaluadas de la etapa */}
-                          {Boolean(smartPrescription.preferencias || smartPrescription.aversiones) && (
-                            <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                              {smartPrescription.preferencias && (
-                                <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/70 text-emerald-950">
-                                  <span className="font-bold text-emerald-800 block text-[11px] uppercase tracking-wider mb-0.5">
-                                    Favoritos de la etapa a incluir:
-                                  </span>
-                                  <span className="leading-snug">{smartPrescription.preferencias}</span>
+                          {/* Exclusiones y Favoritos Alimentarios (Exclusivos de Nutrición) */}
+                          {Boolean(dietaFavoritos || dietaExclusiones) && (
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              {dietaFavoritos && (
+                                <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-200/70 text-emerald-950 flex items-start gap-2">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-emerald-800 text-[10px] uppercase tracking-wider mr-1.5">
+                                      Priorizar en menú:
+                                    </span>
+                                    <span className="leading-snug">{dietaFavoritos}</span>
+                                  </div>
                                 </div>
                               )}
-                              {smartPrescription.aversiones && (
-                                <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/70 text-rose-950">
-                                  <span className="font-bold text-rose-800 block text-[11px] uppercase tracking-wider mb-0.5">
-                                    Aversiones / No incluir:
-                                  </span>
-                                  <span className="leading-snug">{smartPrescription.aversiones}</span>
+                              {dietaExclusiones && (
+                                <div className="p-2 rounded-xl bg-rose-50/60 border border-rose-200/70 text-rose-950 flex items-start gap-2">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-rose-800 text-[10px] uppercase tracking-wider mr-1.5">
+                                      Excluir (Alergias / Aversiones):
+                                    </span>
+                                    <span className="leading-snug">{dietaExclusiones}</span>
+                                  </div>
                                 </div>
                               )}
-                            </div>
-                          )}
-
-                          {/* Notas de actividad física del paciente evaluadas */}
-                          {Boolean(smartPrescription.fafNotas) && (
-                            <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] text-xs">
-                              <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/70 text-amber-950 flex items-start gap-2">
-                                <Flame className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                <div>
-                                  <span className="font-bold text-amber-800 block text-[11px] uppercase tracking-wider mb-0.5">
-                                    Disponibilidad y notas de actividad física (Evaluación):
-                                  </span>
-                                  <span className="leading-snug">{smartPrescription.fafNotas}</span>
-                                </div>
-                              </div>
                             </div>
                           )}
                         </div>
@@ -4075,15 +4179,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                 !hasExpediente ||
                 !cycleMetrica ||
                 !smartTrainingPrescription ||
-                !smartTrainingPrescription.hasEvaluation ||
-                !smartPrescription ||
-                !smartPrescription.hasEvaluation ||
-                !smartPrescription.targetKcal ||
-                smartPrescription.targetKcal <= 0
+                !smartTrainingPrescription.hasEvaluation
               ) {
                 return null;
               }
               const p = smartTrainingPrescription;
+              const rutinaSum = activeDualSummaries?.rutina || {};
+              const rutinaSintesis = rutinaSum.sintesis || p.rationaleBiomecanico;
+              const rutinaBadge = rutinaSum.badge || p.badgeMotivo || "Programación Física";
+              const rutinaDirectrices = Array.isArray(rutinaSum.directrices) ? rutinaSum.directrices : [];
+              const rutinaPrecauciones =
+                rutinaSum.precauciones ||
+                (p.tieneLesiones
+                  ? `${p.lesionesRaw}${p.precaucionesLesion ? ` — ${p.precaucionesLesion}` : ""}`
+                  : "Sin restricciones ni lesiones articulares reportadas");
+              const rutinaDisponibilidad =
+                rutinaSum.disponibilidad ||
+                [
+                  p.deportePref,
+                  p.horario ? `Horario: ${p.horario}` : "",
+                  p.frecuenciaPrevia && p.frecuenciaPrevia !== "No reportada"
+                    ? `Transición: ${p.frecuenciaPrevia} d ➔ ${p.diasSugeridos} d/sem`
+                    : "",
+                  p.fafNotas || "",
+                ]
+                  .filter(Boolean)
+                  .join(" • ");
 
               return (
                 <div className="mb-3.5 md:mb-4 bg-white border-y md:border border-[#E2E8F0] rounded-none md:rounded-2xl shadow-none md:shadow-sm hover:border-[var(--brand-primary)]/40 transition-colors overflow-hidden">
@@ -4104,7 +4225,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             Resumen para rutina
                           </h4>
 
-                          {/* Badge de Objetivo */}
+                          {/* Badge de Objetivo Físico (sin % calórico) */}
                           {p.goalTitle && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
                               <Target className="w-3 h-3 shrink-0" />
@@ -4118,16 +4239,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             <span>{p.frecuenciaLabel}</span>
                           </span>
 
-                          {/* Badge de Lesión o Biomecánica */}
+                          {/* Badge de Lesión o Enfoque Biomecánico IA */}
                           {p.tieneLesiones ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/70">
                               <ShieldAlert className="w-3 h-3 shrink-0 text-rose-600" />
-                              <span>Adaptación por Lesión</span>
+                              <span>{rutinaBadge}</span>
                             </span>
                           ) : (
-                            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                              <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-600" />
-                              <span>Sin Lesiones Declaradas</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                              <Sparkles className="w-3 h-3 shrink-0 text-indigo-600" />
+                              <span>{rutinaBadge}</span>
+                            </span>
+                          )}
+
+                          {syncingDualSummaries && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-[#6B7A8D]">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-600" />
+                              <span>Sincronizando síntesis...</span>
                             </span>
                           )}
                         </div>
@@ -4203,80 +4331,59 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         </div>
                       </div>
 
-                      {/* Dictamen Biomecánico & Criterio IA */}
-                      {p.rationaleBiomecanico && (
-                        <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] flex items-start gap-2.5 text-xs p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100 text-indigo-950">
+                      {/* Síntesis Biomecánica Breve y Exclusiva de Rutina */}
+                      {rutinaSintesis && (
+                        <div className="mt-2.5 flex items-start gap-2.5 text-xs p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-100/80 text-[#334155]">
                           <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                          <div className="leading-relaxed flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <strong className="text-indigo-900 font-bold">
-                                Dictamen Biomecánico IA:
-                              </strong>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200/60">
-                                {p.badgeMotivo}
-                              </span>
-                            </div>
-                            <p className="text-[#334155] leading-relaxed">{p.rationaleBiomecanico}</p>
+                          <div className="leading-snug flex-1 min-w-0">
+                            <p className="text-[#1E293B] font-medium leading-snug">{rutinaSintesis}</p>
+                            {rutinaDirectrices.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {rutinaDirectrices.map((dir, dIdx) => (
+                                  <span
+                                    key={dIdx}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/90 border border-indigo-200/60 text-[11px] text-indigo-950 font-medium"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                    <span>{dir}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
 
-                      {/* Comparativas Inferiores: Lesiones vs Preferencias */}
-                      <div className="mt-3 pt-2.5 border-t border-[#F0F4FA] grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {/* Lesiones / Precauciones */}
-                        <div className={`p-2.5 rounded-xl border ${
+                      {/* Precauciones Articulares y Disponibilidad Físico-Deportiva (Exclusivas de Rutina) */}
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className={`p-2 rounded-xl border flex items-start gap-2 ${
                           p.tieneLesiones
                             ? "bg-rose-50/70 border-rose-200/80 text-rose-950"
                             : "bg-emerald-50/60 border-emerald-200/70 text-emerald-950"
                         }`}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            {p.tieneLesiones ? (
-                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                            ) : (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            )}
-                            <span className={`font-bold text-[11px] uppercase tracking-wider ${
+                          {p.tieneLesiones ? (
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="min-w-0">
+                            <span className={`font-bold text-[10px] uppercase tracking-wider mr-1.5 ${
                               p.tieneLesiones ? "text-rose-800" : "text-emerald-800"
                             }`}>
-                              {p.tieneLesiones ? "Lesiones & Precauciones Biomecánicas:" : "Estado Biomecánico:"}
+                              {p.tieneLesiones ? "Precaución Articular:" : "Estado Articular:"}
                             </span>
+                            <span className="leading-snug">{rutinaPrecauciones}</span>
                           </div>
-                          <p className="leading-snug">
-                            {p.tieneLesiones
-                              ? `${p.lesionesRaw}. ${p.precaucionesLesion || ""}`
-                              : "Sin antecedentes de lesiones ni cirugías articulares que limiten rangos de movimiento."}
-                          </p>
                         </div>
 
-                        {/* Preferencias de Modalidad & Deporte */}
-                        <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200/70 text-blue-950">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Dumbbell className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                            <span className="font-bold text-blue-800 block text-[11px] uppercase tracking-wider">
-                              Modalidad & Preferencias a Incluir:
+                        <div className="p-2 rounded-xl bg-blue-50/60 border border-blue-200/70 text-blue-950 flex items-start gap-2">
+                          <Dumbbell className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-blue-800 text-[10px] uppercase tracking-wider mr-1.5">
+                              Modalidad y Disponibilidad:
                             </span>
+                            <span className="leading-snug">{rutinaDisponibilidad}</span>
                           </div>
-                          <p className="leading-snug">
-                            {p.deportePref}
-                            {p.horario ? ` • Horario habitual: ${p.horario}` : ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Fila de Transición de Actividad Física */}
-                      <div className="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 flex items-center justify-between gap-3 text-xs flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-slate-600 shrink-0" />
-                          <span>
-                            <strong className="text-slate-900">Historial Previo:</strong> {p.nivelPrevio} ({p.frecuenciaPrevia} días previos)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                          <span>➔</span>
-                          <span>
-                            <strong className="text-slate-900">Meta Proyectada:</strong> {p.diasSugeridos} días/semana
-                            {p.fafNotas ? ` (${p.fafNotas})` : ""}
-                          </span>
                         </div>
                       </div>
                     </div>

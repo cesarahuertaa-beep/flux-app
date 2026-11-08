@@ -35,6 +35,7 @@ export function getDefaultClinicalRecord() {
     solicitud_fecha: null,
     ultima_respuesta_paciente: null,
     servicios_activos: { nutricion: true, entrenamiento: true },
+    resumenes_programacion: null,
   };
 }
 
