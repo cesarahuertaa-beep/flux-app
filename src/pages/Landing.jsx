@@ -187,22 +187,46 @@ function HeroPhoneMockup({ config }) {
   const [selectedScreenIdx, setSelectedScreenIdx] = useState(0);
 
   const hasScreenshots = screenshots.length > 0;
+  const videoUrl = config?.app_video_url;
 
   return (
-    <div className="relative mx-auto w-full max-w-[320px] sm:max-w-[340px]">
+    <div className="relative mx-auto flex items-center justify-center w-full">
       {/* Resplandor decorativo de fondo */}
-      <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/20 via-sky-400/20 to-emerald-400/20 rounded-[48px] blur-2xl -z-10" />
+      <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/20 via-sky-400/20 to-emerald-400/20 rounded-[48px] blur-2xl -z-10 pointer-events-none" />
 
-      {/* Marco del Smartphone */}
-      <div className="relative bg-[#0B1929] rounded-[42px] p-3 shadow-2xl border-4 border-[#1E2D3D] ring-1 ring-white/10 flex flex-col overflow-hidden aspect-[9/18.5]">
-        {/* Notch / Dynamic Island */}
-        <div className="w-28 h-4 bg-black rounded-full mx-auto mb-2.5 shrink-0 flex items-center justify-end px-3">
-          <div className="w-2 h-2 rounded-full bg-[#1E2D3D]" />
-        </div>
+      {/* Marco del Smartphone 9:16 responsivo vertical (siempre visible completo) */}
+      <div
+        className="relative bg-[#0B1929] rounded-[38px] sm:rounded-[44px] p-2.5 sm:p-3 shadow-2xl border-[3.5px] sm:border-4 border-[#1E2D3D] ring-1 ring-white/10 flex flex-col overflow-hidden"
+        style={{
+          height: "min(560px, calc(100dvh - 140px))",
+          maxHeight: "min(560px, calc(100dvh - 140px))",
+          aspectRatio: "9 / 16",
+          maxWidth: "min(325px, 85vw)",
+          width: "auto"
+        }}
+      >
+        {/* Pantalla del Teléfono 9:16 */}
+        <div className="flex-1 w-full h-full bg-black rounded-[28px] sm:rounded-[34px] overflow-hidden flex flex-col relative shadow-inner">
+          {/* Notch / Dynamic Island flotante y discreto */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 w-16 sm:w-20 h-3 sm:h-3.5 bg-black/85 backdrop-blur-md rounded-full flex items-center justify-end px-2 pointer-events-none shadow-xs border border-white/5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#1E2D3D]" />
+          </div>
 
-        {/* Pantalla del Teléfono */}
-        <div className="flex-1 bg-[#F7F9FC] rounded-[30px] overflow-hidden flex flex-col text-[#0B1929] relative shadow-inner">
-          {hasScreenshots ? (
+          {videoUrl ? (
+            // Modo Video 9:16 en bucle continuo limpio
+            <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
+              <video
+                key={videoUrl}
+                src={videoUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                className="w-full h-full object-cover select-none pointer-events-none"
+              />
+            </div>
+          ) : hasScreenshots ? (
             // Modo Capturas Reales subidas por el Superadmin
             <div className="w-full h-full flex flex-col">
               <div className="flex-1 relative overflow-hidden bg-black">
@@ -233,103 +257,103 @@ function HeroPhoneMockup({ config }) {
             </div>
           ) : (
             // Modo Interfaz Interactiva Simulada en CSS de Alta Fidelidad
-            <div className="p-3.5 flex flex-col h-full justify-between select-none">
+            <div className="p-3 sm:p-3.5 flex flex-col h-full justify-between select-none bg-[#F7F9FC] text-[#0B1929] overflow-y-auto no-scrollbar pt-6">
               {/* Barra de Estado y Header */}
               <div>
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#E2E8F0]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[var(--brand-primary)] text-white flex items-center justify-center font-bold text-xs">
+                <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[#E2E8F0]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-[var(--brand-primary)] text-white flex items-center justify-center font-bold text-[10px]">
                       FL
                     </div>
                     <div>
-                      <p className="text-[11px] font-bold text-[#0B1929] leading-tight">FLUX App</p>
-                      <p className="text-[8px] font-semibold text-emerald-600">Plan Atleta Pro</p>
+                      <p className="text-[10px] font-bold text-[#0B1929] leading-tight">FLUX App</p>
+                      <p className="text-[7.5px] font-semibold text-emerald-600">Plan Atleta Pro</p>
                     </div>
                   </div>
-                  <span className="text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[8.5px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
                     ★ Premium
                   </span>
                 </div>
 
                 {/* Widget 1: Nutrición & Macros del Día */}
-                <div className="bg-white rounded-2xl p-3 border border-[#E2E8F0] shadow-2xs mb-2.5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-[#0B1929]">
-                      <Utensils size={12} className="text-[#1A6FD4]" /> Macros del Día
+                <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0] shadow-2xs mb-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-[#0B1929]">
+                      <Utensils size={11} className="text-[#1A6FD4]" /> Macros del Día
                     </div>
-                    <span className="text-[10px] font-bold text-[#1A6FD4]">2,150 / 2,400 kcal</span>
+                    <span className="text-[9px] font-bold text-[#1A6FD4]">2,150 / 2,400 kcal</span>
                   </div>
                   {/* Barra de calorías */}
-                  <div className="w-full bg-[#F0F4FA] h-2 rounded-full overflow-hidden mb-2">
+                  <div className="w-full bg-[#F0F4FA] h-1.5 rounded-full overflow-hidden mb-1.5">
                     <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full w-[88%] rounded-full" />
                   </div>
                   {/* Píldoras de nutrientes */}
                   <div className="grid grid-cols-3 gap-1 text-center">
-                    <div className="bg-blue-50 p-1 rounded-lg border border-blue-100">
-                      <p className="text-[8px] text-[#6B7A8D] uppercase font-bold">Prot</p>
-                      <p className="text-[10px] font-bold text-blue-700">165g</p>
+                    <div className="bg-blue-50 p-0.5 rounded-md border border-blue-100">
+                      <p className="text-[7.5px] text-[#6B7A8D] uppercase font-bold">Prot</p>
+                      <p className="text-[9px] font-bold text-blue-700">165g</p>
                     </div>
-                    <div className="bg-amber-50 p-1 rounded-lg border border-amber-100">
-                      <p className="text-[8px] text-[#6B7A8D] uppercase font-bold">Carbs</p>
-                      <p className="text-[10px] font-bold text-amber-700">220g</p>
+                    <div className="bg-amber-50 p-0.5 rounded-md border border-amber-100">
+                      <p className="text-[7.5px] text-[#6B7A8D] uppercase font-bold">Carbs</p>
+                      <p className="text-[9px] font-bold text-amber-700">220g</p>
                     </div>
-                    <div className="bg-emerald-50 p-1 rounded-lg border border-emerald-100">
-                      <p className="text-[8px] text-[#6B7A8D] uppercase font-bold">Grasas</p>
-                      <p className="text-[10px] font-bold text-emerald-700">62g</p>
+                    <div className="bg-emerald-50 p-0.5 rounded-md border border-emerald-100">
+                      <p className="text-[7.5px] text-[#6B7A8D] uppercase font-bold">Grasas</p>
+                      <p className="text-[9px] font-bold text-emerald-700">62g</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Widget 2: Entrenamiento Activo con Temporizador */}
-                <div className="bg-white rounded-2xl p-3 border border-[#E2E8F0] shadow-2xs mb-2.5">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-[#0B1929]">
-                      <Dumbbell size={12} className="text-emerald-600" /> Rutina en Curso
+                <div className="bg-white rounded-xl p-2.5 border border-[#E2E8F0] shadow-2xs mb-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-[#0B1929]">
+                      <Dumbbell size={11} className="text-emerald-600" /> Rutina en Curso
                     </div>
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                    <span className="text-[8.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md">
                       Serie 3 de 4
                     </span>
                   </div>
-                  <p className="text-[11px] font-bold text-[#0B1929] truncate">Press de Banca con Barra</p>
-                  <p className="text-[9px] text-[#6B7A8D] mb-2">80 kg × 8 reps • RPE 8.5</p>
+                  <p className="text-[10px] font-bold text-[#0B1929] truncate">Press de Banca</p>
+                  <p className="text-[8.5px] text-[#6B7A8D] mb-1.5">80 kg × 8 reps • RPE 8.5</p>
 
                   {/* Burbuja animada del temporizador */}
-                  <div className="flex items-center justify-between bg-[#0B1929] text-white px-2.5 py-1.5 rounded-xl text-[10px] font-bold">
-                    <div className="flex items-center gap-1.5">
-                      <span className="relative flex h-2 w-2">
+                  <div className="flex items-center justify-between bg-[#0B1929] text-white px-2 py-1 rounded-lg text-[9px] font-bold">
+                    <div className="flex items-center gap-1">
+                      <span className="relative flex h-1.5 w-1.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                       </span>
                       <span>Descanso</span>
                     </div>
                     <div className="flex items-center gap-1 text-emerald-400 font-mono">
-                      <Clock size={11} />
+                      <Clock size={10} />
                       <span>01:15</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Widget 3: Biometría & Somatocarta */}
-                <div className="bg-white rounded-2xl p-2.5 border border-[#E2E8F0] shadow-2xs">
-                  <div className="flex items-center justify-between text-[10px]">
+                <div className="bg-white rounded-xl p-2 border border-[#E2E8F0] shadow-2xs">
+                  <div className="flex items-center justify-between text-[9px]">
                     <span className="font-bold text-[#0B1929] flex items-center gap-1">
-                      <Activity size={11} className="text-purple-600" /> Masa Muscular
+                      <Activity size={10} className="text-purple-600" /> Masa Muscular
                     </span>
-                    <span className="font-bold text-emerald-600">+1.8 kg (Último ciclo)</span>
+                    <span className="font-bold text-emerald-600">+1.8 kg</span>
                   </div>
                 </div>
               </div>
 
               {/* Barra inferior simulada */}
-              <div className="bg-white p-2 rounded-2xl border border-[#E2E8F0] flex items-center justify-around text-[#6B7A8D] text-[9px] font-bold">
+              <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] flex items-center justify-around text-[#6B7A8D] text-[8px] font-bold mt-2">
                 <span className="text-[var(--brand-primary)] flex flex-col items-center">
-                  <Utensils size={12} /> Dieta
+                  <Utensils size={11} /> Dieta
                 </span>
                 <span className="flex flex-col items-center">
-                  <Dumbbell size={12} /> Rutina
+                  <Dumbbell size={11} /> Rutina
                 </span>
                 <span className="flex flex-col items-center">
-                  <Activity size={12} /> Progreso
+                  <Activity size={11} /> Progreso
                 </span>
               </div>
             </div>
@@ -343,7 +367,7 @@ function HeroPhoneMockup({ config }) {
 // ── HERO ──
 function Hero({ config }) {
   return (
-    <section id="app-showcase" className="pt-28 pb-16 px-6 max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
+    <section id="app-showcase" className="pt-20 sm:pt-24 lg:pt-20 pb-10 sm:pb-14 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 min-h-[calc(100dvh-4rem)]">
       <div className="flex-1 max-w-2xl text-center lg:text-left">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-[#1A6FD4] text-xs font-bold tracking-wider uppercase mb-6 shadow-2xs">
           <Zap size={13} className="fill-[#1A6FD4]" /> Ecosistema FLUX Health &amp; Sport
@@ -401,7 +425,7 @@ function Hero({ config }) {
       </div>
 
       {/* Mockup del Teléfono Inteligente */}
-      <div className="flex-1 w-full flex justify-center lg:justify-end">
+      <div className="flex-1 w-full flex justify-center lg:justify-end items-center">
         <HeroPhoneMockup config={config} />
       </div>
     </section>

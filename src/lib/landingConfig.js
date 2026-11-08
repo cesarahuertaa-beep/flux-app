@@ -25,6 +25,7 @@ export const DEFAULT_LANDING_CONFIG = {
   tiktok_url: "",
   youtube_url: "",
   facebook_url: "",
+  app_video_url: "", // Video vertical 9:16 de la app para el showcase del smartphone
   app_screenshots: [], // array de { id, url, title }
   external_links: {} // mapa { [prodId]: url }
 };

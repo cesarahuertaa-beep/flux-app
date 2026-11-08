@@ -51,6 +51,7 @@ export default function GestorTienda({ setMsg }) {
   const [config, setConfig] = useState(() => peekLandingConfig());
   const [savingConfig, setSavingConfig] = useState(false);
   const [uploadingScreen, setUploadingScreen] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [newScreenTitle, setNewScreenTitle] = useState("");
   const [newAdvisorName, setNewAdvisorName] = useState("");
   const [newAdvisorPhone, setNewAdvisorPhone] = useState("");
@@ -235,6 +236,46 @@ export default function GestorTienda({ setMsg }) {
     setConfig(updatedConfig);
     await saveLandingConfig(updatedConfig);
     setMsg("Captura eliminada");
+  };
+
+  const handleUploadVideo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 80 * 1024 * 1024) {
+      setMsg("El video supera los 80MB. Te sugerimos optimizar o comprimir el video para una carga web ultra rápida.");
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fname = `landing_showcase_video_${Date.now()}.${ext}`;
+      const url = await storageUpload("ejercicios", fname, file, { timeout: 120000 });
+      const updatedConfig = { ...config, app_video_url: url };
+      setConfig(updatedConfig);
+      await saveLandingConfig(updatedConfig);
+      setMsg("✓ Video de la aplicación subido y vinculado correctamente");
+    } catch (err) {
+      setMsg("Error al subir video: " + err.message);
+    }
+    setUploadingVideo(false);
+    e.target.value = "";
+  };
+
+  const handleRemoveVideo = () => {
+    setConfirmDelete({
+      title: "¿Eliminar video del showcase?",
+      description: "El smartphone del landing volverá a mostrar las capturas o la interfaz simulada.",
+      confirmText: "Eliminar video",
+      danger: true,
+      icon: "trash",
+      onConfirm: async () => {
+        const updatedConfig = { ...config, app_video_url: "" };
+        setConfig(updatedConfig);
+        await saveLandingConfig(updatedConfig);
+        setMsg("Video del showcase eliminado");
+        setConfirmDelete(null);
+      }
+    });
   };
 
   // ── GESTIÓN DE MÚLTIPLES NÚMEROS DE WHATSAPP ──
@@ -938,7 +979,109 @@ export default function GestorTienda({ setMsg }) {
             </div>
           </div>
 
-          {/* Tarjeta 3: Capturas de la App (Showcase para el Landing) */}
+          {/* Tarjeta 3: Video Vertical de la App (Showcase en Hero del Landing) */}
+          <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-sky-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                  <Video size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B1929]">Video de la App (Showcase en Celular 9:16)</h3>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">
+                    Video vertical que se reproduce en bucle continuo dentro del smartphone del landing.
+                  </p>
+                </div>
+              </div>
+
+              <label className={`flex items-center gap-2 bg-[var(--brand-primary)] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs hover:opacity-90 transition-opacity cursor-pointer ${uploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
+                <Upload size={14} />
+                <span>{uploadingVideo ? "Subiendo video..." : "Subir Video (9:16)"}</span>
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/mov"
+                  onChange={handleUploadVideo}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {config.app_video_url ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 bg-[#F7F9FC] p-4 rounded-2xl border border-[#E2E8F0]">
+                {/* Mini preview del video 9:16 */}
+                <div className="relative w-24 sm:w-28 aspect-[9/16] bg-black rounded-2xl overflow-hidden shrink-0 shadow-md border-2 border-slate-800">
+                  <video
+                    src={config.app_video_url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-6 h-1 bg-white/40 rounded-full" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h4 className="text-xs sm:text-sm font-bold text-[#0B1929]">Video Activo en el Landing (Proporción 9:16)</h4>
+                  </div>
+                  <p className="text-[11px] text-[#6B7A8D] break-all line-clamp-2 mb-3 bg-white px-3 py-1.5 rounded-lg border border-[#E2E8F0]">
+                    {config.app_video_url}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className={`inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-white border border-[#E2E8F0] text-[#0B1929] hover:bg-gray-50 cursor-pointer transition-colors shadow-2xs ${uploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Upload size={13} />
+                      <span>{uploadingVideo ? "Subiendo..." : "Reemplazar video"}</span>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/mov"
+                        onChange={handleUploadVideo}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleRemoveVideo}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                      <span>Quitar video</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-center py-7 bg-[#F7F9FC] rounded-2xl border border-dashed border-[#E2E8F0]">
+                  <Video className="w-10 h-10 text-[#CBD5E1] mx-auto mb-2" />
+                  <p className="text-xs font-bold text-[#0B1929]">Aún no has subido un video para el smartphone</p>
+                  <p className="text-[11px] text-[#6B7A8D] max-w-sm mx-auto mt-1">
+                    Sube un video en proporción vertical 9:16 de tu app para que los visitantes lo vean correr en tiempo real en el Hero.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                  <input
+                    type="url"
+                    value={config.app_video_url || ""}
+                    onChange={e => setConfig(prev => ({ ...prev, app_video_url: e.target.value }))}
+                    placeholder="O pega directamente una URL de video (https://.../video.mp4)"
+                    className="flex-1 w-full bg-[#F0F4FA] border border-transparent focus:border-[var(--brand-primary)] text-[#0B1929] rounded-xl px-4 py-2.5 text-xs outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveConfig}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-[#0B1929] rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Vincular URL
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tarjeta 4: Capturas de la App (Showcase para el Landing) */}
           <div className="bg-white rounded-none md:rounded-3xl p-4 sm:p-7 border-y md:border border-[#E2E8F0] shadow-none md:shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-[#F0F4FA] mb-5">
               <div className="flex items-center gap-3">

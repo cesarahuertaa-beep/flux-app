@@ -1121,7 +1121,7 @@ export const storageUpload = async (bucket, path, file, opts = {}) => {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), opts.timeout || 90000);
     const token = getValidToken();
     try {
       const isJsonConfig = String(path).endsWith(".json") || file?.type === "application/json";
