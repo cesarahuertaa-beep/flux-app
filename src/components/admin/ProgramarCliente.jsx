@@ -4534,7 +4534,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl border-0 md:border md:border-[#E2E8F0] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[#E2E8F0] bg-white">
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[#E2E8F0] bg-white modal-safe-header">
               <div className="min-w-0">
                 <h3 className="text-base sm:text-lg font-bold text-[#0B1929] truncate">
                   {planModalMode === "edit"
@@ -4781,7 +4781,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
 
             {/* Footer */}
-            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5 bg-white">
+            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex justify-end gap-2.5 bg-white modal-safe-footer">
               <button
                 type="button"
                 onClick={() => setShowPlanModal(false)}
@@ -4826,7 +4826,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         return (
           <div className="fixed inset-0 z-[100] bg-white md:bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
             {/* Top Sticky Bar */}
-            <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3 flex items-center justify-between gap-3 shadow-2xs modal-safe-sticky-top">
               <div className="flex items-center gap-2.5 min-w-0">
                 <button 
                   type="button"
@@ -6579,7 +6579,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
           <div className="bg-white w-full md:max-w-3xl rounded-none md:rounded-2xl shadow-2xl flex flex-col h-full max-h-full md:h-auto md:max-h-[88vh] overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 modal-safe-header">
               <div>
                 <h3 className="text-base font-bold text-[#0B1929] flex items-center gap-2">
                   <Utensils className="w-4 h-4 text-[var(--brand-primary)]" />
@@ -6669,7 +6669,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end">
+            <div className="px-6 py-3 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end modal-safe-footer">
               <button
                 type="button"
                 onClick={() => setPhotoCatalogModal(null)}
@@ -6686,7 +6686,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       {showRutinaModal && (
         <div className="fixed inset-0 z-[100] bg-white md:bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
           {/* Top Sticky Bar */}
-          <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] px-4 md:px-8 py-3 flex items-center justify-between gap-3 shadow-2xs modal-safe-sticky-top">
             <div className="flex items-center gap-2.5 min-w-0">
               <button 
                 type="button"

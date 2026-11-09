@@ -2333,7 +2333,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         return (
           <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
             {/* Top Sticky Header */}
-            <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] shadow-2xs">
+            <div className="sticky top-0 z-30 bg-white border-b border-[#E2E8F0] shadow-2xs modal-safe-sticky-top">
               <div className="px-4 md:px-8 py-3.5 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                   <button

@@ -1796,7 +1796,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {showNewClient && (
         <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0 bg-white">
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0 bg-white modal-safe-header">
               <h2 className="text-lg font-bold text-[#0B1929]">Nuevo Paciente</h2>
               <button onClick={() => setShowNewClient(false)} className="text-[#6B7A8D] hover:text-[#0B1929]">
                 <X size={20} />
@@ -1823,7 +1823,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 El paciente recibirá un email de invitación para crear su contraseña.
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] flex justify-end gap-3 modal-safe-footer">
               <button onClick={() => setShowNewClient(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] hover:bg-[#E2E8F0] transition-colors">Cancelar</button>
               <button onClick={createClient} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
                 {saving ?"Enviando..." :"Crear y enviar invitación"}
@@ -1837,7 +1837,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
         <div className="fixed inset-0 bg-[#0B1929]/40 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header con botón colapsado Guardar y X */}
-            <div className="px-5 sm:px-6 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0 bg-white">
+            <div className="px-5 sm:px-6 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0 bg-white modal-safe-header">
               <h2 className="text-base sm:text-lg font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>Editar Paciente</h2>
               <div className="flex items-center gap-2">
                 <button
@@ -2132,7 +2132,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-white border-t border-[#F0F4FA] flex justify-end shrink-0">
+            <div className="p-4 bg-white border-t border-[#F0F4FA] flex justify-end shrink-0 modal-safe-sheet-bottom">
               <button
                 onClick={() => setSelectedWaClient(null)}
                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-[#F0F4FA] transition-colors"

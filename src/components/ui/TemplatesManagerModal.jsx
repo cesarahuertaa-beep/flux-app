@@ -432,7 +432,7 @@ export default function TemplatesManagerModal({
       <div className="bg-white rounded-none md:rounded-3xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-2xl border-0 md:border md:border-[#E2E8F0] overflow-hidden animate-in fade-in slide-in-from-bottom-6 md:zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
-        <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">
+        <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0 modal-safe-header">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm shrink-0">
               {type === "nutri" ? <Utensils size={20} /> : <Dumbbell size={20} />}

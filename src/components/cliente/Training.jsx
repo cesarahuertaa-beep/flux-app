@@ -1278,11 +1278,11 @@ export default function Training({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-none md:rounded-3xl md:max-w-md w-full h-full max-h-full md:h-auto md:max-h-[90vh] p-5 md:p-7 border-0 md:border md:border-[#E2E8F0] shadow-2xl relative overflow-y-auto"
+            className="bg-white rounded-none md:rounded-3xl md:max-w-md w-full h-full max-h-full md:h-auto md:max-h-[90vh] p-5 md:p-7 border-0 md:border md:border-[#E2E8F0] shadow-2xl relative overflow-y-auto modal-safe-header modal-safe-footer"
           >
             <button
               onClick={() => setShowResumen(false)}
-              className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
+              className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 md:top-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
             >
               <X size={20} />
             </button>

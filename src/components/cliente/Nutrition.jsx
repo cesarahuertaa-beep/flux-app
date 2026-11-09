@@ -971,7 +971,7 @@ export default function Nutrition({
               </div>
 
               {/* Lista de alimentos equivalentes */}
-              <div className="p-4 sm:p-5 overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="p-4 sm:p-5 overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 modal-safe-sheet-bottom">
                 {groupFoods.length === 0 ? (
                   <p className="text-xs text-[#6B7A8D] col-span-2 text-center py-6">
                     No se encontraron alimentos con ese nombre en este grupo.

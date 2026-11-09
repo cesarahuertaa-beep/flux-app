@@ -2306,7 +2306,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       {/* Modal Invitar */}
       {showInvite && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] shadow-xl w-full md:max-w-md h-full max-h-full md:h-auto p-5 md:p-6 overflow-y-auto animate-in zoom-in-95">
+          <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] shadow-xl w-full md:max-w-md h-full max-h-full md:h-auto p-5 md:p-6 overflow-y-auto animate-in zoom-in-95 modal-safe-header modal-safe-footer">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-xl font-bold text-[#0B1929] flex items-center gap-2">
                 <Folder className="w-5 h-5 text-[var(--brand-primary)]" /> Invitar colaborador

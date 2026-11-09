@@ -104,3 +104,44 @@ html, body {
 .animate-in { animation: fadeInUp 0.45s cubic-bezier(0.16,1,0.3,1) forwards; }  
 .animate-in-scale { animation: fadeInScale 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }  
 .float { animation: float 6s ease-in-out infinite; } 
+
+
+/* Soporte integral de Safe Areas para iOS (PWA / Safari con viewport-fit=cover) y Android */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
+}
+
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Modales y vistas en dispositivos móviles (< 768px) */
+@media (max-width: 767px) {
+  /* Cabeceras de modales a pantalla completa */
+  .modal-safe-header {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
+  }
+
+  /* Pies de página / botones de acción de modales */
+  .modal-safe-footer {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Barras sticky superiores en modales y pantallas de edición */
+  .modal-safe-sticky-top {
+    top: 0 !important;
+    padding-top: max(0.875rem, env(safe-area-inset-top, 0px)) !important;
+  }
+
+  /* Bottom sheets en móvil (UpgradeModal, WhatsApp sheets, etc.) */
+  .modal-safe-sheet-bottom {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

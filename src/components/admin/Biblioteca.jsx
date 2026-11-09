@@ -1071,7 +1071,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {showEjModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center modal-safe-header">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editEj ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar ejercicio</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo ejercicio</>}
               </h3>
@@ -1132,7 +1132,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
 
-            <div className="p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50">
+            <div className="p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50 modal-safe-footer">
               <button onClick={() => setShowEjModal(false)} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-gray-50 text-[#6B7A8D] rounded-xl font-semibold text-sm transition-colors">
                 Cancelar
               </button>
@@ -1148,7 +1148,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {showPlatilloModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center modal-safe-header">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editPlatillo ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar platillo</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo platillo</>}
               </h3>
@@ -1290,7 +1290,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50">
+            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50 modal-safe-footer">
               <button
                 type="button"
                 onClick={() => setShowPlatilloModal(false)}
@@ -1315,7 +1315,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {showIngModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+            <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center modal-safe-header">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
                 {editIng ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar ingrediente</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo ingrediente</>}
               </h3>
@@ -1388,7 +1388,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50">
+            <div className="p-4 sm:p-5 border-t border-[#E2E8F0] flex gap-2.5 justify-end bg-gray-50 modal-safe-footer">
               <button
                 type="button"
                 onClick={() => setShowIngModal(false)}

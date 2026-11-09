@@ -292,7 +292,7 @@ export default function ExpedienteClinicoModal({
     <div className="fixed inset-0 z-[110] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-xl border-0 md:border md:border-[#E2E8F0] overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3.5 md:px-5 md:py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
+        <div className="px-4 py-3.5 md:px-5 md:py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white modal-safe-header">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
               <ClipboardList className="w-5 h-5" />
@@ -567,7 +567,7 @@ export default function ExpedienteClinicoModal({
         </div>
 
         {/* Footer del Modal */}
-        <div className="px-4 py-3 md:px-5 md:py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2">
+        <div className="px-4 py-3 md:px-5 md:py-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between gap-2 modal-safe-footer">
           {mode === "nutriologo" ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button

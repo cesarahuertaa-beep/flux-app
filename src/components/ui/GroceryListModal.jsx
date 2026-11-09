@@ -545,7 +545,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
       <div className="bg-white rounded-none md:rounded-3xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[90vh] flex flex-col shadow-2xl border-0 md:border md:border-[#E2E8F0] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* ── Modal Header ── */}
-        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0">
+        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-[#F0F4FA] flex items-center justify-between gap-3 bg-white shrink-0 modal-safe-header">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#E8F1FB] text-[var(--brand-primary)] flex items-center justify-center shadow-sm shrink-0">
               <ShoppingBag size={20} />
@@ -714,7 +714,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
         </div>
 
         {/* ── Ingredients Checklist Body ── */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-2 modal-safe-footer">
           {loadingAi && ingredients.length === 0 ? (
             <div className="py-20 text-center space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto shadow-xs animate-pulse">

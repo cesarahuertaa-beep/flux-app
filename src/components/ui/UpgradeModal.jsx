@@ -163,7 +163,7 @@ export default function UpgradeModal({
         </button>
 
         {/* Contenido scrolleable si la pantalla es muy pequeña */}
-        <div className="p-6 md:p-7 overflow-y-auto no-scrollbar flex-1">
+        <div className="p-6 md:p-7 overflow-y-auto no-scrollbar flex-1 modal-safe-sheet-bottom">
           {/* Cabecera con Icono y Badge */}
           <div className="flex items-start gap-3.5 mb-4">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${iconBg}`}>

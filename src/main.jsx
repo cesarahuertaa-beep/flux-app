@@ -23,6 +23,19 @@ try {
 // Detector de despliegues nuevos (solo web/PWA): se actualiza solo cuando el usuario no está editando
 initVersionWatcher()
 
+// Prevenir desplazamiento residual del viewport en iOS Safari / PWA tras cerrar el teclado virtual
+if (typeof window !== 'undefined') {
+  window.addEventListener('focusout', (e) => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
+      setTimeout(() => {
+        if (window.scrollY !== 0 && !document.activeElement?.matches?.('input, textarea, select')) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+        }
+      }, 100)
+    }
+  })
+}
+
 const boot = () =>
   createRoot(document.getElementById('root')).render(
     <StrictMode>

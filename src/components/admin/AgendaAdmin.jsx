@@ -62,13 +62,13 @@ const Modal = ({ title, onClose, children }) => {
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
       <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto shadow-2xl flex flex-col overflow-visible">
-        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-white rounded-t-2xl shrink-0 modal-safe-header">
           <h3 className="font-bold text-lg text-[#0B1929]">{title}</h3>
           <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors p-1 rounded-lg hover:bg-[#F0F4FA]">
             <XCircle className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 flex flex-col gap-4 overflow-visible rounded-b-2xl bg-white">
+        <div className="p-6 flex flex-col gap-4 overflow-visible rounded-b-2xl bg-white modal-safe-footer">
           {children}
         </div>
       </div>

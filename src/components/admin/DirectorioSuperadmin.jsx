@@ -87,7 +87,7 @@ const Modal = ({ title, onClose, children }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-[#0B1929]/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border border-[#E2E8F0] w-full md:max-w-md h-full max-h-full md:h-auto overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] modal-safe-header">
           <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">{title}</h3>
           <button onClick={onClose} className="p-1 rounded-md text-[#6B7A8D] hover:text-[#0B1929] hover:bg-slate-100 transition-colors"><X size={20} /></button>
         </div>
