@@ -13,7 +13,7 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
-import { isNativePlayApp, startGooglePlaySubscription, PLAY_BILLING_PRODUCTS } from "../../lib/playBilling";
+import { isNativePlayApp } from "../../lib/playBilling";
 import { useBackButton } from "../../lib/backButtonHandler";
 
 const FEATURE_CONFIGS = {
@@ -120,41 +120,18 @@ export default function UpgradeModal({
   const config = FEATURE_CONFIGS[feature] || FEATURE_CONFIGS.general;
   const { badge, badgeColor, iconBg, Icon, title, subtitle, benefits } = config;
 
-  const handleAction = async () => {
+  const handleAction = () => {
     setErrorMsg("");
+    if (onClose) onClose();
 
-    // 1. Android Nativo (Play Store): Proceso in-app oficial con Google Play Billing
     if (isPlayApp) {
-      setBuying(true);
-      try {
-        const resolvedUserId = clienteData?.id || localStorage.getItem("flux_client_id") || localStorage.getItem("flux_profile_id");
-        const res = await startGooglePlaySubscription(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM, {
-          role: "civil",
-          clienteId: resolvedUserId,
-          nombre: clienteData?.nombre || "Atleta Independiente",
-        });
-
-        if (res?.status === "purchased") {
-          if (typeof onSuccessPurchase === "function") {
-            onSuccessPurchase(res);
-          }
-          if (onClose) onClose();
-        }
-      } catch (err) {
-        console.warn("[UpgradeModal] Error en suscripción Google Play:", err);
-        setErrorMsg(err?.message || "No se pudo completar el proceso con Google Play.");
-      } finally {
-        setBuying(false);
-      }
       return;
     }
 
-    // 2. Web / PWA: Navegar a la pantalla de Membresía (SPEI bancario / comprobante)
-    if (onClose) onClose();
+    // Web / PWA: Navegar a la pantalla de Membresía (Portal Web FLUX)
     if (typeof onNavigateMembresia === "function") {
       onNavigateMembresia();
     } else {
-      // Intentar navegar vía hash o evento personalizado si no se pasó la función directa
       window.location.hash = "#membresia";
       window.dispatchEvent(new CustomEvent("flux:navigate-tab", { detail: { tab: "membresia" } }));
     }
@@ -226,50 +203,51 @@ export default function UpgradeModal({
             </div>
           )}
 
-          {/* Botones de Acción */}
-          <div className="space-y-2.5 pt-1">
-            <button
-              type="button"
-              onClick={handleAction}
-              disabled={buying}
-              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-[var(--brand-primary)] to-purple-600 hover:opacity-95 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
-            >
-              {buying ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Conectando con Google Play...</span>
-                </>
-              ) : isPlayApp ? (
-                <>
-                  <ShieldCheck className="w-4 h-4 text-emerald-300" />
-                  <span>Continuar con Google Play</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5" />
-                </>
-              ) : (
-                <>
-                  <Crown className="w-4 h-4 text-amber-300" />
-                  <span>Ver Planes y Membresía</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5" />
-                </>
-              )}
-            </button>
+          {/* Aviso Multiplataforma (Estilo Netflix) en App Nativa vs Botones en Portal Web */}
+          {isPlayApp ? (
+            <div className="space-y-3 pt-1">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-[#475569] leading-relaxed">
+                <span className="font-bold text-[#0B1929] block mb-0.5">Función exclusiva de FLUX Pro</span>
+                En esta aplicación no es posible contratar ni modificar suscripciones. Para activar o administrar tu membresía, inicia sesión con tu cuenta en el portal web de FLUX desde cualquier navegador.
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-3 px-5 rounded-2xl bg-[#0B1929] hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-all flex items-center justify-center cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleAction}
+                disabled={buying}
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-[var(--brand-primary)] to-purple-600 hover:opacity-95 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+              >
+                <Crown className="w-4 h-4 text-amber-300" />
+                <span>Ver Planes y Membresía</span>
+                <ArrowRight className="w-4 h-4 ml-0.5" />
+              </button>
 
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={buying}
-              className="w-full py-2 text-center text-xs font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-colors cursor-pointer"
-            >
-              Quizás más tarde
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={buying}
+                className="w-full py-2 text-center text-xs font-semibold text-[#6B7A8D] hover:text-[#0B1929] transition-colors cursor-pointer"
+              >
+                Quizás más tarde
+              </button>
+            </div>
+          )}
 
           {/* Nota al pie discreta de seguridad */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[10.5px] text-slate-400">
             <Lock className="w-3 h-3 text-slate-400" />
             <span>
               {isPlayApp 
-                ? "Suscripción segura y cancelable en cualquier momento desde Google Play." 
+                ? "Acceso sincronizado con tu cuenta multiplataforma FLUX." 
                 : "Activación inmediata y soporte directo FLUX Sport."}
             </span>
           </div>

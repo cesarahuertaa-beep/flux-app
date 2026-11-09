@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dbPeek, dbGet, dbPatch, dbPost, invalidateCache } from "../../lib/supabase";
 import { 
   CheckCircle2, XCircle, Eye, Banknote, X, Clock, Calendar, 
-  Dumbbell, Settings, Save, Zap, Search, ChevronRight, UserCheck, ShieldCheck
+  Dumbbell, Settings, Save, Zap, Search, ChevronRight, UserCheck, ShieldCheck, CreditCard
 } from "lucide-react";
 import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getNextCutoffDateStr } from "../../utils/tarifas";
 import { ListSkeleton } from "../ui/Skeleton";
@@ -71,10 +71,20 @@ export default function ControlPagos({ setMsg }) {
     nutri_tier1: DEFAULT_RATES.nutri_tier1,
     nutri_tier2: DEFAULT_RATES.nutri_tier2,
     nutri_tier3: DEFAULT_RATES.nutri_tier3,
+    tier1_max: DEFAULT_RATES.tier1_max,
+    tier2_max: DEFAULT_RATES.tier2_max,
+    estudiante_max: DEFAULT_RATES.estudiante_max,
     nutri_estudiante: DEFAULT_RATES.nutri_estudiante,
     civil_premium: DEFAULT_RATES.civil_premium,
     admin_premium: DEFAULT_RATES.admin_premium,
-    comision_pct: DEFAULT_RATES.comision_pct
+    comision_pct: DEFAULT_RATES.comision_pct,
+    domiciliacion_activa: DEFAULT_RATES.domiciliacion_activa,
+    stripe_link_tier1: DEFAULT_RATES.stripe_link_tier1,
+    stripe_link_tier2: DEFAULT_RATES.stripe_link_tier2,
+    stripe_link_tier3: DEFAULT_RATES.stripe_link_tier3,
+    stripe_link_estudiante: DEFAULT_RATES.stripe_link_estudiante,
+    stripe_link_civil: DEFAULT_RATES.stripe_link_civil,
+    stripe_portal_url: DEFAULT_RATES.stripe_portal_url
   });
 
   const loadData = async () => {
@@ -92,10 +102,20 @@ export default function ControlPagos({ setMsg }) {
           nutri_tier1: latest.nutri_tier1,
           nutri_tier2: latest.nutri_tier2,
           nutri_tier3: latest.nutri_tier3,
+          tier1_max: latest.tier1_max ?? DEFAULT_RATES.tier1_max,
+          tier2_max: latest.tier2_max ?? DEFAULT_RATES.tier2_max,
+          estudiante_max: latest.estudiante_max ?? DEFAULT_RATES.estudiante_max,
           nutri_estudiante: latest.nutri_estudiante,
           civil_premium: latest.civil_premium,
           admin_premium: latest.admin_premium,
-          comision_pct: latest.comision_pct
+          comision_pct: latest.comision_pct,
+          domiciliacion_activa: latest.domiciliacion_activa ?? true,
+          stripe_link_tier1: latest.stripe_link_tier1 || "",
+          stripe_link_tier2: latest.stripe_link_tier2 || "",
+          stripe_link_tier3: latest.stripe_link_tier3 || "",
+          stripe_link_estudiante: latest.stripe_link_estudiante || "",
+          stripe_link_civil: latest.stripe_link_civil || "",
+          stripe_portal_url: latest.stripe_portal_url || ""
         });
       }
       const map = {};
@@ -117,14 +137,28 @@ export default function ControlPagos({ setMsg }) {
     try {
       const history = parseTarifasHistory(rawCfg);
       const nextCutoffStr = getNextCutoffDateStr(new Date());
+      const t1Max = Math.max(1, Number(ratesForm.tier1_max) || DEFAULT_RATES.tier1_max);
+      const t2Max = Math.max(t1Max + 1, Number(ratesForm.tier2_max) || DEFAULT_RATES.tier2_max);
+      const estMax = Math.max(1, Number(ratesForm.estudiante_max) || DEFAULT_RATES.estudiante_max);
       const newEntry = {
         nutri_tier1: Number(ratesForm.nutri_tier1) || 0,
         nutri_tier2: Number(ratesForm.nutri_tier2) || 0,
         nutri_tier3: Number(ratesForm.nutri_tier3) || 0,
+        tier1_max: t1Max,
+        tier2_max: t2Max,
+        estudiante_max: estMax,
         nutri_estudiante: Number(ratesForm.nutri_estudiante) || 0,
         civil_premium: Number(ratesForm.civil_premium) || 0,
         admin_premium: Number(ratesForm.admin_premium) || 0,
         comision_pct: Number(ratesForm.comision_pct) || 0,
+        domiciliacion_activa: Boolean(ratesForm.domiciliacion_activa),
+        stripe_link_tier1: String(ratesForm.stripe_link_tier1 || "").trim(),
+        stripe_link_tier2: String(ratesForm.stripe_link_tier2 || "").trim(),
+        stripe_link_tier3: String(ratesForm.stripe_link_tier3 || "").trim(),
+        stripe_link_estudiante: String(ratesForm.stripe_link_estudiante || "").trim(),
+        stripe_link_civil: String(ratesForm.stripe_link_civil || "").trim(),
+        stripe_portal_url: String(ratesForm.stripe_portal_url || "").trim(),
+        modelo_bloques: true,
         effective_from: applyNow ? "2020-01-01" : nextCutoffStr,
         updated_at: new Date().toISOString()
       };
@@ -922,13 +956,25 @@ export default function ControlPagos({ setMsg }) {
                 {/* 1. Perfil Nutriólogo */}
                 <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-3.5">
                   <div className="flex items-center justify-between border-b border-gray-200/70 pb-2.5">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">1. Nutriólogos</span>
-                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">Por paciente</span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929]">1. Nutriólogos (Bloques 30 días)</span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">Mensualidad por Nivel</span>
                   </div>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-semibold text-[#475569]">Nivel 1 (1 – 20 pac.)</label>
+                    {/* Nivel 1 */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-bold text-[#0B1929]">Nivel 1 (1 a</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={ratesForm.tier1_max}
+                          onChange={e => setRatesForm(p => ({ ...p, tier1_max: e.target.value }))}
+                          className="w-14 bg-white border border-[#E2E8F0] rounded-lg px-2 py-1 text-xs font-bold text-[#0B1929] text-center outline-none focus:border-[var(--brand-primary)]"
+                          title="Máximo de pacientes activos para Nivel 1"
+                        />
+                        <span className="text-xs font-semibold text-[#475569]">pac.)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 ml-auto">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
                         <input
                           type="number"
@@ -941,9 +987,23 @@ export default function ControlPagos({ setMsg }) {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-semibold text-[#475569]">Nivel 2 (21 – 50 pac.)</label>
+                    {/* Nivel 2 */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-bold text-[#0B1929]">
+                          Nivel 2 ({(Number(ratesForm.tier1_max) || 20) + 1} a
+                        </label>
+                        <input
+                          type="number"
+                          min={(Number(ratesForm.tier1_max) || 20) + 1}
+                          value={ratesForm.tier2_max}
+                          onChange={e => setRatesForm(p => ({ ...p, tier2_max: e.target.value }))}
+                          className="w-14 bg-white border border-[#E2E8F0] rounded-lg px-2 py-1 text-xs font-bold text-[#0B1929] text-center outline-none focus:border-[var(--brand-primary)]"
+                          title="Máximo de pacientes activos para Nivel 2"
+                        />
+                        <span className="text-xs font-semibold text-[#475569]">pac.)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 ml-auto">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
                         <input
                           type="number"
@@ -956,8 +1016,11 @@ export default function ControlPagos({ setMsg }) {
                       </div>
                     </div>
 
+                    {/* Nivel 3 */}
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-semibold text-[#475569]">Nivel 3 (51+ pac.)</label>
+                      <label className="text-xs font-bold text-[#0B1929]">
+                        Nivel 3 ({(Number(ratesForm.tier2_max) || 40) + 1}+ pac. Ilimitado)
+                      </label>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
                         <input
@@ -971,12 +1034,23 @@ export default function ControlPagos({ setMsg }) {
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-gray-200/70 flex items-center justify-between gap-3">
+                    {/* Nutriólogo Estudiante */}
+                    <div className="pt-3 border-t border-gray-200/70 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <label className="block text-xs font-bold text-amber-700">Nutriólogo Estudiante</label>
-                        <span className="text-[10px] text-[#6B7A8D]">Mensualidad fija (30 días)</span>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-[10px] text-[#6B7A8D]">Hasta</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={ratesForm.estudiante_max}
+                            onChange={e => setRatesForm(p => ({ ...p, estudiante_max: e.target.value }))}
+                            className="w-12 bg-white border border-[#E2E8F0] rounded-md px-1.5 py-0.5 text-[11px] font-bold text-[#0B1929] text-center outline-none focus:border-[var(--brand-primary)]"
+                          />
+                          <span className="text-[10px] text-[#6B7A8D]">pac. activos (30 días)</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 ml-auto">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
                         <input
                           type="number"
@@ -992,7 +1066,7 @@ export default function ControlPagos({ setMsg }) {
                     <div className="pt-2.5 border-t border-gray-200/70 flex items-center justify-between gap-3">
                       <div>
                         <label className="block text-xs font-bold text-indigo-700">Administrativo Extra</label>
-                        <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado</span>
+                        <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado (30 días)</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-[#6B7A8D]">$</span>
@@ -1042,6 +1116,111 @@ export default function ControlPagos({ setMsg }) {
                     Los atletas independientes pagan su suscripción mensual directamente a la cuenta del Superadmin.
                   </p>
                 </div>
+              </div>
+
+              {/* 3. Pasarela de Tarjeta Domiciliada en Portal Web (Estilo Netflix) */}
+              <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/70 pb-3">
+                  <div>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929] flex items-center gap-1.5">
+                      <CreditCard size={15} className="text-[var(--brand-primary)]" />
+                      <span>3. Tarjeta Domiciliada en Portal Web (Estilo Netflix / Stripe)</span>
+                    </span>
+                    <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                      Configura los enlaces de suscripción recurrente automática para que los usuarios puedan domiciliar su tarjeta en el portal web además de SPEI.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setRatesForm(p => ({ ...p, domiciliacion_activa: !p.domiciliacion_activa }))}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      ratesForm.domiciliacion_activa
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${ratesForm.domiciliacion_activa ? "bg-emerald-500" : "bg-gray-300"}`} />
+                    <span>{ratesForm.domiciliacion_activa ? "Domiciliación Visible en Web" : "Solo SPEI en Web"}</span>
+                  </button>
+                </div>
+
+                {ratesForm.domiciliacion_activa && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                        Link Domiciliación · Nivel 1 (${ratesForm.nutri_tier1} MXN / 30d)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_link_tier1}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier1: e.target.value }))}
+                        placeholder="https://buy.stripe.com/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                        Link Domiciliación · Nivel 2 (${ratesForm.nutri_tier2} MXN / 30d)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_link_tier2}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier2: e.target.value }))}
+                        placeholder="https://buy.stripe.com/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                        Link Domiciliación · Nivel 3 (${ratesForm.nutri_tier3} MXN / 30d)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_link_tier3}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier3: e.target.value }))}
+                        placeholder="https://buy.stripe.com/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-800 mb-1">
+                        Link Domiciliación · Estudiante (${ratesForm.nutri_estudiante} MXN / 30d)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_link_estudiante}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_estudiante: e.target.value }))}
+                        placeholder="https://buy.stripe.com/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-blue-800 mb-1">
+                        Link Domiciliación · Atleta Independiente (${ratesForm.civil_premium} MXN / 30d)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_link_civil}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_civil: e.target.value }))}
+                        placeholder="https://buy.stripe.com/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#475569] mb-1">
+                        Link Portal de Clientes (Cambiar / Cancelar Tarjeta)
+                      </label>
+                      <input
+                        type="url"
+                        value={ratesForm.stripe_portal_url}
+                        onChange={e => setRatesForm(p => ({ ...p, stripe_portal_url: e.target.value }))}
+                        placeholder="https://billing.stripe.com/p/login/..."
+                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Acciones de Guardado */}

@@ -9,7 +9,6 @@ import { AppUpdater } from "./components/ui/AppUpdater";
 import FloatingTimerBubble from "./components/ui/FloatingTimerBubble";
 import NotificationManager from "./components/ui/NotificationManager";
 import { initBackButtonHandler } from "./lib/backButtonHandler";
-import { initPlayBilling } from "./lib/playBilling";
 import { refreshUserRoles } from "./lib/authRoles";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 
@@ -370,13 +369,6 @@ export default function App() {
       window.removeEventListener("hashchange", handleHashChange);
     };
   }, []);
-
-  useEffect(() => {
-    const uid = session?.data?.id || session?.data?.auth_id;
-    if (uid) {
-      initPlayBilling(uid).catch(() => {});
-    }
-  }, [session]);
 
   useEffect(() => {
     if (!session) return;

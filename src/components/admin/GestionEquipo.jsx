@@ -81,7 +81,7 @@ const COMPENSACIONES_STORAGE_KEY = "flux_staff_compensaciones_v1";
 const DEFAULT_COMP = {
   modalidad: "solo_comision",
   sueldoBase: 0,
-  comisionPct: 35,
+  comisionPct: 32,
   bonoFijo: 0,
   banco: "",
   clabe: "",
@@ -343,7 +343,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       const comp = compensaciones[colab.id] || DEFAULT_COMP;
       const modalidad = comp.modalidad || "solo_comision";
       const sueldoBase = Number(comp.sueldoBase) || 0;
-      const comisionPct = comp.comisionPct != null ? Number(comp.comisionPct) : 35;
+      const comisionPct = comp.comisionPct != null ? Number(comp.comisionPct) : 32;
       const bonoFijo = Number(comp.bonoFijo) || 0;
 
       // Nutriólogos asignados a este colaborador

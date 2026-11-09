@@ -114,7 +114,7 @@ export default function MisComisiones({ myId, setMsg }) {
     const comisionesMonto = tieneComision
       ? filtrados.reduce((acc, r) => {
           const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
-          const customPct = myComp?.comisionPct != null ? Number(myComp.comisionPct) : (Number(rateForCut.comision_pct) || 35);
+          const customPct = myComp?.comisionPct != null ? Number(myComp.comisionPct) : (Number(rateForCut.comision_pct) || 32);
           const pct = customPct / 100;
           return acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;
         }, 0)

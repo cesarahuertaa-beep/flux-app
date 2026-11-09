@@ -24,7 +24,7 @@ export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
           </p>
           <p className="text-[#6B7A8D] text-sm leading-relaxed">
             {isPlayApp ? (
-              <>Para restablecer el acceso a tu panel y el de tus pacientes, gestiona tu suscripción en la sección <strong>Mi Membresía</strong> o contáctanos directamente.</>
+              <>En esta aplicación no es posible contratar ni modificar suscripciones. Para reactivar el acceso a tu panel y al de tus pacientes, inicia sesión con tu cuenta en el <strong>portal web de FLUX</strong> desde cualquier navegador o contáctanos directamente.</>
             ) : (
               <>Para restablecer el acceso a tu panel y el de tus pacientes, por favor realiza tu transferencia SPEI y sube el comprobante en la sección <strong>Mi Membresía</strong>, o contáctanos directamente.</>
             )}
@@ -45,7 +45,9 @@ export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
 
           {/* Acceso limitado: Solo pueden ir a Membresía */}
           <p className="text-xs text-[#6B7A8D]">
-            Puedes acceder a <strong>Mi Membresía</strong> para gestionar tu suscripción.
+            {isPlayApp
+              ? "Puedes consultar el resumen de tu cuenta en la sección Mi Membresía."
+              : <>Puedes acceder a <strong>Mi Membresía</strong> para gestionar tu suscripción.</>}
           </p>
         </div>
 
@@ -54,7 +56,7 @@ export default function BloqueadoNutriologo({ onLogout, onGoToMembresia }) {
             onClick={onGoToMembresia}
             className="w-full py-3 text-sm text-white font-semibold bg-[#1A6FD4] hover:bg-[#155ab0] rounded-xl transition-colors shadow-sm"
           >
-            Ir a Mi Membresía
+            {isPlayApp ? "Ver estado de mi cuenta" : "Ir a Mi Membresía"}
           </button>
           <button
             onClick={onLogout}

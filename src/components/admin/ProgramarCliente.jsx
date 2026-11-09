@@ -30,6 +30,7 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
+import { SMAE_GROUPS, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion } from "../../lib/smaeData";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
@@ -222,7 +223,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   }, [selected?.id, cicloSel?.id]);
   const [showDiaModal, setShowDiaModal] = useState(false);
   const [editDia, setEditDia] = useState(null);
-  const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"" });
+  const [diaForm, setDiaForm] = useState({ dia:"", orden:0, comidas:[], aguaLitros:"", suplementos:"", smaeMap:{} });
+  const [smaePanelExpanded, setSmaePanelExpanded] = useState(false);
   const [aiOptimizingIndex, setAiOptimizingIndex] = useState(null);
   const [isAuditingDay, setIsAuditingDay] = useState(false);
   const [dayAuditResult, setDayAuditResult] = useState(null);
@@ -930,6 +932,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         tituloPersonalizado: meta.titulo ? `${meta.titulo} (Copia)` : "Día importado",
         aguaLitros: meta.agua || p.aguaLitros || "",
         suplementos: meta.suplementos || p.suplementos || "",
+        smaeMap: meta.smae ? parseSmaeString(meta.smae) : (p.smaeMap || {}),
         comidas: (coms || []).map(x => {
           const parsedOpts = parseMealOptions(x);
           const copy = { 
@@ -2069,6 +2072,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       tituloPersonalizado:"", 
       aguaLitros: suggestedWater,
       suplementos: "",
+      smaeMap: {},
       orden:dias.length, 
       comidas:[{ 
         _dndId: Math.random().toString(36).slice(2,9), 
@@ -2089,14 +2093,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
   const openEditDia = (d) => { 
     const meta = parseDiaMetadata(d.dia || "");
+    const parsedSmae = parseSmaeString(meta.smae || "");
 
     setEditDia(d); 
+    setSmaePanelExpanded(Object.keys(parsedSmae).length > 0);
     setDiaForm({ 
       dia:d.dia, 
       diasSeleccionados: meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : [],
       tituloPersonalizado: meta.titulo || "",
       aguaLitros: meta.agua || "",
       suplementos: meta.suplementos || "",
+      smaeMap: parsedSmae,
       orden:d.orden, 
       comidas:(d.comidas || []).map(c => {
         const parsedOpts = parseMealOptions(c);
@@ -2150,11 +2157,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
 
     const dayCode = formSnap.diasSeleccionados?.length > 0 ? formSnap.diasSeleccionados[0] : "S/D";
+    const serializedSmae = serializeSmaeMap(formSnap.smaeMap || {});
     const finalName = formatDiaMetadata({
       dayCode,
       titulo: formSnap.tituloPersonalizado,
       agua: formSnap.aguaLitros,
-      suplementos: formSnap.suplementos
+      suplementos: formSnap.suplementos,
+      smae: serializedSmae
     });
 
     // 1. Actualización Optimista Instantánea en 0ms y cierre de modal inmediato
@@ -2194,7 +2203,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           dayCode: dCode,
           titulo: formSnap.tituloPersonalizado,
           agua: formSnap.aguaLitros,
-          suplementos: formSnap.suplementos
+          suplementos: formSnap.suplementos,
+          smae: serializedSmae
         });
         const tempDiaId = `temp_dia_${Date.now()}_${idx}`;
         const dObj = {
@@ -2319,7 +2329,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             dayCode: dCode,
             titulo: formSnap.tituloPersonalizado,
             agua: formSnap.aguaLitros,
-            suplementos: formSnap.suplementos
+            suplementos: formSnap.suplementos,
+            smae: serializedSmae
           });
           const d = { nutricion_id: currentNutri.id, dia: optimisticDayName, orden: orderCounter };
           orderCounter++;
@@ -4067,6 +4078,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                 <span className="text-[#CBD5E1]">•</span>
                                 <span className="text-[#0B1929] font-bold">{totKcal} kcal</span>
                                 <span className="text-[#6B7A8D]">({totProt}g P · {totCarb}g C · {totGras}g G)</span>
+                                {meta.smae && (() => {
+                                  const smaeObj = parseSmaeString(meta.smae);
+                                  const smaeTot = calculateSmaeTotals(smaeObj);
+                                  if (smaeTot.totalEquivalentes <= 0) return null;
+                                  return (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold">
+                                      <span>🇲🇽 {smaeTot.totalEquivalentes} eq SMAE</span>
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -5031,6 +5052,270 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     </div>
                   )}
                 </div>
+
+                {/* Card 2.5: Control de Equivalentes SMAE (5ª Edición) */}
+                {(() => {
+                  const currentSmae = diaForm.smaeMap || {};
+                  const smaeTotals = calculateSmaeTotals(currentSmae);
+                  const hasActiveSmae = smaeTotals.totalEquivalentes > 0;
+
+                  const handleAutoSmae = () => {
+                    const targetK = metaKcal > 0 ? metaKcal : 1800;
+                    const targetP = metaProt > 0 ? metaProt : Math.round((targetK * 0.28) / 4);
+                    const targetC = metaCarbs > 0 ? metaCarbs : Math.round((targetK * 0.45) / 4);
+                    const targetF = metaFat > 0 ? metaFat : Math.round((targetK * 0.27) / 9);
+                    const autoMap = autoDistributeSmaeFromMacros({
+                      calorias: targetK,
+                      proteina: targetP,
+                      carbohidratos: targetC,
+                      grasas: targetF,
+                    });
+                    setDiaForm(p => ({ ...p, smaeMap: autoMap }));
+                    setSmaePanelExpanded(true);
+                    setMsg(
+                      <div className="flex items-center gap-1.5 text-emerald-700">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        <span>Equivalentes SMAE auto-distribuidos según la meta de macros ({targetK} kcal)</span>
+                      </div>
+                    );
+                  };
+
+                  const handleStepSmae = (groupId, delta) => {
+                    setDiaForm(p => {
+                      const prevVal = Number(p.smaeMap?.[groupId]) || 0;
+                      const nextVal = Math.max(0, Math.round((prevVal + delta) * 2) / 2);
+                      const nextMap = { ...(p.smaeMap || {}) };
+                      if (nextVal > 0) nextMap[groupId] = nextVal;
+                      else delete nextMap[groupId];
+                      return { ...p, smaeMap: nextMap };
+                    });
+                  };
+
+                  const handleDistributeSmaeToMeals = () => {
+                    if (!hasActiveSmae) return;
+                    const numMeals = Math.max(3, (diaForm.comidas || []).length);
+                    const defaultMealMeta = [
+                      { nombre: "Desayuno", hora: "08:00 AM" },
+                      { nombre: "Comida", hora: "02:30 PM" },
+                      { nombre: "Cena", hora: "08:30 PM" },
+                      { nombre: "Colación Matutina", hora: "11:30 AM" },
+                      { nombre: "Colación Vespertina", hora: "05:30 PM" },
+                    ];
+
+                    const baseMeals = (diaForm.comidas && diaForm.comidas.length >= 3)
+                      ? [...diaForm.comidas]
+                      : Array.from({ length: numMeals }, (_, idx) => (
+                          diaForm.comidas?.[idx] || {
+                            _dndId: Math.random().toString(36).slice(2, 9),
+                            hora: defaultMealMeta[idx]?.hora || "12:00 PM",
+                            nombre: defaultMealMeta[idx]?.nombre || `Comida ${idx + 1}`,
+                            opciones: [""],
+                            opcion1: "",
+                            opcion2: "",
+                            calorias: "",
+                            proteina: "",
+                            carbohidratos: "",
+                            grasas: "",
+                            foto_url: "",
+                            alertaClinica: null,
+                          }
+                        ));
+
+                    // Repartir equivalentes entre las tomas y sugerir alimento real del SMAE
+                    const mealBuckets = baseMeals.map(() => ({ lines: [], kcal: 0, p: 0, c: 0, f: 0 }));
+
+                    SMAE_GROUPS.forEach((grp, gIdx) => {
+                      const totalEq = Number(currentSmae[grp.id]) || 0;
+                      if (totalEq <= 0) return;
+                      const foods = SMAE_FOODS_BY_GROUP[grp.id] || [];
+                      // Repartir en hasta 3 comidas principales o proporcionalmente
+                      const targetBucketsCount = totalEq >= 3 ? Math.min(3, baseMeals.length) : totalEq >= 1.5 ? Math.min(2, baseMeals.length) : 1;
+                      let remaining = totalEq;
+
+                      for (let b = 0; b < targetBucketsCount; b++) {
+                        const isLast = b === targetBucketsCount - 1;
+                        const share = isLast
+                          ? Math.round(remaining * 2) / 2
+                          : Math.max(0.5, Math.round((totalEq / targetBucketsCount) * 2) / 2);
+                        if (share <= 0) continue;
+                        remaining = Math.max(0, remaining - share);
+
+                        const targetMealIdx = (b + (gIdx % baseMeals.length)) % baseMeals.length;
+                        const foodChoice = foods[(b + gIdx) % Math.max(1, foods.length)];
+                        const portionText = foodChoice
+                          ? `• ${formatScaledSmaePortion(foodChoice, share)} [${share} eq ${grp.corto}]`
+                          : `• ${share} eq de ${grp.nombre}`;
+
+                        mealBuckets[targetMealIdx].lines.push(portionText);
+                        mealBuckets[targetMealIdx].kcal += share * grp.kcal;
+                        mealBuckets[targetMealIdx].p += share * grp.proteina;
+                        mealBuckets[targetMealIdx].c += share * grp.carbohidratos;
+                        mealBuckets[targetMealIdx].f += share * grp.grasas;
+                      }
+                    });
+
+                    const updatedMeals = baseMeals.map((meal, idx) => {
+                      const bucket = mealBuckets[idx];
+                      if (!bucket || bucket.lines.length === 0) return meal;
+                      const existingText = (meal.opciones?.[0] || meal.opcion1 || "").trim();
+                      const smaeBlock = bucket.lines.join("\n");
+                      const nextMain = existingText ? `${existingText}\n${smaeBlock}` : smaeBlock;
+                      const nextOpts = [...(meal.opciones && meal.opciones.length > 0 ? meal.opciones : [""])];
+                      nextOpts[0] = nextMain;
+                      const { opcion1, opcion2 } = formatMealOptions(nextOpts);
+
+                      return {
+                        ...meal,
+                        nombre: meal.nombre || defaultMealMeta[idx]?.nombre || `Comida ${idx + 1}`,
+                        opciones: nextOpts,
+                        opcion1,
+                        opcion2,
+                        calorias: Math.round((Number(meal.calorias) || 0) + bucket.kcal),
+                        proteina: Math.round((Number(meal.proteina) || 0) + bucket.p),
+                        carbohidratos: Math.round((Number(meal.carbohidratos) || 0) + bucket.c),
+                        grasas: Math.round((Number(meal.grasas) || 0) + bucket.f),
+                      };
+                    });
+
+                    setDiaForm(p => ({ ...p, comidas: updatedMeals }));
+                    setMsg(
+                      <div className="flex items-center gap-1.5 text-emerald-700">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Equivalentes SMAE distribuidos en las comidas con porciones y macros exactos</span>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm space-y-3.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🇲🇽</span>
+                          <div>
+                            <h4 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider leading-tight">
+                              Equivalentes SMAE (5ª Ed.)
+                            </h4>
+                            <p className="text-[10px] text-[#6B7A8D]">
+                              {hasActiveSmae
+                                ? `${smaeTotals.totalEquivalentes} eq • ${smaeTotals.kcal} kcal (${smaeTotals.proteina}P · ${smaeTotals.carbohidratos}C · ${smaeTotals.grasas}G)`
+                                : "Distribución por grupos de alimentos equivalentes"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleAutoSmae}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                            title="Calcular equivalentes SMAE automáticamente a partir de la meta de Kcal y Macros"
+                          >
+                            <Sparkles className="w-3 h-3 text-emerald-600" />
+                            <span>Auto-distribuir</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSmaePanelExpanded(prev => !prev)}
+                            className="p-1.5 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50 transition-colors cursor-pointer"
+                            title={smaePanelExpanded ? "Ocultar tabla SMAE" : "Desplegar tabla SMAE"}
+                          >
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${smaePanelExpanded ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Píldoras resumen cuando está colapsado pero tiene equivalentes */}
+                      {!smaePanelExpanded && hasActiveSmae && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {SMAE_GROUPS.filter(g => (Number(currentSmae[g.id]) || 0) > 0).map(g => (
+                            <span
+                              key={g.id}
+                              onClick={() => setSmaePanelExpanded(true)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-semibold text-[#0B1929] cursor-pointer hover:border-emerald-300"
+                            >
+                              <span>{g.icono}</span>
+                              <span>{g.corto}:</span>
+                              <strong className="text-emerald-700">{currentSmae[g.id]}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {smaePanelExpanded && (
+                        <div className="space-y-2.5 pt-1 animate-in fade-in">
+                          <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5 divide-y divide-[#F0F4FA]">
+                            {SMAE_GROUPS.map(grp => {
+                              const val = Number(currentSmae[grp.id]) || 0;
+                              return (
+                                <div key={grp.id} className="pt-1.5 first:pt-0 flex items-center justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5 truncate">
+                                      <span>{grp.icono}</span>
+                                      <span className="truncate" title={grp.nombre}>{grp.corto}</span>
+                                    </div>
+                                    <div className="text-[10px] text-[#6B7A8D] font-mono">
+                                      {grp.kcal} kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStepSmae(grp.id, -0.5)}
+                                      disabled={val <= 0}
+                                      className="w-6 h-6 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-gray-100 text-[#0B1929] font-bold text-xs flex items-center justify-center disabled:opacity-35 cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <span className={`w-10 text-center font-mono text-xs font-extrabold ${val > 0 ? "text-emerald-700" : "text-[#94A3B8]"}`}>
+                                      {val}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStepSmae(grp.id, 0.5)}
+                                      className="w-6 h-6 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {hasActiveSmae && (
+                            <div className="pt-2 border-t border-[#E2E8F0] space-y-2">
+                              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-950 flex items-center justify-between gap-2">
+                                <span>Aporte SMAE:</span>
+                                <span className="font-mono font-bold">
+                                  {smaeTotals.kcal} kcal ({smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleDistributeSmaeToMeals}
+                                  className="flex-1 py-2 px-3 rounded-xl bg-[#0B1929] hover:bg-[#162942] text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                                >
+                                  <Utensils className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Repartir equivalentes en las tomas</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDiaForm(p => ({ ...p, smaeMap: {} }))}
+                                  className="py-2 px-2.5 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:text-red-600 hover:bg-red-50 text-[11px] font-semibold transition-colors cursor-pointer"
+                                  title="Limpiar equivalentes SMAE"
+                                >
+                                  Limpiar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Card 3: Hidratación y Suplementación */}
                 <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm space-y-4">

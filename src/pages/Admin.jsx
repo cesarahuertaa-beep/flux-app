@@ -18,6 +18,7 @@ import { peekClinicalRecord } from "../lib/clinicalRecord";
 import { calcEdadFromBirthdate } from "../lib/bodyComposition";
 import { CachedImage } from "../lib/mediaCache";
 import { checkAndCleanOrphanedEmail, deletePatientAccount } from "../lib/authRoles";
+import { getRatesForCutoff } from "../utils/tarifas";
 
 const lazyRetry = (importer) =>
   lazy(() =>
@@ -322,11 +323,11 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
         }
 
-        // ── LOGICA PARA NUTRIÓLOGO ESTUDIANTE (Suscripción rolling de 30 días + 2 de gracia) ──
-        if (role === "nutriologo_estudiante") {
-          const recibosEst = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&order=created_at.desc`);
-          const tienePendiente = recibosEst?.some(r => r.estado === "pendiente");
-          const lastApproved = recibosEst?.find(r => r.estado === "aprobado");
+        // ── LOGICA UNIFICADA PARA NUTRIÓLOGOS Y ESTUDIANTES (Ciclo rolling de 30 días + 2 de gracia + 7 días prueba desde 1er paciente) ──
+        if (role === "nutriologo" || role === "nutriologo_estudiante") {
+          const recibosNutri = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&order=created_at.desc`);
+          const tienePendiente = recibosNutri?.some(r => r.estado === "pendiente");
+          const lastApproved = recibosNutri?.find(r => r.estado === "aprobado");
 
           if (tienePendiente || (!firstClientDate && !lastApproved)) {
             await updateBloqueado(false, false);
@@ -335,7 +336,17 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
           let expirationDate;
           if (lastApproved) {
-            expirationDate = new Date(lastApproved.fecha_corte_mes + "T23:59:59");
+            const rawCut = lastApproved.fecha_corte_mes || "";
+            expirationDate = new Date((rawCut.includes("T") ? rawCut.split("T")[0] : rawCut) + "T23:59:59");
+            if (lastApproved.created_at) {
+              const createdAtDate = new Date(lastApproved.created_at);
+              if (expirationDate <= createdAtDate) {
+                const paidPlus30 = new Date(createdAtDate);
+                paidPlus30.setDate(paidPlus30.getDate() + 30);
+                paidPlus30.setHours(23, 59, 59, 999);
+                expirationDate = paidPlus30;
+              }
+            }
           } else {
             expirationDate = new Date(firstClientDate);
             expirationDate.setDate(expirationDate.getDate() + 7);
@@ -353,38 +364,6 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             await updateBloqueado(false, false);
           }
           return;
-        }
-
-        // ── LOGICA PARA NUTRIÓLOGOS REGULARES (Fija los días 10) ──
-        const diaCorte = 10;
-        const DIA_BLOQUEO = 13;
-
-        let lastPassedCutoff = new Date(today.getFullYear(), today.getMonth(), diaCorte);
-        if (today.getDate() < diaCorte) {
-          lastPassedCutoff = new Date(today.getFullYear(), today.getMonth() - 1, diaCorte);
-        }
-
-        if (!firstClientDate || firstClientDate > lastPassedCutoff) {
-          await updateBloqueado(false, false);
-          return;
-        }
-
-        const lastPassedCutoffStr = lastPassedCutoff.toISOString().split('T')[0];
-        const recibos = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&fecha_corte_mes=eq.${lastPassedCutoffStr}`);
-        const pagadoOPendiente = recibos && recibos.some(r => r.estado === 'aprobado' || r.estado === 'pendiente');
-
-        if (pagadoOPendiente) {
-          await updateBloqueado(false, false);
-          return;
-        }
-
-        const diaHoy = today.getDate();
-        if (today >= lastPassedCutoff && diaHoy >= DIA_BLOQUEO) {
-          await updateBloqueado(true, false);
-        } else if (today >= lastPassedCutoff && diaHoy > diaCorte && diaHoy < DIA_BLOQUEO) {
-          await updateBloqueado(false, true);
-        } else {
-          await updateBloqueado(false, false);
         }
 
       } catch (e) {
@@ -726,6 +705,21 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     const cleanEmail = (newClient.email || "").trim().toLowerCase();
     const cleanNombre = (newClient.nombre || "").trim();
     if (!cleanEmail || !cleanNombre) { setMsg("❌ Nombre y email son obligatorios"); return; }
+
+    if (role === "nutriologo_estudiante") {
+      try {
+        const cfgRows = await dbGet("configuracion_plataforma?clave=eq.tarifas").catch(() => []);
+        const rates = getRatesForCutoff(cfgRows?.[0]?.valor, new Date());
+        const estMax = Number(rates.estudiante_max ?? 15);
+        const currentActiveCount = clientes.filter(item => item.activo !== false).length;
+        if (currentActiveCount >= estMax) {
+          setMsg(`⚠️ Has alcanzado el límite de ${estMax} pacientes activos del Plan Estudiante. Desactiva un paciente inactivo o actualiza tu plan en Mi Membresía.`);
+          setShowNewClient(false);
+          return;
+        }
+      } catch {}
+    }
+
     setSaving(true);
     try {
       // INTERCEPTOR: Detectar si el correo ya existe (limpiando huérfanos automáticamente)
@@ -891,6 +885,18 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   const toggleActivo = async (c) => {
     const nextActivo = !c.activo;
+    if (nextActivo && role === "nutriologo_estudiante") {
+      try {
+        const cfgRows = await dbGet("configuracion_plataforma?clave=eq.tarifas").catch(() => []);
+        const rates = getRatesForCutoff(cfgRows?.[0]?.valor, new Date());
+        const estMax = Number(rates.estudiante_max ?? 15);
+        const currentActiveCount = clientes.filter(item => item.activo !== false).length;
+        if (currentActiveCount >= estMax) {
+          setMsg(`⚠️ Límite alcanzado (${estMax} pacientes activos en Plan Estudiante). Desactiva otro paciente o actualiza tu plan en Mi Membresía.`);
+          return;
+        }
+      } catch {}
+    }
     const payload = { activo: nextActivo };
     if (!nextActivo) {
       payload.deactivated_at = new Date().toISOString();

@@ -48,18 +48,19 @@ export function formatMealOptions(optionsList) {
 }
 
 /**
- * Parsea el string compuesto del día (código, título personalizado, agua y suplementos)
- * Formato: "LUN|Título|AGUA:3.2|SUP:Creatina 5g, Cafeína 200mg"
+ * Parsea el string compuesto del día (código, título personalizado, agua, suplementos y equivalentes SMAE)
+ * Formato: "LUN|Título|AGUA:3.2|SUP:Creatina 5g, Cafeína 200mg|SMAE:verduras=4,frutas=2"
  */
 export function parseDiaMetadata(diaString) {
   if (!diaString) {
-    return { dayCode: "S/D", titulo: "", agua: "", suplementos: "" };
+    return { dayCode: "S/D", titulo: "", agua: "", suplementos: "", smae: "" };
   }
   const parts = String(diaString).split("|");
   const dayCode = parts[0] || "S/D";
   const titulo = parts[1] || "";
   let agua = "";
   let suplementos = "";
+  let smae = "";
 
   for (let i = 2; i < parts.length; i++) {
     const p = parts[i] || "";
@@ -67,16 +68,18 @@ export function parseDiaMetadata(diaString) {
       agua = p.substring(5).trim();
     } else if (p.startsWith("SUP:")) {
       suplementos = p.substring(4).trim();
+    } else if (p.startsWith("SMAE:")) {
+      smae = p.substring(5).trim();
     }
   }
 
-  return { dayCode, titulo, agua, suplementos };
+  return { dayCode, titulo, agua, suplementos, smae };
 }
 
 /**
  * Formatea los datos del día en un string compatible con la base de datos
  */
-export function formatDiaMetadata({ dayCode, titulo, agua, suplementos }) {
+export function formatDiaMetadata({ dayCode, titulo, agua, suplementos, smae }) {
   const code = (dayCode || "S/D").trim();
   const title = (titulo || "").trim();
   const extra = [];
@@ -85,6 +88,9 @@ export function formatDiaMetadata({ dayCode, titulo, agua, suplementos }) {
   }
   if (suplementos && String(suplementos).trim()) {
     extra.push(`SUP:${String(suplementos).trim()}`);
+  }
+  if (smae && String(smae).trim()) {
+    extra.push(`SMAE:${String(smae).trim()}`);
   }
   return [code, title, ...extra].join("|");
 }

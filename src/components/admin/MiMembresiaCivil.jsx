@@ -16,21 +16,19 @@ import {
   ExternalLink,
   RefreshCw
 } from "lucide-react";
-import { getRatesForCutoff } from "../../utils/tarifas";
-import {
-  isNativePlayApp,
-  PLAY_BILLING_PRODUCTS,
-  startGooglePlaySubscription,
-  openPlayStoreSubscriptions,
-  restoreGooglePlayPurchases
-} from "../../lib/playBilling";
+import { getRatesForCutoff, buildCardCheckoutUrl, createDynamicStripeSession } from "../../utils/tarifas";
+import { isNativePlayApp } from "../../lib/playBilling";
 
 /**
  * MiMembresiaCivil — Pantalla de suscripción para Atletas Independientes.
- * Diseño moderno, profesional y homologado para web y Android.
+ * Opera bajo el Modelo Multiplataforma (Estilo Netflix):
+ * - En App Nativa (isPlayApp): Modo lectura de estado de cuenta (sin pasarelas ni links externos).
+ * - En Portal Web (!isPlayApp): Facturación directa vía Portal FLUX (Tarjeta Domiciliada / SPEI).
  */
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const isPlayApp = isNativePlayApp();
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [stripeLoading, setStripeLoading] = useState(false);
   const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
   const _peekRecibos = clienteData?.id ? dbPeek(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`) : null;
 
@@ -74,11 +72,58 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     }
   }, [historial]);
 
-  const TARIFA = useMemo(() => {
+  const activeRates = useMemo(() => {
     const referenceDate = expirationDate && new Date() >= expirationDate ? expirationDate : new Date();
-    const rates = getRatesForCutoff(rawCfg, referenceDate);
-    return Number(rates.civil_premium ?? 75);
+    return getRatesForCutoff(rawCfg, referenceDate);
   }, [rawCfg, expirationDate]);
+
+  const TARIFA = Number(activeRates.civil_premium ?? 75);
+  const cardCheckoutUrl = buildCardCheckoutUrl(activeRates.stripe_link_civil, {
+    userId: clienteData?.id,
+    email: clienteData?.email || clienteData?.correo || ""
+  });
+
+  const handleDynamicStripeCheckout = async () => {
+    if (cardCheckoutUrl) {
+      window.open(cardCheckoutUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setStripeLoading(true);
+    try {
+      const url = await createDynamicStripeSession({
+        action: "checkout",
+        userType: "civil",
+        userId: clienteData?.id || "",
+        email: clienteData?.email || clienteData?.correo || "",
+      });
+      window.location.href = url;
+    } catch (err) {
+      setMsg?.(err?.message || "Aún no se ha conectado la llave de Stripe. Puedes pagar por SPEI.");
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const handleDynamicStripePortal = async () => {
+    if (activeRates.stripe_portal_url) {
+      window.open(activeRates.stripe_portal_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setStripeLoading(true);
+    try {
+      const url = await createDynamicStripeSession({
+        action: "portal",
+        userType: "civil",
+        userId: clienteData?.id || "",
+        email: clienteData?.email || clienteData?.correo || "",
+      });
+      window.location.href = url;
+    } catch (err) {
+      setMsg?.(err?.message || "No se encontró una tarjeta domiciliada activa para tu correo.");
+    } finally {
+      setStripeLoading(false);
+    }
+  };
 
   const isPremium = clienteData?.plan_tipo === "premium";
   const hasPendingPayment = historial.some((r) => r.estado === "pendiente");
@@ -347,17 +392,30 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
               <Sparkles size={12} />
               Membresía Atleta Pro
             </div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-4xl md:text-5xl font-black tracking-tight text-white">
-                ${TARIFA}
-              </span>
-              <span className="text-sm font-semibold text-slate-300">
-                MXN / mes
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 mb-6">
-              Sin contratos forzosos. Renueva cada 30 días o cancela cuando quieras.
-            </p>
+            {!isPlayApp ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-4xl md:text-5xl font-black tracking-tight text-white">
+                    ${TARIFA}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-300">
+                    MXN / mes
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mb-6">
+                  Sin contratos forzosos. Vigencia de 30 días naturales continuos.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl md:text-2xl font-black tracking-tight text-white mb-1">
+                  Ecosistema FLUX Pro
+                </h3>
+                <p className="text-xs text-slate-300 mb-6">
+                  Capacidades avanzadas incluidas en la membresía Atleta Pro.
+                </p>
+              </>
+            )}
 
             <ul className="space-y-3">
               {[
@@ -381,228 +439,232 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
           </div>
         </div>
 
-        {/* Columna Derecha: Método de Pago (7 cols) */}
+        {/* Columna Derecha: En App Nativa muestra Resumen Multiplataforma (Estilo Netflix); en Web muestra Portal SPEI */}
         <div className="md:col-span-7 bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-0 md:border border-[#E2E8F0] flex flex-col justify-between">
           {isPlayApp ? (
-            /* ── FACTURACIÓN GOOGLE PLAY (ANDROID) ── */
             <div className="flex flex-col justify-between h-full">
               <div>
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
                     <ShieldCheck size={18} />
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-[#0B1929]">
-                      Suscripción Google Play
+                      Información de tu Cuenta
                     </h3>
                     <p className="text-xs text-[#6B7A8D]">
-                      Procesada con la seguridad oficial de Google Play Store
+                      Estado actual de tu membresía en FLUX
                     </p>
                   </div>
                 </div>
 
-                <div className="my-5 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
+                <div className="my-5 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2.5">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#6B7A8D] font-medium">Producto:</span>
-                    <span className="font-bold text-[#0B1929]">FLUX Atleta Independiente</span>
+                    <span className="text-[#6B7A8D] font-medium">Nivel actual:</span>
+                    <span className="font-bold text-[#0B1929]">
+                      {isPremium ? "Atleta Premium (FLUX Pro)" : "Plan Estándar (Gratuito)"}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#6B7A8D] font-medium">Tarifa mensual:</span>
-                    <span className="font-bold text-[var(--brand-primary)]">${Number(TARIFA).toFixed(2)} MXN</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#6B7A8D] font-medium">Renovación:</span>
-                    <span className="font-bold text-[#0B1929]">Automática cada 30 días</span>
+                    <span className="text-[#6B7A8D] font-medium">Vigencia:</span>
+                    <span className="font-bold text-[var(--brand-primary)]">
+                      {isPremium && expirationDate
+                        ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })
+                        : "Permanente (Estándar)"}
+                    </span>
                   </div>
                 </div>
-
-                <p className="text-[11px] text-[#6B7A8D] leading-relaxed mb-6">
-                  Puedes cancelar o modificar el método de pago en cualquier momento desde la sección <strong>Pagos y Suscripciones</strong> de tu cuenta de Google.
-                </p>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <button
-                  type="button"
-                  disabled={uploading || loading}
-                  onClick={async () => {
-                    if (isPremium) {
-                      openPlayStoreSubscriptions(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM);
-                      return;
-                    }
-                    setUploading(true);
-                    try {
-                      const res = await startGooglePlaySubscription(PLAY_BILLING_PRODUCTS.CIVIL_PREMIUM, {
-                        role: "civil",
-                        clienteId: clienteData?.id,
-                        nombre: clienteData?.nombre
-                      });
-                      if (res.status === "purchased") {
-                        setMsg(
-                          <div className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-green-500" /> ¡Suscripción activada con éxito en Google Play!
-                          </div>
-                        );
-                        loadData();
-                      } else if (res.status === "unavailable_in_region_or_review") {
-                        setMsg(
-                          <div className="flex items-center gap-1.5">
-                            <Info className="w-4 h-4 text-blue-500" /> La suscripción se activará tan pronto como concluya la revisión de Google Play.
-                          </div>
-                        );
-                      }
-                    } catch (err) {
-                      setMsg(
-                        <div className="flex items-center gap-1.5">
-                          <AlertCircle className="w-4 h-4 text-red-500" /> {err.message}
-                        </div>
-                      );
-                    } finally {
-                      setUploading(false);
-                    }
-                  }}
-                  className="w-full bg-[var(--brand-primary)] hover:opacity-95 text-white font-bold py-3.5 px-4 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
-                >
-                  <CreditCard size={17} />
-                  <span>
-                    {uploading
-                      ? "Conectando con Google Play..."
-                      : isPremium
-                      ? "Administrar Suscripción en Google Play"
-                      : `Suscribirme con Google Play • $${TARIFA} MXN`}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={uploading || loading}
-                  onClick={async () => {
-                    setUploading(true);
-                    try {
-                      const res = await restoreGooglePlayPurchases({
-                        role: "civil",
-                        clienteId: clienteData?.id,
-                        nombre: clienteData?.nombre
-                      });
-                      if (res.hasActiveEntitlement) {
-                        setMsg(
-                          <div className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-green-500" /> Suscripción restaurada con éxito.
-                          </div>
-                        );
-                        loadData();
-                      } else {
-                        setMsg(
-                          <div className="flex items-center gap-1.5">
-                            <Info className="w-4 h-4 text-blue-500" /> No se encontraron compras activas en esta cuenta de Google Play.
-                          </div>
-                        );
-                      }
-                    } catch (err) {
-                      setMsg(
-                        <div className="flex items-center gap-1.5">
-                          <AlertCircle className="w-4 h-4 text-red-500" /> {err.message}
-                        </div>
-                      );
-                    } finally {
-                      setUploading(false);
-                    }
-                  }}
-                  className="w-full text-center text-xs font-semibold text-[#6B7A8D] hover:text-[var(--brand-primary)] py-1.5 transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
-                >
-                  <RefreshCw size={13} />
-                  <span>¿Ya tienes una suscripción? Restaurar compras</span>
-                </button>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-[#0B1929] space-y-1.5">
+                <span className="font-bold block text-slate-800">Administración de Membresía</span>
+                <p className="text-[#6B7A8D] leading-relaxed">
+                  En esta aplicación no es posible contratar ni modificar suscripciones. Para activar o administrar tu membresía, inicia sesión con tu cuenta en el portal web de FLUX desde cualquier navegador.
+                </p>
               </div>
             </div>
           ) : (
-            /* ── TRANSFERENCIA SPEI (WEB / DESKTOP) ── */
-            <div className="flex flex-col justify-between h-full space-y-5">
-              <div>
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
-                    <CreditCard size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-[#0B1929]">
-                      Transferencia Bancaria SPEI
-                    </h3>
-                    <p className="text-xs text-[#6B7A8D]">
-                      Transfiere y sube tu comprobante para validación en menos de 24h
-                    </p>
-                  </div>
+            /* ── PORTAL DE PAGO WEB: TARJETA DOMICILIADA + TRANSFERENCIA SPEI ── */
+            <div className="flex flex-col justify-between h-full space-y-4">
+              {activeRates.domiciliacion_activa && (
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("card")}
+                    className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      paymentMethod === "card"
+                        ? "bg-white text-[var(--brand-primary)] shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <CreditCard size={14} />
+                    <span>Tarjeta Domiciliada</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("spei")}
+                    className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      paymentMethod === "spei"
+                        ? "bg-white text-[var(--brand-primary)] shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <FileText size={14} />
+                    <span>Transferencia SPEI</span>
+                  </button>
                 </div>
+              )}
 
-                <div className="space-y-2.5 text-xs">
-                  {/* Beneficiario */}
-                  <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-                      Beneficiario
-                    </span>
-                    <span className="font-bold text-[#0B1929] text-sm">
-                      {configPago.beneficiario || "FLUX Sport S.A."}
-                    </span>
+              {activeRates.domiciliacion_activa && paymentMethod === "card" ? (
+                <div className="flex flex-col justify-between flex-1 space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                        <CreditCard size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0B1929]">
+                          Suscripción Mensual Domiciliada
+                        </h3>
+                        <p className="text-xs text-[#6B7A8D]">
+                          Cargo automático cada 30 días • Cancela cuando quieras
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#6B7A8D] font-medium">Plan seleccionado:</span>
+                        <span className="font-bold text-[#0B1929]">Atleta Independiente PRO</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#6B7A8D] font-medium">Cargo mensual recurrente:</span>
+                        <span className="font-black text-[var(--brand-primary)] text-sm">
+                          ${Number(TARIFA).toFixed(2)} MXN / mes
+                        </span>
+                      </div>
+                      <div className="pt-1.5 border-t border-slate-200/80 text-[11px] text-[#6B7A8D] leading-relaxed">
+                        Tu membresía se renueva automáticamente cada 30 días sin necesidad de subir comprobantes.
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Banco y CLABE */}
-                  <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-                        CLABE ({configPago.banco || "Banco"})
-                      </span>
-                      <span className="font-mono font-bold text-[#0B1929] text-sm">
-                        {configPago.clabe || "Sin configurar"}
-                      </span>
-                    </div>
-                    {configPago.clabe && (
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(configPago.clabe, "clabe")}
-                        className="px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold hover:bg-blue-50 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                      >
-                        {copiedClabe ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                        <span>{copiedClabe ? "Copiado" : "Copiar"}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Concepto obligatorio */}
-                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">
-                        Concepto Obligatorio
-                      </span>
-                      <span className="font-mono font-black text-amber-900 text-sm">
-                        {conceptoStr}
-                      </span>
-                    </div>
+                  <div className="space-y-2">
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(conceptoStr, "concepto")}
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                      onClick={handleDynamicStripeCheckout}
+                      disabled={stripeLoading}
+                      className="w-full bg-[var(--brand-primary)] hover:opacity-95 disabled:opacity-60 text-white font-bold py-3.5 px-4 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
                     >
-                      {copiedConcepto ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                      <span>{copiedConcepto ? "Copiado" : "Copiar"}</span>
+                      <CreditCard size={17} />
+                      <span>
+                        {stripeLoading
+                          ? "Conectando con pasarela bancaria..."
+                          : `Domiciliar Tarjeta • $${Number(TARIFA).toFixed(2)} MXN/mes`}
+                      </span>
+                      <ExternalLink size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDynamicStripePortal}
+                      disabled={stripeLoading}
+                      className="w-full py-2 px-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>Administrar o cancelar tarjeta domiciliada</span>
+                      <ExternalLink size={12} />
                     </button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col justify-between flex-1 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+                        <CreditCard size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0B1929]">
+                          Transferencia Bancaria SPEI
+                        </h3>
+                        <p className="text-xs text-[#6B7A8D]">
+                          Transfiere y sube tu comprobante para validación en menos de 24h
+                        </p>
+                      </div>
+                    </div>
 
-              <button
-                type="button"
-                onClick={handleUploadClick}
-                disabled={uploading || loading}
-                className="w-full bg-[var(--brand-primary)] hover:opacity-95 text-white font-bold py-3.5 px-4 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm mt-3"
-              >
-                <Upload size={17} />
-                <span>
-                  {uploading
-                    ? "Subiendo comprobante..."
-                    : hasPendingPayment
-                    ? "Subir Nuevo Comprobante"
-                    : `Subir Comprobante • $${Number(TARIFA).toFixed(2)} MXN`}
-                </span>
-              </button>
+                    <div className="space-y-2.5 text-xs">
+                      {/* Beneficiario */}
+                      <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                          Beneficiario
+                        </span>
+                        <span className="font-bold text-[#0B1929] text-sm">
+                          {configPago.beneficiario || "FLUX Sport S.A."}
+                        </span>
+                      </div>
+
+                      {/* Banco y CLABE */}
+                      <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
+                            CLABE ({configPago.banco || "Banco"})
+                          </span>
+                          <span className="font-mono font-bold text-[#0B1929] text-sm">
+                            {configPago.clabe || "Sin configurar"}
+                          </span>
+                        </div>
+                        {configPago.clabe && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(configPago.clabe, "clabe")}
+                            className="px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-[var(--brand-primary)] text-xs font-bold hover:bg-blue-50 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            {copiedClabe ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            <span>{copiedClabe ? "Copiado" : "Copiar"}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Concepto obligatorio */}
+                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">
+                            Concepto Obligatorio
+                          </span>
+                          <span className="font-mono font-black text-amber-900 text-sm">
+                            {conceptoStr}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(conceptoStr, "concepto")}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          {copiedConcepto ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                          <span>{copiedConcepto ? "Copiado" : "Copiar"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleUploadClick}
+                    disabled={uploading || loading}
+                    className="w-full bg-[var(--brand-primary)] hover:opacity-95 text-white font-bold py-3.5 px-4 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm mt-3"
+                  >
+                    <Upload size={17} />
+                    <span>
+                      {uploading
+                        ? "Subiendo comprobante..."
+                        : hasPendingPayment
+                        ? "Subir Nuevo Comprobante"
+                        : `Subir Comprobante • $${Number(TARIFA).toFixed(2)} MXN`}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
