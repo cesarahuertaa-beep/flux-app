@@ -1146,78 +1146,18 @@ export default function ControlPagos({ setMsg }) {
                 </div>
 
                 {ratesForm.domiciliacion_activa && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
-                        Link Domiciliación · Nivel 1 (${ratesForm.nutri_tier1} MXN / 30d)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_link_tier1}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier1: e.target.value }))}
-                        placeholder="https://buy.stripe.com/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
+                  <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>Pasarela Stripe Conectada por API (Modo Dinámico Activo)</span>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
-                        Link Domiciliación · Nivel 2 (${ratesForm.nutri_tier2} MXN / 30d)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_link_tier2}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier2: e.target.value }))}
-                        placeholder="https://buy.stripe.com/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
-                        Link Domiciliación · Nivel 3 (${ratesForm.nutri_tier3} MXN / 30d)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_link_tier3}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_tier3: e.target.value }))}
-                        placeholder="https://buy.stripe.com/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-amber-800 mb-1">
-                        Link Domiciliación · Estudiante (${ratesForm.nutri_estudiante} MXN / 30d)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_link_estudiante}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_estudiante: e.target.value }))}
-                        placeholder="https://buy.stripe.com/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-blue-800 mb-1">
-                        Link Domiciliación · Atleta Independiente (${ratesForm.civil_premium} MXN / 30d)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_link_civil}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_link_civil: e.target.value }))}
-                        placeholder="https://buy.stripe.com/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#475569] mb-1">
-                        Link Portal de Clientes (Cambiar / Cancelar Tarjeta)
-                      </label>
-                      <input
-                        type="url"
-                        value={ratesForm.stripe_portal_url}
-                        onChange={e => setRatesForm(p => ({ ...p, stripe_portal_url: e.target.value }))}
-                        placeholder="https://billing.stripe.com/p/login/..."
-                        className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                      />
+                    <p className="text-[11px] text-emerald-900/80 leading-relaxed">
+                      Los cobros con tarjeta domiciliada (Estilo Netflix), upgrades a mitad de mes y atletas independientes se calculan y cobran en tiempo real leyendo directamente las tarifas y límites de las secciones 1 y 2 superiores. No requieres crear ni pegar enlaces manuales.
+                    </p>
+                    <div className="flex items-center gap-3 pt-1 text-[10px] text-emerald-700 font-semibold">
+                      <span>• Domiciliación cada 30 días</span>
+                      <span>• Depósito automático a tu cuenta BBVA</span>
+                      <span>• Conciliación y desbloqueo inmediato</span>
                     </div>
                   </div>
                 )}
