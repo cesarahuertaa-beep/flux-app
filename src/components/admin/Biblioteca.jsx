@@ -38,6 +38,13 @@ import {
   CATEGORIAS_PLATILLOS,
   CATEGORIAS_INGREDIENTES
 } from "../../lib/customCatalogs";
+import {
+  SMAE_GROUPS,
+  SMAE_GROUPS_MAP,
+  calculateSmaeTotals,
+  estimateMealSmaeMap
+} from "../../lib/smaeData";
+import { DISH_RESTRICTION_OPTIONS } from "../../lib/foodPhotoCatalog";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ── Sub-pestaña activa ("ejercicios" | "platillos" | "ingredientes") ──
@@ -71,17 +78,19 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [formPlatillo, setFormPlatillo]               = useState({
     nombre: "",
     categoria: "desayuno",
-    calorias: 400,
-    proteina: 30,
-    carbohidratos: 40,
-    grasas: 12,
+    calorias: 345,
+    proteina: 25,
+    carbohidratos: 30,
+    grasas: 14,
     foto_url: "",
     texto: "",
-    keywordsStr: ""
+    keywordsStr: "",
+    smae_equivalentes: { aoa_m: 2, cereales_sg: 2, grasas_sp: 1 },
+    tags_restriccion: []
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 3. ESTADOS DE INGREDIENTES
+  // 3. ESTADOS DE ALIMENTOS EQUIVALENTES SMAE
   // ─────────────────────────────────────────────────────────────────────────────
   const [ingredientes, setIngredientes]                   = useState(() => peekCustomIngredientes());
   const [showIngModal, setShowIngModal]                   = useState(false);
@@ -93,7 +102,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [busquedaIng, setBusquedaIng]                     = useState("");
   const [formIng, setFormIng]                             = useState({
     nombre: "",
-    categoria: "proteinas",
+    categoria: "verduras",
+    smaeGroup: "verduras",
+    cantidadBase: 1,
+    unidadBase: "taza",
+    gramosBase: 100,
+    dietTags: [],
     foto: ""
   });
 
@@ -236,36 +250,76 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ACCIONES DE PLATILLOS
+  // ACCIONES DE PLATILLOS ESTRUCTURADOS CON SMAE
   // ─────────────────────────────────────────────────────────────────────────────
+  const updatePlatilloSmaeEq = (groupId, delta) => {
+    setFormPlatillo((prev) => {
+      const curr = Number(prev.smae_equivalentes?.[groupId] || 0);
+      const nextVal = Math.max(0, Math.round((curr + delta) * 2) / 2);
+      const nextMap = { ...(prev.smae_equivalentes || {}) };
+      if (nextVal > 0) nextMap[groupId] = nextVal;
+      else delete nextMap[groupId];
+      const totals = calculateSmaeTotals(nextMap);
+      return {
+        ...prev,
+        smae_equivalentes: nextMap,
+        calorias: totals.kcal,
+        proteina: totals.proteina,
+        carbohidratos: totals.carbohidratos,
+        grasas: totals.grasas,
+      };
+    });
+  };
+
+  const togglePlatilloRestrictionTag = (tagId) => {
+    setFormPlatillo((prev) => {
+      const curr = Array.isArray(prev.tags_restriccion) ? prev.tags_restriccion : [];
+      const next = curr.includes(tagId)
+        ? curr.filter((t) => t !== tagId)
+        : [...curr, tagId];
+      return { ...prev, tags_restriccion: next };
+    });
+  };
+
   const openNewPlatillo = () => {
     setEditPlatillo(null);
+    const defaultSmae = { aoa_mb: 3, cereales_sg: 2, verduras: 1, grasas_sp: 1 };
+    const totals = calculateSmaeTotals(defaultSmae);
     setFormPlatillo({
       nombre: "",
-      categoria: "desayuno",
-      calorias: 400,
-      proteina: 30,
-      carbohidratos: 40,
-      grasas: 12,
+      categoria: "comida",
+      calorias: totals.kcal,
+      proteina: totals.proteina,
+      carbohidratos: totals.carbohidratos,
+      grasas: totals.grasas,
       foto_url: "",
       texto: "",
-      keywordsStr: ""
+      keywordsStr: "",
+      smae_equivalentes: defaultSmae,
+      tags_restriccion: []
     });
     setShowPlatilloModal(true);
   };
 
   const openEditPlatillo = (p) => {
     setEditPlatillo(p);
+    const smaeMap =
+      p.smae_equivalentes && Object.keys(p.smae_equivalentes).length > 0
+        ? { ...p.smae_equivalentes }
+        : estimateMealSmaeMap(p.texto || p.nombre || "");
+    const totals = calculateSmaeTotals(smaeMap);
     setFormPlatillo({
       nombre: p.nombre || "",
       categoria: p.categoria || "comida",
-      calorias: p.calorias != null ? Number(p.calorias) : 400,
-      proteina: p.proteina != null ? Number(p.proteina) : 30,
-      carbohidratos: p.carbohidratos != null ? Number(p.carbohidratos) : 40,
-      grasas: p.grasas != null ? Number(p.grasas) : 12,
+      calorias: totals.kcal > 0 ? totals.kcal : (p.calorias != null ? Number(p.calorias) : 400),
+      proteina: totals.kcal > 0 ? totals.proteina : (p.proteina != null ? Number(p.proteina) : 30),
+      carbohidratos: totals.kcal > 0 ? totals.carbohidratos : (p.carbohidratos != null ? Number(p.carbohidratos) : 40),
+      grasas: totals.kcal > 0 ? totals.grasas : (p.grasas != null ? Number(p.grasas) : 12),
       foto_url: p.foto_url || "",
       texto: p.texto || "",
-      keywordsStr: Array.isArray(p.keywords) ? p.keywords.join(", ") : (p.keywords || "")
+      keywordsStr: Array.isArray(p.keywords) ? p.keywords.join(", ") : (p.keywords || ""),
+      smae_equivalentes: smaeMap,
+      tags_restriccion: Array.isArray(p.tags_restriccion) ? [...p.tags_restriccion] : []
     });
     setShowPlatilloModal(true);
   };
@@ -281,14 +335,23 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         ? formPlatillo.keywordsStr.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
         : formPlatillo.nombre.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
+      const cleanSmae = {};
+      Object.entries(formPlatillo.smae_equivalentes || {}).forEach(([k, v]) => {
+        const num = Number(v || 0);
+        if (num > 0) cleanSmae[k] = num;
+      });
+      const smaeTotals = calculateSmaeTotals(cleanSmae);
+
       const itemPayload = {
         id: editPlatillo ? editPlatillo.id : `dish_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         nombre: formPlatillo.nombre.trim(),
         categoria: formPlatillo.categoria,
-        calorias: Math.max(0, Math.round(Number(formPlatillo.calorias) || 0)),
-        proteina: Math.max(0, Math.round(Number(formPlatillo.proteina) || 0)),
-        carbohidratos: Math.max(0, Math.round(Number(formPlatillo.carbohidratos) || 0)),
-        grasas: Math.max(0, Math.round(Number(formPlatillo.grasas) || 0)),
+        smae_equivalentes: cleanSmae,
+        tags_restriccion: Array.isArray(formPlatillo.tags_restriccion) ? formPlatillo.tags_restriccion : [],
+        calorias: smaeTotals.kcal > 0 ? smaeTotals.kcal : Math.max(0, Math.round(Number(formPlatillo.calorias) || 0)),
+        proteina: smaeTotals.kcal > 0 ? smaeTotals.proteina : Math.max(0, Math.round(Number(formPlatillo.proteina) || 0)),
+        carbohidratos: smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : Math.max(0, Math.round(Number(formPlatillo.carbohidratos) || 0)),
+        grasas: smaeTotals.kcal > 0 ? smaeTotals.grasas : Math.max(0, Math.round(Number(formPlatillo.grasas) || 0)),
         foto_url: formPlatillo.foto_url.trim(),
         texto: formPlatillo.texto.trim(),
         keywords: kws,
@@ -305,7 +368,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       setPlatillos(updatedList);
       await saveCustomPlatillos(updatedList);
       setShowPlatilloModal(false);
-      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Platillo guardado en el catálogo</div>);
+      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Platillo SMAE guardado en la nube</div>);
     } catch (e) {
       setMsg("❌ " + e.message);
     }
@@ -326,13 +389,28 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ACCIONES DE INGREDIENTES
+  // ACCIONES DE ALIMENTOS EQUIVALENTES SMAE
   // ─────────────────────────────────────────────────────────────────────────────
+  const toggleIngDietTag = (tagId) => {
+    setFormIng((prev) => {
+      const curr = Array.isArray(prev.dietTags) ? prev.dietTags : [];
+      const next = curr.includes(tagId)
+        ? curr.filter((t) => t !== tagId)
+        : [...curr, tagId];
+      return { ...prev, dietTags: next };
+    });
+  };
+
   const openNewIng = () => {
     setEditIng(null);
     setFormIng({
       nombre: "",
-      categoria: "proteinas",
+      categoria: "verduras",
+      smaeGroup: "verduras",
+      cantidadBase: 1,
+      unidadBase: "taza",
+      gramosBase: 100,
+      dietTags: [],
       foto: ""
     });
     setShowIngModal(true);
@@ -340,26 +418,42 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   const openEditIng = (ing) => {
     setEditIng(ing);
+    const grp = ing.smaeGroup || ing.categoria || "verduras";
     setFormIng({
       nombre: ing.nombre || "",
-      categoria: ing.categoria || "proteinas",
-      foto: ing.foto || ""
+      categoria: grp,
+      smaeGroup: grp,
+      cantidadBase: ing.cantidadBase != null ? Number(ing.cantidadBase) : 1,
+      unidadBase: ing.unidadBase || "g",
+      gramosBase: ing.gramosBase != null ? Number(ing.gramosBase) : 30,
+      dietTags: Array.isArray(ing.dietTags) ? [...ing.dietTags] : [],
+      foto: ing.foto && !String(ing.foto).startsWith("data:image/svg+xml") ? ing.foto : ""
     });
     setShowIngModal(true);
   };
 
   const saveIng = async () => {
     if (!formIng.nombre.trim()) {
-      setMsg(<div className="flex gap-2 items-center"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del ingrediente</div>);
+      setMsg(<div className="flex gap-2 items-center"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del alimento SMAE</div>);
       return;
     }
     setSavingIng(true);
     try {
+      const grp = formIng.smaeGroup || formIng.categoria || "verduras";
+      const cant = Math.max(0.1, Number(formIng.cantidadBase) || 1);
+      const unid = (formIng.unidadBase || "g").trim();
+      const gBase = Math.max(1, Math.round(Number(formIng.gramosBase) || 30));
+
       const itemPayload = {
-        id: editIng ? editIng.id : `ing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        id: editIng ? editIng.id : `smae_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         nombre: formIng.nombre.trim(),
-        categoria: formIng.categoria,
-        foto: formIng.foto.trim() || `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formIng.nombre.trim())}.png`,
+        categoria: grp,
+        smaeGroup: grp,
+        cantidadBase: cant,
+        unidadBase: unid,
+        gramosBase: gBase,
+        dietTags: Array.isArray(formIng.dietTags) ? formIng.dietTags : [],
+        foto: formIng.foto.trim() || "",
         updated_at: new Date().toISOString()
       };
 
@@ -370,10 +464,10 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         updatedList = [itemPayload, ...ingredientes];
       }
 
-      setIngredientes(updatedList);
-      await saveCustomIngredientes(updatedList);
+      const saved = await saveCustomIngredientes(updatedList);
+      setIngredientes(saved);
       setShowIngModal(false);
-      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Ingrediente guardado en el catálogo</div>);
+      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Alimento SMAE guardado en la nube</div>);
     } catch (e) {
       setMsg("❌ " + e.message);
     }
@@ -882,7 +976,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                           </h4>
 
                           {/* Macros Pills */}
-                          <div className="grid grid-cols-3 gap-1.5 mb-3 text-center">
+                          <div className="grid grid-cols-3 gap-1.5 mb-2.5 text-center">
                             <div className="bg-red-50/70 border border-red-100 rounded-lg p-1">
                               <span className="text-[10px] text-red-600 block font-semibold">Proteína</span>
                               <span className="text-xs font-bold text-red-900">{p.proteina || 0}g</span>
@@ -896,6 +990,28 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                               <span className="text-xs font-bold text-emerald-900">{p.grasas || 0}g</span>
                             </div>
                           </div>
+
+                          {/* Equivalentes SMAE Estructurados del Platillo */}
+                          {p.smae_equivalentes && Object.keys(p.smae_equivalentes).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {Object.entries(p.smae_equivalentes)
+                                .filter(([, val]) => Number(val) > 0)
+                                .map(([gId, val]) => {
+                                  const grp = SMAE_GROUPS_MAP[gId];
+                                  if (!grp) return null;
+                                  return (
+                                    <span
+                                      key={gId}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50/90 border border-emerald-200/80 text-[10px] font-bold text-emerald-900"
+                                      title={`${val} eq de ${grp.nombre}`}
+                                    >
+                                      <span>{grp.icono}</span>
+                                      <span>{val} {grp.corto}</span>
+                                    </span>
+                                  );
+                                })}
+                            </div>
+                          )}
 
                           {/* Recipe preview */}
                           {p.texto && (
@@ -992,13 +1108,13 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         <div className="absolute top-2.5 left-2.5">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border shadow-2xs bg-white/95 text-[#0B1929] border-slate-200 backdrop-blur-xs flex items-center gap-1.5">
                             <span>{catInfo?.icono || "🍽️"}</span>
-                            <span>{catInfo?.nombre || ing.categoria}</span>
+                            <span>{catInfo?.corto || catInfo?.nombre || ing.categoria}</span>
                           </span>
                         </div>
                         <div className="absolute top-2.5 right-2.5">
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#0B1929]/80 text-white backdrop-blur-xs flex items-center gap-1 shadow-2xs">
-                            <Apple className="w-3 h-3 text-emerald-400" />
-                            <span>Ingrediente</span>
+                            <Flame className="w-3 h-3 text-emerald-400" />
+                            <span>{ing.smaeMeta?.kcal ?? catInfo?.kcal ?? 0} kcal / 1 eq</span>
                           </span>
                         </div>
                       </div>
@@ -1010,25 +1126,31 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                             {ing.nombre}
                           </h4>
 
-                          {/* Especificaciones / Info pills homologadas */}
-                          <div className="grid grid-cols-2 gap-1.5 mb-3 text-center">
+                          {/* Especificaciones oficiales de 1 Equivalente SMAE */}
+                          <div className="grid grid-cols-2 gap-1.5 mb-2 text-center">
                             <div className="bg-emerald-50/70 border border-emerald-100 rounded-lg p-1.5">
-                              <span className="text-[10px] text-emerald-600 block font-semibold">Categoría</span>
-                              <span className="text-xs font-bold text-emerald-950 truncate block">{catInfo?.nombre || ing.categoria}</span>
+                              <span className="text-[10px] text-emerald-700 block font-semibold">Porción (1 Eq)</span>
+                              <span className="text-xs font-bold text-emerald-950 truncate block">{ing.porcion1Eq || `${ing.gramosBase || 30} g`}</span>
                             </div>
                             <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
-                              <span className="text-[10px] text-slate-500 block font-semibold">Gráfico</span>
-                              <span className="text-xs font-bold text-slate-800 flex items-center justify-center gap-1">
-                                {ing.foto ? (
-                                  <span className="text-emerald-600 flex items-center gap-1 font-semibold">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Disponible
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 font-normal">Estándar</span>
-                                )}
+                              <span className="text-[10px] text-slate-500 block font-semibold">Macros (1 Eq)</span>
+                              <span className="text-[11px] font-bold text-slate-800 block truncate">
+                                {ing.smaeMeta?.proteina ?? 0}P · {ing.smaeMeta?.carbohidratos ?? 0}C · {ing.smaeMeta?.grasas ?? 0}G
                               </span>
                             </div>
                           </div>
+                          {Array.isArray(ing.dietTags) && ing.dietTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {ing.dietTags.map((tg) => {
+                                const meta = DISH_RESTRICTION_OPTIONS.find((d) => d.id === tg);
+                                return (
+                                  <span key={tg} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                    {meta ? `${meta.icono} ${meta.label}` : tg}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Botones de acción homologados */}
@@ -1147,39 +1269,137 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       {/* Modal Platillo */}
       {showPlatilloModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-2xl h-full max-h-full md:h-auto md:max-h-[92vh] shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center modal-safe-header">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
-                {editPlatillo ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar platillo</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo platillo</>}
+                {editPlatillo ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar platillo SMAE</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo platillo SMAE</>}
               </h3>
               <button onClick={() => setShowPlatilloModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20} /></button>
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del platillo</label>
+                  <input
+                    value={formPlatillo.nombre}
+                    onChange={e => setFormPlatillo(p => ({ ...p, nombre: e.target.value }))}
+                    placeholder="Ej. Salmón a la plancha con espárragos y arroz integral"
+                    className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Tiempo de comida</label>
+                  <CustomSelect
+                    value={formPlatillo.categoria}
+                    onChange={v => setFormPlatillo(p => ({ ...p, categoria: v }))}
+                    options={CATEGORIAS_PLATILLOS.filter(c => c.id !== "todos").map(c => ({ value: c.id, label: `${c.icono} ${c.nombre}` }))}
+                  />
+                </div>
+              </div>
+
+              {/* Receta y preparación libre */}
               <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del platillo</label>
-                <input
-                  value={formPlatillo.nombre}
-                  onChange={e => setFormPlatillo(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej. Salmón a la plancha con espárragos y arroz integral"
-                  className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-medium"
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
+                  Receta / Instrucciones de Preparación (Texto Libre)
+                </label>
+                <textarea
+                  rows={3}
+                  value={formPlatillo.texto}
+                  onChange={e => setFormPlatillo(p => ({ ...p, texto: e.target.value }))}
+                  placeholder="Escribe libremente cómo se prepara el platillo, gramajes caseros y pasos de cocción..."
+                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all leading-relaxed"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Categoría de comida</label>
-                <CustomSelect
-                  value={formPlatillo.categoria}
-                  onChange={v => setFormPlatillo(p => ({ ...p, categoria: v }))}
-                  options={CATEGORIAS_PLATILLOS.filter(c => c.id !== "todos").map(c => ({ value: c.id, label: `${c.icono} ${c.nombre}` }))}
-                />
+              {/* Selector de Equivalentes SMAE del Platillo */}
+              <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/80 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
+                      ⚖️ Equivalentes SMAE del Platillo (5ª Ed.)
+                    </span>
+                    <span className="text-[11px] text-emerald-700">
+                      Selecciona los equivalentes que aporta este platillo; las calorías y macros se calculan solos.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const estimated = estimateMealSmaeMap(`${formPlatillo.nombre || ""}\n${formPlatillo.texto || ""}`);
+                      const totals = calculateSmaeTotals(estimated);
+                      setFormPlatillo((prev) => ({
+                        ...prev,
+                        smae_equivalentes: estimated,
+                        calorias: totals.kcal,
+                        proteina: totals.proteina,
+                        carbohidratos: totals.carbohidratos,
+                        grasas: totals.grasas,
+                      }));
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <span>Sugerir desde texto</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {SMAE_GROUPS.filter((g) => g.id !== "libres").map((grp) => {
+                    const val = Number(formPlatillo.smae_equivalentes?.[grp.id] || 0);
+                    return (
+                      <div
+                        key={grp.id}
+                        className={`p-2 rounded-xl border transition-all flex flex-col justify-between ${
+                          val > 0
+                            ? "bg-white border-emerald-400 shadow-2xs"
+                            : "bg-white/60 border-slate-200/80 opacity-80"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="text-[11px] font-bold text-slate-800 truncate" title={grp.nombre}>
+                            {grp.icono} {grp.corto}
+                          </span>
+                          <span className="text-[9px] font-semibold text-slate-400 shrink-0">
+                            {grp.kcal}kcal
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-1 bg-slate-50 rounded-lg p-0.5 border border-slate-200/70">
+                          <button
+                            type="button"
+                            onClick={() => updatePlatilloSmaeEq(grp.id, -0.5)}
+                            className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center border border-slate-200/80 cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className={`text-xs font-extrabold ${val > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+                            {val} eq
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updatePlatilloSmaeEq(grp.id, 0.5)}
+                            className="w-6 h-6 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Grid de 4 Macros */}
+              {/* Grid de 4 Macros (Auto-calculados por SMAE o editables) */}
               <div className="p-3.5 bg-gray-50 rounded-2xl border border-[#E2E8F0]">
-                <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider block mb-2">
-                  Valores Nutricionales de Referencia
-                </span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Macros Calculados por SMAE
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Sincronizado con Equivalentes
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Calorías (kcal)</label>
@@ -1217,6 +1437,33 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Etiquetas Clínicas de Alérgenos / Restricciones */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
+                  Etiquetas Clínicas de Alérgenos (Para cruce con Evaluación del Paciente)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DISH_RESTRICTION_OPTIONS.map((opt) => {
+                    const active = (formPlatillo.tags_restriccion || []).includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => togglePlatilloRestrictionTag(opt.id)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          active
+                            ? "bg-amber-50 text-amber-900 border-amber-300 shadow-2xs"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span>{opt.icono}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1266,18 +1513,6 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 </div>
               </div>
 
-              {/* Receta y preparación */}
-              <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Receta / Instrucciones de Preparación</label>
-                <textarea
-                  rows={4}
-                  value={formPlatillo.texto}
-                  onChange={e => setFormPlatillo(p => ({ ...p, texto: e.target.value }))}
-                  placeholder="Detalla los ingredientes exactos, gramajes y pasos de cocción..."
-                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all leading-relaxed"
-                />
-              </div>
-
               {/* Palabras clave */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Palabras clave de búsqueda (opcional)</label>
@@ -1304,46 +1539,113 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 disabled={savingPlatillo || uploadingPlatillo}
                 className="px-4 py-2 bg-[var(--brand-primary)] hover:opacity-90 text-white rounded-xl font-semibold text-sm shadow-sm transition-opacity disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                {savingPlatillo ? "Guardando..." : "Guardar platillo"}
+                {savingPlatillo ? "Guardando..." : "Guardar platillo SMAE"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Ingrediente */}
+      {/* Modal Alimento Equivalente SMAE */}
       {showIngModal && (
         <div className="fixed inset-0 z-[100] bg-[#0B1929]/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-md h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
+          <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex justify-between items-center modal-safe-header">
               <h3 className="font-bold text-lg text-[#0B1929] flex items-center gap-2">
-                {editIng ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar ingrediente</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo ingrediente</>}
+                {editIng ? <><Edit2 size={20} className="text-[var(--brand-primary)]" /> Editar Alimento SMAE</> : <><Plus size={20} className="text-[var(--brand-primary)]" /> Nuevo Alimento SMAE</>}
               </h3>
               <button onClick={() => setShowIngModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20} /></button>
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del ingrediente</label>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del Alimento (SMAE)</label>
                 <input
                   value={formIng.nombre}
                   onChange={e => setFormIng(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej. Pechuga de pollo deshebrada"
+                  placeholder="Ej. Pechuga de pollo sin piel cocida"
                   className="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Grupo / Categoría</label>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Grupo Oficial SMAE (5ª Edición)</label>
                 <CustomSelect
-                  value={formIng.categoria}
-                  onChange={v => setFormIng(p => ({ ...p, categoria: v }))}
-                  options={CATEGORIAS_INGREDIENTES.filter(c => c.id !== "todos").map(c => ({ value: c.id, label: `${c.icono} ${c.nombre}` }))}
+                  value={formIng.smaeGroup || formIng.categoria}
+                  onChange={v => setFormIng(p => ({ ...p, categoria: v, smaeGroup: v }))}
+                  options={CATEGORIAS_INGREDIENTES.filter(c => c.id !== "todos").map(c => ({
+                    value: c.id,
+                    label: `${c.icono} ${c.nombre} (${c.kcal ?? 0} kcal · ${c.proteina ?? 0}P/${c.carbohidratos ?? 0}C/${c.grasas ?? 0}G)`
+                  }))}
                 />
               </div>
 
+              {/* Porción Oficial de 1 Equivalente SMAE */}
+              <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/80">
+                <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider block mb-2">
+                  Porción Oficial para 1 Equivalente SMAE
+                </span>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Cantidad (1 Eq)</label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      value={formIng.cantidadBase}
+                      onChange={e => setFormIng(p => ({ ...p, cantidadBase: e.target.value }))}
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Unidad Casera</label>
+                    <input
+                      value={formIng.unidadBase}
+                      onChange={e => setFormIng(p => ({ ...p, unidadBase: e.target.value }))}
+                      placeholder="taza, pieza, cda, g"
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-700 mb-1">Peso Neto (g/ml)</label>
+                    <input
+                      type="number"
+                      value={formIng.gramosBase}
+                      onChange={e => setFormIng(p => ({ ...p, gramosBase: e.target.value }))}
+                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Etiquetas Clínicas de Alérgenos */}
               <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Fotografía o Icono</label>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
+                  Alérgenos / Restricciones Alimentarias
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DISH_RESTRICTION_OPTIONS.map((opt) => {
+                    const active = (formIng.dietTags || []).includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => toggleIngDietTag(opt.id)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                          active
+                            ? "bg-amber-50 text-amber-900 border-amber-300"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span>{opt.icono}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Fotografía personalizada (opcional)</label>
                 <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center bg-gray-50 flex flex-col items-center gap-3">
                   {formIng.foto ? (
                     <div className="flex flex-col items-center">
@@ -1355,13 +1657,13 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         onClick={() => setFormIng(p => ({ ...p, foto: "" }))}
                         className="text-xs px-2.5 py-1 border border-[#E2E8F0] text-red-600 bg-white hover:bg-red-50 rounded-lg font-semibold transition-colors"
                       >
-                        Quitar imagen
+                        Usar icono oficial SMAE
                       </button>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Apple size={32} className="mx-auto text-gray-300" />
-                      <div className="text-[12px] text-[#6B7A8D]">Sube una imagen o pega URL directa</div>
+                      <Apple size={28} className="mx-auto text-emerald-500" />
+                      <div className="text-[12px] text-[#6B7A8D]">Por defecto se muestra el badge oficial de su grupo SMAE. Puedes subir una imagen propia si lo deseas:</div>
                       <input
                         id="ing-foto-upload"
                         type="file"
@@ -1402,7 +1704,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 disabled={savingIng || uploadingIng}
                 className="px-4 py-2 bg-[var(--brand-primary)] hover:opacity-90 text-white rounded-xl font-semibold text-sm shadow-sm transition-opacity disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                {savingIng ? "Guardando..." : "Guardar ingrediente"}
+                {savingIng ? "Guardando..." : "Guardar Alimento SMAE"}
               </button>
             </div>
           </div>
@@ -1474,6 +1776,32 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                   <span className="text-base font-extrabold text-emerald-950">{recipePreviewModal.grasas || 0}g</span>
                 </div>
               </div>
+
+              {/* Desglose de Equivalentes SMAE en Preview */}
+              {recipePreviewModal.smae_equivalentes && Object.keys(recipePreviewModal.smae_equivalentes).length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950 block mb-2">
+                    ⚖️ Equivalentes SMAE del Platillo
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(recipePreviewModal.smae_equivalentes)
+                      .filter(([, val]) => Number(val) > 0)
+                      .map(([gId, val]) => {
+                        const grp = SMAE_GROUPS_MAP[gId];
+                        if (!grp) return null;
+                        return (
+                          <span
+                            key={gId}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-emerald-200 text-xs font-bold text-emerald-900 shadow-2xs"
+                          >
+                            <span>{grp.icono}</span>
+                            <span>{val} eq {grp.nombre}</span>
+                          </span>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
               {/* Recipe instructions */}
               <div>

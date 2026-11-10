@@ -12,16 +12,17 @@ export const OPTION_SEPARATOR = "\n--- OTRA OPCIÓN ---\n";
  */
 export function parseMealOptions(comida) {
   if (!comida) return [""];
+  const cleanSmaeTag = (str) => String(str || "").replace(/\n?\[SMAE:[^\]]+\]/gi, "").trim();
   const list = [];
-  const p1 = (comida.opcion1 || "").trim();
+  const p1 = cleanSmaeTag(comida.opcion1 || "");
   list.push(p1);
 
-  const p2 = (comida.opcion2 || "").trim();
+  const p2 = cleanSmaeTag(comida.opcion2 || "");
   if (p2) {
     if (p2.includes(OPTION_SEPARATOR)) {
       const parts = p2.split(OPTION_SEPARATOR);
       parts.forEach(part => {
-        const tr = (part || "").trim();
+        const tr = cleanSmaeTag(part || "");
         if (tr) list.push(tr);
       });
     } else {

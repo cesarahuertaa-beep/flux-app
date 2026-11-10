@@ -30,7 +30,7 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit } from "../../lib/smaeData";
+import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText } from "../../lib/smaeData";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
@@ -257,10 +257,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       if (optIdx === 0) {
         c.opcion1 = recipeText;
         if (dish.foto_url) c.foto_url = dish.foto_url;
-        if (dish.calorias) c.calorias = dish.calorias;
-        if (dish.proteina) c.proteina = dish.proteina;
-        if (dish.carbohidratos) c.carbohidratos = dish.carbohidratos;
-        if (dish.grasas) c.grasas = dish.grasas;
+        const dishSmae =
+          dish.smae_equivalentes && Object.keys(dish.smae_equivalentes).length > 0
+            ? { ...dish.smae_equivalentes }
+            : estimateMealSmaeMap(recipeText);
+        c.smaeMap = dishSmae;
+        const smaeTotals = calculateSmaeTotals(dishSmae);
+        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : (dish.calorias || 0);
+        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : (dish.proteina || 0);
+        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : (dish.carbohidratos || 0);
+        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : (dish.grasas || 0);
         c.modoEdicion = "manual";
       }
       c.opcionesModoEdicion = {
@@ -275,7 +281,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setMsg(
       <div className="flex items-center gap-1.5 text-purple-700">
         <Sparkles className="w-4 h-4 text-purple-600" />
-        <span>Platillo "{dish.nombre}" cargado en Opción {optLetter}.</span>
+        <span>Platillo "{dish.nombre}" cargado con sus equivalentes SMAE en Opción {optLetter}.</span>
       </div>
     );
   };
@@ -404,10 +410,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       c.opcion2 = opcion2;
 
       if (optIdx === 0) {
-        c.calorias = Math.round((Number(c.calorias) || 0) + totalKcal);
-        c.proteina = Math.round((Number(c.proteina) || 0) + totalProt);
-        c.carbohidratos = Math.round((Number(c.carbohidratos) || 0) + totalCarbs);
-        c.grasas = Math.round((Number(c.grasas) || 0) + totalGrasas);
+        const nextSmaeMap = { ...(c.smaeMap || {}) };
+        details.forEach((d) => {
+          if (d.smaeGroup && d.smaeGroup !== "libres" && d.smaeGroup !== "libre" && d.equivalents > 0) {
+            nextSmaeMap[d.smaeGroup] = Math.round(((Number(nextSmaeMap[d.smaeGroup]) || 0) + d.equivalents) * 10) / 10;
+          }
+        });
+        c.smaeMap = nextSmaeMap;
+        const smaeTotals = calculateSmaeTotals(nextSmaeMap);
+        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : Math.round((Number(c.calorias) || 0) + totalKcal);
+        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : Math.round((Number(c.proteina) || 0) + totalProt);
+        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : Math.round((Number(c.carbohidratos) || 0) + totalCarbs);
+        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : Math.round((Number(c.grasas) || 0) + totalGrasas);
         c.modoEdicion = "manual";
       }
       c.opcionesModoEdicion = {
@@ -2176,6 +2190,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         opciones: [""],
         opcion1:"", 
         opcion2:"", 
+        smaeMap: {},
         calorias:"", 
         proteina:"", 
         carbohidratos:"", 
@@ -2202,10 +2217,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       orden:d.orden, 
       comidas:(d.comidas || []).map(c => {
         const parsedOpts = parseMealOptions(c);
+        const extractedMealSmae = extractSmaeMapFromMealText(c.opcion1 || "");
+        const finalMealSmae =
+          c.smaeMap && Object.keys(c.smaeMap).length > 0
+            ? { ...c.smaeMap }
+            : extractedMealSmae.smaeMap && Object.keys(extractedMealSmae.smaeMap).length > 0
+            ? extractedMealSmae.smaeMap
+            : {};
         return {
           ...c,
           _dndId: String(c.id || Math.random().toString(36).slice(2,9)),
-          opciones: parsedOpts.length > 0 ? parsedOpts : [c.opcion1 || ""],
+          opciones: parsedOpts.length > 0 ? parsedOpts : [extractedMealSmae.cleanText || c.opcion1 || ""],
+          smaeMap: finalMealSmae,
           alertaClinica: null
         };
       })
@@ -2219,9 +2242,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       diasSeleccionados: [...(diaForm.diasSeleccionados || [])],
       comidas: (diaForm.comidas || []).map(c => {
         const { opcion1, opcion2 } = formatMealOptions(c.opciones || [c.opcion1 || ""]);
+        const opcion1WithSmae = embedSmaeMapInMealText(opcion1, c.smaeMap || {});
         return {
           ...c,
-          opcion1,
+          opcion1: opcion1WithSmae,
           opcion2,
         };
       }),
@@ -2575,6 +2599,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const updComida = (i, f, v) => setDiaForm(p => {
     const cs = [...p.comidas];
     if (cs[i]) cs[i] = { ...cs[i], [f]: v };
+    return { ...p, comidas: cs };
+  });
+
+  const updComidaSmaeEq = (mealIdx, groupId, delta) => setDiaForm(p => {
+    const cs = [...p.comidas];
+    const c = { ...(cs[mealIdx] || {}) };
+    const prevMap = { ...(c.smaeMap || {}) };
+    const curr = Number(prevMap[groupId] || 0);
+    const nextVal = Math.max(0, Math.round((curr + delta) * 2) / 2);
+    if (nextVal > 0) prevMap[groupId] = nextVal;
+    else delete prevMap[groupId];
+    c.smaeMap = prevMap;
+    const totals = calculateSmaeTotals(prevMap);
+    c.calorias = totals.kcal;
+    c.proteina = totals.proteina;
+    c.carbohidratos = totals.carbohidratos;
+    c.grasas = totals.grasas;
+    cs[mealIdx] = c;
     return { ...p, comidas: cs };
   });
 
@@ -5716,7 +5758,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               .map((item) => ({
                                                 item,
                                                 evalRes: evaluateIngredientForPatient(
-                                                  { nombre: `${item.nombre} ${item.ingredientes || ""} ${item.descripcion || ""}` },
+                                                  item,
                                                   patientFoodCtx
                                                 ),
                                               }))
@@ -6693,6 +6735,109 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </>
                                       )}
                                     </button>
+                                  </div>
+
+                                  {/* Row 4.5: Selector Directo de Equivalentes SMAE de esta Comida */}
+                                  <div className="mb-3.5 p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-extrabold text-emerald-950">
+                                          ⚖️ Equivalentes SMAE de esta Comida
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                                          Calcula macros y suma al Balance Diario
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const rawTxt = opcionesList[0] || c.opcion1 || "";
+                                            const est = estimateMealSmaeMap(rawTxt);
+                                            const totals = calculateSmaeTotals(est);
+                                            setDiaForm((p) => {
+                                              const cs = [...p.comidas];
+                                              const mealCopy = { ...(cs[i] || {}) };
+                                              mealCopy.smaeMap = est;
+                                              if (totals.kcal > 0) {
+                                                mealCopy.calorias = totals.kcal;
+                                                mealCopy.proteina = totals.proteina;
+                                                mealCopy.carbohidratos = totals.carbohidratos;
+                                                mealCopy.grasas = totals.grasas;
+                                              }
+                                              cs[i] = mealCopy;
+                                              return { ...p, comidas: cs };
+                                            });
+                                          }}
+                                          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 cursor-pointer shadow-2xs transition-colors"
+                                          title="Sugerir equivalentes SMAE leyendo el texto escrito arriba"
+                                        >
+                                          <Sparkles className="w-3 h-3 text-emerald-600" />
+                                          <span>Detectar del texto</span>
+                                        </button>
+                                        {c.smaeMap && Object.keys(c.smaeMap).length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setDiaForm((p) => {
+                                                const cs = [...p.comidas];
+                                                cs[i] = { ...(cs[i] || {}), smaeMap: {} };
+                                                return { ...p, comidas: cs };
+                                              });
+                                            }}
+                                            className="text-[10px] font-semibold px-2 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-colors cursor-pointer"
+                                          >
+                                            Limpiar
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
+                                      {SMAE_GROUPS.filter((g) => g.id !== "libres").map((grp) => {
+                                        const val = Number(c.smaeMap?.[grp.id] || 0);
+                                        return (
+                                          <div
+                                            key={grp.id}
+                                            className={`px-2 py-1.5 rounded-lg border transition-all flex items-center justify-between gap-1 ${
+                                              val > 0
+                                                ? "bg-white border-emerald-400 shadow-2xs"
+                                                : "bg-white/70 border-slate-200/80"
+                                            }`}
+                                          >
+                                            <span
+                                              className="text-[10px] font-bold text-slate-800 truncate"
+                                              title={`${grp.nombre} (${grp.kcal} kcal · ${grp.proteina}P/${grp.carbohidratos}C/${grp.grasas}G)`}
+                                            >
+                                              {grp.icono} {grp.corto}
+                                            </span>
+                                            <div className="flex items-center gap-0.5 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => updComidaSmaeEq(i, grp.id, -0.5)}
+                                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer"
+                                              >
+                                                -
+                                              </button>
+                                              <span
+                                                className={`text-[11px] font-mono font-extrabold min-w-[26px] text-center ${
+                                                  val > 0 ? "text-emerald-700" : "text-slate-400"
+                                                }`}
+                                              >
+                                                {val}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => updComidaSmaeEq(i, grp.id, 0.5)}
+                                                className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                              >
+                                                +
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
 
                                   {/* Row 5: Macronutrientes por comida */}
