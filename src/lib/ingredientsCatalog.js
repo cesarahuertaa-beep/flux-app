@@ -14,11 +14,12 @@ import {
 } from "./smaeData";
 import smaeFoodsComplete from "./seed/smaeFoodsComplete.json" with { type: "json" };
 
-export const KEY_SMAE_ALIMENTOS = "flux_smae_alimentos_v2";
+export const KEY_SMAE_ALIMENTOS = "flux_smae_alimentos_v3";
 
-// Purgar llave obsoleta anterior si existía en el navegador
+// Purgar llaves obsoletas anteriores si existían en el navegador
 try {
   localStorage.removeItem("flux_biblioteca_ingredientes");
+  localStorage.removeItem("flux_smae_alimentos_v2");
 } catch {}
 
 /**

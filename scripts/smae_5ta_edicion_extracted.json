@@ -55,7 +55,7 @@
     "cantidad_base": 3.5,
     "unidad_base": "taza",
     "gramos_base": 116,
-    "porcion_1eq": "3 1/2 taza (116 g)",
+    "porcion_1eq": "3.5 taza (116 g)",
     "tags_restriccion": [],
     "keywords": [
       "alfalfa",
@@ -651,9 +651,9 @@
     "nombre": "Chile ancho",
     "grupo_smae": "verduras",
     "cantidad_base": 6,
-    "unidad_base": "mm",
+    "unidad_base": "pieza",
     "gramos_base": 6,
-    "porcion_1eq": "6 mm (6 g)",
+    "porcion_1eq": "6 pieza (6 g)",
     "tags_restriccion": [],
     "keywords": [
       "chile",
@@ -876,9 +876,9 @@
     "nombre": "Chile nacho lata",
     "grupo_smae": "verduras",
     "cantidad_base": 92,
-    "unidad_base": "ares",
+    "unidad_base": "pieza",
     "gramos_base": 92,
-    "porcion_1eq": "92 ares (92 g)",
+    "porcion_1eq": "92 pieza (92 g)",
     "tags_restriccion": [],
     "keywords": [
       "chile",
@@ -2977,48 +2977,6 @@
     "foto": ""
   },
   {
-    "id": "smae_ex_ce",
-    "nombre": "Ex CE",
-    "grupo_smae": "verduras",
-    "cantidad_base": 1,
-    "unidad_base": "pieza",
-    "gramos_base": 30,
-    "porcion_1eq": "1 pieza (30 g)",
-    "tags_restriccion": [],
-    "keywords": [
-      "verduras"
-    ],
-    "foto": ""
-  },
-  {
-    "id": "smae_a_e_l",
-    "nombre": "a É L",
-    "grupo_smae": "verduras",
-    "cantidad_base": 1,
-    "unidad_base": "pieza",
-    "gramos_base": 30,
-    "porcion_1eq": "1 pieza (30 g)",
-    "tags_restriccion": [],
-    "keywords": [
-      "verduras"
-    ],
-    "foto": ""
-  },
-  {
-    "id": "smae_e_xu",
-    "nombre": "e Xu",
-    "grupo_smae": "verduras",
-    "cantidad_base": 1,
-    "unidad_base": "pieza",
-    "gramos_base": 30,
-    "porcion_1eq": "1 pieza (30 g)",
-    "tags_restriccion": [],
-    "keywords": [
-      "verduras"
-    ],
-    "foto": ""
-  },
-  {
     "id": "smae_acai",
     "nombre": "Acaí",
     "grupo_smae": "frutas",
@@ -3252,9 +3210,9 @@
     "nombre": "Caña de azúcar",
     "grupo_smae": "frutas",
     "cantidad_base": 250,
-    "unidad_base": "a",
+    "unidad_base": "pieza",
     "gramos_base": 100,
-    "porcion_1eq": "250 a (100 g)",
+    "porcion_1eq": "250 pieza (100 g)",
     "tags_restriccion": [],
     "keywords": [
       "cana",
@@ -4702,9 +4660,9 @@
     "nombre": "Manzana deshidratada",
     "grupo_smae": "frutas",
     "cantidad_base": 9,
-    "unidad_base": "orejones",
+    "unidad_base": "pieza",
     "gramos_base": 23,
-    "porcion_1eq": "9 orejones (23 g)",
+    "porcion_1eq": "9 pieza (23 g)",
     "tags_restriccion": [],
     "keywords": [
       "manzana",
@@ -5297,9 +5255,9 @@
     "nombre": "Papaya Hawaiana",
     "grupo_smae": "frutas",
     "cantidad_base": 0.5,
-    "unidad_base": "pe",
+    "unidad_base": "pieza",
     "gramos_base": 114,
-    "porcion_1eq": "1/2 pe (114 g)",
+    "porcion_1eq": "1/2 pieza (114 g)",
     "tags_restriccion": [],
     "keywords": [
       "papaya",
@@ -5665,9 +5623,9 @@
     "nombre": "Pera deshidratada",
     "grupo_smae": "frutas",
     "cantidad_base": 1,
-    "unidad_base": "orejón",
+    "unidad_base": "pieza",
     "gramos_base": 18,
-    "porcion_1eq": "1 orejón (18 g)",
+    "porcion_1eq": "1 pieza (18 g)",
     "tags_restriccion": [],
     "keywords": [
       "pera",
@@ -5858,9 +5816,9 @@
     "nombre": "Piña deshidratada",
     "grupo_smae": "frutas",
     "cantidad_base": 17,
-    "unidad_base": "ea",
+    "unidad_base": "pieza",
     "gramos_base": 30,
-    "porcion_1eq": "17 ea (30 g)",
+    "porcion_1eq": "17 pieza (30 g)",
     "tags_restriccion": [],
     "keywords": [
       "pina",
@@ -5922,9 +5880,9 @@
     "nombre": "Piña rebanada",
     "grupo_smae": "frutas",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 84,
-    "porcion_1eq": "1 red (84 g)",
+    "porcion_1eq": "1 rebanada (84 g)",
     "tags_restriccion": [],
     "keywords": [
       "pina",
@@ -8277,7 +8235,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 40,
-    "porcion_1eq": "1/5 taza (40 g)",
+    "porcion_1eq": "1/4 taza (40 g)",
     "tags_restriccion": [],
     "keywords": [
       "camote",
@@ -8294,7 +8252,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 52,
-    "porcion_1eq": "1/5 taza (52 g)",
+    "porcion_1eq": "1/4 taza (52 g)",
     "tags_restriccion": [],
     "keywords": [
       "camote",
@@ -9764,9 +9722,9 @@
     "nombre": "Ficleo cocido",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 0.5,
-    "unidad_base": "taa",
+    "unidad_base": "taza",
     "gramos_base": 20,
-    "porcion_1eq": "1/2 taa (20 g)",
+    "porcion_1eq": "1/2 taza (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "ficleo",
@@ -11275,7 +11233,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [],
     "keywords": [
       "hojuelas",
@@ -12463,9 +12421,9 @@
     "nombre": "Pan 5 granos",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 red (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12481,9 +12439,9 @@
     "nombre": "Pan 7 granos",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 26,
-    "porcion_1eq": "1 red (26 g)",
+    "porcion_1eq": "1 rebanada (26 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12720,9 +12678,9 @@
     "nombre": "Pan de 5 granos",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 red (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12738,9 +12696,9 @@
     "nombre": "Pan de 7 granos",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "rep",
+    "unidad_base": "rebanada",
     "gramos_base": 26,
-    "porcion_1eq": "1 rep (26 g)",
+    "porcion_1eq": "1 rebanada (26 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12756,9 +12714,9 @@
     "nombre": "Pan de avena",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 90,
-    "porcion_1eq": "1 red (90 g)",
+    "porcion_1eq": "1 rebanada (90 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12792,9 +12750,9 @@
     "nombre": "Pan de caja integral",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 red (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12830,9 +12788,9 @@
     "nombre": "Pan de centeno y trigo",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12928,9 +12886,9 @@
     "nombre": "Pan de jengibre",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "reo",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 reo (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -12965,9 +12923,9 @@
     "nombre": "Pan de plátano",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 0.75,
-    "unidad_base": "re",
+    "unidad_base": "rebanada",
     "gramos_base": 21,
-    "porcion_1eq": "3/4 re (21 g)",
+    "porcion_1eq": "3/4 rebanada (21 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -13109,9 +13067,9 @@
     "nombre": "Pan negro contrigo",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 1,
-    "unidad_base": "reo",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 reo (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -13490,7 +13448,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [],
     "keywords": [
       "papas",
@@ -13557,7 +13515,7 @@
     "cantidad_base": 15,
     "unidad_base": "g",
     "gramos_base": 15,
-    "porcion_1eq": "15 g (15 g)",
+    "porcion_1eq": "15 g",
     "tags_restriccion": [
       "gluten"
     ],
@@ -13831,9 +13789,9 @@
     "nombre": "Pasta para sopa cruda",
     "grupo_smae": "cereales_sg",
     "cantidad_base": 20,
-    "unidad_base": "ha",
+    "unidad_base": "pieza",
     "gramos_base": 20,
-    "porcion_1eq": "20 ha (20 g)",
+    "porcion_1eq": "20 pieza (20 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -14198,7 +14156,7 @@
     "cantidad_base": 50,
     "unidad_base": "g",
     "gramos_base": 50,
-    "porcion_1eq": "50 g (50 g)",
+    "porcion_1eq": "50 g",
     "tags_restriccion": [],
     "keywords": [
       "sopa",
@@ -14763,7 +14721,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "gluten"
     ],
@@ -14865,9 +14823,9 @@
     "nombre": "Barra Kellogg s0 Special KG Nut Bar Sabor a chocolate sur",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "bara",
+    "unidad_base": "barra",
     "gramos_base": 33,
-    "porcion_1eq": "1 bara (33 g)",
+    "porcion_1eq": "1 barra (33 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -15744,9 +15702,9 @@
     "nombre": "Chips de plátano",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.75,
-    "unidad_base": "bosach",
+    "unidad_base": "bolsa",
     "gramos_base": 21,
-    "porcion_1eq": "3/4 bosach (21 g)",
+    "porcion_1eq": "3/4 bolsa (21 g)",
     "tags_restriccion": [],
     "keywords": [
       "chips",
@@ -15992,7 +15950,7 @@
     "cantidad_base": 125,
     "unidad_base": "g",
     "gramos_base": 125,
-    "porcion_1eq": "125 g (125 g)",
+    "porcion_1eq": "125 g",
     "tags_restriccion": [
       "mariscos"
     ],
@@ -16145,9 +16103,9 @@
     "nombre": "Cuemito de queso",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.5,
-    "unidad_base": "pramed",
+    "unidad_base": "pieza",
     "gramos_base": 29,
-    "porcion_1eq": "1/2 pramed (29 g)",
+    "porcion_1eq": "1/2 pieza (29 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -16397,9 +16355,9 @@
     "nombre": "Doraditas",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.5,
-    "unidad_base": "ma",
+    "unidad_base": "pieza",
     "gramos_base": 18,
-    "porcion_1eq": "1/2 ma (18 g)",
+    "porcion_1eq": "1/2 pieza (18 g)",
     "tags_restriccion": [],
     "keywords": [
       "doraditas",
@@ -16412,9 +16370,9 @@
     "nombre": "Doritos Diablo",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.33,
-    "unidad_base": "boslach",
+    "unidad_base": "bolsa",
     "gramos_base": 20,
-    "porcion_1eq": "1/3 boslach (20 g)",
+    "porcion_1eq": "1/3 bolsa (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "doritos",
@@ -16444,9 +16402,9 @@
     "nombre": "Doritos Nacho",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.33,
-    "unidad_base": "boslach",
+    "unidad_base": "bolsa",
     "gramos_base": 20,
-    "porcion_1eq": "1/3 boslach (20 g)",
+    "porcion_1eq": "1/3 bolsa (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "doritos",
@@ -16492,9 +16450,9 @@
     "nombre": "Doritos Pizzerolas",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.33,
-    "unidad_base": "boslach",
+    "unidad_base": "bolsa",
     "gramos_base": 20,
-    "porcion_1eq": "1/3 boslach (20 g)",
+    "porcion_1eq": "1/3 bolsa (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "doritos",
@@ -16624,9 +16582,9 @@
     "nombre": "Fritos chile y limón",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.5,
-    "unidad_base": "ibosiach",
+    "unidad_base": "bolsa",
     "gramos_base": 20,
-    "porcion_1eq": "1/2 ibosiach (20 g)",
+    "porcion_1eq": "1/2 bolsa (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "fritos",
@@ -16641,9 +16599,9 @@
     "nombre": "Fritos chorizo y chipotle",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.5,
-    "unidad_base": "iboslach",
+    "unidad_base": "bolsa",
     "gramos_base": 20,
-    "porcion_1eq": "1/2 iboslach (20 g)",
+    "porcion_1eq": "1/2 bolsa (20 g)",
     "tags_restriccion": [
       "carne_roja"
     ],
@@ -17555,7 +17513,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [],
     "keywords": [
       "habaneras",
@@ -17962,7 +17920,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "gluten"
     ],
@@ -17982,7 +17940,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "30 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "gluten"
     ],
@@ -18516,7 +18474,7 @@
     "cantidad_base": 3.5,
     "unidad_base": "taza",
     "gramos_base": 25,
-    "porcion_1eq": "3 1/2 taza (25 g)",
+    "porcion_1eq": "3.5 taza (25 g)",
     "tags_restriccion": [],
     "keywords": [
       "palomitas",
@@ -18799,9 +18757,9 @@
     "nombre": "Panqué de limón",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -18817,9 +18775,9 @@
     "nombre": "Panqué de nata",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 0.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 23,
-    "porcion_1eq": "1/2 red (23 g)",
+    "porcion_1eq": "1/2 rebanada (23 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -18853,9 +18811,9 @@
     "nombre": "Panqué marmoleado",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "rep",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 rep (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -18929,7 +18887,7 @@
     "cantidad_base": 50,
     "unidad_base": "g",
     "gramos_base": 50,
-    "porcion_1eq": "50 g (50 g)",
+    "porcion_1eq": "50 g",
     "tags_restriccion": [],
     "keywords": [
       "papa",
@@ -19243,9 +19201,9 @@
     "nombre": "Pastel de chocolate",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -19261,9 +19219,9 @@
     "nombre": "Pastel de frutas",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "gluten"
     ],
@@ -19445,9 +19403,9 @@
     "nombre": "Pay de manzana",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 40,
-    "porcion_1eq": "1 red (40 g)",
+    "porcion_1eq": "1 rebanada (40 g)",
     "tags_restriccion": [],
     "keywords": [
       "pay",
@@ -19513,9 +19471,9 @@
     "nombre": "Pay helado de limón",
     "grupo_smae": "cereales_cg",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 40,
-    "porcion_1eq": "1 red (40 g)",
+    "porcion_1eq": "1 rebanada (40 g)",
     "tags_restriccion": [],
     "keywords": [
       "pay",
@@ -19871,7 +19829,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [],
     "keywords": [
       "sandwich",
@@ -20042,7 +20000,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "1/5 pieza (40 g)",
+    "porcion_1eq": "1/4 pieza (40 g)",
     "tags_restriccion": [],
     "keywords": [
       "tamal",
@@ -20074,7 +20032,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "1/5 pieza (40 g)",
+    "porcion_1eq": "1/4 pieza (40 g)",
     "tags_restriccion": [],
     "keywords": [
       "tamal",
@@ -20090,7 +20048,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "1/5 pieza (40 g)",
+    "porcion_1eq": "1/4 pieza (40 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -20387,7 +20345,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [],
     "keywords": [
       "alubia",
@@ -20438,7 +20396,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [],
     "keywords": [
       "alverjon",
@@ -20657,9 +20615,9 @@
     "nombre": "Garbanzo crudo",
     "grupo_smae": "leguminosas",
     "cantidad_base": 35,
-    "unidad_base": "ka",
+    "unidad_base": "pieza",
     "gramos_base": 35,
-    "porcion_1eq": "35 ka (35 g)",
+    "porcion_1eq": "35 pieza (35 g)",
     "tags_restriccion": [],
     "keywords": [
       "garbanzo",
@@ -20874,7 +20832,7 @@
     "cantidad_base": 90,
     "unidad_base": "g",
     "gramos_base": 90,
-    "porcion_1eq": "90 g (90 g)",
+    "porcion_1eq": "90 g",
     "tags_restriccion": [],
     "keywords": [
       "ibes",
@@ -20962,34 +20920,6 @@
     "keywords": [
       "soya",
       "texturizada",
-      "leguminosas"
-    ],
-    "foto": ""
-  },
-  {
-    "id": "smae_tu",
-    "nombre": "Tu",
-    "grupo_smae": "leguminosas",
-    "cantidad_base": 1,
-    "unidad_base": "a",
-    "gramos_base": 30,
-    "porcion_1eq": "1 a (30 g)",
-    "tags_restriccion": [],
-    "keywords": [
-      "leguminosas"
-    ],
-    "foto": ""
-  },
-  {
-    "id": "smae_a_a",
-    "nombre": "a A",
-    "grupo_smae": "leguminosas",
-    "cantidad_base": 1,
-    "unidad_base": "pieza",
-    "gramos_base": 30,
-    "porcion_1eq": "1 pieza (30 g)",
-    "tags_restriccion": [],
-    "keywords": [
       "leguminosas"
     ],
     "foto": ""
@@ -21302,9 +21232,9 @@
     "nombre": "Atún fresco",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 30,
-    "unidad_base": "e",
+    "unidad_base": "pieza",
     "gramos_base": 30,
-    "porcion_1eq": "30 e (30 g)",
+    "porcion_1eq": "30 pieza (30 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -21583,9 +21513,9 @@
     "nombre": "Cabeza de pescado",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 1,
-    "unidad_base": "eu",
+    "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "1 eu (40 g)",
+    "porcion_1eq": "1 pieza (40 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -21883,9 +21813,9 @@
     "nombre": "Camarón seco salado",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 10,
-    "unidad_base": "o",
+    "unidad_base": "pieza",
     "gramos_base": 9,
-    "porcion_1eq": "10 o (9 g)",
+    "porcion_1eq": "10 pieza (9 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -21980,7 +21910,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 40,
-    "porcion_1eq": "40 g (40 g)",
+    "porcion_1eq": "40 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -22054,9 +21984,9 @@
     "nombre": "Carne de avestruz",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 35,
-    "unidad_base": "anos",
+    "unidad_base": "pieza",
     "gramos_base": 35,
-    "porcion_1eq": "35 anos (35 g)",
+    "porcion_1eq": "35 pieza (35 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22074,7 +22004,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "35 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22191,7 +22121,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22392,7 +22322,7 @@
     "cantidad_base": 45,
     "unidad_base": "g",
     "gramos_base": 45,
-    "porcion_1eq": "45 g (45 g)",
+    "porcion_1eq": "45 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -22485,7 +22415,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -22505,7 +22435,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -22565,7 +22495,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -22585,7 +22515,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 40,
-    "porcion_1eq": "40 g (40 g)",
+    "porcion_1eq": "40 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -22731,7 +22661,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22785,9 +22715,9 @@
     "nombre": "Falda de res",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 35,
-    "unidad_base": "me",
+    "unidad_base": "pieza",
     "gramos_base": 33,
-    "porcion_1eq": "35 me (33 g)",
+    "porcion_1eq": "35 pieza (33 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -22842,9 +22772,9 @@
     "nombre": "Filete de calamar crudo",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 45,
-    "unidad_base": "pino",
+    "unidad_base": "pieza",
     "gramos_base": 45,
-    "porcion_1eq": "45 pino (45 g)",
+    "porcion_1eq": "45 pieza (45 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -22862,9 +22792,9 @@
     "nombre": "Filete de cazón crudo",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 30,
-    "unidad_base": "are",
+    "unidad_base": "pieza",
     "gramos_base": 30,
-    "porcion_1eq": "30 are (30 g)",
+    "porcion_1eq": "30 pieza (30 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22901,7 +22831,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -22920,7 +22850,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -22974,9 +22904,9 @@
     "nombre": "Filete de mero",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 40,
-    "unidad_base": "eramos",
+    "unidad_base": "g",
     "gramos_base": 40,
-    "porcion_1eq": "40 eramos (40 g)",
+    "porcion_1eq": "40 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -23033,7 +22963,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 40,
-    "porcion_1eq": "40 g (40 g)",
+    "porcion_1eq": "40 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -23164,7 +23094,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "30 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -23219,9 +23149,9 @@
     "nombre": "Guachinango cocido",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 28,
-    "unidad_base": "ma",
+    "unidad_base": "pieza",
     "gramos_base": 28,
-    "porcion_1eq": "28 ma (28 g)",
+    "porcion_1eq": "28 pieza (28 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -23239,7 +23169,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -23274,9 +23204,9 @@
     "nombre": "Halibut cocido",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 27,
-    "unidad_base": "ramos",
+    "unidad_base": "g",
     "gramos_base": 27,
-    "porcion_1eq": "27 ramos (27 g)",
+    "porcion_1eq": "27 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -23292,9 +23222,9 @@
     "nombre": "Huachinango crudo fileteado",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 35,
-    "unidad_base": "la",
+    "unidad_base": "pieza",
     "gramos_base": 35,
-    "porcion_1eq": "35 la (35 g)",
+    "porcion_1eq": "35 pieza (35 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -23809,9 +23739,9 @@
     "nombre": "Mejillones sin concha cocidos",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 25,
-    "unidad_base": "e",
+    "unidad_base": "pieza",
     "gramos_base": 25,
-    "porcion_1eq": "25 e (25 g)",
+    "porcion_1eq": "25 pieza (25 g)",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -23853,7 +23783,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -23890,7 +23820,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24224,9 +24154,9 @@
     "nombre": "Pechuga de pavo ahumada",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 0.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 34,
-    "porcion_1eq": "1/2 red (34 g)",
+    "porcion_1eq": "1/2 rebanada (34 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24266,7 +24196,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24306,7 +24236,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24328,7 +24258,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24367,7 +24297,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24388,7 +24318,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24409,7 +24339,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24430,7 +24360,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 34,
-    "porcion_1eq": "40 g (34 g)",
+    "porcion_1eq": "34 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24451,7 +24381,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24473,7 +24403,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24517,7 +24447,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24539,7 +24469,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24559,7 +24489,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24653,7 +24583,7 @@
     "cantidad_base": 32,
     "unidad_base": "g",
     "gramos_base": 32,
-    "porcion_1eq": "32 g (32 g)",
+    "porcion_1eq": "32 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -24749,7 +24679,7 @@
     "cantidad_base": 0.33,
     "unidad_base": "g",
     "gramos_base": 12,
-    "porcion_1eq": "1/3 g (12 g)",
+    "porcion_1eq": "12 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -24808,7 +24738,7 @@
     "cantidad_base": 38,
     "unidad_base": "g",
     "gramos_base": 36,
-    "porcion_1eq": "38 g (36 g)",
+    "porcion_1eq": "36 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24828,7 +24758,7 @@
     "cantidad_base": 55,
     "unidad_base": "g",
     "gramos_base": 36,
-    "porcion_1eq": "55 g (36 g)",
+    "porcion_1eq": "36 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24868,7 +24798,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 26,
-    "porcion_1eq": "40 g (26 g)",
+    "porcion_1eq": "26 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24927,7 +24857,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -24946,7 +24876,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -25098,7 +25028,7 @@
     "cantidad_base": 50,
     "unidad_base": "g",
     "gramos_base": 50,
-    "porcion_1eq": "50 g (50 g)",
+    "porcion_1eq": "50 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -25197,9 +25127,9 @@
     "nombre": "Queso Mozzarella cero grasa",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -25218,9 +25148,9 @@
     "nombre": "Queso Suizo muy bajo en grasa",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -25242,7 +25172,7 @@
     "cantidad_base": 350,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "350 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -25262,7 +25192,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 36,
-    "porcion_1eq": "40 g (36 g)",
+    "porcion_1eq": "36 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -25322,7 +25252,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -25356,9 +25286,9 @@
     "nombre": "Róbalo cocido",
     "grupo_smae": "aoa_mb",
     "cantidad_base": 30,
-    "unidad_base": "gros",
+    "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 gros (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -25560,7 +25490,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 23,
-    "porcion_1eq": "25 g (23 g)",
+    "porcion_1eq": "23 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -25580,7 +25510,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 27,
-    "porcion_1eq": "30 g (27 g)",
+    "porcion_1eq": "27 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -25902,7 +25832,7 @@
     "cantidad_base": 495,
     "unidad_base": "g",
     "gramos_base": 50,
-    "porcion_1eq": "495 g (50 g)",
+    "porcion_1eq": "50 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -25999,7 +25929,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 32,
-    "porcion_1eq": "40 g (32 g)",
+    "porcion_1eq": "32 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -26018,7 +25948,7 @@
     "cantidad_base": 60,
     "unidad_base": "g",
     "gramos_base": 39,
-    "porcion_1eq": "60 g (39 g)",
+    "porcion_1eq": "39 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -26037,7 +25967,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -26315,7 +26245,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -26333,9 +26263,9 @@
     "nombre": "Corazón de cordero",
     "grupo_smae": "aoa_b",
     "cantidad_base": 45,
-    "unidad_base": "ramos",
+    "unidad_base": "g",
     "gramos_base": 45,
-    "porcion_1eq": "45 ramos (45 g)",
+    "porcion_1eq": "45 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -26354,7 +26284,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -26392,7 +26322,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 29,
-    "porcion_1eq": "25 g (29 g)",
+    "porcion_1eq": "29 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -26652,7 +26582,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -26805,7 +26735,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "mariscos",
       "animal_meat"
@@ -26900,9 +26830,9 @@
     "nombre": "Jamón de pierna",
     "grupo_smae": "aoa_b",
     "cantidad_base": 2,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 42,
-    "porcion_1eq": "2 red (42 g)",
+    "porcion_1eq": "2 rebanada (42 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -27013,9 +26943,9 @@
     "nombre": "Milanesa de cerdo",
     "grupo_smae": "aoa_b",
     "cantidad_base": 40,
-    "unidad_base": "me",
+    "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "40 me (40 g)",
+    "porcion_1eq": "40 pieza (40 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -27088,9 +27018,9 @@
     "nombre": "Molida de res",
     "grupo_smae": "aoa_b",
     "cantidad_base": 30,
-    "unidad_base": "armo",
+    "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 armo (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -27145,7 +27075,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -27891,7 +27821,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -28418,9 +28348,9 @@
     "nombre": "Camedesuadero",
     "grupo_smae": "aoa_m",
     "cantidad_base": 29,
-    "unidad_base": "los",
+    "unidad_base": "pieza",
     "gramos_base": 29,
-    "porcion_1eq": "29 los (29 g)",
+    "porcion_1eq": "29 pieza (29 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -28456,7 +28386,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -28477,7 +28407,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -28699,7 +28629,7 @@
     "cantidad_base": 15,
     "unidad_base": "g",
     "gramos_base": 15,
-    "porcion_1eq": "15 g (15 g)",
+    "porcion_1eq": "15 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -29136,7 +29066,7 @@
     "cantidad_base": 150,
     "unidad_base": "g",
     "gramos_base": 51,
-    "porcion_1eq": "150 g (51 g)",
+    "porcion_1eq": "51 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -29156,7 +29086,7 @@
     "cantidad_base": 150,
     "unidad_base": "g",
     "gramos_base": 51,
-    "porcion_1eq": "150 g (51 g)",
+    "porcion_1eq": "51 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -29218,7 +29148,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "1/5 pieza (40 g)",
+    "porcion_1eq": "1/4 pieza (40 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -29256,9 +29186,9 @@
     "nombre": "Queso de soya",
     "grupo_smae": "aoa_m",
     "cantidad_base": 2,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 56,
-    "porcion_1eq": "2 red (56 g)",
+    "porcion_1eq": "2 rebanada (56 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29315,9 +29245,9 @@
     "nombre": "Queso Mozzarella reducido en grasa",
     "grupo_smae": "aoa_m",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29338,7 +29268,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29379,7 +29309,7 @@
     "cantidad_base": 3.5,
     "unidad_base": "cucharada",
     "gramos_base": 18,
-    "porcion_1eq": "3 1/2 cucharada (18 g)",
+    "porcion_1eq": "3.5 cucharada (18 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29418,7 +29348,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29458,7 +29388,7 @@
     "cantidad_base": 55,
     "unidad_base": "g",
     "gramos_base": 55,
-    "porcion_1eq": "55 g (55 g)",
+    "porcion_1eq": "55 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29478,7 +29408,7 @@
     "cantidad_base": 30,
     "unidad_base": "g",
     "gramos_base": 30,
-    "porcion_1eq": "30 g (30 g)",
+    "porcion_1eq": "30 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -29671,7 +29601,7 @@
     "cantidad_base": 50,
     "unidad_base": "g",
     "gramos_base": 50,
-    "porcion_1eq": "50 g (50 g)",
+    "porcion_1eq": "50 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -29903,7 +29833,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 38,
-    "porcion_1eq": "40 g (38 g)",
+    "porcion_1eq": "38 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -29923,7 +29853,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 33,
-    "porcion_1eq": "40 g (33 g)",
+    "porcion_1eq": "33 g",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -29963,7 +29893,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -29983,7 +29913,7 @@
     "cantidad_base": 40,
     "unidad_base": "g",
     "gramos_base": 40,
-    "porcion_1eq": "40 g (40 g)",
+    "porcion_1eq": "40 g",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -30227,7 +30157,7 @@
     "cantidad_base": 3.5,
     "unidad_base": "cucharada",
     "gramos_base": 46,
-    "porcion_1eq": "3 1/2 cucharada (46 g)",
+    "porcion_1eq": "3.5 cucharada (46 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -30449,7 +30379,7 @@
     "cantidad_base": 3.5,
     "unidad_base": "cucharada",
     "gramos_base": 40,
-    "porcion_1eq": "3 1/2 cucharada (40 g)",
+    "porcion_1eq": "3.5 cucharada (40 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -30486,9 +30416,9 @@
     "nombre": "Jamón Virginia",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 32,
-    "porcion_1eq": "1 1/2 red (32 g)",
+    "porcion_1eq": "1 1/2 rebanada (32 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -30675,9 +30605,9 @@
     "nombre": "Morcilla de arroz",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 red (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -30693,9 +30623,9 @@
     "nombre": "Moronga",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 25,
-    "porcion_1eq": "1 red (25 g)",
+    "porcion_1eq": "1 rebanada (25 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -30711,9 +30641,9 @@
     "nombre": "Mortadela",
     "grupo_smae": "aoa_a",
     "cantidad_base": 0.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 3,
-    "porcion_1eq": "1/2 red (3 g)",
+    "porcion_1eq": "1/2 rebanada (3 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -31025,9 +30955,9 @@
     "nombre": "Peperoni",
     "grupo_smae": "aoa_a",
     "cantidad_base": 10,
-    "unidad_base": "ren",
+    "unidad_base": "rebanada",
     "gramos_base": 20,
-    "porcion_1eq": "10 ren (20 g)",
+    "porcion_1eq": "10 rebanada (20 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -31119,9 +31049,9 @@
     "nombre": "Queso amarillo",
     "grupo_smae": "aoa_a",
     "cantidad_base": 2,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 42,
-    "porcion_1eq": "2 red (42 g)",
+    "porcion_1eq": "2 rebanada (42 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31197,9 +31127,9 @@
     "nombre": "Queso Asadero",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31312,9 +31242,9 @@
     "nombre": "Queso Cheddar",
     "grupo_smae": "aoa_a",
     "cantidad_base": 0.75,
-    "unidad_base": "rep",
+    "unidad_base": "rebanada",
     "gramos_base": 21,
-    "porcion_1eq": "3/4 rep (21 g)",
+    "porcion_1eq": "3/4 rebanada (21 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31509,7 +31439,7 @@
     "cantidad_base": 35,
     "unidad_base": "g",
     "gramos_base": 35,
-    "porcion_1eq": "35 g (35 g)",
+    "porcion_1eq": "35 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31741,7 +31671,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31761,7 +31691,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31876,9 +31806,9 @@
     "nombre": "Queso Muenster",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 281,
-    "porcion_1eq": "1 red (281 g)",
+    "porcion_1eq": "1 rebanada (281 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31933,9 +31863,9 @@
     "nombre": "Queso pasteurizado Americano",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31953,9 +31883,9 @@
     "nombre": "Queso pasteurizado Suizo",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 32,
-    "porcion_1eq": "1 1/2 red (32 g)",
+    "porcion_1eq": "1 1/2 rebanada (32 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -31993,9 +31923,9 @@
     "nombre": "Queso Provolone",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -32069,9 +31999,9 @@
     "nombre": "Queso Suizo",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 28,
-    "porcion_1eq": "1 red (28 g)",
+    "porcion_1eq": "1 rebanada (28 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -32108,9 +32038,9 @@
     "nombre": "Queso tipo Americano",
     "grupo_smae": "aoa_a",
     "cantidad_base": 1.5,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 27,
-    "porcion_1eq": "1 1/2 red (27 g)",
+    "porcion_1eq": "1 1/2 rebanada (27 g)",
     "tags_restriccion": [
       "lacteos",
       "animal_meat"
@@ -32277,9 +32207,9 @@
     "nombre": "Salami",
     "grupo_smae": "aoa_a",
     "cantidad_base": 0.33,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 27,
-    "porcion_1eq": "1/3 red (27 g)",
+    "porcion_1eq": "1/3 rebanada (27 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -32295,9 +32225,9 @@
     "nombre": "Salami de ternera",
     "grupo_smae": "aoa_a",
     "cantidad_base": 6,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 42,
-    "porcion_1eq": "6 red (42 g)",
+    "porcion_1eq": "6 rebanada (42 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -32466,9 +32396,9 @@
     "nombre": "Sesos de res crudos",
     "grupo_smae": "aoa_a",
     "cantidad_base": 75,
-    "unidad_base": "um",
+    "unidad_base": "pieza",
     "gramos_base": 74,
-    "porcion_1eq": "75 um (74 g)",
+    "porcion_1eq": "75 pieza (74 g)",
     "tags_restriccion": [
       "carne_roja",
       "animal_meat"
@@ -32525,9 +32455,9 @@
     "nombre": "Tofu frito",
     "grupo_smae": "aoa_a",
     "cantidad_base": 40,
-    "unidad_base": "es",
+    "unidad_base": "pieza",
     "gramos_base": 40,
-    "porcion_1eq": "40 es (40 g)",
+    "porcion_1eq": "40 pieza (40 g)",
     "tags_restriccion": [
       "animal_meat"
     ],
@@ -33017,7 +32947,7 @@
     "cantidad_base": 113,
     "unidad_base": "g",
     "gramos_base": 113,
-    "porcion_1eq": "113 g (113 g)",
+    "porcion_1eq": "113 g",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -33371,7 +33301,7 @@
     "cantidad_base": 114,
     "unidad_base": "g",
     "gramos_base": 114,
-    "porcion_1eq": "114 g (114 g)",
+    "porcion_1eq": "114 g",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -33907,7 +33837,7 @@
     "cantidad_base": 188,
     "unidad_base": "g",
     "gramos_base": 188,
-    "porcion_1eq": "188 g (188 g)",
+    "porcion_1eq": "188 g",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -34760,9 +34690,9 @@
     "nombre": "Nescate Dolce Gusto",
     "grupo_smae": "leche_e",
     "cantidad_base": 2,
-    "unidad_base": "cápeul",
+    "unidad_base": "cápsula",
     "gramos_base": 42,
-    "porcion_1eq": "2 cápeul (42 g)",
+    "porcion_1eq": "2 cápsula (42 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -34779,9 +34709,9 @@
     "nombre": "Nescafe Dolce Gusto Chococino 1 cápsula de leche + 1 cápsula",
     "grupo_smae": "leche_e",
     "cantidad_base": 1,
-    "unidad_base": "cápsulat",
+    "unidad_base": "cápsula",
     "gramos_base": 51,
-    "porcion_1eq": "1 cápsulat (51 g)",
+    "porcion_1eq": "1 cápsula (51 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -34998,9 +34928,9 @@
     "nombre": "Aceite",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 1,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 5,
-    "porcion_1eq": "1 edia (5 g)",
+    "porcion_1eq": "1 cucharadita (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "aceite",
@@ -35302,9 +35232,9 @@
     "nombre": "Aceite de olivo",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 1,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 5,
-    "porcion_1eq": "1 edia (5 g)",
+    "porcion_1eq": "1 cucharadita (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "aceite",
@@ -35367,9 +35297,9 @@
     "nombre": "Aceite en spray",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 5,
-    "unidad_base": "dsps",
+    "unidad_base": "disparo",
     "gramos_base": 5,
-    "porcion_1eq": "5 dsps (5 g)",
+    "porcion_1eq": "5 disparo (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "aceite",
@@ -36679,7 +36609,7 @@
     "cantidad_base": 5,
     "unidad_base": "g",
     "gramos_base": 5,
-    "porcion_1eq": "5 g (5 g)",
+    "porcion_1eq": "5 g",
     "tags_restriccion": [],
     "keywords": [
       "grasas",
@@ -36725,9 +36655,9 @@
     "nombre": "Manteca de cacao",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 1,
-    "unidad_base": "vedia",
+    "unidad_base": "cucharadita",
     "gramos_base": 5,
-    "porcion_1eq": "1 vedia (5 g)",
+    "porcion_1eq": "1 cucharadita (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "manteca",
@@ -36949,9 +36879,9 @@
     "nombre": "Mayonesa",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 1,
-    "unidad_base": "feda",
+    "unidad_base": "cucharadita",
     "gramos_base": 5,
-    "porcion_1eq": "1 feda (5 g)",
+    "porcion_1eq": "1 cucharadita (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "mayonesa",
@@ -37047,9 +36977,9 @@
     "nombre": "Pam",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 5,
-    "unidad_base": "dsp",
+    "unidad_base": "disparo",
     "gramos_base": 5,
-    "porcion_1eq": "5 dsp (5 g)",
+    "porcion_1eq": "5 disparo (5 g)",
     "tags_restriccion": [],
     "keywords": [
       "pam",
@@ -37339,9 +37269,9 @@
     "nombre": "Tocineta",
     "grupo_smae": "grasas_sp",
     "cantidad_base": 1,
-    "unidad_base": "red",
+    "unidad_base": "rebanada",
     "gramos_base": 10,
-    "porcion_1eq": "1 red (10 g)",
+    "porcion_1eq": "1 rebanada (10 g)",
     "tags_restriccion": [],
     "keywords": [
       "tocineta",
@@ -37646,9 +37576,9 @@
     "nombre": "Almendra",
     "grupo_smae": "grasas_cp",
     "cantidad_base": 10,
-    "unidad_base": "ez",
+    "unidad_base": "pieza",
     "gramos_base": 12,
-    "porcion_1eq": "10 ez (12 g)",
+    "porcion_1eq": "10 pieza (12 g)",
     "tags_restriccion": [
       "nueces"
     ],
@@ -38320,9 +38250,9 @@
     "nombre": "Chorizo vegetariano",
     "grupo_smae": "grasas_cp",
     "cantidad_base": 15,
-    "unidad_base": "nos",
+    "unidad_base": "pieza",
     "gramos_base": 115,
-    "porcion_1eq": "15 nos (115 g)",
+    "porcion_1eq": "15 pieza (115 g)",
     "tags_restriccion": [
       "carne_roja"
     ],
@@ -38428,7 +38358,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "nueces"
     ],
@@ -38484,7 +38414,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [
       "nueces"
     ],
@@ -38519,7 +38449,7 @@
     "cantidad_base": 15,
     "unidad_base": "g",
     "gramos_base": 18,
-    "porcion_1eq": "15 g (18 g)",
+    "porcion_1eq": "18 g",
     "tags_restriccion": [],
     "keywords": [
       "kkwate",
@@ -38696,9 +38626,9 @@
     "nombre": "Nuez de la India con sali",
     "grupo_smae": "grasas_cp",
     "cantidad_base": 7,
-    "unidad_base": "sea",
+    "unidad_base": "pieza",
     "gramos_base": 11,
-    "porcion_1eq": "7 sea (11 g)",
+    "porcion_1eq": "7 pieza (11 g)",
     "tags_restriccion": [
       "nueces"
     ],
@@ -39220,9 +39150,9 @@
     "nombre": "Queso de nuez",
     "grupo_smae": "grasas_cp",
     "cantidad_base": 0.25,
-    "unidad_base": "ms",
+    "unidad_base": "pieza",
     "gramos_base": 14,
-    "porcion_1eq": "1/4 ms (14 g)",
+    "porcion_1eq": "1/4 pieza (14 g)",
     "tags_restriccion": [
       "lacteos",
       "nueces"
@@ -39256,9 +39186,9 @@
     "nombre": "Queso de puerco",
     "grupo_smae": "grasas_cp",
     "cantidad_base": 20,
-    "unidad_base": "omo",
+    "unidad_base": "pieza",
     "gramos_base": 20,
-    "porcion_1eq": "20 omo (20 g)",
+    "porcion_1eq": "20 pieza (20 g)",
     "tags_restriccion": [
       "lacteos",
       "carne_roja"
@@ -39926,9 +39856,9 @@
     "nombre": "Boing",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 0.5,
-    "unidad_base": "pakch",
+    "unidad_base": "pieza",
     "gramos_base": 125,
-    "porcion_1eq": "1/2 pakch (125 g)",
+    "porcion_1eq": "1/2 pieza (125 g)",
     "tags_restriccion": [],
     "keywords": [
       "boing",
@@ -40264,7 +40194,7 @@
     "cantidad_base": 0.5,
     "unidad_base": "g",
     "gramos_base": 12,
-    "porcion_1eq": "1/2 g (12 g)",
+    "porcion_1eq": "12 g",
     "tags_restriccion": [],
     "keywords": [
       "cascara",
@@ -40281,7 +40211,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [],
     "keywords": [
       "cascara",
@@ -40365,9 +40295,9 @@
     "nombre": "Checolnes",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 15,
-    "unidad_base": "somo",
+    "unidad_base": "pieza",
     "gramos_base": 15,
-    "porcion_1eq": "15 somo (15 g)",
+    "porcion_1eq": "15 pieza (15 g)",
     "tags_restriccion": [],
     "keywords": [
       "checolnes",
@@ -40498,7 +40428,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -41124,7 +41054,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "lata",
     "gramos_base": 91,
-    "porcion_1eq": "1/5 lata (91 g)",
+    "porcion_1eq": "1/4 lata (91 g)",
     "tags_restriccion": [],
     "keywords": [
       "fuze",
@@ -41178,7 +41108,7 @@
     "cantidad_base": 200,
     "unidad_base": "ml",
     "gramos_base": 200,
-    "porcion_1eq": "200 ml (200 g)",
+    "porcion_1eq": "200 ml",
     "tags_restriccion": [],
     "keywords": [
       "gatorade",
@@ -41547,7 +41477,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [],
     "keywords": [
       "gelatina",
@@ -41649,7 +41579,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -41669,7 +41599,7 @@
     "cantidad_base": 4.5,
     "unidad_base": "cucharada",
     "gramos_base": 72,
-    "porcion_1eq": "4 1/2 cucharada (72 g)",
+    "porcion_1eq": "4.5 cucharada (72 g)",
     "tags_restriccion": [],
     "keywords": [
       "gelatina",
@@ -41919,7 +41849,7 @@
     "cantidad_base": 10,
     "unidad_base": "g",
     "gramos_base": 10,
-    "porcion_1eq": "10 g (10 g)",
+    "porcion_1eq": "10 g",
     "tags_restriccion": [],
     "keywords": [
       "huevitos",
@@ -41934,9 +41864,9 @@
     "nombre": "Inulina de agave",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 2,
-    "unidad_base": "cdila",
+    "unidad_base": "cucharadita",
     "gramos_base": 10,
-    "porcion_1eq": "2 cdila (10 g)",
+    "porcion_1eq": "2 cucharadita (10 g)",
     "tags_restriccion": [],
     "keywords": [
       "inulina",
@@ -42207,9 +42137,9 @@
     "nombre": "Jugo Ades de naranja",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 1,
-    "unidad_base": "pakch",
+    "unidad_base": "pieza",
     "gramos_base": 200,
-    "porcion_1eq": "1 pakch (200 g)",
+    "porcion_1eq": "1 pieza (200 g)",
     "tags_restriccion": [],
     "keywords": [
       "jugo",
@@ -42279,7 +42209,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [],
     "keywords": [
       "jugo",
@@ -42294,9 +42224,9 @@
     "nombre": "Jugo de frutas",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 0.33,
-    "unidad_base": "laza",
+    "unidad_base": "taza",
     "gramos_base": 80,
-    "porcion_1eq": "1/3 laza (80 g)",
+    "porcion_1eq": "1/3 taza (80 g)",
     "tags_restriccion": [],
     "keywords": [
       "jugo",
@@ -42361,9 +42291,9 @@
     "nombre": "Leche condensada",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 2,
-    "unidad_base": "edila",
+    "unidad_base": "cucharadita",
     "gramos_base": 11,
-    "porcion_1eq": "2 edila (11 g)",
+    "porcion_1eq": "2 cucharadita (11 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -42574,9 +42504,9 @@
     "nombre": "Mentos frutal",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 4,
-    "unidad_base": "e",
+    "unidad_base": "pieza",
     "gramos_base": 11,
-    "porcion_1eq": "4 e (11 g)",
+    "porcion_1eq": "4 pieza (11 g)",
     "tags_restriccion": [],
     "keywords": [
       "mentos",
@@ -42944,7 +42874,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "lata",
     "gramos_base": 96,
-    "porcion_1eq": "1/5 lata (96 g)",
+    "porcion_1eq": "1/4 lata (96 g)",
     "tags_restriccion": [],
     "keywords": [
       "monster",
@@ -43045,7 +42975,7 @@
     "cantidad_base": 4.5,
     "unidad_base": "cucharadita",
     "gramos_base": 11,
-    "porcion_1eq": "4 1/2 cucharadita (11 g)",
+    "porcion_1eq": "4.5 cucharadita (11 g)",
     "tags_restriccion": [],
     "keywords": [
       "nestea",
@@ -43075,9 +43005,9 @@
     "nombre": "Nieve de limón",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 0.5,
-    "unidad_base": "bola",
+    "unidad_base": "pieza",
     "gramos_base": 34,
-    "porcion_1eq": "1/2 bola (34 g)",
+    "porcion_1eq": "1/2 pieza (34 g)",
     "tags_restriccion": [],
     "keywords": [
       "nieve",
@@ -43328,9 +43258,9 @@
     "nombre": "Piloncillo rallado",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 1,
-    "unidad_base": "ecda",
+    "unidad_base": "cucharadita",
     "gramos_base": 10,
-    "porcion_1eq": "1 ecda (10 g)",
+    "porcion_1eq": "1 cucharadita (10 g)",
     "tags_restriccion": [],
     "keywords": [
       "piloncillo",
@@ -44672,7 +44602,7 @@
     "cantidad_base": 19,
     "unidad_base": "g",
     "gramos_base": 19,
-    "porcion_1eq": "19 g (19 g)",
+    "porcion_1eq": "19 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -44773,9 +44703,9 @@
     "nombre": "Chocolate con galleta y caramelo",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 0.5,
-    "unidad_base": "bara",
+    "unidad_base": "barra",
     "gramos_base": 15,
-    "porcion_1eq": "1/2 bara (15 g)",
+    "porcion_1eq": "1/2 barra (15 g)",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -44812,7 +44742,7 @@
     "cantidad_base": 0.25,
     "unidad_base": "g",
     "gramos_base": 14,
-    "porcion_1eq": "1/4 g (14 g)",
+    "porcion_1eq": "14 g",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -44834,7 +44764,7 @@
     "cantidad_base": 15,
     "unidad_base": "g",
     "gramos_base": 15,
-    "porcion_1eq": "15 g (15 g)",
+    "porcion_1eq": "15 g",
     "tags_restriccion": [
       "lacteos",
       "nueces"
@@ -44980,7 +44910,7 @@
     "cantidad_base": 15,
     "unidad_base": "g",
     "gramos_base": 15,
-    "porcion_1eq": "15 g (15 g)",
+    "porcion_1eq": "15 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -45000,7 +44930,7 @@
     "cantidad_base": 0.5,
     "unidad_base": "g",
     "gramos_base": 12,
-    "porcion_1eq": "1/2 g (12 g)",
+    "porcion_1eq": "12 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -45020,7 +44950,7 @@
     "cantidad_base": 25,
     "unidad_base": "g",
     "gramos_base": 25,
-    "porcion_1eq": "25 g (25 g)",
+    "porcion_1eq": "25 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -45209,7 +45139,7 @@
     "cantidad_base": 20,
     "unidad_base": "g",
     "gramos_base": 20,
-    "porcion_1eq": "20 g (20 g)",
+    "porcion_1eq": "20 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -45324,9 +45254,9 @@
     "nombre": "Chocolate Turín conejo de la Rosa",
     "grupo_smae": "azucares_sg",
     "cantidad_base": 1,
-    "unidad_base": "o",
+    "unidad_base": "pieza",
     "gramos_base": 20,
-    "porcion_1eq": "1 o (20 g)",
+    "porcion_1eq": "1 pieza (20 g)",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -45512,7 +45442,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 61,
-    "porcion_1eq": "1/5 taza (61 g)",
+    "porcion_1eq": "1/4 taza (61 g)",
     "tags_restriccion": [],
     "keywords": [
       "flan",
@@ -45528,7 +45458,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 61,
-    "porcion_1eq": "1/5 taza (61 g)",
+    "porcion_1eq": "1/4 taza (61 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -45550,7 +45480,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 61,
-    "porcion_1eq": "1/5 taza (61 g)",
+    "porcion_1eq": "1/4 taza (61 g)",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -45984,7 +45914,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 21,
-    "porcion_1eq": "1/5 pieza (21 g)",
+    "porcion_1eq": "1/4 pieza (21 g)",
     "tags_restriccion": [],
     "keywords": [
       "paleta",
@@ -46003,7 +45933,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 21,
-    "porcion_1eq": "1/5 pieza (21 g)",
+    "porcion_1eq": "1/4 pieza (21 g)",
     "tags_restriccion": [],
     "keywords": [
       "paleta",
@@ -46022,7 +45952,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "pieza",
     "gramos_base": 21,
-    "porcion_1eq": "1/5 pieza (21 g)",
+    "porcion_1eq": "1/4 pieza (21 g)",
     "tags_restriccion": [
       "lacteos",
       "nueces"
@@ -46496,7 +46426,7 @@
     "cantidad_base": 5.5,
     "unidad_base": "taza",
     "gramos_base": 440,
-    "porcion_1eq": "5 1/2 taza (440 g)",
+    "porcion_1eq": "5.5 taza (440 g)",
     "tags_restriccion": [],
     "keywords": [
       "cafe",
@@ -46694,7 +46624,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "taza",
     "gramos_base": 50,
-    "porcion_1eq": "1/5 taza (50 g)",
+    "porcion_1eq": "1/4 taza (50 g)",
     "tags_restriccion": [],
     "keywords": [
       "caldo",
@@ -46796,7 +46726,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "raja",
     "gramos_base": 2,
-    "porcion_1eq": "1/5 raja (2 g)",
+    "porcion_1eq": "1/4 raja (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "canela",
@@ -46857,9 +46787,9 @@
     "nombre": "Cáscara de limón",
     "grupo_smae": "libres",
     "cantidad_base": 5,
-    "unidad_base": "cdia",
+    "unidad_base": "cucharadita",
     "gramos_base": 10,
-    "porcion_1eq": "5 cdia (10 g)",
+    "porcion_1eq": "5 cucharadita (10 g)",
     "tags_restriccion": [],
     "keywords": [
       "cascara",
@@ -47084,7 +47014,7 @@
     "cantidad_base": 2,
     "unidad_base": "g",
     "gramos_base": 2,
-    "porcion_1eq": "2 g (2 g)",
+    "porcion_1eq": "2 g",
     "tags_restriccion": [],
     "keywords": [
       "chocolate",
@@ -47282,7 +47212,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "cucharada",
     "gramos_base": 2,
-    "porcion_1eq": "1/5 cucharada (2 g)",
+    "porcion_1eq": "1/4 cucharada (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "cocoa",
@@ -47299,7 +47229,7 @@
     "cantidad_base": 0.2,
     "unidad_base": "cucharada",
     "gramos_base": 2,
-    "porcion_1eq": "1/5 cucharada (2 g)",
+    "porcion_1eq": "1/4 cucharada (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "cocoa",
@@ -47949,9 +47879,9 @@
     "nombre": "Gengibre",
     "grupo_smae": "libres",
     "cantidad_base": 3,
-    "unidad_base": "cdia",
+    "unidad_base": "cucharadita",
     "gramos_base": 6,
-    "porcion_1eq": "3 cdia (6 g)",
+    "porcion_1eq": "3 cucharadita (6 g)",
     "tags_restriccion": [],
     "keywords": [
       "gengibre",
@@ -47964,9 +47894,9 @@
     "nombre": "Genglibre fresco",
     "grupo_smae": "libres",
     "cantidad_base": 3,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 6,
-    "porcion_1eq": "3 edia (6 g)",
+    "porcion_1eq": "3 cucharadita (6 g)",
     "tags_restriccion": [],
     "keywords": [
       "genglibre",
@@ -48077,9 +48007,9 @@
     "nombre": "Hierbas molidas",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 2,
-    "porcion_1eq": "1 edia (2 g)",
+    "porcion_1eq": "1 cucharadita (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "hierbas",
@@ -48172,9 +48102,9 @@
     "nombre": "Jamaica",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "taa",
+    "unidad_base": "taza",
     "gramos_base": 1,
-    "porcion_1eq": "1 taa (1 g)",
+    "porcion_1eq": "1 taza (1 g)",
     "tags_restriccion": [],
     "keywords": [
       "jamaica",
@@ -48187,9 +48117,9 @@
     "nombre": "Jengibre",
     "grupo_smae": "libres",
     "cantidad_base": 3,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 6,
-    "porcion_1eq": "3 edia (6 g)",
+    "porcion_1eq": "3 cucharadita (6 g)",
     "tags_restriccion": [],
     "keywords": [
       "jengibre",
@@ -48447,9 +48377,9 @@
     "nombre": "Manzanilla seca",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "bosa",
+    "unidad_base": "bolsa",
     "gramos_base": 2,
-    "porcion_1eq": "1 bosa (2 g)",
+    "porcion_1eq": "1 bolsa (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "manzanilla",
@@ -49193,9 +49123,9 @@
     "nombre": "Romero",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 3,
-    "porcion_1eq": "1 edia (3 g)",
+    "porcion_1eq": "1 cucharadita (3 g)",
     "tags_restriccion": [
       "mariscos"
     ],
@@ -49375,9 +49305,9 @@
     "nombre": "Salsa inglesa",
     "grupo_smae": "libres",
     "cantidad_base": 0.5,
-    "unidad_base": "cdila",
+    "unidad_base": "cucharadita",
     "gramos_base": 8,
-    "porcion_1eq": "1/2 cdila (8 g)",
+    "porcion_1eq": "1/2 cucharadita (8 g)",
     "tags_restriccion": [],
     "keywords": [
       "salsa",
@@ -49542,9 +49472,9 @@
     "nombre": "Semilla de eneldo",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "odia",
+    "unidad_base": "cucharadita",
     "gramos_base": 2,
-    "porcion_1eq": "1 odia (2 g)",
+    "porcion_1eq": "1 cucharadita (2 g)",
     "tags_restriccion": [
       "nueces"
     ],
@@ -49560,9 +49490,9 @@
     "nombre": "Sidral de dieta",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "leta",
+    "unidad_base": "lata",
     "gramos_base": 355,
-    "porcion_1eq": "1 leta (355 g)",
+    "porcion_1eq": "1 lata (355 g)",
     "tags_restriccion": [],
     "keywords": [
       "sidral",
@@ -49672,9 +49602,9 @@
     "nombre": "Té Chai",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "cata",
+    "unidad_base": "lata",
     "gramos_base": 2,
-    "porcion_1eq": "1 cata (2 g)",
+    "porcion_1eq": "1 lata (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "chai",
@@ -49687,9 +49617,9 @@
     "nombre": "Té verde",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "edia",
+    "unidad_base": "cucharadita",
     "gramos_base": 2,
-    "porcion_1eq": "1 edia (2 g)",
+    "porcion_1eq": "1 cucharadita (2 g)",
     "tags_restriccion": [],
     "keywords": [
       "verde",
@@ -49890,9 +49820,9 @@
     "nombre": "Vinagre de vino",
     "grupo_smae": "libres",
     "cantidad_base": 1,
-    "unidad_base": "redia",
+    "unidad_base": "cucharadita",
     "gramos_base": 516,
-    "porcion_1eq": "1 redia (516 g)",
+    "porcion_1eq": "1 cucharadita (516 g)",
     "tags_restriccion": [],
     "keywords": [
       "vinagre",
@@ -49939,7 +49869,7 @@
     "cantidad_base": 50,
     "unidad_base": "ml",
     "gramos_base": 50,
-    "porcion_1eq": "50 ml (50 g)",
+    "porcion_1eq": "50 ml",
     "tags_restriccion": [],
     "keywords": [
       "aguardiente",
@@ -49952,9 +49882,9 @@
     "nombre": "Anís dulce o seco",
     "grupo_smae": "libres",
     "cantidad_base": 55,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 55,
-    "porcion_1eq": "55 mi (55 g)",
+    "porcion_1eq": "55 ml",
     "tags_restriccion": [],
     "keywords": [
       "anis",
@@ -49969,9 +49899,9 @@
     "nombre": "Brandy",
     "grupo_smae": "libres",
     "cantidad_base": 60,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 60,
-    "porcion_1eq": "60 mi (60 g)",
+    "porcion_1eq": "60 ml",
     "tags_restriccion": [],
     "keywords": [
       "brandy",
@@ -50030,9 +49960,9 @@
     "nombre": "Coñac",
     "grupo_smae": "libres",
     "cantidad_base": 60,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 60,
-    "porcion_1eq": "60 mi (60 g)",
+    "porcion_1eq": "60 ml",
     "tags_restriccion": [],
     "keywords": [
       "conac",
@@ -50045,9 +49975,9 @@
     "nombre": "Crema de menta",
     "grupo_smae": "libres",
     "cantidad_base": 40,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 40,
-    "porcion_1eq": "40 mi (40 g)",
+    "porcion_1eq": "40 ml",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -50065,7 +49995,7 @@
     "cantidad_base": 55,
     "unidad_base": "ml",
     "gramos_base": 55,
-    "porcion_1eq": "55 ml (55 g)",
+    "porcion_1eq": "55 ml",
     "tags_restriccion": [],
     "keywords": [
       "ginebra",
@@ -50078,9 +50008,9 @@
     "nombre": "Licor 100” proof",
     "grupo_smae": "libres",
     "cantidad_base": 50,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 50,
-    "porcion_1eq": "50 mi (50 g)",
+    "porcion_1eq": "50 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50097,7 +50027,7 @@
     "cantidad_base": 60,
     "unidad_base": "ml",
     "gramos_base": 60,
-    "porcion_1eq": "60 ml (60 g)",
+    "porcion_1eq": "60 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50111,9 +50041,9 @@
     "nombre": "Licor 86” proof",
     "grupo_smae": "libres",
     "cantidad_base": 55,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 55,
-    "porcion_1eq": "55 mi (55 g)",
+    "porcion_1eq": "55 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50127,9 +50057,9 @@
     "nombre": "Licor 90” proof",
     "grupo_smae": "libres",
     "cantidad_base": 55,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 55,
-    "porcion_1eq": "55 mi (55 g)",
+    "porcion_1eq": "55 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50145,7 +50075,7 @@
     "cantidad_base": 50,
     "unidad_base": "ml",
     "gramos_base": 50,
-    "porcion_1eq": "50 ml (50 g)",
+    "porcion_1eq": "50 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50159,9 +50089,9 @@
     "nombre": "Licor de almendras",
     "grupo_smae": "libres",
     "cantidad_base": 60,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 60,
-    "porcion_1eq": "60 mi (60 g)",
+    "porcion_1eq": "60 ml",
     "tags_restriccion": [
       "nueces"
     ],
@@ -50179,7 +50109,7 @@
     "cantidad_base": 45,
     "unidad_base": "ml",
     "gramos_base": 45,
-    "porcion_1eq": "45 ml (45 g)",
+    "porcion_1eq": "45 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",
@@ -50193,9 +50123,9 @@
     "nombre": "Licor de café con crema",
     "grupo_smae": "libres",
     "cantidad_base": 45,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 45,
-    "porcion_1eq": "45 mi (45 g)",
+    "porcion_1eq": "45 ml",
     "tags_restriccion": [
       "lacteos"
     ],
@@ -50213,9 +50143,9 @@
     "nombre": "Licor de café con whiskey",
     "grupo_smae": "libres",
     "cantidad_base": 45,
-    "unidad_base": "mi",
+    "unidad_base": "ml",
     "gramos_base": 45,
-    "porcion_1eq": "45 mi (45 g)",
+    "porcion_1eq": "45 ml",
     "tags_restriccion": [],
     "keywords": [
       "licor",

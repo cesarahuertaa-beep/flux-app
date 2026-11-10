@@ -23,7 +23,11 @@ const foods = INGREDIENTES_CATALOGO.map((f) => {
 });
 
 const batchSize = 500;
-let foodsSql = `-- Semilla oficial completa de public.smae_alimentos (${foods.length} alimentos). Generado por scripts/generate_smae_seed.mjs\n\n`;
+let foodsSql = `-- Semilla oficial completa de public.smae_alimentos (${foods.length} alimentos). Generado por scripts/generate_smae_seed.mjs
+-- Limpiar tabla previamente para eliminar registros obsoletos o erróneos:
+DELETE FROM public.smae_alimentos;
+
+`;
 
 for (let i = 0; i < foods.length; i += batchSize) {
   const batch = foods.slice(i, i + batchSize);

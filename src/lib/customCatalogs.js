@@ -172,11 +172,23 @@ export async function fetchCustomPlatillos() {
 export async function fetchCustomIngredientes() {
   const local = peekCustomIngredientes();
 
-  // 1. Intentar leer desde la tabla PostgreSQL de Supabase
+  // 1. Intentar leer desde la tabla PostgreSQL de Supabase (paginado en bloques de 1000 para superar el límite de PostgREST)
   try {
-    const rows = await dbGet("smae_alimentos?order=nombre.asc");
-    if (Array.isArray(rows) && rows.length > 0) {
-      const mapped = rows.map(mapRowToAlimento).filter(Boolean);
+    const PAGE_SIZE = 1000;
+    let allRows = [];
+    let offset = 0;
+    while (true) {
+      const batch = await dbGet(`smae_alimentos?order=id.asc&limit=${PAGE_SIZE}&offset=${offset}`);
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      allRows.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+
+    if (allRows.length > 0) {
+      // Ordenar alfabéticamente para una vista impecable
+      allRows.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }));
+      const mapped = allRows.map(mapRowToAlimento).filter(Boolean);
       try {
         localStorage.setItem(KEY_SMAE_ALIMENTOS, JSON.stringify(mapped));
       } catch {}
