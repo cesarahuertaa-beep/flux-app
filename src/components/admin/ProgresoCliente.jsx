@@ -2194,6 +2194,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
           ):rutinas.map(r=>{
             const semanas = getSemanasConFecha(r, cicloSel);
+            const numSemanas = Math.max(1, semanas.length);
+            const metricColPercent = (62 / (numSemanas * 2)).toFixed(2);
+            const tableMinPx = Math.max(740, 240 + 50 + (numSemanas * 2 * 56));
             const tieneData = r.ejercicios.some(ej => Object.keys(progreso).some(key => key.startsWith(`${ej.id}-`)));
             return (
               <div key={r.id} className="mb-6">
@@ -2203,21 +2206,43 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
                 {tieneData&&(
                   <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] shadow-sm">
-                    <table className="border-collapse text-[11px] min-w-full bg-white">
+                    <table 
+                      className="border-collapse text-[11px] min-w-full bg-white table-fixed" 
+                      style={{ minWidth: `${tableMinPx}px` }}
+                    >
+                      <colgroup>
+                        <col style={{ width: "32%" }} />
+                        <col style={{ width: "6%" }} />
+                        {semanas.map((_, i) => (
+                          <Fragment key={`col-grp-${i}`}>
+                            <col style={{ width: `${metricColPercent}%` }} />
+                            <col style={{ width: `${metricColPercent}%` }} />
+                          </Fragment>
+                        ))}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th className="bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left min-w-[120px]">Ejercicio</th>
-                          <th className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center min-w-[40px]">Serie</th>
+                          <th 
+                            rowSpan={2} 
+                            className="sticky left-0 z-30 bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left font-bold shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                          >
+                            Ejercicio
+                          </th>
+                          <th 
+                            rowSpan={2} 
+                            className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center font-bold"
+                          >
+                            Serie
+                          </th>
                           {semanas.map((s,i)=>(
-                            <th key={i} colSpan={2} className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] whitespace-nowrap">{s.label}</th>
+                            <th key={i} colSpan={2} className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap">{s.label}</th>
                           ))}
                         </tr>
                         <tr>
-                          <th colSpan={2} className="bg-gray-50/50 border border-[#E2E8F0]"/>
                           {semanas.map((_,i)=>(
                             <Fragment key={`h${i}`}>
-                              <th key={`p${i}`} className="bg-gray-50/50 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px]">Peso</th>
-                              <th key={`r${i}`} className="bg-gray-50/50 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px]">Reps</th>
+                              <th key={`p${i}`} className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold">Peso</th>
+                              <th key={`r${i}`} className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold">Reps</th>
                             </Fragment>
                           ))}
                         </tr>
@@ -2246,12 +2271,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             return Array.from({length: exObj.num_series || ej.num_series || 4}, (_, si) => (
                               <tr key={`${ej.id}-${vid}-${si}`} className={highlight}>
                                 {si === 0 && (
-                                  <td rowSpan={exObj.num_series || ej.num_series || 4} className="px-3 py-2 border border-[#E2E8F0] font-bold align-middle">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[#0B1929]">{exObj.nombre}</span>
-                                      {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold">ALT</span>}
+                                  <td 
+                                    rowSpan={exObj.num_series || ej.num_series || 4} 
+                                    className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] ${
+                                      !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
+                                      {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold shrink-0">ALT</span>}
                                     </div>
-                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
+                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
                                   </td>
                                 )}
                                 <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
