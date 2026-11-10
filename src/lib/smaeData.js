@@ -170,6 +170,60 @@ export const SMAE_GROUPS = [
 export const SMAE_GROUPS_MAP = Object.fromEntries(SMAE_GROUPS.map((g) => [g.id, g]));
 
 /**
+ * Etiquetas rápidas de Restricción Alimentaria (1 clic en Paso 2 de Evaluación, estilo Avena).
+ */
+export const DIET_RESTRICTION_TAGS = [
+  {
+    id: "sin_lacteos",
+    label: "Sin Lácteos / Deslactosado",
+    shortLabel: "Sin Lácteos",
+    icon: "🥛",
+    tagMatch: "lacteos",
+    keywords: ["sin lacteos", "sin lácteos", "deslactosado", "intolerancia a la lactosa", "sin lactosa", "alergia a la leche"],
+  },
+  {
+    id: "sin_gluten",
+    label: "Sin Gluten / Trigo",
+    shortLabel: "Sin Gluten",
+    icon: "🌾",
+    tagMatch: "gluten",
+    keywords: ["sin gluten", "sin trigo", "celiaco", "celíaco", "celiaquia", "celiaquía"],
+  },
+  {
+    id: "sin_mariscos",
+    label: "Sin Pescados / Mariscos",
+    shortLabel: "Sin Mariscos",
+    icon: "🦐",
+    tagMatch: "mariscos",
+    keywords: ["sin pescados", "sin mariscos", "alergia a mariscos", "alergia al pescado", "sin pescado"],
+  },
+  {
+    id: "sin_carne_roja",
+    label: "Sin Carne Roja / Cerdo",
+    shortLabel: "Sin Carne Roja",
+    icon: "🥩",
+    tagMatch: "carne_roja",
+    keywords: ["sin carne roja", "sin cerdo", "sin res", "sin puerco"],
+  },
+  {
+    id: "sin_nueces",
+    label: "Sin Nueces / Cacahuates",
+    shortLabel: "Sin Nueces",
+    icon: "🥜",
+    tagMatch: "nueces",
+    keywords: ["sin nueces", "sin cacahuates", "sin cacahuate", "alergia a nueces", "alergia al cacahuate", "sin frutos secos"],
+  },
+  {
+    id: "vegetariano",
+    label: "Vegetariano",
+    shortLabel: "Vegetariano",
+    icon: "🌱",
+    tagMatch: "animal_meat",
+    keywords: ["vegetariano", "vegetariana", "vegano", "vegana"],
+  },
+];
+
+/**
  * Catálogo de alimentos equivalentes por grupo SMAE (1 Equivalente estándar).
  * Cada elemento define:
  * - id: identificador único
@@ -522,4 +576,62 @@ export function detectSwappableIngredientsInMeal(mealText = "") {
   }
 
   return detected;
+}
+
+/**
+ * Calcula cuántos equivalentes de cada grupo SMAE están presentes en el texto de una comida.
+ */
+export function estimateMealSmaeMap(mealText = "") {
+  const detected = detectSwappableIngredientsInMeal(mealText);
+  const map = {};
+  for (const item of detected) {
+    map[item.groupId] = Math.round(((map[item.groupId] || 0) + (Number(item.equivalents) || 0)) * 10) / 10;
+  }
+  return map;
+}
+
+/**
+ * Suma los equivalentes SMAE detectados en todas las comidas (opción principal) de un día.
+ */
+export function estimateDaySmaeUsage(comidas = []) {
+  const usedMap = {};
+  if (!Array.isArray(comidas)) return usedMap;
+  for (const meal of comidas) {
+    const firstOpt = String(meal?.opcion1 || "").split(/\n---OPCION---\n/)[0] || "";
+    const mealMap = estimateMealSmaeMap(firstOpt);
+    for (const [grpId, eq] of Object.entries(mealMap)) {
+      usedMap[grpId] = Math.round(((usedMap[grpId] || 0) + eq) * 10) / 10;
+    }
+  }
+  return usedMap;
+}
+
+/**
+ * Sugiere dinámicamente el reparto de equivalentes SMAE para una comida específica
+ * adaptándose al número libre de tiempos de comida que tenga ese día en FLUX (2, 3, 4, 5...).
+ */
+export function suggestMealSmaeSplit(daySmaeMap = {}, totalMeals = 3, mealIndex = 0) {
+  const n = Math.max(1, Number(totalMeals) || 3);
+  const idx = Math.max(0, Math.min(n - 1, Number(mealIndex) || 0));
+
+  // Pesos proporcionales según cuántos tiempos de comida tenga el día
+  // Ej. 3 comidas: [35%, 40%, 25%] | 4 comidas: [30%, 15%, 35%, 20%] | 5 comidas: [25%, 12%, 33%, 10%, 20%]
+  let weights = Array(n).fill(1 / n);
+  if (n === 3) weights = [0.33, 0.38, 0.29];
+  else if (n === 4) weights = [0.28, 0.14, 0.34, 0.24];
+  else if (n === 5) weights = [0.25, 0.12, 0.33, 0.10, 0.20];
+
+  const roundHalf = (v) => Math.max(0, Math.round(v * 2) / 2);
+  const w = weights[idx] || 1 / n;
+  const split = {};
+
+  for (const grp of SMAE_GROUPS) {
+    const totalEq = Number(daySmaeMap?.[grp.id]) || 0;
+    if (totalEq <= 0) continue;
+    const suggested = roundHalf(totalEq * w);
+    if (suggested > 0) {
+      split[grp.id] = suggested;
+    }
+  }
+  return split;
 }

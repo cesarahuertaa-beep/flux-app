@@ -1198,6 +1198,7 @@ export function generateSmartMacroPrescription({
     aiAudit: ai || null,
     manualMacros: mm || null,
     prescribedMacros: pm || null,
+    smaeDistribution: pm?.smaeDistribution || enriched?.smae_distribution || null,
     evalFecha: enriched?.fecha || null,
     weight: peso,
 

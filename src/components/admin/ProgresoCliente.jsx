@@ -35,6 +35,12 @@ import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
 import { auditMacroPrescriptionWithAi, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import {
+  SMAE_GROUPS,
+  DIET_RESTRICTION_TAGS,
+  autoDistributeSmaeFromMacros,
+  calculateSmaeTotals,
+} from "../../lib/smaeData";
 import UpgradeModal from "../ui/UpgradeModal";
 
 const FIELDS_BASICAS = [
@@ -337,6 +343,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [isAuditingAi, setIsAuditingAi] = useState(false);
   const [aiAuditError, setAiAuditError] = useState(null);
+  const [customSmaeMap, setCustomSmaeMap] = useState(null);
+  const [showStep5SmaeTable, setShowStep5SmaeTable] = useState(false);
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
@@ -839,6 +847,28 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     };
   }, [prescriptionMode, liveSmartMacros, manualMacros, aiAuditResult, form.peso]);
 
+  const effectiveSmaeDistribution = useMemo(() => {
+    if (customSmaeMap && Object.keys(customSmaeMap).length > 0) {
+      return customSmaeMap;
+    }
+    if (!activePrescription || !activePrescription.targetKcal) return {};
+    return autoDistributeSmaeFromMacros({
+      calorias: activePrescription.targetKcal,
+      proteina: activePrescription.proteinG,
+      carbohidratos: activePrescription.carbsG,
+      grasas: activePrescription.fatsG,
+    });
+  }, [customSmaeMap, activePrescription]);
+
+  const adjustStep5Smae = (groupId, delta) => {
+    setCustomSmaeMap((prev) => {
+      const base = prev && Object.keys(prev).length > 0 ? prev : effectiveSmaeDistribution;
+      const cur = Number(base[groupId]) || 0;
+      const nextVal = Math.max(0, Math.round((cur + delta) * 2) / 2);
+      return { ...base, [groupId]: nextVal };
+    });
+  };
+
   const handleAuditMacrosWithAi = async () => {
     if (isFreemium) {
       openPaywall("ia");
@@ -1134,6 +1164,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           ajustesSugeridos: activePrescription.ajustesSugeridos || [],
           estrategiaMenu: activePrescription.estrategiaMenu || null,
           model: activePrescription.model || null,
+          smaeDistribution: effectiveSmaeDistribution || null,
         };
       }
 
@@ -1325,6 +1356,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setShowModal(false); setForm(emptyForm());
     setPendingFotos([]); setPreviewUrls([]);
     setEditingId(null); setExistingFotos([]);
+    setCustomSmaeMap(null);
+    setShowStep5SmaeTable(false);
   };
 
   const startEdit = (mRaw) => {
@@ -1434,6 +1467,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     } else {
       setAiAuditResult(null);
     }
+
+    // Restaurar distribución de equivalentes SMAE del ciclo si existía
+    if (m.prescribed_macros?.smaeDistribution && Object.keys(m.prescribed_macros.smaeDistribution).length > 0) {
+      setCustomSmaeMap(m.prescribed_macros.smaeDistribution);
+    } else {
+      setCustomSmaeMap(null);
+    }
+    setShowStep5SmaeTable(false);
 
     setIsAuditingAi(false);
     setAiAuditError(null);
@@ -2708,6 +2749,58 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
+                  {/* Exclusiones Rápidas en 1 Clic (Se conectan en automático con el Catálogo SMAE e Ingredientes) */}
+                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
+                        <Ban className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Restricciones Rápidas de Dieta (1 clic · Pre-filtra platillos e ingredientes SMAE):</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DIET_RESTRICTION_TAGS.map((tag) => {
+                        const currentAvers = String(form.aversiones_alimentos || "");
+                        const isActive = tag.keywords.some((kw) =>
+                          currentAvers.toLowerCase().includes(kw.toLowerCase())
+                        );
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => {
+                              if (isReadOnly) return;
+                              if (isActive) {
+                                // Remover la etiqueta del texto de aversiones
+                                let cleaned = currentAvers;
+                                tag.keywords.forEach((kw) => {
+                                  const regex = new RegExp(`(?:^|,\\s*|\\s*\\|\\s*)${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi");
+                                  cleaned = cleaned.replace(regex, "");
+                                });
+                                cleaned = cleaned.replace(/^[\s,|]+|[\s,|]+$/g, "").trim();
+                                updForm("aversiones_alimentos", cleaned);
+                              } else {
+                                const next = currentAvers.trim()
+                                  ? `${currentAvers.trim()}, ${tag.shortLabel}`
+                                  : tag.shortLabel;
+                                updForm("aversiones_alimentos", next);
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
+                                : "bg-white text-[#475569] border-[#E2E8F0] hover:border-rose-300 hover:bg-rose-50/40"
+                            }`}
+                          >
+                            <span>{tag.icon}</span>
+                            <span>{tag.label}</span>
+                            {isActive && <Check className="w-3 h-3 stroke-[3]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                     {/* Favoritos */}
                     <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 space-y-2">
@@ -3878,6 +3971,127 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
                         </div>
                       )}
+
+                      {/* ── Cuadro Dietosintético SMAE del Ciclo (Nace en el Paso 5 junto con los Macros) ── */}
+                      {(() => {
+                        const smaeTotals = calculateSmaeTotals(effectiveSmaeDistribution);
+                        const activeGroups = SMAE_GROUPS.filter((g) => (Number(effectiveSmaeDistribution[g.id]) || 0) > 0);
+                        return (
+                          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3.5 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm">🇲🇽</span>
+                                <div>
+                                  <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                                    <span>Equivalentes SMAE del Ciclo</span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      {smaeTotals.totalEquivalentes} eq · {smaeTotals.kcal} kcal
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-emerald-800/80">
+                                    Distribución diaria base que guiará el armado del menú en Nutrición &gt; Programar
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {customSmaeMap && !isReadOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomSmaeMap(null)}
+                                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 cursor-pointer flex items-center gap-1"
+                                    title="Volver a calcular automáticamente desde las Kcal y Macros prescritos"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Auto</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowStep5SmaeTable((v) => !v)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <span>{showStep5SmaeTable ? "Compactar" : "Ajustar eq"}</span>
+                                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStep5SmaeTable ? "rotate-180" : ""}`} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Chips resumen de equivalentes activos */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {activeGroups.map((g) => (
+                                <span
+                                  key={g.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-200/80 text-[11px] font-semibold text-[#0B1929]"
+                                >
+                                  <span>{g.icono}</span>
+                                  <span>{g.corto}:</span>
+                                  <strong className="text-emerald-700 font-mono">{effectiveSmaeDistribution[g.id]}</strong>
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Tabla expandible de ajuste por grupo SMAE */}
+                            {showStep5SmaeTable && (
+                              <div className="pt-2 border-t border-emerald-200/60 space-y-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-0.5">
+                                  {SMAE_GROUPS.map((grp) => {
+                                    const eqVal = Number(effectiveSmaeDistribution[grp.id]) || 0;
+                                    return (
+                                      <div
+                                        key={grp.id}
+                                        className={`flex items-center justify-between gap-1.5 p-2 rounded-lg border transition-all ${
+                                          eqVal > 0
+                                            ? "bg-white border-emerald-300 shadow-2xs"
+                                            : "bg-white/60 border-gray-200 opacity-75"
+                                        }`}
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-xs">{grp.icono}</span>
+                                            <span className="text-[11px] font-bold text-[#0B1929] truncate" title={grp.nombre}>
+                                              {grp.corto}
+                                            </span>
+                                          </div>
+                                          <div className="text-[9px] text-gray-500 font-mono">
+                                            1eq={grp.kcal}kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly || eqVal <= 0}
+                                            onClick={() => adjustStep5Smae(grp.id, -0.5)}
+                                            className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                          >
+                                            -
+                                          </button>
+                                          <span className="w-8 text-center text-xs font-extrabold font-mono text-[#0B1929]">
+                                            {eqVal}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly}
+                                            onClick={() => adjustStep5Smae(grp.id, 0.5)}
+                                            className="w-5 h-5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-emerald-900 bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200/70">
+                                  <span>Aporte SMAE:</span>
+                                  <strong>
+                                    {smaeTotals.kcal} kcal · {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
+                                  </strong>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Sincronización Automática con el Plan Nutricional */}
                       {!isReadOnly && (

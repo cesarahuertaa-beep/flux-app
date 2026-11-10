@@ -30,9 +30,9 @@ import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { SMAE_GROUPS, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion } from "../../lib/smaeData";
+import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit } from "../../lib/smaeData";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
-import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO } from "../../lib/ingredientsCatalog";
+import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
@@ -231,6 +231,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const [aiGeneratingDishIndex, setAiGeneratingDishIndex] = useState(null);
   const [ingredientSearchMap, setIngredientSearchMap] = useState({});
   const [ingredientCatMap, setIngredientCatMap] = useState({});
+  const [ingredientEqMap, setIngredientEqMap] = useState({});
   const [dishCatalogOpenMap, setDishCatalogOpenMap] = useState({});
   const [dishCatalogSearchMap, setDishCatalogSearchMap] = useState({});
   const [dishCatalogCatMap, setDishCatalogCatMap] = useState({});
@@ -334,6 +335,98 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     });
   };
 
+  const adjustIngredientEq = (mealIdx, optIdx, ingNombre, delta) => {
+    const key = `${mealIdx}_${optIdx}_${ingNombre}`;
+    setIngredientEqMap((prev) => {
+      const cur = Number(prev[key]) || 1;
+      const next = Math.max(0.5, Math.min(8, Math.round((cur + delta) * 2) / 2));
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const getScaledSelectedIngredients = (mealIdx, optIdx = 0) => {
+    const meal = diaForm.comidas?.[mealIdx];
+    const items = optIdx === 0
+      ? (meal?.ingredientesSeleccionados || [])
+      : (meal?.opcionesIngredientes?.[optIdx] || []);
+    const catalog = getIngredientesCatalog();
+    let totalKcal = 0;
+    let totalProt = 0;
+    let totalCarbs = 0;
+    let totalGrasas = 0;
+    let totalEq = 0;
+
+    const details = items.map((ingNombre) => {
+      const eq = Number(ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`]) || 1;
+      const found = catalog.find((x) => x.nombre === ingNombre) || { nombre: ingNombre };
+      const scaled = formatIngredientSmaePortion(found, eq);
+      totalKcal += scaled.kcal || 0;
+      totalProt += scaled.proteina || 0;
+      totalCarbs += scaled.carbohidratos || 0;
+      totalGrasas += scaled.grasas || 0;
+      totalEq += scaled.equivalents || 0;
+      return {
+        nombre: ingNombre,
+        eq,
+        ...scaled,
+      };
+    });
+
+    return {
+      details,
+      totalKcal: Math.round(totalKcal),
+      totalProt: Math.round(totalProt),
+      totalCarbs: Math.round(totalCarbs),
+      totalGrasas: Math.round(totalGrasas),
+      totalEq: Math.round(totalEq * 10) / 10,
+    };
+  };
+
+  const handleInsertIngredientsDirectly = (mealIdx, optIdx = 0) => {
+    const { details, totalKcal, totalProt, totalCarbs, totalGrasas } = getScaledSelectedIngredients(mealIdx, optIdx);
+    if (details.length === 0) return;
+
+    const lines = details
+      .map((d) => `• ${d.label}${d.smaeCorto ? ` [${d.equivalents} eq ${d.smaeCorto}]` : ""}`)
+      .join("\n");
+
+    setDiaForm((p) => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+      while (opts.length <= optIdx) opts.push("");
+      const existing = (opts[optIdx] || "").trim();
+      const nextText = existing ? `${existing}\n${lines}` : lines;
+      opts[optIdx] = nextText;
+      c.opciones = opts;
+      const { opcion1, opcion2 } = formatMealOptions(opts);
+      c.opcion1 = opcion1;
+      c.opcion2 = opcion2;
+
+      if (optIdx === 0) {
+        c.calorias = Math.round((Number(c.calorias) || 0) + totalKcal);
+        c.proteina = Math.round((Number(c.proteina) || 0) + totalProt);
+        c.carbohidratos = Math.round((Number(c.carbohidratos) || 0) + totalCarbs);
+        c.grasas = Math.round((Number(c.grasas) || 0) + totalGrasas);
+        c.modoEdicion = "manual";
+      }
+      c.opcionesModoEdicion = {
+        ...(c.opcionesModoEdicion || {}),
+        [optIdx]: "manual",
+      };
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+
+    const optLetter = String.fromCharCode(65 + optIdx);
+    setMsg(
+      <div className="flex items-center gap-1.5 text-emerald-700">
+        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <span>Equivalentes SMAE insertados en Opción {optLetter} (+{totalKcal} kcal)</span>
+      </div>
+    );
+  };
+
   const handleGenerateDishFromIngredients = async (mealIdx, optIdx = 0) => {
     if (isEstandar) {
       openPaywall("ia");
@@ -347,6 +440,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       alert("Selecciona al menos 2 ingredientes marcando sus casillas para generar un platillo.");
       return;
     }
+    const scaledPack = getScaledSelectedIngredients(mealIdx, optIdx);
+    const scaledIngredientStrings = scaledPack.details.map((d) => d.label || d.nombre);
     const optKey = `${mealIdx}_${optIdx}`;
     setAiGeneratingDishMap(prev => ({ ...prev, [optKey]: true }));
     setAiGeneratingDishIndex(mealIdx);
@@ -355,8 +450,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const otherMealsKcal = diaForm.comidas.reduce((sum, item, idx) => idx !== mealIdx ? sum + (Number(item.calorias) || 0) : sum, 0);
       const remainingForDay = Math.max(0, metaKcal - otherMealsKcal);
 
-      // Prioridad 1: Calorías definidas por el nutriólogo para esta toma específica
-      let targetKcal = Number(meal?.calorias) || 0;
+      // Prioridad 1: Calorías definidas por el nutriólogo o suma de equivalentes SMAE seleccionados
+      let targetKcal = Number(meal?.calorias) || scaledPack.totalKcal || 0;
       if (targetKcal <= 0) {
         // Prioridad 2: Si el nutriólogo aún no definió calorías, calcular para una comida estándar (NUNCA el 100% del día)
         const numComidasEstimadas = Math.max(diaForm.comidas.length, 3);
@@ -365,11 +460,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         if (targetKcal <= 0) targetKcal = 500;
       }
 
-      // Calcular macros proporcionales basados en targetKcal
-      let pMeta = null;
-      let cMeta = null;
-      let fMeta = null;
-      if (metaKcal > 0) {
+      // Calcular macros proporcionales basados en los equivalentes seleccionados o targetKcal
+      let pMeta = scaledPack.totalProt > 0 ? scaledPack.totalProt : null;
+      let cMeta = scaledPack.totalCarbs > 0 ? scaledPack.totalCarbs : null;
+      let fMeta = scaledPack.totalGrasas > 0 ? scaledPack.totalGrasas : null;
+      if (!pMeta && metaKcal > 0) {
         const ratio = targetKcal / metaKcal;
         const totalP = Number(macros.proteina || smartPrescription?.proteinG || 160);
         const totalC = Number(macros.carbohidratos || smartPrescription?.carbsG || 270);
@@ -377,14 +472,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         pMeta = Math.round(totalP * ratio);
         cMeta = Math.round(totalC * ratio);
         fMeta = Math.round(totalF * ratio);
-      } else {
+      } else if (!pMeta) {
         pMeta = Math.round((targetKcal * 0.30) / 4);
         cMeta = Math.round((targetKcal * 0.45) / 4);
         fMeta = Math.round((targetKcal * 0.25) / 9);
       }
 
       const res = await generateDishFromIngredientsWithAi({
-        ingredientes: items,
+        ingredientes: scaledIngredientStrings,
         cliente: selected,
         clinicalRec,
         targetMacros: { calorias: targetKcal, proteina: pMeta, carbohidratos: cMeta, grasas: fMeta },
@@ -3919,6 +4014,47 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                             </div>
                           </div>
 
+                          {/* Equivalentes SMAE del Ciclo (Definidos en el Paso 5 de la Evaluación) */}
+                          {(() => {
+                            const smaeDist =
+                              smartPrescription.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
+                                ? smartPrescription.smaeDistribution
+                                : autoDistributeSmaeFromMacros({
+                                    calorias: targetKcal,
+                                    proteina: activeP,
+                                    carbohidratos: activeC,
+                                    grasas: activeF,
+                                  });
+                            const smaeTotals = calculateSmaeTotals(smaeDist);
+                            const activeGrps = SMAE_GROUPS.filter((g) => (Number(smaeDist[g.id]) || 0) > 0);
+                            if (activeGrps.length === 0) return null;
+                            return (
+                              <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200/70 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span>🇲🇽</span>
+                                    <span>Meta de Equivalentes SMAE del Ciclo ({smaeTotals.totalEquivalentes} eq/día):</span>
+                                  </span>
+                                  <span className="text-[10px] font-mono font-semibold text-emerald-800">
+                                    {smaeTotals.kcal} kcal · {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {activeGrps.map((g) => (
+                                    <span
+                                      key={g.id}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-200/80 text-[11px] font-semibold text-[#0B1929]"
+                                    >
+                                      <span>{g.icono}</span>
+                                      <span>{g.corto}:</span>
+                                      <strong className="text-emerald-700 font-mono">{smaeDist[g.id]} eq</strong>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* Síntesis Nutricional Breve y Exclusiva de Dieta */}
                           {dietaSintesis && (
                             <div className="mt-2.5 flex items-start gap-2.5 text-xs p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-100/80 text-[#334155]">
@@ -4822,6 +4958,23 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
         const pesoActual = cycleMetrica?.peso || latestMetrica?.peso || selected?.peso || null;
         const recWater = pesoActual ? (Math.round(pesoActual * 0.035 * 10) / 10).toFixed(1) : "2.5";
+        const evalMetricaForFood = cycleMetrica || latestMetrica || null;
+        const patientFoodCtx = {
+          aversionesText: evalMetricaForFood?.aversiones_alimentos || "",
+          preferenciasText: `${evalMetricaForFood?.preferencias_alimentos || ""} ${evalMetricaForFood?.recordatorio_24h || ""}`,
+          expediente: selected?.expediente_clinico || null,
+        };
+        const daySmaeTargetMap =
+          smartPrescription?.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
+            ? smartPrescription.smaeDistribution
+            : metaKcal > 0
+            ? autoDistributeSmaeFromMacros({
+                calorias: metaKcal,
+                proteina: metaProt,
+                carbohidratos: metaCarbs,
+                grasas: metaFat,
+              })
+            : {};
 
         return (
           <div className="fixed inset-0 z-[100] bg-white md:bg-[#F8FAFC] flex flex-col overflow-y-auto animate-in fade-in duration-150">
@@ -5051,271 +5204,67 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       )}
                     </div>
                   )}
+
+                  {/* Avance de Equivalentes SMAE del Día (Conectado a la Evaluación del Ciclo) */}
+                  {(() => {
+                    const targetSmaeMap =
+                      smartPrescription?.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
+                        ? smartPrescription.smaeDistribution
+                        : metaKcal > 0
+                        ? autoDistributeSmaeFromMacros({
+                            calorias: metaKcal,
+                            proteina: metaProt,
+                            carbohidratos: metaCarbs,
+                            grasas: metaFat,
+                          })
+                        : {};
+                    const usedSmaeMap = estimateDaySmaeUsage(diaForm.comidas);
+                    const activeGroups = SMAE_GROUPS.filter(
+                      (g) => (Number(targetSmaeMap[g.id]) || 0) > 0 || (Number(usedSmaeMap[g.id]) || 0) > 0
+                    );
+                    if (activeGroups.length === 0) return null;
+
+                    return (
+                      <div className="mt-4 pt-3.5 border-t border-[#F0F4FA] space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1">
+                            <span>🇲🇽</span>
+                            <span>Equivalentes SMAE (Usados / Meta Evaluación)</span>
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeGroups.map((g) => {
+                            const used = Number(usedSmaeMap[g.id]) || 0;
+                            const target = Number(targetSmaeMap[g.id]) || 0;
+                            const isComplete = target > 0 && Math.abs(used - target) <= 0.5;
+                            const isOver = target > 0 && used > target + 0.5;
+                            return (
+                              <span
+                                key={g.id}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-semibold ${
+                                  isComplete
+                                    ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                                    : isOver
+                                    ? "bg-amber-50 border-amber-300 text-amber-900"
+                                    : "bg-[#F8FAFC] border-[#E2E8F0] text-[#0B1929]"
+                                }`}
+                                title={g.nombre}
+                              >
+                                <span>{g.icono}</span>
+                                <span>{g.corto}:</span>
+                                <strong className="font-mono">
+                                  {used}
+                                  {target > 0 ? `/${target}` : ""}
+                                </strong>
+                                {isComplete && <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-
-                {/* Card 2.5: Control de Equivalentes SMAE (5ª Edición) */}
-                {(() => {
-                  const currentSmae = diaForm.smaeMap || {};
-                  const smaeTotals = calculateSmaeTotals(currentSmae);
-                  const hasActiveSmae = smaeTotals.totalEquivalentes > 0;
-
-                  const handleAutoSmae = () => {
-                    const targetK = metaKcal > 0 ? metaKcal : 1800;
-                    const targetP = metaProt > 0 ? metaProt : Math.round((targetK * 0.28) / 4);
-                    const targetC = metaCarbs > 0 ? metaCarbs : Math.round((targetK * 0.45) / 4);
-                    const targetF = metaFat > 0 ? metaFat : Math.round((targetK * 0.27) / 9);
-                    const autoMap = autoDistributeSmaeFromMacros({
-                      calorias: targetK,
-                      proteina: targetP,
-                      carbohidratos: targetC,
-                      grasas: targetF,
-                    });
-                    setDiaForm(p => ({ ...p, smaeMap: autoMap }));
-                    setSmaePanelExpanded(true);
-                    setMsg(
-                      <div className="flex items-center gap-1.5 text-emerald-700">
-                        <Sparkles className="w-4 h-4 text-emerald-600" />
-                        <span>Equivalentes SMAE auto-distribuidos según la meta de macros ({targetK} kcal)</span>
-                      </div>
-                    );
-                  };
-
-                  const handleStepSmae = (groupId, delta) => {
-                    setDiaForm(p => {
-                      const prevVal = Number(p.smaeMap?.[groupId]) || 0;
-                      const nextVal = Math.max(0, Math.round((prevVal + delta) * 2) / 2);
-                      const nextMap = { ...(p.smaeMap || {}) };
-                      if (nextVal > 0) nextMap[groupId] = nextVal;
-                      else delete nextMap[groupId];
-                      return { ...p, smaeMap: nextMap };
-                    });
-                  };
-
-                  const handleDistributeSmaeToMeals = () => {
-                    if (!hasActiveSmae) return;
-                    const numMeals = Math.max(3, (diaForm.comidas || []).length);
-                    const defaultMealMeta = [
-                      { nombre: "Desayuno", hora: "08:00 AM" },
-                      { nombre: "Comida", hora: "02:30 PM" },
-                      { nombre: "Cena", hora: "08:30 PM" },
-                      { nombre: "Colación Matutina", hora: "11:30 AM" },
-                      { nombre: "Colación Vespertina", hora: "05:30 PM" },
-                    ];
-
-                    const baseMeals = (diaForm.comidas && diaForm.comidas.length >= 3)
-                      ? [...diaForm.comidas]
-                      : Array.from({ length: numMeals }, (_, idx) => (
-                          diaForm.comidas?.[idx] || {
-                            _dndId: Math.random().toString(36).slice(2, 9),
-                            hora: defaultMealMeta[idx]?.hora || "12:00 PM",
-                            nombre: defaultMealMeta[idx]?.nombre || `Comida ${idx + 1}`,
-                            opciones: [""],
-                            opcion1: "",
-                            opcion2: "",
-                            calorias: "",
-                            proteina: "",
-                            carbohidratos: "",
-                            grasas: "",
-                            foto_url: "",
-                            alertaClinica: null,
-                          }
-                        ));
-
-                    // Repartir equivalentes entre las tomas y sugerir alimento real del SMAE
-                    const mealBuckets = baseMeals.map(() => ({ lines: [], kcal: 0, p: 0, c: 0, f: 0 }));
-
-                    SMAE_GROUPS.forEach((grp, gIdx) => {
-                      const totalEq = Number(currentSmae[grp.id]) || 0;
-                      if (totalEq <= 0) return;
-                      const foods = SMAE_FOODS_BY_GROUP[grp.id] || [];
-                      // Repartir en hasta 3 comidas principales o proporcionalmente
-                      const targetBucketsCount = totalEq >= 3 ? Math.min(3, baseMeals.length) : totalEq >= 1.5 ? Math.min(2, baseMeals.length) : 1;
-                      let remaining = totalEq;
-
-                      for (let b = 0; b < targetBucketsCount; b++) {
-                        const isLast = b === targetBucketsCount - 1;
-                        const share = isLast
-                          ? Math.round(remaining * 2) / 2
-                          : Math.max(0.5, Math.round((totalEq / targetBucketsCount) * 2) / 2);
-                        if (share <= 0) continue;
-                        remaining = Math.max(0, remaining - share);
-
-                        const targetMealIdx = (b + (gIdx % baseMeals.length)) % baseMeals.length;
-                        const foodChoice = foods[(b + gIdx) % Math.max(1, foods.length)];
-                        const portionText = foodChoice
-                          ? `• ${formatScaledSmaePortion(foodChoice, share)} [${share} eq ${grp.corto}]`
-                          : `• ${share} eq de ${grp.nombre}`;
-
-                        mealBuckets[targetMealIdx].lines.push(portionText);
-                        mealBuckets[targetMealIdx].kcal += share * grp.kcal;
-                        mealBuckets[targetMealIdx].p += share * grp.proteina;
-                        mealBuckets[targetMealIdx].c += share * grp.carbohidratos;
-                        mealBuckets[targetMealIdx].f += share * grp.grasas;
-                      }
-                    });
-
-                    const updatedMeals = baseMeals.map((meal, idx) => {
-                      const bucket = mealBuckets[idx];
-                      if (!bucket || bucket.lines.length === 0) return meal;
-                      const existingText = (meal.opciones?.[0] || meal.opcion1 || "").trim();
-                      const smaeBlock = bucket.lines.join("\n");
-                      const nextMain = existingText ? `${existingText}\n${smaeBlock}` : smaeBlock;
-                      const nextOpts = [...(meal.opciones && meal.opciones.length > 0 ? meal.opciones : [""])];
-                      nextOpts[0] = nextMain;
-                      const { opcion1, opcion2 } = formatMealOptions(nextOpts);
-
-                      return {
-                        ...meal,
-                        nombre: meal.nombre || defaultMealMeta[idx]?.nombre || `Comida ${idx + 1}`,
-                        opciones: nextOpts,
-                        opcion1,
-                        opcion2,
-                        calorias: Math.round((Number(meal.calorias) || 0) + bucket.kcal),
-                        proteina: Math.round((Number(meal.proteina) || 0) + bucket.p),
-                        carbohidratos: Math.round((Number(meal.carbohidratos) || 0) + bucket.c),
-                        grasas: Math.round((Number(meal.grasas) || 0) + bucket.f),
-                      };
-                    });
-
-                    setDiaForm(p => ({ ...p, comidas: updatedMeals }));
-                    setMsg(
-                      <div className="flex items-center gap-1.5 text-emerald-700">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Equivalentes SMAE distribuidos en las comidas con porciones y macros exactos</span>
-                      </div>
-                    );
-                  };
-
-                  return (
-                    <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm space-y-3.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">🇲🇽</span>
-                          <div>
-                            <h4 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider leading-tight">
-                              Equivalentes SMAE (5ª Ed.)
-                            </h4>
-                            <p className="text-[10px] text-[#6B7A8D]">
-                              {hasActiveSmae
-                                ? `${smaeTotals.totalEquivalentes} eq • ${smaeTotals.kcal} kcal (${smaeTotals.proteina}P · ${smaeTotals.carbohidratos}C · ${smaeTotals.grasas}G)`
-                                : "Distribución por grupos de alimentos equivalentes"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={handleAutoSmae}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-                            title="Calcular equivalentes SMAE automáticamente a partir de la meta de Kcal y Macros"
-                          >
-                            <Sparkles className="w-3 h-3 text-emerald-600" />
-                            <span>Auto-distribuir</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSmaePanelExpanded(prev => !prev)}
-                            className="p-1.5 rounded-lg border border-[#E2E8F0] text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50 transition-colors cursor-pointer"
-                            title={smaePanelExpanded ? "Ocultar tabla SMAE" : "Desplegar tabla SMAE"}
-                          >
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${smaePanelExpanded ? "rotate-180" : ""}`} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Píldoras resumen cuando está colapsado pero tiene equivalentes */}
-                      {!smaePanelExpanded && hasActiveSmae && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {SMAE_GROUPS.filter(g => (Number(currentSmae[g.id]) || 0) > 0).map(g => (
-                            <span
-                              key={g.id}
-                              onClick={() => setSmaePanelExpanded(true)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-semibold text-[#0B1929] cursor-pointer hover:border-emerald-300"
-                            >
-                              <span>{g.icono}</span>
-                              <span>{g.corto}:</span>
-                              <strong className="text-emerald-700">{currentSmae[g.id]}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {smaePanelExpanded && (
-                        <div className="space-y-2.5 pt-1 animate-in fade-in">
-                          <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5 divide-y divide-[#F0F4FA]">
-                            {SMAE_GROUPS.map(grp => {
-                              const val = Number(currentSmae[grp.id]) || 0;
-                              return (
-                                <div key={grp.id} className="pt-1.5 first:pt-0 flex items-center justify-between gap-2">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5 truncate">
-                                      <span>{grp.icono}</span>
-                                      <span className="truncate" title={grp.nombre}>{grp.corto}</span>
-                                    </div>
-                                    <div className="text-[10px] text-[#6B7A8D] font-mono">
-                                      {grp.kcal} kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStepSmae(grp.id, -0.5)}
-                                      disabled={val <= 0}
-                                      className="w-6 h-6 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-gray-100 text-[#0B1929] font-bold text-xs flex items-center justify-center disabled:opacity-35 cursor-pointer"
-                                    >
-                                      -
-                                    </button>
-                                    <span className={`w-10 text-center font-mono text-xs font-extrabold ${val > 0 ? "text-emerald-700" : "text-[#94A3B8]"}`}>
-                                      {val}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStepSmae(grp.id, 0.5)}
-                                      className="w-6 h-6 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center cursor-pointer"
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {hasActiveSmae && (
-                            <div className="pt-2 border-t border-[#E2E8F0] space-y-2">
-                              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-950 flex items-center justify-between gap-2">
-                                <span>Aporte SMAE:</span>
-                                <span className="font-mono font-bold">
-                                  {smaeTotals.kcal} kcal ({smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G)
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={handleDistributeSmaeToMeals}
-                                  className="flex-1 py-2 px-3 rounded-xl bg-[#0B1929] hover:bg-[#162942] text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
-                                >
-                                  <Utensils className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>Repartir equivalentes en las tomas</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDiaForm(p => ({ ...p, smaeMap: {} }))}
-                                  className="py-2 px-2.5 rounded-xl border border-[#E2E8F0] text-[#6B7A8D] hover:text-red-600 hover:bg-red-50 text-[11px] font-semibold transition-colors cursor-pointer"
-                                  title="Limpiar equivalentes SMAE"
-                                >
-                                  Limpiar
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
 
                 {/* Card 3: Hidratación y Suplementación */}
                 <div className="bg-white rounded-none md:rounded-2xl border-0 md:border border-[#E2E8F0] p-4 sm:p-5 shadow-none md:shadow-sm space-y-4">
@@ -5520,6 +5469,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           const remainingKcalAfterThis = metaKcal - otherMealsKcal - mealKcal;
                           const remainingPctAfterThis = metaKcal > 0 ? Math.round((remainingKcalAfterThis / metaKcal) * 100) : 0;
                           const opcionesList = c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
+                          const mealSmaeDetected = estimateMealSmaeMap(opcionesList[0] || "");
+                          const mealSmaeEntries = SMAE_GROUPS.filter((g) => (Number(mealSmaeDetected[g.id]) || 0) > 0);
+                          const suggestedMealSmae = mealSmaeEntries.length === 0
+                            ? suggestMealSmaeSplit(daySmaeTargetMap, diaForm.comidas.length, i)
+                            : {};
+                          const suggestedMealSmaeEntries = SMAE_GROUPS.filter((g) => (Number(suggestedMealSmae[g.id]) || 0) > 0);
 
                           return (
                             <SortableItem key={c._dndId} id={c._dndId}>
@@ -5541,6 +5496,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           {metaKcal > 0 && <span className="text-[10px] text-amber-600 font-semibold">({mealPct}%)</span>}
                                         </span>
                                       )}
+
+                                      {mealSmaeEntries.length > 0 ? (
+                                        <span
+                                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center gap-1 animate-in fade-in"
+                                          title="Equivalentes SMAE detectados en esta comida"
+                                        >
+                                          <span>🇲🇽</span>
+                                          <span>
+                                            {mealSmaeEntries.map((g) => `${mealSmaeDetected[g.id]} ${g.corto}`).join(" · ")}
+                                          </span>
+                                        </span>
+                                      ) : suggestedMealSmaeEntries.length > 0 && !(opcionesList[0] || "").trim() ? (
+                                        <span
+                                          className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-[#6B7A8D] border border-slate-200/80 flex items-center gap-1"
+                                          title={`Reparto sugerido SMAE para 1/${diaForm.comidas.length} del día`}
+                                        >
+                                          <span>💡 Sugerido (1/{diaForm.comidas.length}):</span>
+                                          <span>
+                                            {suggestedMealSmaeEntries.slice(0, 4).map((g) => `${suggestedMealSmae[g.id]} ${g.corto}`).join(" · ")}
+                                          </span>
+                                        </span>
+                                      ) : null}
 
                                       {c.macrosCalculadosPorIa && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/70 flex items-center gap-1 animate-in fade-in">
@@ -5724,27 +5701,46 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })}
                                         </div>
 
-                                        {/* Grid de Platillos en formato visual similar a ingredientes */}
+                                        {/* Grid de Platillos en formato visual similar a ingredientes (Pre-filtrado con Evaluación del Paciente) */}
                                         <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
                                           {(() => {
-                                            const platillos = buscarPlatillosCatalogo(
+                                            const rawPlatillos = buscarPlatillosCatalogo(
                                               dishCatalogSearchMap[i] || "",
                                               dishCatalogCatMap[i] || "todos"
                                             );
-                                            if (platillos.length === 0) {
+                                            if (rawPlatillos.length === 0) {
                                               return (
                                                 <div className="text-center py-6 text-xs text-[#6B7A8D]">
                                                   No se encontraron platillos para esa búsqueda.
                                                 </div>
                                               );
                                             }
+                                            const platillosEvaluados = rawPlatillos
+                                              .map((item) => ({
+                                                item,
+                                                evalRes: evaluateIngredientForPatient(
+                                                  { nombre: `${item.nombre} ${item.ingredientes || ""} ${item.descripcion || ""}` },
+                                                  patientFoodCtx
+                                                ),
+                                              }))
+                                              .sort((a, b) => {
+                                                const rank = { favorito: 0, neutral: 1, evitar: 2 };
+                                                return (rank[a.evalRes.status] ?? 1) - (rank[b.evalRes.status] ?? 1);
+                                              });
+
                                             return (
                                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                                {platillos.map(item => (
+                                                {platillosEvaluados.map(({ item, evalRes }) => (
                                                   <div
                                                     key={item.id}
                                                     onClick={() => handleSelectDishFromCatalog(i, item, 0)}
-                                                    className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
+                                                    className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all group ${
+                                                      evalRes.status === "evitar"
+                                                        ? "border-rose-200 bg-rose-50/40 opacity-75 hover:opacity-100"
+                                                        : evalRes.status === "favorito"
+                                                        ? "border-emerald-300 bg-emerald-50/30 hover:border-emerald-400"
+                                                        : "border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50"
+                                                    }`}
                                                   >
                                                     <img
                                                       src={item.foto_url}
@@ -5756,15 +5752,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
                                                         {item.nombre}
                                                       </p>
-                                                      <div className="flex items-center gap-2 mt-1">
+                                                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                                         {item.calorias && (
                                                           <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                                                             {item.calorias} kcal
                                                           </span>
                                                         )}
-                                                        <span className="text-[10px] text-[#6B7A8D] capitalize">
-                                                          {item.categoria}
-                                                        </span>
+                                                        {evalRes.status === "favorito" && (
+                                                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                                            ⭐ Favorito
+                                                          </span>
+                                                        )}
+                                                        {evalRes.status === "evitar" && (
+                                                          <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded" title={evalRes.reason}>
+                                                            🚫 Evitar
+                                                          </span>
+                                                        )}
                                                       </div>
                                                     </div>
                                                   </div>
@@ -5775,7 +5778,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </div>
                                       </div>
                                     ) : c.modoEdicion === "ingredientes" ? (
-                                      /* Constructor por Ingredientes con Checkboxes */
+                                      /* Constructor por Ingredientes + Equivalentes SMAE Integrado */
                                       <div className="space-y-2.5">
                                         {/* Barra de búsqueda */}
                                         <div className="relative">
@@ -5784,7 +5787,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             type="text"
                                             value={ingredientSearchMap[i] || ""}
                                             onChange={e => setIngredientSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
-                                            placeholder="Buscar ingrediente (ej. Tortilla, Carne molida, Chipotle, Aguacate, Huevo)..."
+                                            placeholder="Buscar ingrediente o equivalente SMAE (ej. Tortilla, Pechuga, Aguacate, Huevo)..."
                                             className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                           />
                                           {ingredientSearchMap[i] && (
@@ -5821,13 +5824,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })}
                                         </div>
 
-                                        {/* Bandeja de seleccionados */}
+                                        {/* Bandeja de seleccionados con Steppers de Equivalentes SMAE (- / + 0.5 eq) */}
                                         {c.ingredientesSeleccionados?.length > 0 && (
-                                          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
-                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
                                               <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
                                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                {c.ingredientesSeleccionados.length} ingredientes seleccionados:
+                                                {c.ingredientesSeleccionados.length} ingredientes / equivalentes SMAE seleccionados (ajusta las porciones con - / +):
                                               </span>
                                               <button
                                                 type="button"
@@ -5838,50 +5841,94 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               </button>
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
-                                              {c.ingredientesSeleccionados.map(ing => (
-                                                <span
-                                                  key={ing}
-                                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white border border-emerald-300 text-xs font-semibold text-emerald-900 shadow-2xs"
-                                                >
-                                                  {ing}
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => toggleIngrediente(i, ing)}
-                                                    className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                              {c.ingredientesSeleccionados.map(ing => {
+                                                const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
+                                                const eqVal = Number(ingredientEqMap[i]?.[ing]) || 1;
+                                                const portionLabel = formatIngredientSmaePortion(catItem, eqVal);
+                                                return (
+                                                  <div
+                                                    key={ing}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
                                                   >
-                                                    <X className="w-3 h-3" />
-                                                  </button>
-                                                </span>
-                                              ))}
+                                                    <span className="truncate max-w-[230px]" title={portionLabel}>
+                                                      {portionLabel}
+                                                    </span>
+                                                    <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => adjustIngredientEq(i, 0, ing, -0.5)}
+                                                        className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                        title="Restar 0.5 equivalentes"
+                                                      >
+                                                        -
+                                                      </button>
+                                                      <span className="text-[10px] font-mono font-extrabold text-emerald-900 px-1">
+                                                        {eqVal}eq
+                                                      </span>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => adjustIngredientEq(i, 0, ing, 0.5)}
+                                                        className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                        title="Sumar 0.5 equivalentes"
+                                                      >
+                                                        +
+                                                      </button>
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => toggleIngrediente(i, ing)}
+                                                      className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                      title="Quitar ingrediente"
+                                                    >
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </div>
+                                                );
+                                              })}
                                             </div>
                                           </div>
                                         )}
 
-                                        {/* Grid de Ingredientes con Checkboxes */}
-                                        <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-56 overflow-y-auto">
+                                        {/* Grid de Ingredientes con Porción Oficial SMAE + Pre-filtrado de Consulta */}
+                                        <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-60 overflow-y-auto">
                                           {(() => {
-                                            const items = buscarIngredientes(
+                                            const rawItems = buscarIngredientes(
                                               ingredientSearchMap[i] || "",
                                               ingredientCatMap[i] || "todos"
                                             );
-                                            if (items.length === 0) {
+                                            if (rawItems.length === 0) {
                                               return (
                                                 <div className="text-center py-6 text-xs text-[#6B7A8D]">
                                                   No se encontraron ingredientes con ese término.
                                                 </div>
                                               );
                                             }
+                                            const evaluatedItems = rawItems
+                                              .map((item) => ({
+                                                item,
+                                                evalRes: evaluateIngredientForPatient(item, patientFoodCtx),
+                                              }))
+                                              .sort((a, b) => {
+                                                const rank = { favorito: 0, neutral: 1, evitar: 2 };
+                                                return (rank[a.evalRes.status] ?? 1) - (rank[b.evalRes.status] ?? 1);
+                                              });
+
                                             return (
-                                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
-                                                {items.map(item => {
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                                                {evaluatedItems.map(({ item, evalRes }) => {
                                                   const isChecked = (c.ingredientesSeleccionados || []).includes(item.nombre);
+                                                  const smaeGrp = item.smaeGroup ? SMAE_GROUPS_MAP[item.smaeGroup] : null;
                                                   return (
                                                     <div
                                                       key={item.id}
                                                       onClick={() => toggleIngrediente(i, item.nombre)}
-                                                      className={`flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                                                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
                                                         isChecked
                                                           ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                          : evalRes.status === "evitar"
+                                                          ? "bg-rose-50/40 border-rose-200 opacity-75 hover:opacity-100"
+                                                          : evalRes.status === "favorito"
+                                                          ? "bg-emerald-50/30 border-emerald-200 hover:border-emerald-300"
                                                           : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
                                                       }`}
                                                     >
@@ -5894,13 +5941,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       <img
                                                         src={item.foto}
                                                         alt={item.nombre}
-                                                        className="w-6 h-6 object-contain rounded shrink-0 bg-white"
+                                                        className="w-7 h-7 object-contain rounded shrink-0 bg-white"
                                                         loading="lazy"
                                                         onError={e => { e.currentTarget.style.display = 'none'; }}
                                                       />
-                                                      <span className="text-xs font-medium text-[#0B1929] truncate flex-1" title={item.nombre}>
-                                                        {item.nombre}
-                                                      </span>
+                                                      <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-1">
+                                                          <span className="text-xs font-bold text-[#0B1929] truncate" title={item.nombre}>
+                                                            {item.nombre}
+                                                          </span>
+                                                          {evalRes.status === "favorito" && (
+                                                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
+                                                              ⭐
+                                                            </span>
+                                                          )}
+                                                          {evalRes.status === "evitar" && (
+                                                            <span className="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
+                                                              🚫 Evitar
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                        <div className="text-[10px] text-[#6B7A8D] truncate">
+                                                          1 eq: <strong className="text-emerald-700">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
+                                                          {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
+                                                        </div>
+                                                      </div>
                                                     </div>
                                                   );
                                                 })}
@@ -5909,72 +5974,85 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })()}
                                         </div>
 
-                                        {/* Pie del Constructor: Meta calórica objetivo + Botón Generar con IA */}
-                                        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
-                                          {/* A la izquierda: Input de Meta Calórica para la IA */}
-                                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-[#0B1929]">
+                                        {/* Pie del Constructor: Meta calórica + Insertar Equivalentes Directo (0ms) + Generar con IA */}
+                                        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                          {/* A la izquierda: Input de Meta Calórica */}
+                                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            <div className="flex items-center gap-1 shrink-0 text-xs font-bold text-[#0B1929]">
                                               <Flame className="w-4 h-4 text-amber-500 shrink-0" />
-                                              <span>Meta calórica:</span>
+                                              <span>Meta kcal:</span>
                                             </div>
-                                            <div className="relative w-28 sm:w-32 shrink-0">
+                                            <div className="relative w-24 sm:w-28 shrink-0">
                                               <input 
                                                 type="number"
                                                 min="0"
                                                 step="10"
-                                                className="w-full pl-3 pr-9 py-1.5 rounded-lg border border-[#CBD5E1] bg-[#F8FAFC] focus:bg-white text-xs font-bold text-[#0B1929] text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                                className="w-full pl-2.5 pr-8 py-1.5 rounded-lg border border-[#CBD5E1] bg-[#F8FAFC] focus:bg-white text-xs font-bold text-[#0B1929] text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                                                 value={c.calorias || ""} 
                                                 onChange={e => updComida(i, "calorias", e.target.value)} 
                                                 placeholder={metaKcal > 0 ? String(Math.round(metaKcal / Math.max(diaForm.comidas.length, 3))) : "500"} 
                                                 title="Calorías objetivo para la receta formulada con estos ingredientes"
                                               />
-                                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#94A3B8] pointer-events-none">
+                                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#94A3B8] pointer-events-none">
                                                 kcal
                                               </span>
                                             </div>
                                             {metaKcal > 0 && (
-                                              <span className="text-[11px] text-[#6B7A8D] truncate hidden sm:inline">
+                                              <span className="text-[11px] text-[#6B7A8D] truncate hidden xl:inline">
                                                 {remainingKcalAfterThis < 0 
                                                   ? `(${Math.abs(remainingKcalAfterThis)} kcal excedido)` 
                                                   : remainingKcalAfterThis === 0 
                                                   ? "(✓ Meta cubierta)" 
-                                                  : `(Quedan ${remainingKcalAfterThis} kcal del día)`}
+                                                  : `(Quedan ${remainingKcalAfterThis} kcal)`}
                                               </span>
                                             )}
                                           </div>
 
-                                          {/* A la derecha: Botón Generar con IA */}
-                                          <button
-                                            type="button"
-                                            onClick={() => handleGenerateDishFromIngredients(i)}
-                                            disabled={aiGeneratingDishIndex === i || (!isEstandar && (c.ingredientesSeleccionados || []).length === 0)}
-                                            className={`text-xs font-bold flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer shrink-0 ${
-                                              isEstandar
-                                                ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-                                                : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
-                                            }`}
-                                          >
-                                            {aiGeneratingDishIndex === i ? (
-                                              <>
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                <span>Creando platillo...</span>
-                                              </>
-                                            ) : (
-                                              <>
-                                                {isEstandar ? (
-                                                  <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                                ) : (
-                                                  <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                                                )}
-                                                <span>Generar Platillo con IA {(c.ingredientesSeleccionados || []).length > 0 ? `(${c.ingredientesSeleccionados.length})` : ""}</span>
-                                                {isEstandar && (
-                                                  <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
-                                                    PRO
-                                                  </span>
-                                                )}
-                                              </>
-                                            )}
-                                          </button>
+                                          {/* A la derecha: Insertar Directo (sin IA) o Generar con IA */}
+                                          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleInsertIngredientsDirectly(i, 0)}
+                                              disabled={(c.ingredientesSeleccionados || []).length === 0}
+                                              className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                              title="Insertar porciones equivalentes SMAE directamente en la comida y sumar sus macros al instante sin usar IA"
+                                            >
+                                              <Check className="w-3.5 h-3.5" />
+                                              <span>Insertar Equivalentes {(c.ingredientesSeleccionados || []).length > 0 ? `(${c.ingredientesSeleccionados.length})` : ""}</span>
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => handleGenerateDishFromIngredients(i)}
+                                              disabled={aiGeneratingDishIndex === i || (!isEstandar && (c.ingredientesSeleccionados || []).length === 0)}
+                                              className={`flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                                isEstandar
+                                                  ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                                                  : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
+                                              }`}
+                                            >
+                                              {aiGeneratingDishIndex === i ? (
+                                                <>
+                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                  <span>Creando...</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  {isEstandar ? (
+                                                    <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                                  ) : (
+                                                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                  )}
+                                                  <span>Redactar con IA</span>
+                                                  {isEstandar && (
+                                                    <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                                      PRO
+                                                    </span>
+                                                  )}
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     ) : (
@@ -6249,21 +6327,40 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 {/* Grid de Platillos */}
                                                 <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
                                                   {(() => {
-                                                    const platillos = buscarPlatillosCatalogo(catSearch, catActive);
-                                                    if (platillos.length === 0) {
+                                                    const rawPlatillos = buscarPlatillosCatalogo(catSearch, catActive);
+                                                    if (rawPlatillos.length === 0) {
                                                       return (
                                                         <div className="text-center py-6 text-xs text-[#6B7A8D]">
                                                           No se encontraron platillos para esa búsqueda.
                                                         </div>
                                                       );
                                                     }
+                                                    const platillosEvaluados = rawPlatillos
+                                                      .map((item) => ({
+                                                        item,
+                                                        evalRes: evaluateIngredientForPatient(
+                                                          { nombre: `${item.nombre} ${item.ingredientes || ""} ${item.descripcion || ""}` },
+                                                          patientFoodCtx
+                                                        ),
+                                                      }))
+                                                      .sort((a, b) => {
+                                                        const rank = { favorito: 0, neutral: 1, evitar: 2 };
+                                                        return (rank[a.evalRes.status] ?? 1) - (rank[b.evalRes.status] ?? 1);
+                                                      });
+
                                                     return (
                                                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                                        {platillos.map(item => (
+                                                        {platillosEvaluados.map(({ item, evalRes }) => (
                                                           <div
                                                             key={item.id}
                                                             onClick={() => handleSelectDishFromCatalog(i, item, actualIdx)}
-                                                            className="flex items-start gap-2.5 p-2 rounded-xl border border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer select-none transition-all group"
+                                                            className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all group ${
+                                                              evalRes.status === "evitar"
+                                                                ? "border-rose-200 bg-rose-50/40 opacity-75 hover:opacity-100"
+                                                                : evalRes.status === "favorito"
+                                                                ? "border-emerald-300 bg-emerald-50/30 hover:border-emerald-400"
+                                                                : "border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50"
+                                                            }`}
                                                           >
                                                             <img
                                                              src={item.foto_url}
@@ -6275,15 +6372,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
                                                                 {item.nombre}
                                                               </p>
-                                                              <div className="flex items-center gap-2 mt-1">
+                                                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                                                 {item.calorias && (
                                                                   <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                                                                     {item.calorias} kcal
                                                                   </span>
                                                                 )}
-                                                                <span className="text-[10px] text-[#6B7A8D] capitalize">
-                                                                  {item.categoria}
-                                                                </span>
+                                                                {evalRes.status === "favorito" && (
+                                                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                                                    ⭐ Favorito
+                                                                  </span>
+                                                                )}
+                                                                {evalRes.status === "evitar" && (
+                                                                  <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded" title={evalRes.reason}>
+                                                                    🚫 Evitar
+                                                                  </span>
+                                                                )}
                                                               </div>
                                                             </div>
                                                           </div>
@@ -6294,7 +6398,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 </div>
                                               </div>
                                             ) : modo === "ingredientes" ? (
-                                              /* Constructor por Ingredientes */
+                                              /* Constructor por Ingredientes + Equivalentes SMAE */
                                               <div className="space-y-2.5">
                                                 {/* Barra de búsqueda de ingredientes */}
                                                 <div className="relative">
@@ -6303,7 +6407,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     type="text"
                                                     value={ingSearch}
                                                     onChange={e => setIngredientSearchMap(prev => ({ ...prev, [optKey]: e.target.value }))}
-                                                    placeholder="Buscar ingrediente (ej. Pollo, Arroz, Brócoli, Avena, Huevo)..."
+                                                    placeholder="Buscar ingrediente o equivalente SMAE (ej. Pollo, Arroz, Brócoli, Avena)..."
                                                     className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                                   />
                                                   {ingSearch && (
@@ -6339,13 +6443,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })}
                                                 </div>
 
-                                                {/* Bandeja de seleccionados */}
+                                                {/* Bandeja de seleccionados con Steppers de Equivalentes SMAE */}
                                                 {selectedIngs.length > 0 && (
-                                                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
-                                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                                                    <div className="flex items-center justify-between gap-2">
                                                       <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
                                                         <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                        {selectedIngs.length} ingredientes seleccionados:
+                                                        {selectedIngs.length} ingredientes / equivalentes SMAE seleccionados:
                                                       </span>
                                                       <button
                                                         type="button"
@@ -6356,47 +6460,88 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       </button>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1.5">
-                                                      {selectedIngs.map(ing => (
-                                                        <span
-                                                          key={ing}
-                                                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white border border-emerald-300 text-xs font-semibold text-emerald-900 shadow-2xs"
-                                                        >
-                                                          {ing}
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => toggleIngrediente(i, ing, actualIdx)}
-                                                            className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                      {selectedIngs.map(ing => {
+                                                        const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
+                                                        const eqVal = Number(ingredientEqMap[optKey]?.[ing]) || 1;
+                                                        const portionLabel = formatIngredientSmaePortion(catItem, eqVal);
+                                                        return (
+                                                          <div
+                                                            key={ing}
+                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
                                                           >
-                                                            <X className="w-3 h-3" />
-                                                          </button>
-                                                        </span>
-                                                      ))}
+                                                            <span className="truncate max-w-[230px]" title={portionLabel}>
+                                                              {portionLabel}
+                                                            </span>
+                                                            <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => adjustIngredientEq(i, actualIdx, ing, -0.5)}
+                                                                className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                              >
+                                                                -
+                                                              </button>
+                                                              <span className="text-[10px] font-mono font-extrabold text-emerald-900 px-1">
+                                                                {eqVal}eq
+                                                              </span>
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => adjustIngredientEq(i, actualIdx, ing, 0.5)}
+                                                                className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                              >
+                                                                +
+                                                              </button>
+                                                            </div>
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => toggleIngrediente(i, ing, actualIdx)}
+                                                              className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                            >
+                                                              <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                          </div>
+                                                        );
+                                                      })}
                                                     </div>
                                                   </div>
                                                 )}
 
-                                                {/* Grid de Ingredientes con Checkboxes */}
-                                                <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-56 overflow-y-auto">
+                                                {/* Grid de Ingredientes con Checkboxes + Porción Oficial SMAE */}
+                                                <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-60 overflow-y-auto">
                                                   {(() => {
-                                                    const items = buscarIngredientes(ingSearch, ingActive);
-                                                    if (items.length === 0) {
+                                                    const rawItems = buscarIngredientes(ingSearch, ingActive);
+                                                    if (rawItems.length === 0) {
                                                       return (
                                                         <div className="text-center py-6 text-xs text-[#6B7A8D]">
                                                           No se encontraron ingredientes con ese término.
                                                         </div>
                                                       );
                                                     }
+                                                    const evaluatedItems = rawItems
+                                                      .map((item) => ({
+                                                        item,
+                                                        evalRes: evaluateIngredientForPatient(item, patientFoodCtx),
+                                                      }))
+                                                      .sort((a, b) => {
+                                                        const rank = { favorito: 0, neutral: 1, evitar: 2 };
+                                                        return (rank[a.evalRes.status] ?? 1) - (rank[b.evalRes.status] ?? 1);
+                                                      });
+
                                                     return (
-                                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                                        {items.map(item => {
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                                                        {evaluatedItems.map(({ item, evalRes }) => {
                                                           const isChecked = selectedIngs.includes(item.nombre);
+                                                          const smaeGrp = item.smaeGroup ? SMAE_GROUPS_MAP[item.smaeGroup] : null;
                                                           return (
                                                             <div
                                                               key={item.id}
                                                               onClick={() => toggleIngrediente(i, item.nombre, actualIdx)}
-                                                              className={`flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                                                              className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
                                                                 isChecked
                                                                   ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                                  : evalRes.status === "evitar"
+                                                                  ? "bg-rose-50/40 border-rose-200 opacity-75 hover:opacity-100"
+                                                                  : evalRes.status === "favorito"
+                                                                  ? "bg-emerald-50/30 border-emerald-200 hover:border-emerald-300"
                                                                   : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
                                                               }`}
                                                             >
@@ -6409,13 +6554,31 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               <img
                                                                 src={item.foto}
                                                                 alt={item.nombre}
-                                                                className="w-6 h-6 object-contain rounded shrink-0 bg-white"
+                                                                className="w-7 h-7 object-contain rounded shrink-0 bg-white"
                                                                 loading="lazy"
                                                                 onError={e => { e.currentTarget.style.display = 'none'; }}
                                                               />
-                                                              <span className="text-xs font-medium text-[#0B1929] truncate flex-1" title={item.nombre}>
-                                                                {item.nombre}
-                                                              </span>
+                                                              <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center gap-1">
+                                                                  <span className="text-xs font-bold text-[#0B1929] truncate" title={item.nombre}>
+                                                                    {item.nombre}
+                                                                  </span>
+                                                                  {evalRes.status === "favorito" && (
+                                                                    <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
+                                                                      ⭐
+                                                                    </span>
+                                                                  )}
+                                                                  {evalRes.status === "evitar" && (
+                                                                    <span className="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
+                                                                      🚫 Evitar
+                                                                    </span>
+                                                                  )}
+                                                                </div>
+                                                                <div className="text-[10px] text-[#6B7A8D] truncate">
+                                                                  1 eq: <strong className="text-emerald-700">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
+                                                                  {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
+                                                                </div>
+                                                              </div>
                                                             </div>
                                                           );
                                                         })}
@@ -6424,44 +6587,53 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })()}
                                                 </div>
 
-                                                {/* Pie del Constructor: Botón Generar con IA */}
-                                                <div className="pt-1 flex items-center justify-between gap-3 flex-wrap">
+                                                {/* Pie del Constructor: Insertar Equivalentes Directo + Generar con IA */}
+                                                <div className="pt-1 flex items-center justify-between gap-2 flex-wrap">
                                                   <span className="text-[11px] text-[#6B7A8D]">
-                                                    {selectedIngs.length >= 2 
-                                                      ? `Combina tus ingredientes para la Opción ${optionLetter}.`
-                                                      : "Selecciona al menos 2 ingredientes para generar el platillo."}
+                                                    Inserta las porciones SMAE directo o redacta con IA para la Opción {optionLetter}:
                                                   </span>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
-                                                    disabled={isGen || (!isEstandar && selectedIngs.length === 0)}
-                                                    className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
-                                                      isEstandar
-                                                        ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-                                                        : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
-                                                    }`}
-                                                  >
-                                                    {isGen ? (
-                                                      <>
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                        <span>Creando platillo...</span>
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        {isEstandar ? (
-                                                          <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                                        ) : (
-                                                          <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                                                        )}
-                                                        <span>Generar Platillo con IA {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
-                                                        {isEstandar && (
-                                                          <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
-                                                            PRO
-                                                          </span>
-                                                        )}
-                                                      </>
-                                                    )}
-                                                  </button>
+                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
+                                                      disabled={selectedIngs.length === 0}
+                                                      className="text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                    >
+                                                      <Check className="w-3.5 h-3.5" />
+                                                      <span>Insertar Equivalentes {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
+                                                      disabled={isGen || (!isEstandar && selectedIngs.length === 0)}
+                                                      className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                                        isEstandar
+                                                          ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                                                          : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
+                                                      }`}
+                                                    >
+                                                      {isGen ? (
+                                                        <>
+                                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                          <span>Creando...</span>
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                          {isEstandar ? (
+                                                            <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                                          ) : (
+                                                            <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                                          )}
+                                                          <span>Redactar con IA</span>
+                                                          {isEstandar && (
+                                                            <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
+                                                              PRO
+                                                            </span>
+                                                          )}
+                                                        </>
+                                                      )}
+                                                    </button>
+                                                  </div>
                                                 </div>
                                               </div>
                                             ) : (

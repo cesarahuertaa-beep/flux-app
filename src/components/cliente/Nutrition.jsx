@@ -1,17 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2, Pill, ArrowLeftRight, X, RotateCcw, Search } from "lucide-react";
+import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2, Pill } from "lucide-react";
 import { useBrand } from "../BrandContext";
 import { generateNutriPDF } from "../../utils/pdf";
 import { CachedImage } from "../../lib/mediaCache";
 import { parseMealOptions, parseDiaMetadata } from "../../lib/mealOptions";
-import {
-  SMAE_GROUPS,
-  SMAE_FOODS_BY_GROUP,
-  parseSmaeString,
-  calculateSmaeTotals,
-  detectSwappableIngredientsInMeal,
-  formatScaledSmaePortion,
-} from "../../lib/smaeData";
 
 const GroceryListModal = lazy(() => import("../ui/GroceryListModal"));
 
@@ -39,33 +31,7 @@ export default function Nutrition({
   const [activeDay, setActiveDay]       = useState(0);
   const [expandedMeal, setExpandedMeal] = useState(0); // Primer comida abierta por defecto
   const [showGrocery, setShowGrocery]   = useState(false);
-  const [showSmaeModal, setShowSmaeModal] = useState(false);
-  const [smaeActiveGroup, setSmaeActiveGroup] = useState("cereales_sg");
-  const [smaeModalEq, setSmaeModalEq] = useState(1);
-  const [smaeSearch, setSmaeSearch] = useState("");
-  const [openSwapPicker, setOpenSwapPicker] = useState(null); // { mealKey, detIdx }
   const [activeMealOptions, setActiveMealOptions] = useState({});
-  const swapStorageKey = `flux_smae_swaps_${cliente?.id || "user"}`;
-  const [customSwaps, setCustomSwaps] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(swapStorageKey) || "{}");
-    } catch {
-      return {};
-    }
-  });
-
-  const saveCustomSwap = (swapKey, replacementObj) => {
-    setCustomSwaps((prev) => {
-      const next = { ...prev };
-      if (replacementObj) next[swapKey] = replacementObj;
-      else delete next[swapKey];
-      try {
-        localStorage.setItem(swapStorageKey, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-    setOpenSwapPicker(null);
-  };
   const autoSelectedForPlanRef          = useRef(null);
   const brand = useBrand();
 
@@ -321,14 +287,6 @@ export default function Nutrition({
           {/* Action buttons + Total Día desktop */}
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">
             <button
-              onClick={() => setShowSmaeModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-emerald-50/80 border border-emerald-200 text-emerald-900 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:bg-emerald-100 transition-colors whitespace-nowrap cursor-pointer"
-              title="Consultar tabla de intercambios del Sistema Mexicano de Alimentos Equivalentes (SMAE)"
-            >
-              <ArrowLeftRight size={15} className="text-emerald-600 shrink-0" />
-              <span>Equivalentes SMAE</span>
-            </button>
-            <button
               onClick={() => setShowGrocery(true)}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-[#E2E8F0] text-[#0B1929] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors whitespace-nowrap cursor-pointer"
             >
@@ -477,67 +435,19 @@ export default function Nutrition({
           </p>
         </div>
 
-        {/* Metadatos del día: Suplementación asignada y Equivalentes SMAE del Día */}
+        {/* Metadatos del día: Suplementación asignada */}
         {(() => {
           const meta = parseDiaMetadata(diaActual?.dia || diaActual?.nombre);
-          const smaeMap = meta.smae ? parseSmaeString(meta.smae) : {};
-          const smaeTotals = calculateSmaeTotals(smaeMap);
-          const hasSmae = smaeTotals.totalEquivalentes > 0;
-
-          if (!meta.suplementos && !hasSmae) return null;
+          if (!meta.suplementos) return null;
           return (
-            <div className="space-y-2">
-              {meta.suplementos && (
-                <div className="px-4 md:px-0 py-2.5 bg-purple-50/70 border-b md:border border-purple-200/60 md:rounded-xl flex items-center gap-2.5 text-xs text-purple-950">
-                  <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                    <Pill className="w-3.5 h-3.5 text-purple-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Suplementación prescrita</div>
-                    <div className="text-xs font-bold text-purple-900 truncate" title={meta.suplementos}>{meta.suplementos}</div>
-                  </div>
-                </div>
-              )}
-
-              {hasSmae && (
-                <div className="px-4 md:p-3.5 py-2.5 bg-emerald-50/60 border-b md:border border-emerald-200/70 md:rounded-xl space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">🇲🇽</span>
-                      <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider">
-                        Tus Equivalentes SMAE del Día ({smaeTotals.totalEquivalentes} eq)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowSmaeModal(true)}
-                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer flex items-center gap-1"
-                    >
-                      <ArrowLeftRight size={12} />
-                      <span>Ver tabla de intercambios</span>
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SMAE_GROUPS.filter((g) => (Number(smaeMap[g.id]) || 0) > 0).map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => {
-                          setSmaeActiveGroup(g.id);
-                          setSmaeModalEq(Number(smaeMap[g.id]) || 1);
-                          setShowSmaeModal(true);
-                        }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-200/80 text-xs font-semibold text-[#0B1929] hover:border-emerald-400 transition-colors cursor-pointer shadow-2xs"
-                        title={`Toca para ver equivalentes de ${g.nombre}`}
-                      >
-                        <span>{g.icono}</span>
-                        <span>{g.corto}:</span>
-                        <strong className="text-emerald-700 font-mono">{smaeMap[g.id]} eq</strong>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="px-4 md:px-0 py-2.5 bg-purple-50/70 border-b md:border border-purple-200/60 md:rounded-xl flex items-center gap-2.5 text-xs text-purple-950">
+              <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                <Pill className="w-3.5 h-3.5 text-purple-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Suplementación prescrita</div>
+                <div className="text-xs font-bold text-purple-900 truncate" title={meta.suplementos}>{meta.suplementos}</div>
+              </div>
             </div>
           );
         })()}
@@ -653,8 +563,6 @@ export default function Nutrition({
                           const options = parseMealOptions(meal);
                           const activeOptIdx = options.length > 1 ? (activeMealOptions[meal.id || idx] || 0) : 0;
                           const currentOptionText = options[activeOptIdx] || options[0] || meal.opcion1 || "";
-                          const mealUniqueKey = `${diaId || safeActiveDay}_${meal.id || idx}_opt${activeOptIdx}`;
-                          const detectedSwaps = detectSwappableIngredientsInMeal(currentOptionText);
 
                           return (
                             <div className="mt-1 space-y-2.5">
@@ -685,135 +593,6 @@ export default function Nutrition({
                                 <p className="text-sm text-[#6B7A8D] leading-relaxed whitespace-pre-line">
                                   {currentOptionText}
                                 </p>
-                              )}
-
-                              {/* ── Intercambiador Instantáneo de Equivalentes SMAE (0ms, sin IA) ── */}
-                              {detectedSwaps.length > 0 && (
-                                <div className="pt-2 border-t border-[#F0F4FA] space-y-2">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-                                      <ArrowLeftRight size={11} className="text-emerald-600" />
-                                      <span>Intercambiar ingrediente por equivalente SMAE:</span>
-                                    </span>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {detectedSwaps.map((det, dIdx) => {
-                                      const swapSlotKey = `${mealUniqueKey}_${det.groupId}_${det.food.id}`;
-                                      const appliedSwap = customSwaps[swapSlotKey];
-                                      const isPickerOpen =
-                                        openSwapPicker?.mealKey === mealUniqueKey &&
-                                        openSwapPicker?.detIdx === dIdx;
-
-                                      return (
-                                        <button
-                                          key={swapSlotKey}
-                                          type="button"
-                                          onClick={() =>
-                                            setOpenSwapPicker(
-                                              isPickerOpen ? null : { mealKey: mealUniqueKey, detIdx: dIdx }
-                                            )
-                                          }
-                                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                                            appliedSwap
-                                              ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                                              : isPickerOpen
-                                              ? "bg-emerald-100 text-emerald-950 border-emerald-300"
-                                              : "bg-emerald-50/70 text-emerald-900 border-emerald-200/80 hover:bg-emerald-100/80"
-                                          }`}
-                                        >
-                                          <ArrowLeftRight size={12} className="shrink-0" />
-                                          <span>
-                                            {appliedSwap
-                                              ? `${appliedSwap.porcionEscalada}`
-                                              : `Cambiar ${det.food.nombre} (${det.equivalents} eq ${det.groupCorto})`}
-                                          </span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* Mostrar intercambios activos con botón de restaurar */}
-                                  {detectedSwaps.map((det) => {
-                                    const swapSlotKey = `${mealUniqueKey}_${det.groupId}_${det.food.id}`;
-                                    const appliedSwap = customSwaps[swapSlotKey];
-                                    if (!appliedSwap) return null;
-                                    return (
-                                      <div
-                                        key={`active_${swapSlotKey}`}
-                                        className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between gap-2 text-xs text-emerald-950"
-                                      >
-                                        <div className="min-w-0">
-                                          <span className="font-bold text-emerald-800">✓ Equivalente activo: </span>
-                                          <span>{appliedSwap.porcionEscalada}</span>
-                                          <span className="text-[11px] text-emerald-700 block">
-                                            Sustituye a: {det.food.nombre} ({det.equivalents} eq de {det.groupCorto} · {det.groupKcal} kcal)
-                                          </span>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => saveCustomSwap(swapSlotKey, null)}
-                                          className="px-2 py-1 rounded-lg bg-white border border-emerald-200 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 shrink-0 flex items-center gap-1 cursor-pointer"
-                                          title="Volver al ingrediente original"
-                                        >
-                                          <RotateCcw size={11} />
-                                          <span>Original</span>
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {/* Selector desplegable de equivalentes SMAE para el ingrediente tocado */}
-                                  {openSwapPicker?.mealKey === mealUniqueKey &&
-                                    detectedSwaps[openSwapPicker.detIdx] &&
-                                    (() => {
-                                      const activeDet = detectedSwaps[openSwapPicker.detIdx];
-                                      const swapSlotKey = `${mealUniqueKey}_${activeDet.groupId}_${activeDet.food.id}`;
-                                      return (
-                                        <div className="p-3 rounded-xl bg-[#F8FAFC] border border-emerald-200 space-y-2 animate-in fade-in">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div>
-                                              <span className="text-xs font-extrabold text-[#0B1929] flex items-center gap-1.5">
-                                                <span>{activeDet.groupIcono}</span>
-                                                <span>
-                                                  Equivalentes de {activeDet.groupNombre} ({activeDet.equivalents} eq · {activeDet.groupKcal} kcal)
-                                                </span>
-                                              </span>
-                                              <span className="text-[11px] text-[#6B7A8D] block">
-                                                Elige cualquier opción para sustituir{" "}
-                                                <strong className="text-[#0B1929]">{activeDet.food.nombre}</strong> manteniendo tus macros exactos:
-                                              </span>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => setOpenSwapPicker(null)}
-                                              className="p-1 rounded-lg text-[#6B7A8D] hover:bg-gray-200 cursor-pointer shrink-0"
-                                            >
-                                              <X size={14} />
-                                            </button>
-                                          </div>
-
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                                            {activeDet.alternatives.map((alt) => (
-                                              <button
-                                                key={alt.id}
-                                                type="button"
-                                                onClick={() => saveCustomSwap(swapSlotKey, alt)}
-                                                className="p-2 rounded-lg bg-white hover:bg-emerald-50 border border-[#E2E8F0] hover:border-emerald-300 text-left transition-all flex items-center justify-between gap-2 cursor-pointer"
-                                              >
-                                                <span className="text-xs font-semibold text-[#0B1929] leading-snug">
-                                                  {alt.porcionEscalada}
-                                                </span>
-                                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
-                                                  Elegir
-                                                </span>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                </div>
                               )}
                             </div>
                           );
@@ -857,148 +636,6 @@ export default function Nutrition({
           />
         </Suspense>
       )}
-
-      {/* ── Modal / Calculadora Interactiva de Equivalentes SMAE (5ª Edición) ── */}
-      {showSmaeModal && (() => {
-        const activeGroupObj = SMAE_GROUPS.find((g) => g.id === smaeActiveGroup) || SMAE_GROUPS[0];
-        const groupFoods = (SMAE_FOODS_BY_GROUP[activeGroupObj.id] || []).filter((f) =>
-          !smaeSearch.trim() ||
-          f.nombre.toLowerCase().includes(smaeSearch.trim().toLowerCase())
-        );
-
-        return (
-          <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-            <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl border border-[#E2E8F0] shadow-xl max-h-[88vh] flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-[#F8FAFC]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 text-lg">
-                    🇲🇽
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm sm:text-base font-extrabold text-[#0B1929] truncate">
-                      Tabla de Alimentos Equivalentes (SMAE)
-                    </h3>
-                    <p className="text-[11px] text-[#6B7A8D] truncate">
-                      Intercambia cualquier alimento del mismo grupo manteniendo tus calorías y macros exactos
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSmaeModal(false)}
-                  className="p-2 rounded-xl text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Selector de Grupo SMAE */}
-              <div className="px-5 pt-3 pb-2.5 border-b border-[#F0F4FA] bg-white space-y-2.5 shrink-0">
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scroll-hide">
-                  {SMAE_GROUPS.map((grp) => {
-                    const isSel = grp.id === activeGroupObj.id;
-                    return (
-                      <button
-                        key={grp.id}
-                        type="button"
-                        onClick={() => setSmaeActiveGroup(grp.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 border transition-all cursor-pointer ${
-                          isSel
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                            : "bg-[#F8FAFC] text-[#6B7A8D] border-[#E2E8F0] hover:text-[#0B1929]"
-                        }`}
-                      >
-                        <span>{grp.icono}</span>
-                        <span>{grp.corto}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Controles de Equivalentes y Búsqueda */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-                  <div className="flex items-center gap-2 bg-emerald-50/70 border border-emerald-200/80 px-3 py-1.5 rounded-xl">
-                    <span className="text-xs font-bold text-emerald-950">Cantidad a intercambiar:</span>
-                    <div className="flex items-center gap-1">
-                      {[0.5, 1, 1.5, 2, 3].map((eqVal) => (
-                        <button
-                          key={eqVal}
-                          type="button"
-                          onClick={() => setSmaeModalEq(eqVal)}
-                          className={`px-2 py-0.5 rounded-lg text-xs font-mono font-extrabold transition-colors cursor-pointer ${
-                            smaeModalEq === eqVal
-                              ? "bg-emerald-600 text-white"
-                              : "bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                          }`}
-                        >
-                          {eqVal} eq
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="relative flex-1">
-                    <Search size={14} className="text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={smaeSearch}
-                      onChange={(e) => setSmaeSearch(e.target.value)}
-                      placeholder={`Buscar en ${activeGroupObj.corto}...`}
-                      className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] outline-none focus:border-emerald-500"
-                    />
-                    {smaeSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setSmaeSearch("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Resumen nutricional del grupo escalado */}
-              <div className="px-5 py-2 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between text-xs">
-                <span className="font-bold text-[#0B1929]">
-                  {activeGroupObj.icono} {activeGroupObj.nombre} ({smaeModalEq} {smaeModalEq === 1 ? "equivalente" : "equivalentes"})
-                </span>
-                <span className="font-mono font-bold text-emerald-700">
-                  {Math.round(activeGroupObj.kcal * smaeModalEq)} kcal · {Math.round(activeGroupObj.proteina * smaeModalEq)}g P · {Math.round(activeGroupObj.carbohidratos * smaeModalEq)}g C · {Math.round(activeGroupObj.grasas * smaeModalEq)}g G
-                </span>
-              </div>
-
-              {/* Lista de alimentos equivalentes */}
-              <div className="p-4 sm:p-5 overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 modal-safe-sheet-bottom">
-                {groupFoods.length === 0 ? (
-                  <p className="text-xs text-[#6B7A8D] col-span-2 text-center py-6">
-                    No se encontraron alimentos con ese nombre en este grupo.
-                  </p>
-                ) : (
-                  groupFoods.map((food) => (
-                    <div
-                      key={food.id}
-                      className="p-3 rounded-xl border border-[#E2E8F0] bg-white hover:border-emerald-300 transition-all flex items-center justify-between gap-2 shadow-2xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#0B1929] truncate">{food.nombre}</p>
-                        <p className="text-xs text-emerald-700 font-semibold mt-0.5">
-                          {formatScaledSmaePortion(food, smaeModalEq)}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 shrink-0">
-                        ={smaeModalEq} eq
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
