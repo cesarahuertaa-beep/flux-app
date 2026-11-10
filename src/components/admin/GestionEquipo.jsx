@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { 
   authInvite, authResetPassword, dbPeek, dbGet, dbGetFresh, dbPost, 
-  dbPatch, getProfileId, updateQueryCache, invalidateCache, syncPersonalData 
+  dbPatch, dbUpsert, dbDel, getProfileId, updateQueryCache, invalidateCache, syncPersonalData 
 } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { getLatestConfiguredRates } from "../../utils/tarifas";
@@ -88,6 +88,35 @@ const DEFAULT_COMP = {
   titular: "",
   notas: ""
 };
+
+export function mapRowToComp(row) {
+  if (!row) return DEFAULT_COMP;
+  return {
+    modalidad: row.modalidad || "solo_comision",
+    sueldoBase: Number(row.sueldo_base) || 0,
+    comisionPct: row.comision_pct != null ? Number(row.comision_pct) : 32,
+    bonoFijo: Number(row.bono_fijo) || 0,
+    banco: row.banco || "",
+    clabe: row.clabe || "",
+    titular: row.titular || "",
+    notas: row.notas || "",
+  };
+}
+
+export function mapCompToRow(colabId, comp) {
+  return {
+    colaborador_id: colabId,
+    modalidad: comp.modalidad || "solo_comision",
+    sueldo_base: Number(comp.sueldoBase) || 0,
+    comision_pct: comp.comisionPct != null ? Number(comp.comisionPct) : 32,
+    bono_fijo: Number(comp.bonoFijo) || 0,
+    banco: comp.banco || "",
+    clabe: comp.clabe || "",
+    titular: comp.titular || "",
+    notas: comp.notas || "",
+    updated_at: new Date().toISOString(),
+  };
+}
 
 const loadCompensaciones = () => {
   try {
@@ -248,6 +277,30 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
           setPatrocinios(m);
           if (cfg && cfg.length > 0) setTarifaAdmin(getLatestConfiguredRates(cfg[0]).admin_premium);
         } catch { }
+      } else {
+        // Carga de roles corporativos y compensaciones de staff desde Supabase
+        try {
+          const [rolesDb, compsDb] = await Promise.all([
+            fetcher("staff_roles?activo=eq.true&order=nombre.asc"),
+            fetcher("staff_compensaciones")
+          ]);
+          if (Array.isArray(rolesDb) && rolesDb.length > 0) {
+            setAllStaffRoles(rolesDb);
+            try { localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(rolesDb)); } catch {}
+          }
+          if (Array.isArray(compsDb) && compsDb.length > 0) {
+            const map = {};
+            compsDb.forEach(r => {
+              if (r.colaborador_id) {
+                map[r.colaborador_id] = mapRowToComp(r);
+              }
+            });
+            setCompensaciones(map);
+            try { localStorage.setItem(COMPENSACIONES_STORAGE_KEY, JSON.stringify(map)); } catch {}
+          }
+        } catch (e) {
+          console.warn("load staff_roles/compensaciones:", e);
+        }
       }
     } catch { }
     hasLoadedRef.current = true;
@@ -728,13 +781,18 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     } : item));
 
     if (isSuperadmin) {
-      const currentComps = loadCompensaciones();
-      currentComps[targetId] = {
+      const compPayload = {
         ...editComp,
         titular: editComp.titular || nombre
       };
+      const currentComps = loadCompensaciones();
+      currentComps[targetId] = compPayload;
       saveCompensaciones(currentComps);
       setCompensaciones(currentComps);
+
+      // Persistir compensación directamente en Supabase Database
+      dbUpsert("staff_compensaciones?on_conflict=colaborador_id", mapCompToRow(targetId, compPayload))
+        .catch(err => console.warn("Error guardando staff_compensaciones en Supabase:", err));
     }
 
     setMsg("✅ Colaborador actualizado con éxito.");
@@ -823,6 +881,17 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updatedList));
     } catch {}
 
+    // Persistir rol actualizado en Supabase Database
+    dbUpsert("staff_roles?on_conflict=id", {
+      id: roleId,
+      nombre: cleanNombre,
+      departamento: editingRoleForm.departamento.trim() || editingRole.departamento || "Corporativo",
+      descripcion: editingRoleForm.descripcion.trim() || editingRole.descripcion || "",
+      modulos: editingRoleForm.modulos || [],
+      activo: true,
+      updated_at: new Date().toISOString()
+    }).catch(err => console.warn("Error actualizando staff_role en Supabase:", err));
+
     setMsg(`✅ Rol "${cleanNombre}" actualizado con éxito.`);
     setEditingRole(null);
     setConfirmDeleteRole(false);
@@ -834,6 +903,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     try {
       localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
     } catch {}
+
+    // Eliminar de Supabase Database
+    dbDel(`staff_roles?id=eq.${encodeURIComponent(roleId)}`)
+      .catch(err => console.warn("Error eliminando staff_role en Supabase:", err));
+
     setMsg("✓ Rol eliminado del catálogo corporativo.");
     setEditingRole(null);
     setConfirmDeleteRole(false);
@@ -860,6 +934,17 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     try {
       localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(updated));
     } catch {}
+
+    // Persistir nuevo rol en Supabase Database
+    dbUpsert("staff_roles?on_conflict=id", {
+      id: newRole.id,
+      nombre: newRole.nombre,
+      departamento: newRole.departamento,
+      descripcion: newRole.descripcion,
+      modulos: newRole.modulos || [],
+      activo: true,
+      updated_at: new Date().toISOString()
+    }).catch(err => console.warn("Error creando staff_role en Supabase:", err));
 
     setMsg(`✅ Rol "${cleanNombre}" creado con éxito.`);
     setShowNewRoleModal(false);

@@ -1,4 +1,4 @@
-import { storageUpload, storageRemoveMany, broadcastTableChange, invalidateCache } from "./supabase";
+import { dbGet, dbPatch, storageUpload, storageRemoveMany, broadcastTableChange, invalidateCache } from "./supabase";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -69,12 +69,13 @@ export function peekClinicalRecord(clienteId) {
 
 export async function fetchClinicalRecord(clienteId) {
   const local = peekClinicalRecord(clienteId);
-  if (!clienteId || !SUPA_URL) return local;
+  if (!clienteId) return local;
+
+  // 1. Intentar desde la tabla PostgreSQL public.clientes (columna expediente_clinico)
   try {
-    const url = `${SUPA_URL}/storage/v1/object/public/logos/expediente_clinico_${clienteId}.json?t=${Date.now()}`;
-    const r = await fetch(url, { cache: "no-store" });
-    if (r.ok) {
-      const parsed = await r.json();
+    const rows = await dbGet(`clientes?id=eq.${clienteId}&select=expediente_clinico`);
+    if (rows && rows.length > 0 && rows[0].expediente_clinico) {
+      const parsed = rows[0].expediente_clinico;
       const merged = {
         ...getDefaultClinicalRecord(),
         ...parsed,
@@ -88,14 +89,39 @@ export async function fetchClinicalRecord(clienteId) {
       };
       try {
         localStorage.setItem(getCacheKey(clienteId), JSON.stringify(merged));
-      } catch {
-        // ignore
-      }
+      } catch {}
       return merged;
     }
-  } catch {
-    // Offline fallback
+  } catch (e) {
+    // Continuar al fallback de Storage si no existe la columna aún
   }
+
+  // 2. Fallback a Supabase Storage JSON
+  if (SUPA_URL) {
+    try {
+      const url = `${SUPA_URL}/storage/v1/object/public/logos/expediente_clinico_${clienteId}.json?t=${Date.now()}`;
+      const r = await fetch(url, { cache: "no-store" });
+      if (r.ok) {
+        const parsed = await r.json();
+        const merged = {
+          ...getDefaultClinicalRecord(),
+          ...parsed,
+          anamnesis: { ...EMPTY_ANAMNESIS, ...(parsed?.anamnesis || {}) },
+          checkins: Array.isArray(parsed?.checkins) ? parsed.checkins : [],
+          servicios_activos: {
+            nutricion: true,
+            entrenamiento: true,
+            ...(parsed?.servicios_activos || {}),
+          },
+        };
+        try {
+          localStorage.setItem(getCacheKey(clienteId), JSON.stringify(merged));
+        } catch {}
+        return merged;
+      }
+    } catch {}
+  }
+
   return local;
 }
 
@@ -117,19 +143,31 @@ export async function saveClinicalRecord(clienteId, nextRecord) {
   } catch {
     // ignore
   }
+
+  // 1. Guardar en Supabase Database (public.clientes.expediente_clinico)
   try {
-    const blob = new Blob([JSON.stringify(normalized)], {
-      type: "application/json",
-    });
-    await storageUpload(
-      "logos",
-      `expediente_clinico_${clienteId}.json`,
-      blob,
-      { upsert: true }
-    );
+    await dbPatch(`clientes?id=eq.${clienteId}`, { expediente_clinico: normalized });
   } catch (e) {
-    console.warn("Guardado de expediente en caché local (sin red):", e);
+    console.warn("Guardado de expediente en Supabase Database:", e);
   }
+
+  // 2. Respaldo secundario en Supabase Storage
+  if (SUPA_URL) {
+    try {
+      const blob = new Blob([JSON.stringify(normalized)], {
+        type: "application/json",
+      });
+      await storageUpload(
+        "logos",
+        `expediente_clinico_${clienteId}.json`,
+        blob,
+        { upsert: true }
+      );
+    } catch (e) {
+      console.warn("Guardado de expediente en caché local (sin red):", e);
+    }
+  }
+
   try {
     window.dispatchEvent(
       new CustomEvent("flux:expediente-updated", {
@@ -138,9 +176,7 @@ export async function saveClinicalRecord(clienteId, nextRecord) {
     );
     invalidateCache("expediente_clinico", { clienteId });
     broadcastTableChange("expediente_clinico", { clienteId });
-  } catch {
-    // ignore
-  }
+  } catch {}
   return normalized;
 }
 

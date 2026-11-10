@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Bookmark, Plus, Trash2, CheckCircle2, Copy, Dumbbell, Utensils, Sparkles, ChevronRight, AlertCircle, Users } from "lucide-react";
-import { dbGet, dbGetFresh, storageUpload } from "../../lib/supabase";
+import { dbGet, dbGetFresh, dbUpsert, dbDel, storageUpload } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
@@ -120,11 +120,29 @@ export default function TemplatesManagerModal({
     }
   });
 
-  // Sincronización en la nube (Supabase Storage) en segundo plano con fusión inteligente
+  // Sincronización en la nube (Supabase Database public.plantillas con fallback a Storage)
   useEffect(() => {
-    if (!SUPA_URL || !creatorId || creatorId === "default") return;
+    if (!creatorId || creatorId === "default") return;
     let isMounted = true;
     const fetchCloudTemplates = async () => {
+      // 1. Intentar desde la tabla PostgreSQL public.plantillas
+      try {
+        const dbRows = await dbGet(`plantillas?creador_id=eq.${creatorId}&tipo=eq.${type}&order=created_at.desc`);
+        if (Array.isArray(dbRows) && dbRows.length > 0 && isMounted && !hasLocalChangesRef.current) {
+          const deletedSet = getDeletedIds();
+          const mappedFromDb = dbRows
+            .map(r => ({ id: r.id, nombre: r.nombre, descripcion: r.descripcion, ...(r.datos || {}), created_at: r.created_at }))
+            .filter(t => !deletedSet.has(t.id));
+          setUserTemplates(mappedFromDb);
+          try { localStorage.setItem(storageKey, JSON.stringify(mappedFromDb)); } catch {}
+          return;
+        }
+      } catch (e) {
+        // Fallback a Storage si la tabla no está creada aún o hay error de red
+      }
+
+      // 2. Fallback a Supabase Storage JSON
+      if (!SUPA_URL) return;
       try {
         const url = `${SUPA_URL}/storage/v1/object/public/logos/${cloudFileName}?t=${Date.now()}`;
         const r = await fetch(url, { cache: "no-store" });
@@ -133,8 +151,6 @@ export default function TemplatesManagerModal({
           if (Array.isArray(cloudData) && isMounted && !hasLocalChangesRef.current) {
             const deletedSet = getDeletedIds();
             setUserTemplates((prevLocal) => {
-              // Conservar plantillas locales recién creadas que aún no estaban en el archivo remoto
-              // y excluir cualquier plantilla que el usuario haya eliminado localmente
               const localList = Array.isArray(prevLocal) ? prevLocal : [];
               const mergedMap = new Map();
               localList.forEach((t) => {
@@ -156,14 +172,14 @@ export default function TemplatesManagerModal({
           }
         }
       } catch (err) {
-        // Silencioso: mantiene las plantillas locales si no existe el archivo aún o está offline
+        // Silencioso: mantiene las plantillas locales
       }
     };
     fetchCloudTemplates();
     return () => { isMounted = false; };
-  }, [cloudFileName, creatorId, storageKey]);
+  }, [cloudFileName, creatorId, storageKey, type]);
 
-  // Guardar en localStorage y respaldar en Supabase Storage
+  // Guardar en localStorage, respaldar en Supabase Database (public.plantillas) y Storage
   const saveUserTemplates = (newList) => {
     hasLocalChangesRef.current = true;
     setUserTemplates(newList);
@@ -172,6 +188,29 @@ export default function TemplatesManagerModal({
     } catch (e) {
       console.error(e);
     }
+
+    // 1. Guardar en Supabase Database (public.plantillas)
+    if (creatorId && creatorId !== "default") {
+      try {
+        const rows = (newList || []).map(t => ({
+          id: t.id,
+          creador_id: creatorId,
+          tipo: type,
+          nombre: t.nombre || "Plantilla",
+          descripcion: t.descripcion || t.tags || "",
+          datos: t,
+          updated_at: new Date().toISOString()
+        }));
+        if (rows.length > 0) {
+          dbUpsert("plantillas?on_conflict=id", rows)
+            .catch(err => console.warn("Error guardando plantillas en Supabase:", err));
+        }
+      } catch (e) {
+        console.warn("saveUserTemplates dbUpsert:", e);
+      }
+    }
+
+    // 2. Respaldo secundario en Supabase Storage
     if (SUPA_URL && creatorId && creatorId !== "default") {
       try {
         const blob = new Blob([JSON.stringify(newList)], { type: "application/json" });
@@ -329,6 +368,8 @@ export default function TemplatesManagerModal({
           localStorage.setItem(deletedStorageKey, JSON.stringify(Array.from(delSet)));
         } catch {}
         saveUserTemplates(userTemplates.filter((t) => t.id !== id));
+        dbDel(`plantillas?id=eq.${encodeURIComponent(id)}`)
+          .catch(err => console.warn("Error eliminando plantilla en Supabase:", err));
         setConfirmAction(null);
       }
     });

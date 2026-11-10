@@ -1,4 +1,4 @@
-import { storageUpload } from "./supabase";
+import { dbGet, dbPatch, storageUpload } from "./supabase";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY_LANDING_CONFIG = "flux_landing_tienda_config";
@@ -49,51 +49,83 @@ export function peekLandingConfig() {
  */
 export async function fetchLandingConfig() {
   const local = peekLandingConfig();
-  if (!SUPA_URL) return local;
+
+  // 1. Intentar desde la tabla PostgreSQL public.configuracion_plataforma (columna landing_config)
   try {
-    const url = `${SUPA_URL}/storage/v1/object/public/logos/tienda_config.json?t=${Date.now()}`;
-    const r = await fetch(url, { cache: "no-store" });
-    if (r.ok) {
-      const data = await r.json();
-      if (data && typeof data === "object") {
-        const merged = { ...DEFAULT_LANDING_CONFIG, ...data };
-        // Asegurar estructura de números de WhatsApp
-        if (!Array.isArray(merged.whatsapp_ventas_numeros) || merged.whatsapp_ventas_numeros.length === 0) {
-          merged.whatsapp_ventas_numeros = [
-            { id: "v1", nombre: "Ventas Principal", numero: merged.whatsapp_ventas || "7751016733", activo: true }
-          ];
-        }
-        try {
-          localStorage.setItem(KEY_LANDING_CONFIG, JSON.stringify(merged));
-        } catch {}
-        return merged;
+    const rows = await dbGet("configuracion_plataforma?id=eq.1&select=landing_config");
+    if (rows && rows.length > 0 && rows[0].landing_config) {
+      const data = rows[0].landing_config;
+      const merged = { ...DEFAULT_LANDING_CONFIG, ...data };
+      if (!Array.isArray(merged.whatsapp_ventas_numeros) || merged.whatsapp_ventas_numeros.length === 0) {
+        merged.whatsapp_ventas_numeros = [
+          { id: "v1", nombre: "Ventas Principal", numero: merged.whatsapp_ventas || "7751016733", activo: true }
+        ];
       }
+      try {
+        localStorage.setItem(KEY_LANDING_CONFIG, JSON.stringify(merged));
+      } catch {}
+      return merged;
     }
   } catch (e) {
-    console.warn("fetchLandingConfig:", e);
+    // Continuar al fallback de Storage si no existe la columna aún
   }
+
+  // 2. Fallback a Supabase Storage JSON
+  if (SUPA_URL) {
+    try {
+      const url = `${SUPA_URL}/storage/v1/object/public/logos/tienda_config.json?t=${Date.now()}`;
+      const r = await fetch(url, { cache: "no-store" });
+      if (r.ok) {
+        const data = await r.json();
+        if (data && typeof data === "object") {
+          const merged = { ...DEFAULT_LANDING_CONFIG, ...data };
+          if (!Array.isArray(merged.whatsapp_ventas_numeros) || merged.whatsapp_ventas_numeros.length === 0) {
+            merged.whatsapp_ventas_numeros = [
+              { id: "v1", nombre: "Ventas Principal", numero: merged.whatsapp_ventas || "7751016733", activo: true }
+            ];
+          }
+          try {
+            localStorage.setItem(KEY_LANDING_CONFIG, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.warn("fetchLandingConfig storage fallback:", e);
+    }
+  }
+
   return local;
 }
 
-/**
- * Guarda la configuración en Supabase Storage y localmente, notificando a las vistas.
- */
 export async function saveLandingConfig(newConfig) {
   const merged = { ...DEFAULT_LANDING_CONFIG, ...newConfig };
   try {
     localStorage.setItem(KEY_LANDING_CONFIG, JSON.stringify(merged));
   } catch {}
+
+  // 1. Guardar en Supabase Database (public.configuracion_plataforma.landing_config)
   try {
-    const blob = new Blob([JSON.stringify(merged, null, 2)], {
-      type: "application/json",
-    });
-    await storageUpload("logos", "tienda_config.json", blob, { upsert: true });
-    window.dispatchEvent(
-      new CustomEvent("flux:landing-config-updated", { detail: merged })
-    );
+    await dbPatch("configuracion_plataforma?id=eq.1", { landing_config: merged });
   } catch (e) {
-    console.error("Error guardando config de tienda/landing en nube:", e);
+    console.warn("Error guardando landing_config en Supabase Database:", e);
   }
+
+  // 2. Respaldo secundario en Supabase Storage
+  if (SUPA_URL) {
+    try {
+      const blob = new Blob([JSON.stringify(merged, null, 2)], {
+        type: "application/json",
+      });
+      await storageUpload("logos", "tienda_config.json", blob, { upsert: true });
+    } catch (e) {
+      console.error("Error guardando config de tienda/landing en Storage:", e);
+    }
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("flux:landing-config-updated", { detail: merged })
+  );
   return merged;
 }
 

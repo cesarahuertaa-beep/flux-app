@@ -1126,18 +1126,35 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return true;
   });
 
-  const staffModules = (() => {
-    if (role !== "staff") return [];
-    const esp = myProfile?.especialidad || session?.data?.especialidad || "staff_general";
-    let allRoles = DEFAULT_STAFF_ROLES;
+  const [staffCustomRoles, setStaffCustomRoles] = useState(() => {
     try {
       const saved = localStorage.getItem("flux_staff_roles_v4");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) allRoles = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    const found = allRoles.find(r => r.id === esp);
+    return DEFAULT_STAFF_ROLES;
+  });
+
+  useEffect(() => {
+    if (role !== "staff") return;
+    dbGet("staff_roles?activo=eq.true&order=nombre.asc")
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length > 0) {
+          setStaffCustomRoles(rows);
+          try {
+            localStorage.setItem("flux_staff_roles_v4", JSON.stringify(rows));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [role]);
+
+  const staffModules = (() => {
+    if (role !== "staff") return [];
+    const esp = myProfile?.especialidad || session?.data?.especialidad || "staff_general";
+    const found = staffCustomRoles.find((r) => r.id === esp);
     if (found && Array.isArray(found.modulos) && found.modulos.length > 0) {
       return found.modulos;
     }
