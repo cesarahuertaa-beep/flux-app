@@ -242,7 +242,7 @@ export function formatIngredientSmaePortion(ing, equivalents = 1) {
  */
 export function evaluateIngredientForPatient(ing, { aversionesText = "", preferenciasText = "", expediente = null } = {}) {
   const info = getIngredientSmaeInfo(ing);
-  if (!info) return { isExcluded: false, excludeReason: "", isFavorite: false };
+  if (!info) return { status: "neutral", reason: "", isExcluded: false, excludeReason: "", isFavorite: false };
 
   const normAvers = normalizar(
     `${aversionesText || ""} ${expediente?.alergias_intolerancias || ""} ${expediente?.aversiones_alimentos || ""}`
@@ -256,6 +256,8 @@ export function evaluateIngredientForPatient(ing, { aversionesText = "", prefere
     const isTagActive = tagRule.keywords.some((kw) => normAvers.includes(normalizar(kw)));
     if (isTagActive && (info.dietTags || []).includes(tagRule.tagMatch)) {
       return {
+        status: "evitar",
+        reason: tagRule.shortLabel,
         isExcluded: true,
         excludeReason: tagRule.shortLabel,
         isFavorite: false,
@@ -266,6 +268,8 @@ export function evaluateIngredientForPatient(ing, { aversionesText = "", prefere
   // 2. Verificar coincidencia directa en aversiones o alergias
   if (normAvers && baseWord.length >= 4 && normAvers.includes(baseWord)) {
     return {
+      status: "evitar",
+      reason: "Evitar en consulta",
       isExcluded: true,
       excludeReason: "Evitar en consulta",
       isFavorite: false,
@@ -276,6 +280,8 @@ export function evaluateIngredientForPatient(ing, { aversionesText = "", prefere
   const isFavorite = Boolean(normPref && baseWord.length >= 4 && normPref.includes(baseWord));
 
   return {
+    status: isFavorite ? "favorito" : "neutral",
+    reason: isFavorite ? "Favorito en consulta" : "",
     isExcluded: false,
     excludeReason: "",
     isFavorite,

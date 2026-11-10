@@ -847,9 +847,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     };
   }, [prescriptionMode, liveSmartMacros, manualMacros, aiAuditResult, form.peso]);
 
+  const activeMacroSignature = `${prescriptionMode}_${activePrescription?.targetKcal || 0}_${activePrescription?.proteinG || 0}_${activePrescription?.carbsG || 0}_${activePrescription?.fatsG || 0}`;
+
+  const isCustomSmaeActive = Boolean(
+    customSmaeMap &&
+    customSmaeMap.signature === activeMacroSignature &&
+    customSmaeMap.map &&
+    Object.keys(customSmaeMap.map).length > 0
+  );
+
   const effectiveSmaeDistribution = useMemo(() => {
-    if (customSmaeMap && Object.keys(customSmaeMap).length > 0) {
-      return customSmaeMap;
+    if (isCustomSmaeActive) {
+      return customSmaeMap.map;
     }
     if (!activePrescription || !activePrescription.targetKcal) return {};
     return autoDistributeSmaeFromMacros({
@@ -858,14 +867,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       carbohidratos: activePrescription.carbsG,
       grasas: activePrescription.fatsG,
     });
-  }, [customSmaeMap, activePrescription]);
+  }, [isCustomSmaeActive, customSmaeMap, activePrescription]);
 
   const adjustStep5Smae = (groupId, delta) => {
     setCustomSmaeMap((prev) => {
-      const base = prev && Object.keys(prev).length > 0 ? prev : effectiveSmaeDistribution;
+      const base =
+        prev && prev.signature === activeMacroSignature && prev.map
+          ? prev.map
+          : effectiveSmaeDistribution;
       const cur = Number(base[groupId]) || 0;
       const nextVal = Math.max(0, Math.round((cur + delta) * 2) / 2);
-      return { ...base, [groupId]: nextVal };
+      return {
+        signature: activeMacroSignature,
+        map: { ...base, [groupId]: nextVal },
+      };
     });
   };
 
@@ -1165,6 +1180,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           estrategiaMenu: activePrescription.estrategiaMenu || null,
           model: activePrescription.model || null,
           smaeDistribution: effectiveSmaeDistribution || null,
+          smaeCustomized: isCustomSmaeActive,
         };
       }
 
@@ -1468,9 +1484,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       setAiAuditResult(null);
     }
 
-    // Restaurar distribución de equivalentes SMAE del ciclo si existía
-    if (m.prescribed_macros?.smaeDistribution && Object.keys(m.prescribed_macros.smaeDistribution).length > 0) {
-      setCustomSmaeMap(m.prescribed_macros.smaeDistribution);
+    // Restaurar distribución de equivalentes SMAE del ciclo solo si fue ajustada manualmente por el nutriólogo
+    if (
+      m.prescribed_macros?.smaeCustomized &&
+      m.prescribed_macros?.smaeDistribution &&
+      Object.keys(m.prescribed_macros.smaeDistribution).length > 0
+    ) {
+      const savedSig = `${savedMode}_${m.prescribed_macros.targetKcal || 0}_${m.prescribed_macros.proteinG || 0}_${m.prescribed_macros.carbsG || 0}_${m.prescribed_macros.fatsG || 0}`;
+      setCustomSmaeMap({
+        signature: savedSig,
+        map: m.prescribed_macros.smaeDistribution,
+      });
     } else {
       setCustomSmaeMap(null);
     }
@@ -3976,33 +4000,38 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       {(() => {
                         const smaeTotals = calculateSmaeTotals(effectiveSmaeDistribution);
                         const activeGroups = SMAE_GROUPS.filter((g) => (Number(effectiveSmaeDistribution[g.id]) || 0) > 0);
+                        const targetK = Number(activePrescription?.targetKcal) || 0;
+                        const adequacyPct = targetK > 0 ? Math.round((smaeTotals.kcal / targetK) * 100) : 100;
                         return (
                           <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3.5 space-y-2.5">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm">🇲🇽</span>
                                 <div>
-                                  <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                                  <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5 flex-wrap">
                                     <span>Equivalentes SMAE del Ciclo</span>
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      {smaeTotals.totalEquivalentes} eq · {smaeTotals.kcal} kcal
+                                      {smaeTotals.totalEquivalentes} eq · {smaeTotals.kcal} kcal ({adequacyPct}%)
                                     </span>
                                   </div>
-                                  <p className="text-[10px] text-emerald-800/80">
-                                    Distribución diaria base que guiará el armado del menú en Nutrición &gt; Programar
+                                  <p className="text-[10px] text-emerald-800/90 font-medium">
+                                    {isCustomSmaeActive ? "Ajustado manualmente" : `Sincronizado en automático con ${activePrescription.modeLabel}`}:{" "}
+                                    <strong className="font-mono">
+                                      {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
+                                    </strong>
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                {customSmaeMap && !isReadOnly && (
+                                {isCustomSmaeActive && !isReadOnly && (
                                   <button
                                     type="button"
                                     onClick={() => setCustomSmaeMap(null)}
                                     className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 cursor-pointer flex items-center gap-1"
-                                    title="Volver a calcular automáticamente desde las Kcal y Macros prescritos"
+                                    title="Volver a sincronizar con las Kcal y Macros de arriba"
                                   >
                                     <RotateCcw className="w-3 h-3" />
-                                    <span>Auto</span>
+                                    <span>Sincronizar</span>
                                   </button>
                                 )}
                                 <button
@@ -4010,7 +4039,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   onClick={() => setShowStep5SmaeTable((v) => !v)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                  <span>{showStep5SmaeTable ? "Compactar" : "Ajustar eq"}</span>
+                                  <span>{showStep5SmaeTable ? "Compactar" : "Personalizar eq"}</span>
                                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStep5SmaeTable ? "rotate-180" : ""}`} />
                                 </button>
                               </div>

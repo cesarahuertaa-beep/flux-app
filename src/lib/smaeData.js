@@ -369,7 +369,8 @@ export function calculateSmaeTotals(smaeMap = {}) {
 
 /**
  * Algoritmo de Auto-Distribución Inteligente SMAE a partir de la meta de Kcal y Macros del paciente.
- * Calcula una distribución clínica equilibrada en pasos de 0.5 equivalentes.
+ * Calcula una distribución clínica equilibrada en pasos de 0.5 equivalentes y aplica un cierre
+ * iterativo de precisión para converger con las calorías y macros prescritos (Matemático, IA o Manual).
  */
 export function autoDistributeSmaeFromMacros({ calorias = 2000, proteina = 140, carbohidratos = 200, grasas = 60 } = {}) {
   const targetKcal = Number(calorias) || 1800;
@@ -379,20 +380,19 @@ export function autoDistributeSmaeFromMacros({ calorias = 2000, proteina = 140, 
 
   const roundHalf = (val) => Math.max(0, Math.round(val * 2) / 2);
 
-  // 1. Base de micronutrientes y fibra: Verduras, Frutas, Leche descremada y Leguminosas
-  const verduras = targetKcal >= 2200 ? 5 : targetKcal >= 1600 ? 4 : 3;
-  const frutas = targetCarbs >= 220 ? 3 : targetCarbs >= 130 ? 2 : 1.5;
-  const leche_d = targetKcal >= 1500 ? 1 : 0.5;
-  const leguminosas = targetCarbs >= 160 ? 1 : 0.5;
+  // 1. Base de micronutrientes y fibra adaptada al nivel calórico y de carbohidratos real
+  let verduras = targetKcal >= 2200 ? 5 : targetKcal >= 1500 ? 4 : 3;
+  let frutas = targetCarbs >= 210 ? 3 : targetCarbs >= 130 ? 2 : targetCarbs >= 70 ? 1 : 0.5;
+  let leche_d = targetKcal >= 1600 && targetCarbs >= 90 ? 1 : targetCarbs >= 60 ? 0.5 : 0;
+  let leguminosas = targetCarbs >= 150 ? 1 : targetCarbs >= 90 ? 0.5 : 0;
 
-  // 2. Carbohidratos restantes → Cereales sin grasa (15g C por eq)
+  // 2. Carbohidratos restantes → Cereales sin grasa (15g C, 2g P, 70 kcal por eq)
   const carbsUsed = verduras * 4 + frutas * 15 + leche_d * 12 + leguminosas * 20;
-  const remCarbs = Math.max(15, targetCarbs - carbsUsed);
-  const cereales_sg = roundHalf(remCarbs / 15);
+  const remCarbs = Math.max(0, targetCarbs - carbsUsed);
+  let cereales_sg = roundHalf(remCarbs / 15);
 
-  // 3. Proteína restante → AOA Muy Bajo (65%) + AOA Bajo (20%) + AOA Moderado / Huevo (15%)
-  // Primero reservamos Grasas con Proteína (nueces/almendras = 1 a 2 eq)
-  const grasas_cp = targetFat >= 55 ? 2 : 1;
+  // 3. Proteína restante → AOA Muy Bajo (40 kcal, 7g P, 1g G), AOA Bajo (55 kcal, 7g P, 3g G), AOA Moderado (75 kcal, 7g P, 5g G)
+  let grasas_cp = targetFat >= 60 ? 2 : targetFat >= 35 ? 1 : 0.5;
   const protUsed =
     verduras * 2 +
     cereales_sg * 2 +
@@ -400,13 +400,13 @@ export function autoDistributeSmaeFromMacros({ calorias = 2000, proteina = 140, 
     leche_d * 9 +
     grasas_cp * 3;
 
-  const remProt = Math.max(21, targetProt - protUsed);
+  const remProt = Math.max(7, targetProt - protUsed);
   const totalAoaEq = remProt / 7;
-  const aoa_m = totalAoaEq >= 4 ? 2 : 1; // 1 a 2 huevos enteros
-  const aoa_b = roundHalf(Math.max(1, (totalAoaEq - aoa_m) * 0.3));
-  const aoa_mb = roundHalf(Math.max(1, totalAoaEq - aoa_m - aoa_b));
+  let aoa_m = totalAoaEq >= 5 ? 2 : totalAoaEq >= 2.5 ? 1 : 0.5;
+  let aoa_b = roundHalf(Math.max(0, (totalAoaEq - aoa_m) * 0.3));
+  let aoa_mb = roundHalf(Math.max(0.5, totalAoaEq - aoa_m - aoa_b));
 
-  // 4. Grasas restantes → Aceites y Grasas sin proteína (Aguacate / Aceite de oliva, 5g G por eq)
+  // 4. Grasas restantes → Aceites y Grasas sin proteína (45 kcal, 5g G por eq)
   const fatUsed =
     leguminosas * 1 +
     aoa_mb * 1 +
@@ -414,10 +414,10 @@ export function autoDistributeSmaeFromMacros({ calorias = 2000, proteina = 140, 
     aoa_m * 5 +
     leche_d * 2 +
     grasas_cp * 5;
-  const remFat = Math.max(5, targetFat - fatUsed);
-  const grasas_sp = roundHalf(remFat / 5);
+  const remFat = Math.max(0, targetFat - fatUsed);
+  let grasas_sp = roundHalf(remFat / 5);
 
-  return {
+  const map = {
     verduras,
     frutas,
     cereales_sg,
@@ -433,6 +433,49 @@ export function autoDistributeSmaeFromMacros({ calorias = 2000, proteina = 140, 
     grasas_cp,
     azucares_sg: 0,
   };
+
+  // 5. Pase de convergencia calórica y de macros (ajusta en bloques de 0.5 eq hasta quedar dentro de ±20 kcal)
+  for (let step = 0; step < 16; step++) {
+    const cur = calculateSmaeTotals(map);
+    const diffKcal = targetKcal - cur.kcal;
+    if (Math.abs(diffKcal) <= 20) break;
+
+    const diffC = targetCarbs - cur.carbohidratos;
+    const diffP = targetProt - cur.proteina;
+    const diffG = targetFat - cur.grasas;
+
+    if (diffKcal > 20) {
+      // Faltan calorías: subir el macro más rezagado
+      if (diffC >= 6) {
+        map.cereales_sg = roundHalf(map.cereales_sg + 0.5);
+      } else if (diffG >= 2.5) {
+        map.grasas_sp = roundHalf(map.grasas_sp + 0.5);
+      } else if (diffP >= 3) {
+        map.aoa_mb = roundHalf(map.aoa_mb + 0.5);
+      } else {
+        map.grasas_sp = roundHalf(map.grasas_sp + 0.5);
+      }
+    } else if (diffKcal < -20) {
+      // Sobran calorías: bajar el macro más excedido sin dejar grupos base vacíos
+      if (diffC <= -6 && map.cereales_sg >= 0.5) {
+        map.cereales_sg = roundHalf(map.cereales_sg - 0.5);
+      } else if (diffG <= -2.5 && map.grasas_sp >= 0.5) {
+        map.grasas_sp = roundHalf(map.grasas_sp - 0.5);
+      } else if (diffP <= -3 && map.aoa_mb >= 1) {
+        map.aoa_mb = roundHalf(map.aoa_mb - 0.5);
+      } else if (map.grasas_sp >= 0.5) {
+        map.grasas_sp = roundHalf(map.grasas_sp - 0.5);
+      } else if (map.cereales_sg >= 0.5) {
+        map.cereales_sg = roundHalf(map.cereales_sg - 0.5);
+      } else if (map.aoa_b >= 0.5) {
+        map.aoa_b = roundHalf(map.aoa_b - 0.5);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return map;
 }
 
 /**

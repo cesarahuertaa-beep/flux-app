@@ -4016,15 +4016,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                           {/* Equivalentes SMAE del Ciclo (Definidos en el Paso 5 de la Evaluación) */}
                           {(() => {
-                            const smaeDist =
-                              smartPrescription.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
-                                ? smartPrescription.smaeDistribution
-                                : autoDistributeSmaeFromMacros({
-                                    calorias: targetKcal,
-                                    proteina: activeP,
-                                    carbohidratos: activeC,
-                                    grasas: activeF,
-                                  });
+                            const hasCustomSavedSmae =
+                              Boolean(cycleMetrica?.prescribed_macros?.smaeCustomized) &&
+                              smartPrescription.smaeDistribution &&
+                              Object.keys(smartPrescription.smaeDistribution).length > 0;
+                            const smaeDist = hasCustomSavedSmae
+                              ? smartPrescription.smaeDistribution
+                              : autoDistributeSmaeFromMacros({
+                                  calorias: targetKcal,
+                                  proteina: activeP,
+                                  carbohidratos: activeC,
+                                  grasas: activeF,
+                                });
                             const smaeTotals = calculateSmaeTotals(smaeDist);
                             const activeGrps = SMAE_GROUPS.filter((g) => (Number(smaeDist[g.id]) || 0) > 0);
                             if (activeGrps.length === 0) return null;
@@ -4964,8 +4967,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           preferenciasText: `${evalMetricaForFood?.preferencias_alimentos || ""} ${evalMetricaForFood?.recordatorio_24h || ""}`,
           expediente: selected?.expediente_clinico || null,
         };
+        const hasCustomSavedSmaeDay =
+          Boolean(cycleMetrica?.prescribed_macros?.smaeCustomized) &&
+          smartPrescription?.smaeDistribution &&
+          Object.keys(smartPrescription.smaeDistribution).length > 0;
         const daySmaeTargetMap =
-          smartPrescription?.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
+          hasCustomSavedSmaeDay
             ? smartPrescription.smaeDistribution
             : metaKcal > 0
             ? autoDistributeSmaeFromMacros({
@@ -5207,17 +5214,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                   {/* Avance de Equivalentes SMAE del Día (Conectado a la Evaluación del Ciclo) */}
                   {(() => {
-                    const targetSmaeMap =
-                      smartPrescription?.smaeDistribution && Object.keys(smartPrescription.smaeDistribution).length > 0
-                        ? smartPrescription.smaeDistribution
-                        : metaKcal > 0
-                        ? autoDistributeSmaeFromMacros({
-                            calorias: metaKcal,
-                            proteina: metaProt,
-                            carbohidratos: metaCarbs,
-                            grasas: metaFat,
-                          })
-                        : {};
+                    const targetSmaeMap = daySmaeTargetMap;
                     const usedSmaeMap = estimateDaySmaeUsage(diaForm.comidas);
                     const activeGroups = SMAE_GROUPS.filter(
                       (g) => (Number(targetSmaeMap[g.id]) || 0) > 0 || (Number(usedSmaeMap[g.id]) || 0) > 0
@@ -5843,8 +5840,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             <div className="flex flex-wrap gap-1.5">
                                               {c.ingredientesSeleccionados.map(ing => {
                                                 const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
-                                                const eqVal = Number(ingredientEqMap[i]?.[ing]) || 1;
-                                                const portionLabel = formatIngredientSmaePortion(catItem, eqVal);
+                                                const eqVal = Number(ingredientEqMap[`${i}_0_${ing}`]) || 1;
+                                                const portionObj = formatIngredientSmaePortion(catItem, eqVal);
+                                                const portionLabel = typeof portionObj === "string" ? portionObj : (portionObj?.label || ing);
                                                 return (
                                                   <div
                                                     key={ing}
@@ -6462,8 +6460,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     <div className="flex flex-wrap gap-1.5">
                                                       {selectedIngs.map(ing => {
                                                         const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
-                                                        const eqVal = Number(ingredientEqMap[optKey]?.[ing]) || 1;
-                                                        const portionLabel = formatIngredientSmaePortion(catItem, eqVal);
+                                                        const eqVal = Number(ingredientEqMap[`${i}_${actualIdx}_${ing}`]) || 1;
+                                                        const portionObj = formatIngredientSmaePortion(catItem, eqVal);
+                                                        const portionLabel = typeof portionObj === "string" ? portionObj : (portionObj?.label || ing);
                                                         return (
                                                           <div
                                                             key={ing}
