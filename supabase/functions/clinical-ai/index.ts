@@ -53,7 +53,7 @@ function isFemenino(val: any): boolean {
   return s.startsWith("F") || s === "MUJER" || s === "FEMALE";
 }
 
-const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash-lite"];
+const CANDIDATE_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
 
 function extractGeminiText(data: any): string {
   const parts = data?.candidates?.[0]?.content?.parts || [];
@@ -1353,6 +1353,113 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
           } catch {}
         }
       }
+    }
+
+    // =========================================================================
+    // ACCIÓN 10: OCR INTELIGENTE DE TICKET / REPORTE INBODY / BIOIMPEDANCIA
+    // =========================================================================
+    if (action === "ocr-inbody") {
+      if (!geminiKey || geminiKey.trim().length < 20) {
+        return new Response(
+          JSON.stringify({
+            error: "NO_GEMINI_KEY",
+            message: "No se ha configurado la API Key de FLUX IA.",
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const fileBase64 = body.fileBase64 || "";
+      const mimeType = body.mimeType || "image/jpeg";
+
+      if (!fileBase64) {
+        return new Response(
+          JSON.stringify({ error: "NO_FILE", message: "No se proporcionó el archivo del ticket en base64." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const promptOcr = `Eres un médico y nutriólogo clínico especialista en antropometría y bioimpedancia eléctrica (BIA).
+Analiza detalladamente este documento o imagen de un reporte/ticket de InBody o báscula de bioimpedancia (ej. InBody 120, 270, 370, 570, 770 o Tanita).
+Tu objetivo es extraer con máxima precisión los valores numéricos correspondientes a los campos clínicos solicitados.
+
+Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si algún dato no aparece o no es legible, pon null, NUNCA inventes números):
+{
+  "peso": number | null,                  // Peso corporal total en kg (Weight)
+  "estatura": number | null,              // Estatura en cm si viene en el ticket (Height)
+  "grasa_pct": number | null,              // Porcentaje de grasa corporal % (PBF)
+  "calc_masa_grasa": number | null,        // Masa grasa total en kg (BFM - Body Fat Mass)
+  "inbody_smm": number | null,             // Masa muscular esquelética en kg (SMM - Skeletal Muscle Mass)
+  "inbody_tbw": number | null,             // Agua corporal total en litros o kg (TBW - Total Body Water)
+  "inbody_proteina": number | null,        // Proteína en kg (Protein)
+  "inbody_mineral_oseo": number | null,    // Mineral óseo / masa ósea en kg (Minerals)
+  "inbody_grasa_visceral": number | null,  // Nivel de grasa visceral (VFL - escala 1-20)
+  "inbody_bmr": number | null,             // Tasa metabólica basal en kcal (BMR)
+  "inbody_score": number | null,           // Puntuación InBody (InBody Score 0-100)
+  "inbody_magra_brazo_der": number | null, // Masa magra brazo derecho en kg (Right Arm)
+  "inbody_magra_brazo_izq": number | null, // Masa magra brazo izquierdo en kg (Left Arm)
+  "inbody_magra_tronco": number | null,    // Masa magra tronco en kg (Trunk)
+  "inbody_magra_pierna_der": number | null,// Masa magra pierna derecha en kg (Right Leg)
+  "inbody_magra_pierna_izq": number | null,// Masa magra pierna izquierda en kg (Left Leg)
+  "cintura": number | null,                // Circunferencia de cintura en cm si viene
+  "cadera": number | null,                 // Circunferencia de cadera en cm si viene
+  "presion_arterial": string | null,       // Si trae presión arterial (ej. "120/80")
+  "frecuencia_cardiaca": number | null,    // Si trae frecuencia cardíaca (pulso en bpm)
+  "equipo_detectado": string | null,       // Modelo inferido (ej. "InBody 270", "InBody 120", "Tanita")
+  "fecha_ticket": string | null            // Fecha de la prueba si aparece (formato YYYY-MM-DD o DD/MM/YYYY)
+}`;
+
+      let lastError = null;
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const genCfg = getGenerationConfig(model, true, 0.1);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: promptOcr },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: fileBase64
+                    }
+                  }
+                ]
+              }],
+              generationConfig: genCfg
+            })
+          });
+
+          if (!res.ok) {
+            const errTxt = await res.text();
+            lastError = errTxt;
+            continue;
+          }
+
+          const resData = await res.json();
+          const rawTxt = extractGeminiText(resData);
+          const parsed = JSON.parse(rawTxt);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: parsed,
+              model: model
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (e: any) {
+          lastError = e?.message || String(e);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ error: "OCR_FAILED", message: lastError || "No se pudo procesar el ticket con IA." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(

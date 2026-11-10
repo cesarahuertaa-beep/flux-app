@@ -25,7 +25,7 @@ import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../uti
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw, Upload
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -34,7 +34,7 @@ import { ListSkeleton } from "../ui/Skeleton";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import ExpedienteClinicoModal from "../clinical/ExpedienteClinicoModal";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../../lib/clinicalRecord";
-import { auditMacroPrescriptionWithAi, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { auditMacroPrescriptionWithAi, syncDualDomainSummariesInBackground, extractInbodyFromDocument } from "../../lib/clinicalAi";
 import {
   SMAE_GROUPS,
   DIET_RESTRICTION_TAGS,
@@ -408,7 +408,102 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [lightbox,     setLightbox]     = useState(null); // URL shown fullscreen
   const [editingId,    setEditingId]    = useState(null); // null=new, ID=editing
   const [existingFotos,setExistingFotos]= useState([]);   // fotos ya guardadas al editar
+  const [analyzingInbody, setAnalyzingInbody] = useState(false);
+  const [inbodyOcrResult, setInbodyOcrResult] = useState(null);
+  const inbodyFileInputRef = useRef(null);
   const brand = useBrand();
+
+  const handleInbodyFileUpload = async (file) => {
+    if (!file) return;
+    setAnalyzingInbody(true);
+    setInbodyOcrResult(null);
+
+    try {
+      // 1. Convertir a Base64
+      const fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result;
+          if (typeof res === "string") {
+            const raw = res.includes(",") ? res.split(",")[1] : res;
+            resolve(raw);
+          } else {
+            reject(new Error("No se pudo leer el archivo"));
+          }
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      const mimeType = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+
+      // 2. Extraer datos con IA Vision
+      const extracted = await extractInbodyFromDocument({ fileBase64, mimeType });
+
+      // 3. Auto-rellenar campos en el formulario
+      setForm((prev) => {
+        const next = { ...prev };
+        if (extracted.peso != null) next.peso = extracted.peso;
+        if (extracted.estatura != null && (!next.estatura || Number(next.estatura) === 0)) {
+          next.estatura = extracted.estatura;
+        }
+        if (extracted.grasa_pct != null) next.grasa_pct = extracted.grasa_pct;
+        if (extracted.calc_masa_grasa != null) next.calc_masa_grasa = extracted.calc_masa_grasa;
+        if (extracted.inbody_smm != null) next.inbody_smm = extracted.inbody_smm;
+        if (extracted.inbody_tbw != null) next.inbody_tbw = extracted.inbody_tbw;
+        if (extracted.inbody_proteina != null) next.inbody_proteina = extracted.inbody_proteina;
+        if (extracted.inbody_mineral_oseo != null) next.inbody_mineral_oseo = extracted.inbody_mineral_oseo;
+        if (extracted.inbody_grasa_visceral != null) next.inbody_grasa_visceral = extracted.inbody_grasa_visceral;
+        if (extracted.inbody_bmr != null) next.inbody_bmr = extracted.inbody_bmr;
+        if (extracted.inbody_score != null) next.inbody_score = extracted.inbody_score;
+        if (extracted.inbody_magra_brazo_der != null) next.inbody_magra_brazo_der = extracted.inbody_magra_brazo_der;
+        if (extracted.inbody_magra_brazo_izq != null) next.inbody_magra_brazo_izq = extracted.inbody_magra_brazo_izq;
+        if (extracted.inbody_magra_tronco != null) next.inbody_magra_tronco = extracted.inbody_magra_tronco;
+        if (extracted.inbody_magra_pierna_der != null) next.inbody_magra_pierna_der = extracted.inbody_magra_pierna_der;
+        if (extracted.inbody_magra_pierna_izq != null) next.inbody_magra_pierna_izq = extracted.inbody_magra_pierna_izq;
+        if (extracted.cintura != null) next.cintura = extracted.cintura;
+        if (extracted.cadera != null) next.cadera = extracted.cadera;
+        if (extracted.presion_arterial != null) next.presion_arterial = extracted.presion_arterial;
+        if (extracted.frecuencia_cardiaca != null) next.frecuencia_cardiaca = extracted.frecuencia_cardiaca;
+        return next;
+      });
+
+      // 4. Si es imagen, adjuntarla automáticamente al carrusel de fotos para que quede guardada como respaldo
+      if (file.type.startsWith("image/")) {
+        setPendingFotos((prev) => [...prev, file]);
+        setPreviewUrls((prev) => [...prev, URL.createObjectURL(file)]);
+      }
+
+      // 5. Contar métricas pobladas
+      const filledCount = Object.keys(extracted).filter(
+        (k) => extracted[k] != null && k !== "equipo_detectado" && k !== "fecha_ticket"
+      ).length;
+
+      setInbodyOcrResult({
+        success: true,
+        count: filledCount,
+        equipo: extracted.equipo_detectado || "InBody / BIA",
+        fileName: file.name,
+      });
+
+      setMsg(
+        <div className="flex gap-2 items-center">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span>¡{filledCount} mediciones cargadas desde el ticket ({extracted.equipo_detectado || "InBody"})!</span>
+        </div>
+      );
+    } catch (err) {
+      console.error("Error en lectura IA de InBody:", err);
+      setInbodyOcrResult({
+        success: false,
+        error: err?.message || "No se pudo interpretar el archivo.",
+        fileName: file.name,
+      });
+      setMsg("❌ " + (err?.message || "Error al procesar el ticket. Revisa que sea legible."));
+    } finally {
+      setAnalyzingInbody(false);
+    }
+  };
 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
   useBackButton(showModal, () => setShowModal(false), 20);
@@ -650,6 +745,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setExistingFotos([]);
     setPendingFotos([]);
     setPreviewUrls([]);
+    setInbodyOcrResult(null);
+    setAnalyzingInbody(false);
     setShowModal(true);
   }, [isCivil, cicloActivo, cicloSel, selected?.objetivo, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, clinicalRec, rutinas]);
 
@@ -1374,6 +1471,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEditingId(null); setExistingFotos([]);
     setCustomSmaeMap(null);
     setShowStep5SmaeTable(false);
+    setInbodyOcrResult(null);
+    setAnalyzingInbody(false);
   };
 
   const startEdit = (mRaw) => {
@@ -3164,6 +3263,93 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     )}
                   </div>
                 </div>
+
+                {/* Lector IA OCR para Bioimpedancia / InBody */}
+                {form.metodo_evaluacion === "inbody" && (
+                  <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-blue-50/60 rounded-none md:rounded-2xl border-y md:border border-purple-200/80 p-4 sm:p-5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-600/10 border border-purple-200 flex items-center justify-center text-purple-600 shrink-0 mt-0.5 shadow-2xs">
+                          <Sparkles className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black uppercase tracking-wider text-purple-950">
+                              Lector IA de Ticket InBody / BIA
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                              Gemini Vision OCR
+                            </span>
+                          </div>
+                          <p className="text-xs text-purple-900/80 mt-1 leading-relaxed">
+                            Sube una foto o PDF del ticket (InBody 120, 270, 370, 570, Tanita) y la IA autocompletará las mediciones de bioimpedancia al instante.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          ref={inbodyFileInputRef}
+                          type="file"
+                          accept="application/pdf,image/png,image/jpeg,image/webp,image/heic"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleInbodyFileUpload(f);
+                            e.target.value = "";
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          disabled={analyzingInbody || isReadOnly}
+                          onClick={() => inbodyFileInputRef.current?.click()}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                        >
+                          {analyzingInbody ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-white" />
+                              <span>Analizando ticket...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 text-white" />
+                              <span>Subir PDF o Foto del Ticket</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {inbodyOcrResult && (
+                      <div className={`mt-3.5 pt-3 border-t ${inbodyOcrResult.success ? "border-purple-200/80" : "border-red-200"} flex items-center justify-between text-xs font-semibold`}>
+                        <div className="flex items-center gap-2">
+                          {inbodyOcrResult.success ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span className="text-purple-950">
+                                ¡{inbodyOcrResult.count} valores extraídos desde <strong>{inbodyOcrResult.fileName}</strong>
+                                {inbodyOcrResult.equipo ? ` (${inbodyOcrResult.equipo})` : ""}! Revisa los campos antes de guardar.
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                              <span className="text-red-700">{inbodyOcrResult.error}</span>
+                            </>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setInbodyOcrResult(null)}
+                          className="text-purple-600 hover:text-purple-800 text-[11px] underline ml-2 shrink-0 cursor-pointer"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Card 2: Grupos de Campos Antropométricos */}
                 {activeGroups.map(group => (

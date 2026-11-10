@@ -273,7 +273,7 @@ export function getGeminiApiKey() {
   return "";
 }
 
-const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash-lite"];
+const CANDIDATE_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
 
 function extractGeminiText(data) {
   const parts = data?.candidates?.[0]?.content?.parts || [];
@@ -2676,4 +2676,152 @@ export async function syncDualDomainSummariesInBackground({
 
   inFlightDualSummaries.set(inflightKey, task);
   return task;
+}
+
+/**
+ * Normaliza y valida los datos extraídos de un ticket de InBody por Gemini Vision.
+ */
+function sanitizeInbodyExtracted(data) {
+  if (!data || typeof data !== "object") return {};
+
+  const numOrNull = (v, min = 0, max = Infinity, decimals = 1) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < min || n > max) return null;
+    return decimals === 0 ? Math.round(n) : Number(n.toFixed(decimals));
+  };
+
+  const peso = numOrNull(data.peso, 15, 350, 2);
+  const estatura = numOrNull(data.estatura, 60, 240, 0);
+  const grasa_pct = numOrNull(data.grasa_pct, 2, 70, 1);
+  let calc_masa_grasa = numOrNull(data.calc_masa_grasa, 1, 200, 2);
+
+  // Si no se leyó masa grasa directa pero sí peso y % grasa, derivarla:
+  if (!calc_masa_grasa && peso && grasa_pct) {
+    calc_masa_grasa = Number(((peso * grasa_pct) / 100).toFixed(2));
+  }
+
+  return {
+    peso,
+    estatura,
+    grasa_pct,
+    calc_masa_grasa,
+    inbody_smm: numOrNull(data.inbody_smm, 5, 120, 2),
+    inbody_tbw: numOrNull(data.inbody_tbw, 10, 150, 2),
+    inbody_proteina: numOrNull(data.inbody_proteina, 2, 40, 2),
+    inbody_mineral_oseo: numOrNull(data.inbody_mineral_oseo, 0.5, 15, 2),
+    inbody_grasa_visceral: numOrNull(data.inbody_grasa_visceral, 1, 30, 0),
+    inbody_bmr: numOrNull(data.inbody_bmr, 400, 4500, 0),
+    inbody_score: numOrNull(data.inbody_score, 20, 120, 0),
+    inbody_magra_brazo_der: numOrNull(data.inbody_magra_brazo_der, 0.3, 20, 2),
+    inbody_magra_brazo_izq: numOrNull(data.inbody_magra_brazo_izq, 0.3, 20, 2),
+    inbody_magra_tronco: numOrNull(data.inbody_magra_tronco, 3, 70, 2),
+    inbody_magra_pierna_der: numOrNull(data.inbody_magra_pierna_der, 1, 40, 2),
+    inbody_magra_pierna_izq: numOrNull(data.inbody_magra_pierna_izq, 1, 40, 2),
+    cintura: numOrNull(data.cintura, 30, 220, 1),
+    cadera: numOrNull(data.cadera, 40, 240, 1),
+    presion_arterial: typeof data.presion_arterial === "string" && data.presion_arterial.trim().length >= 4 ? data.presion_arterial.trim() : null,
+    frecuencia_cardiaca: numOrNull(data.frecuencia_cardiaca, 35, 220, 0),
+    equipo_detectado: data.equipo_detectado ? String(data.equipo_detectado).trim() : null,
+    fecha_ticket: data.fecha_ticket ? String(data.fecha_ticket).trim() : null,
+  };
+}
+
+/**
+ * Lector IA (Gemini Vision OCR) de Tickets y Reportes InBody / Bioimpedancia.
+ * Extrae automáticamente las métricas antropométricas desde un PDF o foto (PNG/JPG).
+ */
+export async function extractInbodyFromDocument({ fileBase64, mimeType = "image/jpeg", geminiKey = null }) {
+  if (!fileBase64) throw new Error("No se proporcionó el archivo del ticket.");
+
+  // 1. Intentar llamar a Supabase Edge Function
+  try {
+    const edgeRes = await invokeEdgeFunction("clinical-ai", {
+      action: "ocr-inbody",
+      fileBase64,
+      mimeType,
+      geminiKey,
+    });
+
+    if (edgeRes?.success && edgeRes.data) {
+      return sanitizeInbodyExtracted(edgeRes.data);
+    }
+  } catch (e) {
+    console.warn("Edge function ocr-inbody fallback a llamada directa:", e?.message || e);
+  }
+
+  // 2. Fallback directo a Gemini API con clave de frontend
+  const activeKey = geminiKey || getDirectGeminiKey();
+  if (!activeKey) {
+    throw new Error("No hay API Key de Gemini configurada.");
+  }
+
+  const promptOcr = `Eres un médico y nutriólogo clínico especialista en antropometría y bioimpedancia eléctrica (BIA).
+Analiza detalladamente este documento o imagen de un reporte/ticket de InBody o báscula de bioimpedancia (ej. InBody 120, 270, 370, 570, 770 o Tanita).
+Tu objetivo es extraer con máxima precisión los valores numéricos correspondientes a los campos clínicos solicitados.
+
+Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si algún dato no aparece o no es legible, pon null, NUNCA inventes números):
+{
+  "peso": number | null,
+  "estatura": number | null,
+  "grasa_pct": number | null,
+  "calc_masa_grasa": number | null,
+  "inbody_smm": number | null,
+  "inbody_tbw": number | null,
+  "inbody_proteina": number | null,
+  "inbody_mineral_oseo": number | null,
+  "inbody_grasa_visceral": number | null,
+  "inbody_bmr": number | null,
+  "inbody_score": number | null,
+  "inbody_magra_brazo_der": number | null,
+  "inbody_magra_brazo_izq": number | null,
+  "inbody_magra_tronco": number | null,
+  "inbody_magra_pierna_der": number | null,
+  "inbody_magra_pierna_izq": number | null,
+  "cintura": number | null,
+  "cadera": number | null,
+  "presion_arterial": string | null,
+  "frecuencia_cardiaca": number | null,
+  "equipo_detectado": string | null,
+  "fecha_ticket": string | null
+}`;
+
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptOcr },
+              {
+                inlineData: {
+                  mimeType,
+                  data: fileBase64
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1
+          }
+        })
+      });
+
+      if (!res.ok) continue;
+      const resData = await res.json();
+      const txt = extractGeminiText(resData);
+      if (txt) {
+        const parsed = JSON.parse(txt);
+        return sanitizeInbodyExtracted(parsed);
+      }
+    } catch {
+      // try next model
+    }
+  }
+
+  throw new Error("No se pudo procesar el ticket con IA. Verifica que la imagen sea nítida.");
 }
