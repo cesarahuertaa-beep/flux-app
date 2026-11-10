@@ -1282,7 +1282,7 @@ export default function Training({
           >
             <button
               onClick={() => setShowResumen(false)}
-              className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 md:top-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
+              className="absolute top-4 right-4 text-[#6B7A8D] hover:text-[#0B1929] transition-colors"
             >
               <X size={20} />
             </button>

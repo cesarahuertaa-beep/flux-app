@@ -72,7 +72,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
   const subtitle = ROLE_LABELS[session?.role] || "Panel Admin";
 
   return (
-    <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height:"100dvh", width:"100vw" }}>
+    <div className="flex bg-[#F7F9FC] overflow-hidden" style={{ height:"100dvh", width:"100vw", paddingTop:"env(safe-area-inset-top, 0px)" }}>
       
 
       {/* ══════════════════════════════════════════════

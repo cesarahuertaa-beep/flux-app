@@ -6,13 +6,15 @@
 
 export const OPTION_SEPARATOR = "\n--- OTRA OPCIÓN ---\n";
 
+import { stripSmaeTag, extractSmaeMapFromMealText, embedSmaeMapInMealText } from "./smaeData";
+
 /**
  * Parsea las opciones de una comida desde opcion1 y opcion2
  * Devuelve un array de strings [opcionPrincipal, alt1, alt2, ...]
  */
 export function parseMealOptions(comida) {
   if (!comida) return [""];
-  const cleanSmaeTag = (str) => String(str || "").replace(/\n?\[SMAE:[^\]]+\]/gi, "").trim();
+  const cleanSmaeTag = stripSmaeTag;
   const list = [];
   const p1 = cleanSmaeTag(comida.opcion1 || "");
   list.push(p1);
@@ -46,6 +48,18 @@ export function formatMealOptions(optionsList) {
   const alts = optionsList.slice(1).map(o => (o || "").trim()).filter(Boolean);
   const opcion2 = alts.join(OPTION_SEPARATOR);
   return { opcion1, opcion2 };
+}
+
+/**
+ * Igual que formatMealOptions, pero conserva los equivalentes SMAE de la comida de origen
+ * (`sourceMeal.smaeMap` o la etiqueta embebida en `sourceMeal.opcion1`). Úsese al copiar
+ * comidas (plantillas, duplicados) para no perder el desglose SMAE.
+ */
+export function formatMealOptionsKeepSmae(optionsList, sourceMeal = {}) {
+  const { opcion1, opcion2 } = formatMealOptions(optionsList);
+  const fromMeal = sourceMeal?.smaeMap && Object.keys(sourceMeal.smaeMap).length > 0 ? sourceMeal.smaeMap : null;
+  const smaeMap = fromMeal || extractSmaeMapFromMealText(sourceMeal?.opcion1 || "").smaeMap || {};
+  return { opcion1: embedSmaeMapInMealText(opcion1, smaeMap), opcion2 };
 }
 
 /**

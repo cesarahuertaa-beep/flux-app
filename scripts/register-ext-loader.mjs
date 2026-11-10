@@ -1,0 +1,13 @@
+// Permite importar módulos del proyecto sin extensión (como hace Vite) desde scripts de Node.
+import { register } from "node:module";
+register("data:text/javascript," + encodeURIComponent(`
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+export async function resolve(specifier, context, next) {
+  if (specifier.startsWith('.') && !/\\.[a-z]+$/i.test(specifier) && context.parentURL) {
+    const url = new URL(specifier + '.js', context.parentURL);
+    if (existsSync(fileURLToPath(url))) return next(url.href, context);
+  }
+  return next(specifier, context);
+}
+`));

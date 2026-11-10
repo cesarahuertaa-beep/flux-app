@@ -1165,7 +1165,7 @@ export default function GestorTienda({ setMsg }) {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4">
+            <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-4">
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-[#6B7A8D] uppercase mb-1.5">Nombre *</label>

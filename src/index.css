@@ -18,6 +18,12 @@ html, body, #root {
   /* These will be overridden dynamically by BrandContext.jsx */
   --brand-primary: #56CCF2;
   --brand-secondary: #E0F7FE;
+
+  /* Safe Areas para iOS (PWA / Safari con viewport-fit=cover) y Android */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 * {
@@ -78,12 +84,12 @@ h1, h2, h3, h4, h5, h6 {
   height: 0 !important;
 }
 
-/* Desactivar pull-to-refresh en móvil — comportamiento de app nativa */
+/* Desactivar pull-to-refresh en móvil — comportamiento de app nativa.
+   NOTA: No usar -webkit-overflow-scrolling: touch en html/body porque en WebKit iOS moderno
+   encapsula los contenedores overflow-y-auto y rompe el anclaje de hijos position: fixed. */
 html, body {
   overscroll-behavior-y: none;
   background-color: var(--background);
-  /* Evita el bounce de Safari en iOS y el escalado automático de fuentes en WebView */
-  -webkit-overflow-scrolling: touch;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -93,25 +99,29 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* Asegurar que el fondo de toda la app sea blanco en mobile */
+/* Asegurar que el fondo de toda la app sea consistente en mobile */
 #root {
   min-height: 100dvh;
   background: #F7F9FC;
-}  
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }  
-@keyframes fadeInScale { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }  
-@keyframes float { 0%%, 100%% { transform: translateY(0px) rotate(0deg); } 33%% { transform: translateY(-12px) rotate(1deg); } 66%% { transform: translateY(-6px) rotate(-1deg); } }  
-.animate-in { animation: fadeInUp 0.45s cubic-bezier(0.16,1,0.3,1) forwards; }  
-.animate-in-scale { animation: fadeInScale 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }  
-.float { animation: float 6s ease-in-out infinite; } 
+}
 
+/* Animaciones sin 'forwards' con transform persistente:
+   En CSS/WebKit, mantener transform: translateY(0) tras finalizar la animación crea un
+   containing block que atrapa y desborda a todos los modales position: fixed hijos. */
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fadeInScale { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fadeInOnly { from { opacity: 0; } to { opacity: 1; } }
+@keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 33% { transform: translateY(-12px) rotate(1deg); } 66% { transform: translateY(-6px) rotate(-1deg); } }
 
-/* Soporte integral de Safe Areas para iOS (PWA / Safari con viewport-fit=cover) y Android */
-:root {
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
+.animate-in { animation: fadeInUp 0.28s cubic-bezier(0.16,1,0.3,1); }
+.animate-in-scale { animation: fadeInScale 0.28s cubic-bezier(0.16,1,0.3,1); }
+.float { animation: float 6s ease-in-out infinite; }
+
+/* Los contenedores fixed nunca deben animar transform para no desfasar el viewport en iOS WebKit */
+.fixed.animate-in,
+.fixed.inset-0 > .animate-in {
+  animation: fadeInOnly 0.18s ease-out !important;
+  transform: none !important;
 }
 
 .safe-top {
@@ -122,26 +132,67 @@ html, body {
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* Modales y vistas en dispositivos móviles (< 768px) */
+/* Confinamiento estricto de Safe Areas y Viewport Dinámico en móviles (< 768px) para iOS y Android */
 @media (max-width: 767px) {
-  /* Cabeceras de modales a pantalla completa */
-  .modal-safe-header {
-    padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
+  /* Escudos físicos para la zona superior (Notch / Isla Dinámica) e inferior (Home Indicator) */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: #FFFFFF;
+    z-index: 9999;
+    pointer-events: none;
   }
 
-  /* Pies de página / botones de acción de modales */
+  body::after {
+    content: "";
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-bottom, 0px);
+    background: #FFFFFF;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  /* Todo modal / overlay fixed inset-0 queda confinado estrictamente al área segura útil,
+     igualando el comportamiento nativo del WebView de Android */
+  .fixed.inset-0 {
+    top: env(safe-area-inset-top, 0px) !important;
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    overscroll-behavior: contain;
+  }
+
+  /* Evitar que en iOS WebKit las tarjetas hijas dentro de flexbox superen el 100% de la zona segura */
+  .fixed.inset-0:not(.overflow-y-auto) > div {
+    max-height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .fixed.inset-0 > .rounded-none {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  /* Garantizar que el cuerpo scrolleable dentro de un modal flex-col siempre active scroll interno */
+  .fixed.inset-0 .flex-col > .overflow-y-auto {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+  }
+
+  .modal-safe-header,
   .modal-safe-footer {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+    flex-shrink: 0;
   }
 
-  /* Barras sticky superiores en modales y pantallas de edición */
   .modal-safe-sticky-top {
     top: 0 !important;
-    padding-top: max(0.875rem, env(safe-area-inset-top, 0px)) !important;
-  }
-
-  /* Bottom sheets en móvil (UpgradeModal, WhatsApp sheets, etc.) */
-  .modal-safe-sheet-bottom {
-    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px)) !important;
   }
 }

@@ -1,3 +1,4 @@
+import { stripSmaeTag } from "../lib/smaeData";
 import { escapeHtml, parseFotos } from "./helpers";
 import { registerBackAction } from "../lib/backButtonHandler";
 import { parseDiaMetadata } from "../lib/mealOptions";
@@ -797,7 +798,7 @@ export const generateNutriPDF = (cliente, nutri, dias, brand = {}) => {
   <tbody>${comidas
     .map(
       (c) => `<tr><td>${escapeHtml(c.hora)}</td><td><strong>${escapeHtml(c.nombre)}</strong></td>
-  <td>${escapeHtml(c.opcion1)}</td><td>${escapeHtml(c.opcion2)}</td>
+  <td>${escapeHtml(stripSmaeTag(c.opcion1))}</td><td>${escapeHtml(stripSmaeTag(c.opcion2))}</td>
   <td>${escapeHtml(c.calorias || 0)}</td><td>${escapeHtml(c.proteina || 0)}/${escapeHtml(c.carbohidratos || 0)}/${escapeHtml(c.grasas || 0)}g</td></tr>`
     )
     .join("")}

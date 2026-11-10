@@ -1,3 +1,4 @@
+import { stripSmaeTag } from "./smaeData";
 // Clinical AI Engine for FLUX
 // Synthesizes clinical intake questionnaires, extracts key highlights, food preferences/aversions,
 // and produces actionable clinical diagnoses for nutritionists and coaches.
@@ -1979,7 +1980,7 @@ export async function generateGroceryListWithAi({ dias = [], incluirAlternativas
 
   const resumenDieta = diasAnalizados.map((d) => {
     const comidasTexto = d.comidas.map((c, idx) => {
-      let t = `- ${c.nombre || `Comida ${idx + 1}`}: ${c.opcion1 || ""}`;
+      let t = `- ${c.nombre || `Comida ${idx + 1}`}: ${stripSmaeTag(c.opcion1)}`;
       if (incluirAlternativas && c.opcion2 && c.opcion2.trim()) {
         t += `\n  [Alternativa]: ${c.opcion2.trim()}`;
       }

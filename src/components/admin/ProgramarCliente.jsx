@@ -29,7 +29,7 @@ import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
-import { parseMealOptions, formatMealOptions, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
+import { parseMealOptions, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText } from "../../lib/smaeData";
 import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
 import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient } from "../../lib/ingredientsCatalog";
@@ -1811,7 +1811,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
             ? c.opciones
             : parseMealOptions(c);
-          const { opcion1, opcion2 } = formatMealOptions(optsList);
+          const { opcion1, opcion2 } = formatMealOptionsKeepSmae(optsList, c);
           return {
             ...c,
             id: `temp_tpl_com_${nowTs}_${i}_${cIdx}`,
@@ -1922,7 +1922,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
               ? c.opciones
               : parseMealOptions(c);
-            const { opcion1, opcion2 } = formatMealOptions(optsList);
+            const { opcion1, opcion2 } = formatMealOptionsKeepSmae(optsList, c);
             allComidasPayload.push({
               dia_id: nuevoDia.id,
               hora: c.hora || "",
@@ -4738,7 +4738,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
             </div>
 
             {/* Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 space-y-4">
               
               {/* Aviso de protección de datos si el paciente ya tiene registros en este ciclo */}
               {planModalMode === "edit" && hasPatientData && (
@@ -5666,7 +5666,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             }`}
                                           >
                                             <span>🥑</span>
-                                            <span>Ingredientes</span>
+                                            <span>Alimentos SMAE</span>
                                             {c.ingredientesSeleccionados?.length > 0 && (
                                               <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
                                                 {c.ingredientesSeleccionados.length}
@@ -5880,14 +5880,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               </button>
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
-                                              {c.ingredientesSeleccionados.map(ing => {
-                                                const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
-                                                const eqVal = Number(ingredientEqMap[`${i}_0_${ing}`]) || 1;
+                                              {c.ingredientesSeleccionados.map((ing, ingIdx) => {
+                                                const ingName = typeof ing === "string" ? ing : (ing?.nombre || ing?.label || "");
+                                                if (!ingName) return null;
+                                                const catItem = getIngredientesCatalog().find((x) => x.nombre === ingName) || { nombre: ingName };
+                                                const eqVal = Number(ingredientEqMap[`${i}_0_${ingName}`]) || 1;
                                                 const portionObj = formatIngredientSmaePortion(catItem, eqVal);
-                                                const portionLabel = typeof portionObj === "string" ? portionObj : (portionObj?.label || ing);
+                                                const rawPortion = typeof portionObj === "string" ? portionObj : portionObj?.label;
+                                                const portionLabel = typeof rawPortion === "string" && rawPortion ? rawPortion : ingName;
                                                 return (
                                                   <div
-                                                    key={ing}
+                                                    key={`${ingName}_${ingIdx}`}
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
                                                   >
                                                     <span className="truncate max-w-[230px]" title={portionLabel}>
@@ -5896,7 +5899,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
                                                       <button
                                                         type="button"
-                                                        onClick={() => adjustIngredientEq(i, 0, ing, -0.5)}
+                                                        onClick={() => adjustIngredientEq(i, 0, ingName, -0.5)}
                                                         className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
                                                         title="Restar 0.5 equivalentes"
                                                       >
@@ -5907,7 +5910,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       </span>
                                                       <button
                                                         type="button"
-                                                        onClick={() => adjustIngredientEq(i, 0, ing, 0.5)}
+                                                        onClick={() => adjustIngredientEq(i, 0, ingName, 0.5)}
                                                         className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
                                                         title="Sumar 0.5 equivalentes"
                                                       >
@@ -5916,9 +5919,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     </div>
                                                     <button
                                                       type="button"
-                                                      onClick={() => toggleIngrediente(i, ing)}
+                                                      onClick={() => toggleIngrediente(i, ingName)}
                                                       className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
-                                                      title="Quitar ingrediente"
+                                                      title="Quitar alimento"
                                                     >
                                                       <X className="w-3.5 h-3.5" />
                                                     </button>
@@ -6279,7 +6282,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     }`}
                                                   >
                                                     <span>🥑</span>
-                                                    <span>Ingredientes</span>
+                                                    <span>Alimentos SMAE</span>
                                                     {selectedIngs.length > 0 && (
                                                       <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
                                                         {selectedIngs.length}
@@ -6500,14 +6503,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       </button>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1.5">
-                                                      {selectedIngs.map(ing => {
-                                                        const catItem = getIngredientesCatalog().find((x) => x.nombre === ing) || { nombre: ing };
-                                                        const eqVal = Number(ingredientEqMap[`${i}_${actualIdx}_${ing}`]) || 1;
+                                                      {selectedIngs.map((ing, ingIdx) => {
+                                                        const ingName = typeof ing === "string" ? ing : (ing?.nombre || ing?.label || "");
+                                                        if (!ingName) return null;
+                                                        const catItem = getIngredientesCatalog().find((x) => x.nombre === ingName) || { nombre: ingName };
+                                                        const eqVal = Number(ingredientEqMap[`${i}_${actualIdx}_${ingName}`]) || 1;
                                                         const portionObj = formatIngredientSmaePortion(catItem, eqVal);
-                                                        const portionLabel = typeof portionObj === "string" ? portionObj : (portionObj?.label || ing);
+                                                        const rawPortion = typeof portionObj === "string" ? portionObj : portionObj?.label;
+                                                        const portionLabel = typeof rawPortion === "string" && rawPortion ? rawPortion : ingName;
                                                         return (
                                                           <div
-                                                            key={ing}
+                                                            key={`${ingName}_${ingIdx}`}
                                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
                                                           >
                                                             <span className="truncate max-w-[230px]" title={portionLabel}>
@@ -6516,7 +6522,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
                                                               <button
                                                                 type="button"
-                                                                onClick={() => adjustIngredientEq(i, actualIdx, ing, -0.5)}
+                                                                onClick={() => adjustIngredientEq(i, actualIdx, ingName, -0.5)}
                                                                 className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
                                                               >
                                                                 -
@@ -6526,7 +6532,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               </span>
                                                               <button
                                                                 type="button"
-                                                                onClick={() => adjustIngredientEq(i, actualIdx, ing, 0.5)}
+                                                                onClick={() => adjustIngredientEq(i, actualIdx, ingName, 0.5)}
                                                                 className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
                                                               >
                                                                 +
@@ -6534,8 +6540,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             </div>
                                                             <button
                                                               type="button"
-                                                              onClick={() => toggleIngrediente(i, ing, actualIdx)}
+                                                              onClick={() => toggleIngrediente(i, ingName, actualIdx)}
                                                               className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                              title="Quitar alimento"
                                                             >
                                                               <X className="w-3.5 h-3.5" />
                                                             </button>

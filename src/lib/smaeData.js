@@ -647,6 +647,14 @@ export function embedSmaeMapInMealText(cleanText = "", smaeMap = {}) {
 }
 
 /**
+ * Elimina la etiqueta interna [SMAE:...] de cualquier texto de comida.
+ * Úsese SIEMPRE antes de mostrar o enviar texto de comidas al paciente, PDF, lista de compras o IA.
+ */
+export function stripSmaeTag(text = "") {
+  return String(text || "").replace(/\n?\[SMAE:[^\]]*\]/gi, "").trim();
+}
+
+/**
  * Formatea una porción escalada de un alimento SMAE para el número de equivalentes indicado.
  */
 export function formatScaledSmaePortion(food, equivalents = 1) {

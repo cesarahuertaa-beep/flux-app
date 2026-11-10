@@ -35,6 +35,8 @@ import {
   fetchCustomIngredientes,
   saveCustomPlatillos,
   saveCustomIngredientes,
+  deleteCustomPlatilloFromDb,
+  deleteCustomIngredienteFromDb,
   CATEGORIAS_PLATILLOS,
   CATEGORIAS_INGREDIENTES
 } from "../../lib/customCatalogs";
@@ -378,9 +380,11 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const executeDeletePlatillo = async () => {
     if (!deletePlatilloModal) return;
     try {
-      const updatedList = platillos.filter(p => p.id !== deletePlatilloModal.id);
+      const targetId = deletePlatilloModal.id;
+      const updatedList = platillos.filter(p => p.id !== targetId);
       setPlatillos(updatedList);
       await saveCustomPlatillos(updatedList);
+      await deleteCustomPlatilloFromDb(targetId);
       setMsg(<div className="flex gap-2 items-center"><Trash2 className="w-4 h-4 text-red-500" /> Platillo eliminado del catálogo</div>);
       setDeletePlatilloModal(null);
     } catch (e) {
@@ -477,10 +481,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const executeDeleteIng = async () => {
     if (!deleteIngModal) return;
     try {
-      const updatedList = ingredientes.filter(item => item.id !== deleteIngModal.id);
+      const targetId = deleteIngModal.id;
+      const updatedList = ingredientes.filter(item => item.id !== targetId);
       setIngredientes(updatedList);
       await saveCustomIngredientes(updatedList);
-      setMsg(<div className="flex gap-2 items-center"><Trash2 className="w-4 h-4 text-red-500" /> Ingrediente eliminado del catálogo</div>);
+      await deleteCustomIngredienteFromDb(targetId);
+      setMsg(<div className="flex gap-2 items-center"><Trash2 className="w-4 h-4 text-red-500" /> Alimento SMAE eliminado del catálogo</div>);
       setDeleteIngModal(null);
     } catch (e) {
       setMsg("❌ " + e.message);
@@ -603,8 +609,8 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
   const searchPlaceholder =
     subtab === "ejercicios" ? "Buscar ejercicio…" :
-    subtab === "platillos" ? "Buscar platillo o ingrediente…" :
-    "Buscar ingrediente…";
+    subtab === "platillos" ? "Buscar platillo por nombre o ingredientes…" :
+    "Buscar alimento SMAE…";
 
   return (
     <div className="w-full flex-1 flex flex-col">
@@ -615,10 +621,10 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             Panel de Administración
           </p>
           <h1 className="text-lg md:text-2xl font-bold text-[#0B1929]" style={{ fontFamily: "DM Sans" }}>
-            Biblioteca de Ejercicios
+            Biblioteca de Ejercicios y Nutrición
           </h1>
           <p className="hidden md:block text-sm text-[#6B7A8D] mt-1">
-            Colección global de ejercicios con demostración visual, platillos y recetas culinarias
+            Colección global de ejercicios con demostración visual, platillos con SMAE y catálogo oficial de alimentos equivalentes
           </p>
         </div>
 
@@ -657,17 +663,17 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               title={
                 subtab === "ejercicios" ? "Nuevo ejercicio" :
                 subtab === "platillos" ? "Nuevo platillo" :
-                "Nuevo ingrediente"
+                "Nuevo alimento SMAE"
               }
               aria-label={
                 subtab === "ejercicios" ? "Nuevo ejercicio" :
                 subtab === "platillos" ? "Nuevo platillo" :
-                "Nuevo ingrediente"
+                "Nuevo alimento SMAE"
               }
             >
               <Plus size={18} strokeWidth={2.5} className="shrink-0" />
               <span className="hidden sm:inline">
-                {subtab === "ejercicios" ? "Nuevo ejercicio" : subtab === "platillos" ? "Nuevo platillo" : "Nuevo ingrediente"}
+                {subtab === "ejercicios" ? "Nuevo ejercicio" : subtab === "platillos" ? "Nuevo platillo" : "Nuevo alimento SMAE"}
               </span>
             </button>
           )}
@@ -723,7 +729,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             }`}
           >
             <Apple className="w-4 h-4 shrink-0" />
-            <span>Ingredientes</span>
+            <span>Alimentos SMAE</span>
             <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
               subtab === "ingredientes" ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]" : "bg-white/60 text-[#6B7A8D]"
             }`}>
@@ -1061,19 +1067,19 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
         )}
 
         {/* ═════════════════════════════════════════════════════════════════════════ */}
-        {/* VISTA 3: INGREDIENTES CULINARIOS */}
+        {/* VISTA 3: ALIMENTOS EQUIVALENTES SMAE */}
         {/* ═════════════════════════════════════════════════════════════════════════ */}
         {subtab === "ingredientes" && (
           <div className="space-y-4">
-            {/* Grid de Ingredientes */}
+            {/* Grid de Alimentos SMAE */}
             {ingredientesFiltrados.length === 0 ? (
               <div className="text-center py-20 text-[#6B7A8D] bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
                 <Apple size={48} className="mx-auto mb-4 opacity-20" />
                 <div className="text-[16px] font-semibold mb-1.5 text-[#0B1929]">
-                  {ingredientes.length === 0 ? "El catálogo de ingredientes está vacío" : "No hay ingredientes que coincidan"}
+                  {ingredientes.length === 0 ? "El catálogo de alimentos SMAE está vacío" : "No hay alimentos SMAE que coincidan"}
                 </div>
                 <div className="text-[13px] text-[#6B7A8D]">
-                  {ingredientes.length === 0 && isSuperadmin ? "Agrega el primer ingrediente con el botón de arriba" : "Intenta con otros filtros"}
+                  {ingredientes.length === 0 && isSuperadmin ? "Agrega el primer alimento SMAE con el botón de arriba" : "Intenta con otros filtros"}
                 </div>
               </div>
             ) : (
@@ -1277,7 +1283,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <button onClick={() => setShowPlatilloModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20} /></button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4">
+            <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del platillo</label>
@@ -1557,7 +1563,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               <button onClick={() => setShowIngModal(false)} className="text-[#6B7A8D] hover:text-[#0B1929] transition-colors"><X size={20} /></button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4">
+            <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">Nombre del Alimento (SMAE)</label>
                 <input
@@ -1751,7 +1757,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
             </div>
 
             {/* Body */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-4">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--brand-primary)] block mb-1">
                   {CATEGORIAS_PLATILLOS.find(c => c.id === recipePreviewModal.categoria)?.nombre || recipePreviewModal.categoria}

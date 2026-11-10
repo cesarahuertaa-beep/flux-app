@@ -4,7 +4,7 @@ import { dbGet, dbGetFresh, storageUpload } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { ConfirmModal, showFluxAlert } from "./ConfirmModal";
 import { CustomSelect } from "./CustomSelect";
-import { parseMealOptions, formatMealOptions } from "../../lib/mealOptions";
+import { parseMealOptions, formatMealOptionsKeepSmae } from "../../lib/mealOptions";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -257,7 +257,7 @@ export default function TemplatesManagerModal({
                 const optsList = Array.isArray(c.opciones) && c.opciones.length > 0
                   ? c.opciones
                   : parseMealOptions(c);
-                const { opcion1, opcion2 } = formatMealOptions(optsList);
+                const { opcion1, opcion2 } = formatMealOptionsKeepSmae(optsList, c);
                 return {
                   hora: c.hora || "",
                   nombre: c.nombre || `Comida ${cIdx + 1}`,
@@ -354,7 +354,7 @@ export default function TemplatesManagerModal({
             orden: d.orden != null ? d.orden : dIdx,
             comidas: sortedComs.map((c, cIdx) => {
               const optsList = parseMealOptions(c);
-              const { opcion1, opcion2 } = formatMealOptions(optsList);
+              const { opcion1, opcion2 } = formatMealOptionsKeepSmae(optsList, c);
               return {
                 hora: c.hora || "",
                 nombre: c.nombre || `Comida ${cIdx + 1}`,
@@ -717,7 +717,7 @@ export default function TemplatesManagerModal({
         </div>
 
         {/* ── Modal Footer ── */}
-        <div className="px-4 py-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gray-50 border-t border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-4 py-3 sm:p-4 bg-gray-50 border-t border-[#E2E8F0] flex items-center justify-between gap-3 shrink-0 modal-safe-footer">
           <p className="hidden sm:block text-xs text-[#6B7A8D]">
             ✨ Las plantillas te ahorran tiempo al reutilizar tus mejores programas.
           </p>

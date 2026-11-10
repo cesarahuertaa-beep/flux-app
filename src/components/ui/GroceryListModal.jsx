@@ -1,3 +1,4 @@
+import { stripSmaeTag } from "../../lib/smaeData";
 import React, { useState, useMemo, useEffect } from "react";
 import { X, ShoppingBag, Check, Copy, CheckCheck, Search, Trash2, Filter, Utensils, Apple, Wheat, Milk, Package, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { useBackButton } from "../../lib/backButtonHandler";
@@ -258,7 +259,7 @@ export default function GroceryListModal({ dias = [], onClose, clienteNombre, se
   const menuHash = useMemo(() => {
     try {
       return JSON.stringify(
-        (dias || []).map((d) => (d?.comidas || []).map((c) => [c?.opcion1 || "", c?.opcion2 || ""]))
+        (dias || []).map((d) => (d?.comidas || []).map((c) => [stripSmaeTag(c?.opcion1), stripSmaeTag(c?.opcion2)]))
       );
     } catch {
       return "";

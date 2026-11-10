@@ -1,3 +1,4 @@
+import { stripSmaeTag } from "../../lib/smaeData";
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Flame, ChevronRight, Apple, FileText, ShoppingBag, Droplets, Plus, Minus, Check, CheckCircle2, Pill } from "lucide-react";
 import { useBrand } from "../BrandContext";
@@ -464,7 +465,7 @@ export default function Nutrition({
             const mealName = (meal.nombre || "").trim() || `Comida ${idx + 1}`;
             const hora = meal.hora || "";
             const preview = meal.opcion1
-              ? meal.opcion1.split("\n")[0].substring(0, 65)
+              ? stripSmaeTag(meal.opcion1).split("\n")[0].substring(0, 65)
               : "";
 
             return (
@@ -562,7 +563,7 @@ export default function Nutrition({
                         {(() => {
                           const options = parseMealOptions(meal);
                           const activeOptIdx = options.length > 1 ? (activeMealOptions[meal.id || idx] || 0) : 0;
-                          const currentOptionText = options[activeOptIdx] || options[0] || meal.opcion1 || "";
+                          const currentOptionText = options[activeOptIdx] || options[0] || stripSmaeTag(meal.opcion1) || "";
 
                           return (
                             <div className="mt-1 space-y-2.5">
