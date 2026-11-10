@@ -61,12 +61,14 @@
     "electron-updater": "^6.8.9",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-image-crop": "^11.1.2",
     "react-muscle-highlighter": "^1.2.0",
     "react-router-dom": "^7.18.3",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

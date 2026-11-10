@@ -19,15 +19,29 @@ mkdirSync(OUT, { recursive: true });
 // ── Alimentos ──────────────────────────────────────────────────────────────
 const foods = INGREDIENTES_CATALOGO.map((f) => {
   const foto = String(f.foto || "").startsWith("data:") ? "" : f.foto || "";
-  return `(${q(f.id)},${q(f.nombre)},${q(f.smaeGroup)},${num(f.cantidadBase, 1)},${q(f.unidadBase)},${num(f.gramosBase, 30)},${q(f.porcion1Eq)},${arr(f.dietTags)},${arr(f.keywords)},${q(foto)})`;
+  return `(${q(f.id)},${q(f.nombre)},${q(f.smaeGroup || f.categoria)},${num(f.cantidadBase, 1)},${q(f.unidadBase || 'pieza')},${num(f.gramosBase, 30)},${q(f.porcion1Eq)},${arr(f.dietTags)},${arr(f.keywords)},${q(foto)})`;
 });
-writeFileSync(
-  new URL("seed_smae_alimentos.sql", OUT),
-  `-- Semilla inicial de public.smae_alimentos (${foods.length} alimentos). Generado por scripts/generate_smae_seed.mjs\n` +
-    `INSERT INTO public.smae_alimentos (id,nombre,grupo_smae,cantidad_base,unidad_base,gramos_base,porcion_1eq,tags_restriccion,keywords,foto) VALUES\n` +
-    foods.join(",\n") +
-    `\nON CONFLICT (id) DO NOTHING;\n`
-);
+
+const batchSize = 500;
+let foodsSql = `-- Semilla oficial completa de public.smae_alimentos (${foods.length} alimentos). Generado por scripts/generate_smae_seed.mjs\n\n`;
+
+for (let i = 0; i < foods.length; i += batchSize) {
+  const batch = foods.slice(i, i + batchSize);
+  foodsSql += `INSERT INTO public.smae_alimentos (id,nombre,grupo_smae,cantidad_base,unidad_base,gramos_base,porcion_1eq,tags_restriccion,keywords,foto) VALUES\n` +
+    batch.join(",\n") +
+    `\nON CONFLICT (id) DO UPDATE SET\n` +
+    `  nombre = EXCLUDED.nombre,\n` +
+    `  grupo_smae = EXCLUDED.grupo_smae,\n` +
+    `  cantidad_base = EXCLUDED.cantidad_base,\n` +
+    `  unidad_base = EXCLUDED.unidad_base,\n` +
+    `  gramos_base = EXCLUDED.gramos_base,\n` +
+    `  porcion_1eq = EXCLUDED.porcion_1eq,\n` +
+    `  tags_restriccion = EXCLUDED.tags_restriccion,\n` +
+    `  keywords = EXCLUDED.keywords,\n` +
+    `  updated_at = now();\n\n`;
+}
+
+writeFileSync(new URL("seed_smae_alimentos.sql", OUT), foodsSql);
 
 // ── Platillos ──────────────────────────────────────────────────────────────
 const dishes = RAW_PLATILLOS_SEED.map((d) => {

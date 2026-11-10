@@ -12,6 +12,7 @@ import {
   SMAE_FOODS_BY_GROUP,
   DIET_RESTRICTION_TAGS,
 } from "./smaeData";
+import smaeFoodsComplete from "./seed/smaeFoodsComplete.json" with { type: "json" };
 
 export const KEY_SMAE_ALIMENTOS = "flux_smae_alimentos_v2";
 
@@ -83,37 +84,43 @@ function buildPorcion1EqText(food, groupId) {
 }
 
 /**
- * Catálogo Maestro de Alimentos SMAE (construido 100% desde SMAE_FOODS_BY_GROUP)
+ * Catálogo Maestro Oficial SMAE 5ª Edición (2,857 alimentos certificados)
  */
-export const INGREDIENTES_CATALOGO = Object.entries(SMAE_FOODS_BY_GROUP).flatMap(
-  ([groupId, foods]) => {
-    const grp = SMAE_GROUPS_MAP[groupId] || {
-      id: groupId,
-      nombre: groupId,
-      corto: groupId,
-      icono: "🥗",
-      color: "#10b981",
-      kcal: 0,
-      proteina: 0,
-      carbohidratos: 0,
-      grasas: 0,
-    };
-    const defaultAvatar = buildSmaeSvgAvatar(grp.icono, grp.color);
-    return (foods || []).map((food) => ({
-      id: food.id,
-      nombre: food.nombre,
-      categoria: groupId,
-      smaeGroup: groupId,
-      cantidadBase: Number(food.cantidadBase || 1),
-      unidadBase: food.unidadBase || "g",
-      gramosBase: Number(food.gramosBase || 30),
-      porcion1Eq: buildPorcion1EqText(food, groupId),
-      dietTags: Array.isArray(food.dietTags) ? food.dietTags : [],
-      keywords: Array.isArray(food.keywords) ? food.keywords : [],
-      foto: food.foto || defaultAvatar,
-    }));
-  }
-);
+export const INGREDIENTES_CATALOGO = (smaeFoodsComplete && smaeFoodsComplete.length > 0
+  ? smaeFoodsComplete
+  : Object.entries(SMAE_FOODS_BY_GROUP).flatMap(([g, fs]) => fs)
+).map((food) => {
+  const groupId = food.grupo_smae || food.categoria || food.smaeGroup || "verduras";
+  const grp = SMAE_GROUPS_MAP[groupId] || {
+    id: groupId,
+    nombre: groupId,
+    corto: groupId,
+    icono: "🥗",
+    color: "#10b981",
+    kcal: 0,
+    proteina: 0,
+    carbohidratos: 0,
+    grasas: 0,
+  };
+  const defaultAvatar = buildSmaeSvgAvatar(grp.icono, grp.color);
+  return {
+    id: food.id,
+    nombre: food.nombre,
+    categoria: groupId,
+    smaeGroup: groupId,
+    cantidadBase: Number(food.cantidad_base ?? food.cantidadBase ?? 1),
+    unidadBase: food.unidad_base || food.unidadBase || "pieza",
+    gramosBase: Number(food.gramos_base ?? food.gramosBase ?? 30),
+    porcion1Eq: food.porcion_1eq || food.porcion1Eq || buildPorcion1EqText(food, groupId),
+    dietTags: Array.isArray(food.tags_restriccion)
+      ? food.tags_restriccion
+      : Array.isArray(food.dietTags)
+      ? food.dietTags
+      : [],
+    keywords: Array.isArray(food.keywords) ? food.keywords : [],
+    foto: food.foto || defaultAvatar,
+  };
+});
 
 const MASTER_BY_ID = Object.fromEntries(
   INGREDIENTES_CATALOGO.map((i) => [i.id, i])
