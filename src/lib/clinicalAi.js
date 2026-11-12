@@ -2735,8 +2735,9 @@ export async function extractInbodyFromDocument({ fileBase64, mimeType = "image/
   if (!fileBase64) throw new Error("No se proporcionó el archivo del ticket.");
 
   const activeKey = geminiKey || getGeminiApiKey();
+  let edgeError = null;
 
-  // 1. Intentar llamar a Supabase Edge Function
+  // 1. Intentar llamar a Supabase Edge Function (Backend centralizado y seguro)
   try {
     const edgeRes = await invokeEdgeFunction("clinical-ai", {
       action: "ocr-inbody",
@@ -2748,13 +2749,17 @@ export async function extractInbodyFromDocument({ fileBase64, mimeType = "image/
     if (edgeRes?.success && edgeRes.data) {
       return sanitizeInbodyExtracted(edgeRes.data);
     }
+    if (edgeRes?.error) {
+      edgeError = edgeRes.message || edgeRes.error;
+    }
   } catch (e) {
-    console.warn("Edge function ocr-inbody fallback a llamada directa:", e?.message || e);
+    edgeError = e?.message || String(e);
+    console.warn("Edge function ocr-inbody fallback a llamada directa:", edgeError);
   }
 
-  // 2. Fallback directo a Gemini API con clave de frontend
+  // 2. Fallback directo a Gemini API con clave de frontend si está disponible
   if (!activeKey) {
-    throw new Error("No hay API Key de Gemini configurada.");
+    throw new Error(edgeError || "No hay API Key de Gemini configurada.");
   }
 
   const promptOcr = `Eres un médico y nutriólogo clínico especialista en antropometría y bioimpedancia eléctrica (BIA).
