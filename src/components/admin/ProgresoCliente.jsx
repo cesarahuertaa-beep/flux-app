@@ -17,7 +17,7 @@ import {
   generateSmartTrainingPrescription,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
-import { dbPeek, dbGet, dbGetFresh, updateQueryCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
@@ -378,6 +378,119 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       : Number(num.toFixed(1)).toString();
   };
 
+  const [promoteModal, setPromoteModal] = useState(null);
+
+  const originalHasData = (ejId) => {
+    return Object.keys(progreso).some(key => {
+      if (key.startsWith(`${ejId}-`) && key.endsWith("-original")) {
+        const val = progreso[key];
+        if (val == null) return false;
+        const str = String(val).trim().toUpperCase();
+        return str !== "" && str !== "—" && str !== "-" && str !== "ALT" && str !== "ORG";
+      }
+      return false;
+    });
+  };
+
+  const handleConfirmPromote = async () => {
+    if (!promoteModal) return;
+    const { rutina, ej, altIdx, alt, hasOrigData } = promoteModal;
+    setPromoteModal(null);
+    setLoading(true);
+    try {
+      const targetAltVid = `alt_${altIdx}`;
+
+      const nextNombre = alt.nombre;
+      const nextGrupo = alt.grupo_muscular || ej.grupo_muscular || "";
+      const nextGif = alt.gif_url || "";
+      const nextBibliotecaId = alt.biblioteca_id || null;
+
+      let nextAlternativas = [];
+      if (hasOrigData) {
+        const oldMainAsAlt = {
+          biblioteca_id: ej.biblioteca_id || null,
+          nombre: ej.nombre,
+          grupo_muscular: ej.grupo_muscular || "",
+          gif_url: ej.gif_url || "",
+          reps_sugeridas: ej.reps_sugeridas || 10,
+          peso_sugerido: ej.peso_sugerido || "",
+          unidad: ej.unidad || "kg"
+        };
+        nextAlternativas = (ej.alternativas || []).map((a, idx) => idx === altIdx ? oldMainAsAlt : a);
+      } else {
+        nextAlternativas = (ej.alternativas || []).filter((_, idx) => idx !== altIdx);
+      }
+
+      await dbPatch(`ejercicios?id=eq.${ej.id}`, {
+        nombre: nextNombre,
+        grupo_muscular: nextGrupo,
+        gif_url: nextGif,
+        biblioteca_id: nextBibliotecaId,
+        alternativas: nextAlternativas
+      });
+
+      if (selected?.id) {
+        if (hasOrigData) {
+          await dbPatch(
+            `progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.original`,
+            { variante_id: "temp_swap" }
+          );
+          await dbPatch(
+            `progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.${targetAltVid}`,
+            { variante_id: "original" }
+          );
+          await dbPatch(
+            `progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.temp_swap`,
+            { variante_id: targetAltVid }
+          );
+        } else {
+          await dbDel(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.original`).catch(() => {});
+          await dbPatch(
+            `progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.${targetAltVid}`,
+            { variante_id: "original" }
+          );
+          const origAlts = ej.alternativas || [];
+          for (let i = altIdx + 1; i < origAlts.length; i++) {
+            await dbPatch(
+              `progreso?cliente_id=eq.${selected.id}&ejercicio_id=eq.${ej.id}&variante_id=eq.alt_${i}`,
+              { variante_id: `alt_${i - 1}` }
+            ).catch(() => {});
+          }
+        }
+      }
+
+      setRutinas(prev => prev.map(r => {
+        if (r.id !== rutina.id) return r;
+        return {
+          ...r,
+          ejercicios: (r.ejercicios || []).map(e => {
+            if (e.id !== ej.id) return e;
+            return {
+              ...e,
+              nombre: nextNombre,
+              grupo_muscular: nextGrupo,
+              gif_url: nextGif,
+              biblioteca_id: nextBibliotecaId,
+              alternativas: nextAlternativas
+            };
+          })
+        };
+      }));
+
+      invalidateCache("progreso");
+      invalidateCache("rutinas");
+      invalidateCache("ejercicios");
+
+      await loadCicloData(cicloSel, true);
+      setMsg(<div className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-500" /> Ejercicio promovido a principal exitosamente</div>);
+    } catch (err) {
+      console.error("Error al promover ejercicio:", err);
+      setMsg("❌ Error al promover ejercicio: " + (err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
   const deletedIdsRef = useRef(new Set());
   const initialLoadedRef = useRef(false);
@@ -540,19 +653,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   useBackButton(showModal, () => setShowModal(false), 20);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
 
-  const loadCicloData = useCallback(async (ciclo) => {
+  const loadCicloData = useCallback(async (ciclo, force = false) => {
     if (!selected) return;
     const cicloFiltro = ciclo ? `ciclo_id=eq.${ciclo.id}` : `ciclo_id=is.null`;
 
     // 1. Rutinas y progreso de pesas (solo si mode no es "nutricion")
     if (mode !== "nutricion") {
-      let rsFull = (Array.isArray(initialRutinas) && initialRutinas.length > 0) ? initialRutinas : null;
+      let rsFull = (!force && Array.isArray(initialRutinas) && initialRutinas.length > 0) ? initialRutinas : null;
       if (!rsFull) {
-        const rs = await dbGet(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
+        const rs = await (force ? dbGetFresh : dbGet)(`rutinas?cliente_id=eq.${selected.id}&${cicloFiltro}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []);
         rsFull = await Promise.all((rs || []).map(async (r) => {
           const ejs = Array.isArray(r.ejercicios)
             ? [...r.ejercicios].sort((a, b) => (a.orden || 0) - (b.orden || 0))
-            : await dbGet(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
+            : await (force ? dbGetFresh : dbGet)(`ejercicios?rutina_id=eq.${r.id}&order=orden.asc`).catch(() => []);
           return { ...r, ejercicios: ejs };
         }));
         setRutinas(rsFull);
@@ -560,7 +673,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
       const allIds = rsFull.flatMap(r => (r.ejercicios || []).map(e => e.id));
       if (allIds.length) {
-        const ps = await dbGet(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
+        const ps = await (force ? dbGetFresh : dbGet)(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allIds.join(",")})&limit=3000`).catch(() => []);
         const pm = {};
         (ps || []).forEach(p => { pm[`${p.ejercicio_id}-${p.semana}-${p.serie}-${p.tipo}-${p.variante_id || 'original'}`] = p.valor; });
         setProgreso(pm);
@@ -2378,7 +2491,32 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center flex-wrap gap-1.5 min-w-0">
                                           <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
-                                          {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold shrink-0">ALT</span>}
+                                          {!isOriginal && (
+                                            <div className="inline-flex items-center gap-1 shrink-0">
+                                              <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold">ALT</span>
+                                              {!isReadOnly && altIdx >= 0 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(ev) => {
+                                                    ev.stopPropagation();
+                                                    const hasOrig = originalHasData(ej.id);
+                                                    setPromoteModal({
+                                                      rutina: r,
+                                                      ej,
+                                                      altIdx,
+                                                      alt: exObj,
+                                                      hasOrigData: hasOrig
+                                                    });
+                                                  }}
+                                                  className="inline-flex items-center gap-0.5 text-[9px] bg-amber-500 hover:bg-amber-600 text-white px-1.5 py-0.5 rounded font-bold transition-colors cursor-pointer shadow-2xs"
+                                                  title="Promover este ejercicio a principal"
+                                                >
+                                                  <ArrowUp className="w-2.5 h-2.5" />
+                                                  Promover
+                                                </button>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                         <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
                                       </div>
@@ -4494,6 +4632,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         cancelText={confirmDelete?.cancelText || "Cancelar"}
         danger={confirmDelete?.danger ?? true}
         icon={confirmDelete?.icon || "trash"}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(promoteModal)}
+        onClose={() => setPromoteModal(null)}
+        onConfirm={handleConfirmPromote}
+        title="Promover a Ejercicio Principal"
+        description={
+          promoteModal?.hasOrigData
+            ? `Al promover "${promoteModal?.alt?.nombre}" a principal, el ejercicio anterior ("${promoteModal?.ej?.nombre}") pasará a guardarse como alternativa para conservar su historial de semanas previas.`
+            : `El ejercicio original ("${promoteModal?.ej?.nombre}") nunca tuvo registros en este ciclo. Al promover "${promoteModal?.alt?.nombre}", el anterior se eliminará de la rutina para mantenerla limpia y sin filas vacías.`
+        }
+        confirmText="Promover a Principal"
+        cancelText="Cancelar"
+        danger={false}
+        icon="alert"
       />
 
       <UpgradeModal

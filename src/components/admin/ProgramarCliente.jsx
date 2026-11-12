@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "../SortableItem";
-import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, Calendar, Activity, CheckCircle2, AlertCircle, ShieldAlert, AlertTriangle, Save, Edit2, Plus, Search, FileText, Download, Lock, X, Utensils, Dumbbell, BarChart2, Camera, Image as ImageIcon, Bookmark, Calculator, ArrowLeft, ArrowUp, User, Check, ClipboardList, RotateCcw, MessageCircle, Copy, TrendingUp, Sparkles, Flame, Target, Droplets, Pill, Clock, Loader2 } from "lucide-react";
 import { EjercicioSelector } from "./EjercicioSelector";
 import { GRUPO_LABELS, normalizeMuscleGroup } from "../../lib/constants";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -3411,6 +3411,39 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const toggleUnidadAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], unidad: alts[altIdx].unidad ==="lb" ?"kg" :"lb"}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
   const updAlt = (i, altIdx, f, v) => setRutinaForm(p => { const es=[...p.ejercicios]; const alts=[...es[i].alternativas]; alts[altIdx]={...alts[altIdx], [f]:v}; es[i]={...es[i], alternativas: alts}; return { ...p, ejercicios:es }; });
   const remAlt = (i, altIdx) => setRutinaForm(p => { const es=[...p.ejercicios]; es[i]={...es[i], alternativas: es[i].alternativas.filter((_,x)=>x!==altIdx)}; return { ...p, ejercicios:es }; });
+  const promoteAlt = (i, altIdx) => setRutinaForm(p => {
+    const es = [...p.ejercicios];
+    const main = es[i];
+    const alts = [...(main.alternativas || [])];
+    const targetAlt = alts[altIdx];
+    if (!targetAlt) return p;
+
+    const oldMainAsAlt = {
+      biblioteca_id: main.biblioteca_id || null,
+      nombre: main.nombre,
+      grupo_muscular: main.grupo_muscular || "",
+      gif_url: main.gif_url || "",
+      reps_sugeridas: main.reps_sugeridas || 10,
+      peso_sugerido: main.peso_sugerido || "",
+      unidad: main.unidad || "kg"
+    };
+
+    const newAlts = alts.map((a, idx) => idx === altIdx ? oldMainAsAlt : a);
+
+    es[i] = {
+      ...main,
+      biblioteca_id: targetAlt.biblioteca_id || main.biblioteca_id || null,
+      nombre: targetAlt.nombre,
+      grupo_muscular: targetAlt.grupo_muscular || main.grupo_muscular || "",
+      gif_url: targetAlt.gif_url || "",
+      reps_sugeridas: targetAlt.reps_sugeridas ?? main.reps_sugeridas,
+      peso_sugerido: targetAlt.peso_sugerido ?? main.peso_sugerido,
+      unidad: targetAlt.unidad || main.unidad || "kg",
+      alternativas: newAlts
+    };
+
+    return { ...p, ejercicios: es };
+  });
 
   // ── Handlers de Drag & Drop ──
   const sensors = useSensors(
@@ -7304,7 +7337,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       </div>
                                     </div>
                             
-                                    <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-center">
+                                    <div className="col-start-3 row-start-1 sm:col-start-5 sm:row-start-1 flex items-center justify-end self-center gap-1">
+                                      <button type="button" onClick={() => promoteAlt(i, altIdx)} className="bg-amber-50 text-amber-600 rounded-lg p-1.5 hover:bg-amber-100 flex items-center justify-center transition-colors border-none cursor-pointer" title="Promover a ejercicio principal">
+                                        <ArrowUp className="w-[14px] h-[14px]" />
+                                      </button>
                                       <button type="button" onClick={() => remAlt(i, altIdx)} className="bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 flex items-center justify-center transition-colors border-none" title="Quitar alternativa">
                                         <X className="w-[14px] h-[14px]" />
                                       </button>

@@ -2734,13 +2734,15 @@ function sanitizeInbodyExtracted(data) {
 export async function extractInbodyFromDocument({ fileBase64, mimeType = "image/jpeg", geminiKey = null }) {
   if (!fileBase64) throw new Error("No se proporcionó el archivo del ticket.");
 
+  const activeKey = geminiKey || getGeminiApiKey();
+
   // 1. Intentar llamar a Supabase Edge Function
   try {
     const edgeRes = await invokeEdgeFunction("clinical-ai", {
       action: "ocr-inbody",
       fileBase64,
       mimeType,
-      geminiKey,
+      geminiKey: activeKey,
     });
 
     if (edgeRes?.success && edgeRes.data) {
@@ -2751,7 +2753,6 @@ export async function extractInbodyFromDocument({ fileBase64, mimeType = "image/
   }
 
   // 2. Fallback directo a Gemini API con clave de frontend
-  const activeKey = geminiKey || getDirectGeminiKey();
   if (!activeKey) {
     throw new Error("No hay API Key de Gemini configurada.");
   }
@@ -2815,7 +2816,8 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si alg
       const resData = await res.json();
       const txt = extractGeminiText(resData);
       if (txt) {
-        const parsed = JSON.parse(txt);
+        const clean = txt.replace(/```json\s*|```/gi, "").trim();
+        const parsed = JSON.parse(clean);
         return sanitizeInbodyExtracted(parsed);
       }
     } catch {
