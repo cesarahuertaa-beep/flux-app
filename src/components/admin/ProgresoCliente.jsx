@@ -2207,7 +2207,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 {tieneData&&(
                   <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] shadow-sm">
                     <table 
-                      className="border-collapse text-[11px] min-w-full bg-white table-fixed" 
+                      className="border-collapse text-[11px] w-full min-w-full bg-white table-fixed" 
                       style={{ minWidth: `${tableMinPx}px` }}
                     >
                       <colgroup>
@@ -2224,25 +2224,46 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <tr>
                           <th 
                             rowSpan={2} 
-                            className="sticky left-0 z-30 bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left font-bold shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                            style={{ width: "32%" }}
+                            className="sticky left-0 z-30 bg-gray-50 text-[#0B1929] px-3 py-2 border border-[#E2E8F0] text-left font-bold shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] w-[32%]"
                           >
                             Ejercicio
                           </th>
                           <th 
                             rowSpan={2} 
-                            className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center font-bold"
+                            style={{ width: "6%" }}
+                            className="bg-gray-50 text-[#0B1929] px-2 py-2 border border-[#E2E8F0] text-center font-bold w-[6%]"
                           >
                             Serie
                           </th>
                           {semanas.map((s,i)=>(
-                            <th key={i} colSpan={2} className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap">{s.label}</th>
+                            <th 
+                              key={i} 
+                              colSpan={2} 
+                              style={{ width: `${(parseFloat(metricColPercent) * 2).toFixed(2)}%` }}
+                              className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap"
+                            >
+                              {s.label}
+                            </th>
                           ))}
                         </tr>
                         <tr>
                           {semanas.map((_,i)=>(
                             <Fragment key={`h${i}`}>
-                              <th key={`p${i}`} className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold">Peso</th>
-                              <th key={`r${i}`} className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold">Reps</th>
+                              <th 
+                                key={`p${i}`} 
+                                style={{ width: `${metricColPercent}%` }}
+                                className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold"
+                              >
+                                Peso
+                              </th>
+                              <th 
+                                key={`r${i}`} 
+                                style={{ width: `${metricColPercent}%` }}
+                                className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold"
+                              >
+                                Reps
+                              </th>
                             </Fragment>
                           ))}
                         </tr>
@@ -2273,11 +2294,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 {si === 0 && (
                                   <td 
                                     rowSpan={exObj.num_series || ej.num_series || 4} 
-                                    className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] ${
+                                    style={{ width: "32%" }}
+                                    className={`px-3 py-2 border border-[#E2E8F0] font-bold align-middle sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] w-[32%] ${
                                       !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
                                     }`}
                                   >
-                                    <div className="flex items-center gap-1.5 min-w-0">
+                                    <div className="flex items-center flex-wrap gap-1.5 min-w-0">
                                       <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
                                       {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold shrink-0">ALT</span>}
                                     </div>
