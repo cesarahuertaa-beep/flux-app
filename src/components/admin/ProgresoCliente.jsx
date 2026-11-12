@@ -2358,11 +2358,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                       !isOriginal ? "bg-[#f0f9ff]" : (eji % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]")
                                     }`}
                                   >
-                                    <div className="flex items-center flex-wrap gap-1.5 min-w-0">
-                                      <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
-                                      {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold shrink-0">ALT</span>}
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div 
+                                        onClick={() => exObj.gif_url && setLightbox(exObj.gif_url)}
+                                        className={`w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200 flex items-center justify-center ${exObj.gif_url ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                                        title={exObj.gif_url ? "Ver demostración en grande" : ""}
+                                      >
+                                        {exObj.gif_url ? (
+                                          /\.(mp4|webm|mov)($|\?)/i.test(exObj.gif_url) ? (
+                                            <video src={exObj.gif_url} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                                          ) : (
+                                            <img src={exObj.gif_url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                                          )
+                                        ) : (
+                                          <Dumbbell className="w-4 h-4 text-slate-400" />
+                                        )}
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                                          <span className="text-[#0B1929] leading-tight break-words">{exObj.nombre}</span>
+                                          {!isOriginal && <span className="text-[9px] bg-[var(--brand-primary)] text-white px-1 py-0.5 rounded font-bold shrink-0">ALT</span>}
+                                        </div>
+                                        <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
+                                      </div>
                                     </div>
-                                    <div className="text-[10px] text-[#6B7A8D] font-normal mt-0.5 truncate">{GRUPO_LABELS[normalizeMuscleGroup(exObj.grupo_muscular || ej.grupo_muscular)] || exObj.grupo_muscular || ej.grupo_muscular}</div>
                                   </td>
                                 )}
                                 <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
@@ -4453,8 +4473,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
       {/* Lightbox */}
       {lightbox&&createPortal(
-        <div onClick={()=>setLightbox(null)} className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out">
-          <img src={lightbox} className="max-w-[90vw] max-h-[90vh] rounded-[14px] object-contain shadow-2xl" alt=""/>
+        <div onClick={()=>setLightbox(null)} className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out p-4">
+          {/\.(mp4|webm|mov)($|\?)/i.test(lightbox) ? (
+            <video src={lightbox} autoPlay loop muted playsInline controls className="max-w-[90vw] max-h-[90vh] rounded-[14px] object-contain shadow-2xl" />
+          ) : (
+            <img src={lightbox} className="max-w-[90vw] max-h-[90vh] rounded-[14px] object-contain shadow-2xl" alt=""/>
+          )}
           <div className="absolute top-5 right-6 text-white text-3xl cursor-pointer font-bold" onClick={()=>setLightbox(null)}><X className="w-8 h-8" /></div>
         </div>,
         document.body
