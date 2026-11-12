@@ -464,7 +464,25 @@ export default function Training({
 
   useBackButton(!!previewEx, () => setPreviewEx(null), 50);
   useBackButton(showResumen, () => setShowResumen(false), 30);
-  const [unitPrefs,       setUnitPrefs]       = useState({}); // { [exId_variantId]: 'kg' | 'lb' }
+  const [unitPrefs, setUnitPrefs] = useState(() => {
+    try {
+      const saved = localStorage.getItem("flux_client_unit_prefs");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const updateUnitPref = useCallback((key, unit) => {
+    setUnitPrefs(prev => {
+      const next = { ...prev, [key]: unit, lastUsed: unit };
+      try {
+        localStorage.setItem("flux_client_unit_prefs", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   const [focusedInput,    setFocusedInput]    = useState(null); // { exId, wi, si }
   // Local raw text while user is typing — prevents React from overwriting mid-keystroke
   const [localWeightInputs, setLocalWeightInputs] = useState({}); // { [kgKey]: string }
@@ -571,13 +589,20 @@ export default function Training({
     if (typeof dbVal === 'string' && dbVal.startsWith("LB:")) return dbVal.replace("LB:","");
     if (!dbVal || dbVal ==="-" || isNaN(dbVal)) return dbVal;
     
+    const num = parseFloat(dbVal);
+    if (isNaN(num)) return dbVal;
+
     // If unit is lb, convert stored kg back to lb
     if (unit === 'lb') {
-      const num = parseFloat(dbVal);
       const lb = num * 2.20462262;
-      return Number(lb.toFixed(1)).toString();
+      return (Math.abs(lb - Math.round(lb)) < 0.08)
+        ? Math.round(lb).toString()
+        : Number(lb.toFixed(1)).toString();
     }
-    return dbVal; // for kg, keep exactly as typed/stored
+    // For kg: if virtually integer or clean round, format cleanly without trailing raw decimals
+    return (Math.abs(num - Math.round(num)) < 0.05)
+      ? Math.round(num).toString()
+      : Number(num.toFixed(1)).toString();
   };
 
   const parseDBWeight = (inputVal, unit) => {
@@ -963,7 +988,7 @@ export default function Training({
                   {/* Tabla de Series */}
                   <div>
                     {(() => {
-                      const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || activeObj.unidad || 'kg';
+                      const prefUnit = unitPrefs[`${ex.id}_${activeVarId}`] || unitPrefs.lastUsed || activeObj.unidad || 'kg';
 
                       return (
                         <>
@@ -976,7 +1001,7 @@ export default function Training({
                               <div className="inline-flex items-center p-0.5 bg-[#F1F5F9] rounded-md border border-[#E2E8F0] shadow-2xs">
                                 <button
                                   type="button"
-                                  onClick={() => setUnitPrefs(s => ({ ...s, [`${ex.id}_${activeVarId}`]: 'kg' }))}
+                                  onClick={() => updateUnitPref(`${ex.id}_${activeVarId}`, 'kg')}
                                   className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
                                     prefUnit === 'kg'
                                       ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'
@@ -988,7 +1013,7 @@ export default function Training({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setUnitPrefs(s => ({ ...s, [`${ex.id}_${activeVarId}`]: 'lb' }))}
+                                  onClick={() => updateUnitPref(`${ex.id}_${activeVarId}`, 'lb')}
                                   className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
                                     prefUnit === 'lb'
                                       ? 'bg-white text-[#0B1929] shadow-2xs font-extrabold'

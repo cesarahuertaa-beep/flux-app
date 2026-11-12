@@ -347,6 +347,37 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [showStep5SmaeTable, setShowStep5SmaeTable] = useState(false);
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
+  const [trackingWeightUnit, setTrackingWeightUnit] = useState(() => {
+    try {
+      return localStorage.getItem("flux_tracking_unit") || "kg";
+    } catch {
+      return "kg";
+    }
+  });
+
+  const handleToggleTrackingUnit = (u) => {
+    setTrackingWeightUnit(u);
+    try {
+      localStorage.setItem("flux_tracking_unit", u);
+    } catch {}
+  };
+
+  const formatTrackingWeight = (val, unit) => {
+    if (!val || val === "—" || val === "-" || val === "ALT" || val === "ORG") return val;
+    const num = parseFloat(val);
+    if (isNaN(num)) return val;
+    if (unit === "lb") {
+      const lb = num * 2.20462262;
+      return (Math.abs(lb - Math.round(lb)) < 0.08)
+        ? Math.round(lb).toString()
+        : Number(lb.toFixed(1)).toString();
+    }
+    // En kg: si es entero o prácticamente entero, mostrar entero; si no, 1 decimal
+    return (Math.abs(num - Math.round(num)) < 0.05)
+      ? Math.round(num).toString()
+      : Number(num.toFixed(1)).toString();
+  };
+
   // Tombstoning para borrado 100% instantáneo que resiste ecos asíncronos de red
   const deletedIdsRef = useRef(new Set());
   const initialLoadedRef = useRef(false);
@@ -2169,24 +2200,52 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       {/* ── RUTINAS DEL CLIENTE ── */}
       {activeSection === "rutinas" && (
         <div>
-          {/* Cycle selector */}
-          {!cicloActivo && ciclos.length > 0 && (
-            <div className="mb-4">
-              <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
-              <div className="flex gap-1.5 flex-wrap">
-                {ciclos.map(c => (
-                  <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                    cicloSel?.id===c.id 
-                      ? (c.activo ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" :"bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
-                      :"bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
-                  }`}>
-                    {c.nombre.split("|")[0]}
-                    {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>}
-                  </button>
-                ))}
+          {/* Barra de opciones de Tracking: selector de ciclo + selector de unidad KG / LB */}
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            {!cicloActivo && ciclos.length > 0 ? (
+              <div>
+                <div className="text-[11px] text-[#6B7A8D] font-bold uppercase tracking-[0.8px] mb-2">Ciclo</div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {ciclos.map(c => (
+                    <button key={c.id} onClick={async () => { setCicloSel(c); await loadRutinas(c); }} className={`px-3 py-1.5 rounded-lg text-[13px] border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                      cicloSel?.id===c.id 
+                        ? (c.activo ?"bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] font-bold shadow-md" :"bg-gray-100 text-[#0B1929] border-gray-300 font-bold") 
+                        :"bg-transparent text-[#6B7A8D] border-[#E2E8F0] font-medium hover:bg-gray-50"
+                    }`}>
+                      {c.nombre.split("|")[0]}
+                      {c.activo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cicloSel?.id===c.id ?"bg-white" :"bg-green-400"}`}/>}
+                    </button>
+                  ))}
+                </div>
               </div>
+            ) : <div />}
+
+            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-[#E2E8F0] shadow-2xs ml-auto">
+              <span className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider px-2">Unidad:</span>
+              <button
+                type="button"
+                onClick={() => handleToggleTrackingUnit("kg")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  trackingWeightUnit === "kg"
+                    ? "bg-[var(--brand-primary)] text-white shadow-xs"
+                    : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                }`}
+              >
+                KG
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleTrackingUnit("lb")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  trackingWeightUnit === "lb"
+                    ? "bg-[var(--brand-primary)] text-white shadow-xs"
+                    : "text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-50"
+                }`}
+              >
+                LB
+              </button>
             </div>
-          )}
+          </div>
           {rutinas.length===0?(
             <div className="text-center py-16 text-[#6B7A8D]">
               <div className="flex justify-center mb-3 text-[#E2E8F0]"><Dumbbell className="w-12 h-12" /></div>
@@ -2255,7 +2314,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 style={{ width: `${metricColPercent}%` }}
                                 className="bg-gray-50/70 text-[#6B7A8D] px-1.5 py-1 border border-[#E2E8F0] text-center text-[10px] font-semibold"
                               >
-                                Peso
+                                Peso ({trackingWeightUnit})
                               </th>
                               <th 
                                 key={`r${i}`} 
@@ -2329,7 +2388,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   return (
                                     <Fragment key={`w${wi}`}>
                                       <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ?"bg-[var(--brand-primary)]/10" :""}`}>
-                                        <span className={`text-[11px] ${pVal ?"text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal||emptyText}</span>
+                                        <span className={`text-[11px] ${pVal ?"text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal ? formatTrackingWeight(pVal, trackingWeightUnit) : emptyText}</span>
                                       </td>
                                       <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ?"bg-[var(--brand-primary)]/5" :""}`}>
                                         <span className={`text-[11px] ${rVal ?"text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
