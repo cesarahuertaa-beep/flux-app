@@ -1441,7 +1441,8 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos (si alg
 
           const resData = await res.json();
           const rawTxt = extractGeminiText(resData);
-          const parsed = JSON.parse(rawTxt);
+          const cleanTxt = rawTxt.replace(/```json\s*|```/gi, "").trim();
+          const parsed = JSON.parse(cleanTxt);
 
           return new Response(
             JSON.stringify({
