@@ -4428,41 +4428,40 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         const targetK = Number(activePrescription?.targetKcal) || 0;
                         const adequacyPct = targetK > 0 ? Math.round((smaeTotals.kcal / targetK) * 100) : 100;
                         return (
-                          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm">🇲🇽</span>
-                                <div>
-                                  <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5 flex-wrap">
-                                    <span>Equivalentes SMAE del Ciclo</span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      {smaeTotals.totalEquivalentes} eq · {smaeTotals.kcal} kcal ({adequacyPct}%)
-                                    </span>
-                                  </div>
-                                  <p className="text-[10px] text-emerald-800/90 font-medium">
-                                    {isCustomSmaeActive ? "Ajustado manualmente" : `Sincronizado en automático con ${activePrescription.modeLabel}`}:{" "}
-                                    <strong className="font-mono">
-                                      {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
-                                    </strong>
-                                  </p>
+                          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-3.5 space-y-3 shadow-2xs">
+                            {/* Encabezado: Título y Acciones alineadas sin desbordamiento */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-emerald-950">Equivalentes SMAE</span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    {smaeTotals.totalEquivalentes} eq · {smaeTotals.kcal} kcal ({adequacyPct}%)
+                                  </span>
                                 </div>
+                                <p className="text-[10px] text-emerald-800/80 font-medium mt-0.5">
+                                  {isCustomSmaeActive ? "Ajuste manual" : `Sincronizado (${activePrescription.modeLabel})`}:{" "}
+                                  <strong className="font-mono text-emerald-950">
+                                    {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
+                                  </strong>
+                                </p>
                               </div>
-                              <div className="flex items-center gap-1.5">
+
+                              <div className="flex items-center gap-1 shrink-0 pt-0.5">
                                 {isCustomSmaeActive && !isReadOnly && (
                                   <button
                                     type="button"
                                     onClick={() => setCustomSmaeMap(null)}
-                                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 cursor-pointer flex items-center gap-1"
+                                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 cursor-pointer flex items-center gap-1 shadow-2xs"
                                     title="Volver a sincronizar con las Kcal y Macros de arriba"
                                   >
                                     <RotateCcw className="w-3 h-3" />
-                                    <span>Sincronizar</span>
+                                    <span className="hidden sm:inline">Reset</span>
                                   </button>
                                 )}
                                 <button
                                   type="button"
                                   onClick={() => setShowStep5SmaeTable((v) => !v)}
-                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
                                 >
                                   <span>{showStep5SmaeTable ? "Compactar" : "Personalizar eq"}</span>
                                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStep5SmaeTable ? "rotate-180" : ""}`} />
@@ -4470,17 +4469,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               </div>
                             </div>
 
-                            {/* Chips resumen de equivalentes activos */}
-                            <div className="flex flex-wrap gap-1.5">
+                            {/* Rejilla simétrica de 2 columnas para los equivalentes activos */}
+                            <div className="grid grid-cols-2 gap-1.5">
                               {activeGroups.map((g) => (
-                                <span
+                                <div
                                   key={g.id}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-200/80 text-[11px] font-semibold text-[#0B1929]"
+                                  className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200/70 shadow-2xs"
                                 >
-                                  <span>{g.icono}</span>
-                                  <span>{g.corto}:</span>
-                                  <strong className="text-emerald-700 font-mono">{effectiveSmaeDistribution[g.id]}</strong>
-                                </span>
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-xs shrink-0">{g.icono}</span>
+                                    <span className="text-[11px] font-bold text-[#0B1929] truncate">{g.corto}</span>
+                                  </div>
+                                  <span className="text-xs font-mono font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">
+                                    {effectiveSmaeDistribution[g.id]}
+                                  </span>
+                                </div>
                               ))}
                             </div>
 
