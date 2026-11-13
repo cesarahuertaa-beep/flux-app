@@ -2788,7 +2788,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                  {/* Selector de Fecha de Evaluación (a la izquierda del botón de guardar) */}
+                  <div
+                    className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2 sm:px-3 py-1.5 shadow-2xs"
+                    title="Fecha de la evaluación corporal"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-[#6B7A8D] shrink-0" />
+                    <input
+                      type="date"
+                      readOnly={isReadOnly}
+                      value={form.fecha}
+                      onChange={(e) => !isReadOnly && updForm("fecha", e.target.value)}
+                      className="bg-transparent text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none cursor-pointer"
+                    />
+                  </div>
+
                   {!isReadOnly && (
                     <button
                       type="button"
@@ -3417,28 +3432,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider shrink-0">
-                            Paso 5
-                          </span>
-
-                          {/* En móvil: Fecha y Edad a la derecha de Paso 5 */}
-                          <div className="sm:hidden flex items-center gap-1.5 shrink-0">
-                            <span
-                              className="text-[11px] font-bold text-[#475569] bg-[#F1F5F9] border border-[#E2E8F0] rounded-lg px-2 py-0.5 whitespace-nowrap"
-                              title="Edad demográfica"
-                            >
-                              {evalEdad} {evalEdad === 1 ? "año" : "años"}
-                            </span>
-                            <input
-                              type="date"
-                              readOnly={isReadOnly}
-                              value={form.fecha}
-                              onChange={e => !isReadOnly && updForm("fecha", e.target.value)}
-                              className="bg-[#F1F5F9] border border-[#E2E8F0] rounded-lg px-1.5 py-0.5 text-[11px] font-bold text-[#0B1929] focus:outline-none"
-                            />
-                          </div>
-                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider inline-block">
+                          Paso 5
+                        </span>
 
                         <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mt-1 sm:mt-0.5">
                           Mediciones Corporales y Antropometría
@@ -3447,6 +3443,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           Selecciona el protocolo de medición (Básico, Plicometría o Bioimpedancia) e ingresa las medidas corporales del paciente.
                         </p>
                       </div>
+                    </div>
+
+                    {/* Marcador de Edad en la esquina superior derecha del contenedor del Paso 5 */}
+                    <div
+                      className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2.5 sm:px-3 py-1.5 shrink-0 select-none shadow-2xs"
+                      title="Edad demográfica calculada a partir de la fecha de nacimiento del paciente"
+                    >
+                      <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
+                      <span className="text-xs font-bold text-[#0B1929]">{evalEdad} {evalEdad === 1 ? "año" : "años"}</span>
                     </div>
                   </div>
 
@@ -3483,25 +3488,77 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </button>
                       </div>
 
-                      {/* Edad y Fecha (En escritorio se muestran aquí, en móvil ya están a la derecha de Paso 5) */}
-                      <div className="hidden sm:flex flex-wrap items-center gap-2">
-                        <div
-                          className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-1.5 select-none"
-                          title="Edad demográfica calculada a partir de la fecha de nacimiento del paciente"
-                        >
-                          <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
-                          <span className="text-xs font-bold text-[#0B1929]">{evalEdad} {evalEdad === 1 ? "año" : "años"}</span>
-                        </div>
+                      {/* Botón de subir ticket InBody en el espacio donde estaban los 2 banners (Edad y Fecha) */}
+                      {form.metodo_evaluacion === "inbody" && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={inbodyFileInputRef}
+                            type="file"
+                            accept="application/pdf,image/png,image/jpeg,image/webp,image/heic"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleInbodyFileUpload(f);
+                              e.target.value = "";
+                            }}
+                          />
 
-                        <input
-                          type="date"
-                          readOnly={isReadOnly}
-                          value={form.fecha}
-                          onChange={e => !isReadOnly && updForm("fecha", e.target.value)}
-                          className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
-                        />
-                      </div>
+                          <button
+                            type="button"
+                            disabled={analyzingInbody || isReadOnly}
+                            onClick={() => inbodyFileInputRef.current?.click()}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-60"
+                            title="Sube una foto o PDF del ticket (InBody 120, 270, 370, 570, Tanita) para autocompletar con IA"
+                          >
+                            {analyzingInbody ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                <span>Analizando ticket...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5 text-white" />
+                                <span>Subir PDF o Foto del Ticket</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Banner de resultado de lectura OCR (si se acaba de procesar un ticket) */}
+                    {form.metodo_evaluacion === "inbody" && inbodyOcrResult && (
+                      <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in ${
+                        inbodyOcrResult.success
+                          ? "bg-purple-50/90 border-purple-200 text-purple-950"
+                          : "bg-red-50 border-red-200 text-red-800"
+                      }`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {inbodyOcrResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                          )}
+                          <span className="truncate">
+                            {inbodyOcrResult.success ? (
+                              <>
+                                ¡<strong>{inbodyOcrResult.count} valores extraídos</strong> desde <strong>{inbodyOcrResult.fileName}</strong>
+                                {inbodyOcrResult.equipo ? ` (${inbodyOcrResult.equipo})` : ""}! Revisa los campos antes de guardar.
+                              </>
+                            ) : (
+                              inbodyOcrResult.error
+                            )}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setInbodyOcrResult(null)}
+                          className="text-purple-600 hover:text-purple-800 text-[11px] underline ml-2 shrink-0 cursor-pointer"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    )}
 
                     {/* Sub-selector de Plicometría */}
                     {!isCivil && isPlicometria && (
@@ -3532,93 +3589,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     )}
                   </div>
                 </div>
-
-                {/* Lector IA OCR para Bioimpedancia / InBody */}
-                {form.metodo_evaluacion === "inbody" && (
-                  <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-blue-50/60 rounded-none md:rounded-2xl border-y md:border border-purple-200/80 p-4 sm:p-5 shadow-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-purple-600/10 border border-purple-200 flex items-center justify-center text-purple-600 shrink-0 mt-0.5 shadow-2xs">
-                          <Sparkles className="w-5 h-5 animate-pulse" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black uppercase tracking-wider text-purple-950">
-                              Lector IA de Ticket InBody / BIA
-                            </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                              Gemini Vision OCR
-                            </span>
-                          </div>
-                          <p className="text-xs text-purple-900/80 mt-1 leading-relaxed">
-                            Sube una foto o PDF del ticket (InBody 120, 270, 370, 570, Tanita) y la IA autocompletará las mediciones de bioimpedancia al instante.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <input
-                          ref={inbodyFileInputRef}
-                          type="file"
-                          accept="application/pdf,image/png,image/jpeg,image/webp,image/heic"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleInbodyFileUpload(f);
-                            e.target.value = "";
-                          }}
-                        />
-
-                        <button
-                          type="button"
-                          disabled={analyzingInbody || isReadOnly}
-                          onClick={() => inbodyFileInputRef.current?.click()}
-                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
-                        >
-                          {analyzingInbody ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin text-white" />
-                              <span>Analizando ticket...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 text-white" />
-                              <span>Subir PDF o Foto del Ticket</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {inbodyOcrResult && (
-                      <div className={`mt-3.5 pt-3 border-t ${inbodyOcrResult.success ? "border-purple-200/80" : "border-red-200"} flex items-center justify-between text-xs font-semibold`}>
-                        <div className="flex items-center gap-2">
-                          {inbodyOcrResult.success ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                              <span className="text-purple-950">
-                                ¡{inbodyOcrResult.count} valores extraídos desde <strong>{inbodyOcrResult.fileName}</strong>
-                                {inbodyOcrResult.equipo ? ` (${inbodyOcrResult.equipo})` : ""}! Revisa los campos antes de guardar.
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                              <span className="text-red-700">{inbodyOcrResult.error}</span>
-                            </>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setInbodyOcrResult(null)}
-                          className="text-purple-600 hover:text-purple-800 text-[11px] underline ml-2 shrink-0 cursor-pointer"
-                        >
-                          Cerrar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Card 2: Grupos de Campos Antropométricos */}
                 {activeGroups.map(group => (
