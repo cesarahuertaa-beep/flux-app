@@ -234,7 +234,7 @@ export function formatIngredientSmaePortion(ing, equivalents = 1) {
  */
 export function evaluateIngredientForPatient(
   item,
-  { aversionesText = "", preferenciasText = "", expediente = null } = {}
+  { aversionesText = "", preferenciasText = "", expediente = null, smaeGustos = null } = {}
 ) {
   if (!item) {
     return {
@@ -244,6 +244,29 @@ export function evaluateIngredientForPatient(
       excludeReason: "",
       isFavorite: false,
     };
+  }
+
+  // 0. Comprobación directa por Grupo SMAE (Preferencia o Aversión a nivel de grupo completo)
+  if (smaeGustos && item.smaeGroup && typeof smaeGustos === "object") {
+    const grpPref = smaeGustos[item.smaeGroup];
+    if (grpPref === "disgusto") {
+      return {
+        status: "evitar",
+        reason: "Grupo SMAE no preferido",
+        isExcluded: true,
+        excludeReason: "Grupo SMAE en disgusto del paciente",
+        isFavorite: false,
+      };
+    }
+    if (grpPref === "favorito") {
+      return {
+        status: "favorito",
+        reason: "Grupo SMAE favorito",
+        isExcluded: false,
+        excludeReason: "",
+        isFavorite: true,
+      };
+    }
   }
 
   const itemTags = Array.isArray(item.tags_restriccion)

@@ -5041,6 +5041,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           aversionesText: evalMetricaForFood?.aversiones_alimentos || "",
           preferenciasText: `${evalMetricaForFood?.preferencias_alimentos || ""} ${evalMetricaForFood?.recordatorio_24h || ""}`,
           expediente: selected?.expediente_clinico || null,
+          smaeGustos: evalMetricaForFood?.smae_gustos || smartPrescription?.smaeGustos || null,
         };
         const hasCustomSavedSmaeDay =
           Boolean(cycleMetrica?.prescribed_macros?.smaeCustomized) &&

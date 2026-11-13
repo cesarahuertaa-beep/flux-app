@@ -37,7 +37,6 @@ import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord } from "../
 import { auditMacroPrescriptionWithAi, syncDualDomainSummariesInBackground, extractInbodyFromDocument } from "../../lib/clinicalAi";
 import {
   SMAE_GROUPS,
-  DIET_RESTRICTION_TAGS,
   autoDistributeSmaeFromMacros,
   calculateSmaeTotals,
 } from "../../lib/smaeData";
@@ -241,7 +240,8 @@ const emptyForm = () => ({
   dias_ejercicio_actual: "",
   horario_ejercicio: "",
 
-  // Preferencias y gustos alimentarios del ciclo (migrados del expediente)
+  // Preferencias y gustos alimentarios del ciclo (16 grupos SMAE + notas específicas)
+  smae_gustos: {},
   preferencias_alimentos: "",
   aversiones_alimentos: "",
 
@@ -345,6 +345,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [aiAuditError, setAiAuditError] = useState(null);
   const [customSmaeMap, setCustomSmaeMap] = useState(null);
   const [showStep5SmaeTable, setShowStep5SmaeTable] = useState(false);
+  const [draggedSmaeId, setDraggedSmaeId] = useState(null);
+
+  const getSmaeGroupPref = (groupId) => (form.smae_gustos && form.smae_gustos[groupId]) || "neutro";
+  const setSmaeGroupPref = (groupId, pref) => {
+    if (isReadOnly) return;
+    setForm((prev) => {
+      const next = { ...(prev.smae_gustos || {}) };
+      if (!pref || pref === "neutro") {
+        delete next[groupId];
+      } else {
+        next[groupId] = pref;
+      }
+      return { ...prev, smae_gustos: next };
+    });
+  };
+  const resetAllSmaePrefs = () => {
+    if (isReadOnly) return;
+    setForm((prev) => ({ ...prev, smae_gustos: {} }));
+  };
   const [sub,          setSub]          = useState(() => mode || "evaluaciones");
 
   const [trackingWeightUnit, setTrackingWeightUnit] = useState(() => {
@@ -875,6 +894,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     base.eval_faf = String(calculatedFaf || 1.375);
     base.eval_faf_notas = "";
 
+    const latestPrev = (allLinkedMetricas && allLinkedMetricas[0]) || (metricas && metricas[0]) || null;
+    if (latestPrev?.smae_gustos && typeof latestPrev.smae_gustos === "object") {
+      base.smae_gustos = { ...latestPrev.smae_gustos };
+    }
+    if (latestPrev?.preferencias_alimentos) {
+      base.preferencias_alimentos = latestPrev.preferencias_alimentos;
+    }
+    if (latestPrev?.aversiones_alimentos) {
+      base.aversiones_alimentos = latestPrev.aversiones_alimentos;
+    }
+
     const clin = clinicalRec || peekClinicalRecord(selected?.id);
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento, 25));
@@ -1389,6 +1419,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       rawData.metodo_evaluacion = form.metodo_evaluacion;
       rawData.evalSexo = evalSexo;
       rawData.evalEdad = evalEdad;
+      rawData.smae_gustos = form.smae_gustos || {};
 
       // Preservar modo de prescripción y resultados de auditoría clínica con IA
       rawData.prescription_mode = prescriptionMode;
@@ -1704,6 +1735,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     // 4. Configurar sexo, edad, fotos y estado de edición
     const detectedSexo = normalizeSexo(m.sexo || selected?.genero || selected?.sexo || clinicalRec?.anamnesis?.genero);
     const detectedEdad = Number(m.edad) || calcEdadFromBirthdate(selected?.fecha_nacimiento, 25);
+    filled.smae_gustos = (typeof m.smae_gustos === "object" && m.smae_gustos) ? m.smae_gustos : {};
     setEvalSexo(detectedSexo);
     setEvalEdad(detectedEdad);
     setForm(filled);
@@ -3133,7 +3165,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   )}
                 </div>
 
-                {/* Paso 2: Preferencias Alimentarias */}
+                {/* Paso 2: Preferencias Alimentarias (16 Grupos SMAE en 3 Estados: Favoritos, Neutro, Disgusto) */}
                 <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start sm:items-center gap-2.5 min-w-0">
@@ -3150,94 +3182,249 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </h3>
                         </div>
                         <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
-                          Anota las preferencias alimentarias del paciente para esta etapa (lo que más le gusta comer y lo que no le gusta o prefiere evitar). Esto corresponde exclusivamente a gustos personales para estructurar el mejor menú posible; las alergias o patologías clínicas ya están resguardadas en su expediente.
+                          Clasifica los 16 grupos del SMAE según las preferencias del paciente para priorizar o advertir en la prescripción y armado de dietas. Por defecto todos están en <strong>Neutro</strong>. Puedes arrastrarlos o usar los botones rápidos.
                         </p>
                       </div>
                     </div>
+
+                    {!isReadOnly && Object.keys(form.smae_gustos || {}).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={resetAllSmaePrefs}
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 cursor-pointer flex items-center gap-1 shrink-0 transition-colors shadow-2xs"
+                        title="Restablecer todos los grupos a Neutro"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span className="hidden sm:inline">Restablecer a neutro</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Exclusiones Rápidas en 1 Clic (Se conectan en automático con el Catálogo SMAE e Ingredientes) */}
-                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
-                        <Ban className="w-3.5 h-3.5 text-rose-500" />
-                        <span>Restricciones Rápidas de Dieta (1 clic · Pre-filtra platillos e ingredientes SMAE):</span>
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DIET_RESTRICTION_TAGS.map((tag) => {
-                        const currentAvers = String(form.aversiones_alimentos || "");
-                        const isActive = tag.keywords.some((kw) =>
-                          currentAvers.toLowerCase().includes(kw.toLowerCase())
-                        );
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => {
-                              if (isReadOnly) return;
-                              if (isActive) {
-                                // Remover la etiqueta del texto de aversiones
-                                let cleaned = currentAvers;
-                                tag.keywords.forEach((kw) => {
-                                  const regex = new RegExp(`(?:^|,\\s*|\\s*\\|\\s*)${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi");
-                                  cleaned = cleaned.replace(regex, "");
-                                });
-                                cleaned = cleaned.replace(/^[\s,|]+|[\s,|]+$/g, "").trim();
-                                updForm("aversiones_alimentos", cleaned);
-                              } else {
-                                const next = currentAvers.trim()
-                                  ? `${currentAvers.trim()}, ${tag.shortLabel}`
-                                  : tag.shortLabel;
-                                updForm("aversiones_alimentos", next);
-                              }
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              isActive
-                                ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
-                                : "bg-white text-[#475569] border-[#E2E8F0] hover:border-rose-300 hover:bg-rose-50/40"
-                            }`}
-                          >
-                            <span>{tag.icon}</span>
-                            <span>{tag.label}</span>
-                            {isActive && <Check className="w-3 h-3 stroke-[3]" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {/* TABLERO INTERACTIVO DE 3 ESTADOS (DRAG & DROP / 1-TAP) */}
+                  {(() => {
+                    const favGroups = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "favorito");
+                    const disgustoGroups = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "disgusto");
+                    const neutroGroups = SMAE_GROUPS.filter((g) => !form.smae_gustos?.[g.id] || form.smae_gustos[g.id] === "neutro");
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                    {/* Favoritos */}
-                    <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 space-y-2">
-                      <label className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                    const renderCard = (grp, currentBucket) => {
+                      return (
+                        <div
+                          key={grp.id}
+                          draggable={!isReadOnly}
+                          onDragStart={(e) => {
+                            setDraggedSmaeId(grp.id);
+                            try { e.dataTransfer.setData("text/plain", grp.id); } catch {}
+                          }}
+                          className={`flex items-center justify-between gap-1.5 p-2 rounded-xl border transition-all select-none ${
+                            currentBucket === "favorito"
+                              ? "bg-white border-emerald-300 shadow-2xs hover:border-emerald-400"
+                              : currentBucket === "disgusto"
+                              ? "bg-white border-rose-300 shadow-2xs hover:border-rose-400"
+                              : "bg-white border-gray-200 shadow-2xs hover:border-gray-300"
+                          } ${isReadOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="text-sm shrink-0">{grp.icono}</span>
+                            <span className="text-xs font-bold text-[#0B1929] truncate" title={grp.nombre}>
+                              {grp.corto}
+                            </span>
+                          </div>
+
+                          {!isReadOnly && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              {currentBucket !== "favorito" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSmaeGroupPref(grp.id, "favorito")}
+                                  className="w-6 h-6 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Marcar como Favorito"
+                                >
+                                  <Heart className="w-3 h-3 fill-emerald-600/30" />
+                                </button>
+                              )}
+
+                              {currentBucket !== "neutro" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSmaeGroupPref(grp.id, "neutro")}
+                                  className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Volver a Neutro"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                </button>
+                              )}
+
+                              {currentBucket !== "disgusto" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSmaeGroupPref(grp.id, "disgusto")}
+                                  className="w-6 h-6 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Marcar como Disgusto / Evitar"
+                                >
+                                  <Ban className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* COLUMNA 1: FAVORITOS */}
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            try { e.dataTransfer.dropEffect = "move"; } catch {}
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            let gId = null;
+                            try { gId = e.dataTransfer.getData("text/plain"); } catch {}
+                            const finalId = gId || draggedSmaeId;
+                            if (finalId) setSmaeGroupPref(finalId, "favorito");
+                            setDraggedSmaeId(null);
+                          }}
+                          className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-3 flex flex-col space-y-2.5 transition-colors"
+                        >
+                          <div className="flex items-center justify-between pb-1.5 border-b border-emerald-200/80">
+                            <div className="flex items-center gap-1.5">
+                              <Heart className="w-4 h-4 text-emerald-600 fill-emerald-600" />
+                              <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider">Favoritos</span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              {favGroups.length}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 flex-1 min-h-[140px] max-h-72 overflow-y-auto pr-0.5">
+                            {favGroups.length === 0 ? (
+                              <div className="h-full flex flex-col items-center justify-center text-center p-3 text-emerald-700/60 border border-dashed border-emerald-300/80 rounded-xl min-h-[120px]">
+                                <Heart className="w-5 h-5 mb-1 stroke-1" />
+                                <span className="text-[11px] font-medium leading-tight">
+                                  Arrastra aquí o toca 💚 para priorizar
+                                </span>
+                              </div>
+                            ) : (
+                              favGroups.map((grp) => renderCard(grp, "favorito"))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* COLUMNA 2: NEUTRO (POR DEFECTO) */}
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            try { e.dataTransfer.dropEffect = "move"; } catch {}
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            let gId = null;
+                            try { gId = e.dataTransfer.getData("text/plain"); } catch {}
+                            const finalId = gId || draggedSmaeId;
+                            if (finalId) setSmaeGroupPref(finalId, "neutro");
+                            setDraggedSmaeId(null);
+                          }}
+                          className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex flex-col space-y-2.5 transition-colors"
+                        >
+                          <div className="flex items-center justify-between pb-1.5 border-b border-gray-200">
+                            <div className="flex items-center gap-1.5">
+                              <Layers className="w-4 h-4 text-gray-500" />
+                              <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">Neutro / Indiferente</span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 border border-gray-300">
+                              {neutroGroups.length}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 flex-1 min-h-[140px] max-h-72 overflow-y-auto pr-0.5">
+                            {neutroGroups.length === 0 ? (
+                              <div className="h-full flex flex-col items-center justify-center text-center p-3 text-gray-400 border border-dashed border-gray-300 rounded-xl min-h-[120px]">
+                                <span className="text-[11px] font-medium leading-tight">
+                                  Todos los grupos clasificados
+                                </span>
+                              </div>
+                            ) : (
+                              neutroGroups.map((grp) => renderCard(grp, "neutro"))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* COLUMNA 3: DISGUSTO / EVITAR */}
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            try { e.dataTransfer.dropEffect = "move"; } catch {}
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            let gId = null;
+                            try { gId = e.dataTransfer.getData("text/plain"); } catch {}
+                            const finalId = gId || draggedSmaeId;
+                            if (finalId) setSmaeGroupPref(finalId, "disgusto");
+                            setDraggedSmaeId(null);
+                          }}
+                          className="bg-rose-50/60 border border-rose-200 rounded-2xl p-3 flex flex-col space-y-2.5 transition-colors"
+                        >
+                          <div className="flex items-center justify-between pb-1.5 border-b border-rose-200/80">
+                            <div className="flex items-center gap-1.5">
+                              <Ban className="w-4 h-4 text-rose-600" />
+                              <span className="text-xs font-bold text-rose-950 uppercase tracking-wider">Disgusto / Evitar</span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                              {disgustoGroups.length}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 flex-1 min-h-[140px] max-h-72 overflow-y-auto pr-0.5">
+                            {disgustoGroups.length === 0 ? (
+                              <div className="h-full flex flex-col items-center justify-center text-center p-3 text-rose-700/60 border border-dashed border-rose-300/80 rounded-xl min-h-[120px]">
+                                <Ban className="w-5 h-5 mb-1 stroke-1" />
+                                <span className="text-[11px] font-medium leading-tight">
+                                  Arrastra aquí o toca 🚫 para evitar
+                                </span>
+                              </div>
+                            ) : (
+                              disgustoGroups.map((grp) => renderCard(grp, "disgusto"))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* EXCEPCIONES ESPECÍFICAS DE ALIMENTOS O PLATILLOS (NOTAS PUNTUALES) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-[#E2E8F0]">
+                    {/* Favoritos puntuales */}
+                    <div className="bg-emerald-50/30 border border-emerald-200/70 rounded-xl p-3 space-y-1.5">
+                      <label className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/30" />
-                        <span>Alimentos e ingredientes o platillos favoritos</span>
+                        <span>Comentarios o platillos favoritos específicos</span>
                       </label>
                       <textarea
-                        rows={3}
+                        rows={2}
                         readOnly={isReadOnly}
                         value={form.preferencias_alimentos || ""}
                         onChange={(e) => !isReadOnly && updForm("preferencias_alimentos", e.target.value)}
-                        placeholder="Ej. Pollo, claras de huevo, arroz basmati, aguacate, plátano, avena..."
-                        className={`w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-emerald-500"}`}
+                        placeholder="Ej. Le encanta la avena con canela, claras con espinaca, café negro..."
+                        className={`w-full bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-emerald-500"}`}
                       />
                     </div>
 
-                    {/* Aversiones */}
-                    <div className="bg-rose-50/40 border border-rose-200/80 rounded-xl p-3.5 space-y-2">
-                      <label className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+                    {/* Aversiones puntuales */}
+                    <div className="bg-rose-50/30 border border-rose-200/70 rounded-xl p-3 space-y-1.5">
+                      <label className="text-[11px] font-bold text-rose-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Ban className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Alimentos, ingredientes o comidas que prefiero evitar</span>
+                        <span>Aversiones o ingredientes específicos a evitar</span>
                       </label>
                       <textarea
-                        rows={3}
+                        rows={2}
                         readOnly={isReadOnly}
                         value={form.aversiones_alimentos || ""}
                         onChange={(e) => !isReadOnly && updForm("aversiones_alimentos", e.target.value)}
-                        placeholder="Ej. Pescado/mariscos, hígado, brócoli, mayonesa, cebolla cruda..."
-                        className={`w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default" : "focus:outline-none focus:border-rose-500"}`}
+                        placeholder="Ej. No le gusta la cebolla cruda, pescado blanco, mayonesa..."
+                        className={`w-full bg-white border border-rose-200 rounded-lg px-3 py-1.5 text-xs text-[#0B1929] shadow-2xs resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-rose-500"}`}
                       />
                     </div>
                   </div>
@@ -4482,47 +4669,91 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               </span>
                             </div>
 
-                            {/* VISTA 1: Compacta (Rejilla simétrica de 2 columnas para los equivalentes activos) */}
+                            {/* VISTA 1: Compacta (Rejilla simétrica de 2 columnas para los equivalentes activos con advertencia visual) */}
                             {!showStep5SmaeTable && (
                               <div className="grid grid-cols-2 gap-1.5">
-                                {activeGroups.map((g) => (
-                                  <div
-                                    key={g.id}
-                                    className="flex items-center justify-between gap-1 px-2 py-1.5 rounded-xl bg-white border border-emerald-200/70 shadow-2xs"
-                                  >
-                                    <div className="flex items-center gap-1 min-w-0">
-                                      <span className="text-xs shrink-0">{g.icono}</span>
-                                      <span className="text-[10.5px] font-bold text-[#0B1929] truncate" title={g.corto}>{g.corto}</span>
+                                {activeGroups.map((g) => {
+                                  const isDisgusto = form.smae_gustos?.[g.id] === "disgusto";
+                                  const isFavorito = form.smae_gustos?.[g.id] === "favorito";
+                                  return (
+                                    <div
+                                      key={g.id}
+                                      className={`flex items-center justify-between gap-1 px-2 py-1.5 rounded-xl border transition-all ${
+                                        isDisgusto
+                                          ? "bg-rose-50/80 border-rose-300 shadow-2xs"
+                                          : isFavorito
+                                          ? "bg-emerald-50/80 border-emerald-300 shadow-2xs"
+                                          : "bg-white border-emerald-200/70 shadow-2xs"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1 min-w-0">
+                                        <span className="text-xs shrink-0">{g.icono}</span>
+                                        <span className="text-[10.5px] font-bold text-[#0B1929] truncate" title={g.corto}>{g.corto}</span>
+                                        {isDisgusto && (
+                                          <span className="text-[8.5px] font-bold px-1 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title="Al paciente le disgusta este grupo">
+                                            ⚠️ Evitar
+                                          </span>
+                                        )}
+                                        {isFavorito && (
+                                          <span className="text-[8.5px] font-bold px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0" title="Grupo favorito del paciente">
+                                            💚 Fav
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={`text-xs font-mono font-extrabold px-1.5 py-0.5 rounded-md border shrink-0 ${
+                                        isDisgusto
+                                          ? "text-rose-700 bg-rose-100 border-rose-200"
+                                          : isFavorito
+                                          ? "text-emerald-800 bg-emerald-100 border-emerald-300"
+                                          : "text-emerald-700 bg-emerald-50 border-emerald-100"
+                                      }`}>
+                                        {effectiveSmaeDistribution[g.id]}
+                                      </span>
                                     </div>
-                                    <span className="text-xs font-mono font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">
-                                      {effectiveSmaeDistribution[g.id]}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
 
-                            {/* VISTA 2: Personalización expandida (1 sola columna, espaciosa, sin nombres cortados) */}
+                            {/* VISTA 2: Personalización expandida (1 sola columna, espaciosa, con alertas de preferencia) */}
                             {showStep5SmaeTable && (
                               <div className="space-y-2 pt-1 border-t border-emerald-200/60 animate-in fade-in duration-150">
                                 <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                                   {SMAE_GROUPS.map((grp) => {
                                     const eqVal = Number(effectiveSmaeDistribution[grp.id]) || 0;
+                                    const isDisgusto = form.smae_gustos?.[grp.id] === "disgusto";
+                                    const isFavorito = form.smae_gustos?.[grp.id] === "favorito";
                                     return (
                                       <div
                                         key={grp.id}
                                         className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                          eqVal > 0
+                                          isDisgusto
+                                            ? "bg-rose-50/50 border-rose-300 shadow-2xs"
+                                            : isFavorito
+                                            ? "bg-emerald-50/50 border-emerald-300 shadow-2xs"
+                                            : eqVal > 0
                                             ? "bg-white border-emerald-300 shadow-2xs"
                                             : "bg-white/60 border-gray-200 opacity-65 hover:opacity-100"
                                         }`}
                                       >
                                         <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="text-sm shrink-0">{grp.icono}</span>
                                             <span className="text-xs font-bold text-[#0B1929] whitespace-nowrap" title={grp.nombre}>
                                               {grp.corto}
                                             </span>
+                                            {isDisgusto && (
+                                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1 shrink-0">
+                                                <Ban className="w-2.5 h-2.5" />
+                                                <span>Evitar (0 eq rec.)</span>
+                                              </span>
+                                            )}
+                                            {isFavorito && (
+                                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 shrink-0">
+                                                <Heart className="w-2.5 h-2.5 fill-emerald-600" />
+                                                <span>Favorito</span>
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="text-[10px] text-gray-500 font-mono mt-0.5 whitespace-nowrap">
                                             1 eq = {grp.kcal} kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
@@ -4539,14 +4770,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                           >
                                             -
                                           </button>
-                                          <span className="w-8 text-center text-xs font-extrabold font-mono text-[#0B1929]">
+                                          <span className={`w-8 text-center text-xs font-extrabold font-mono ${
+                                            isDisgusto && eqVal > 0 ? "text-rose-700 font-black" : "text-[#0B1929]"
+                                          }`}>
                                             {eqVal}
                                           </span>
                                           <button
                                             type="button"
                                             disabled={isReadOnly}
                                             onClick={() => adjustStep5Smae(grp.id, 0.5)}
-                                            className="w-6 h-6 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center disabled:opacity-30 cursor-pointer active:scale-95 transition-transform"
+                                            className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center disabled:opacity-30 cursor-pointer active:scale-95 transition-transform ${
+                                              isDisgusto ? "bg-rose-100 hover:bg-rose-200 text-rose-800" : "bg-emerald-100 hover:bg-emerald-200 text-emerald-800"
+                                            }`}
                                             title="Sumar 0.5 eq"
                                           >
                                             +

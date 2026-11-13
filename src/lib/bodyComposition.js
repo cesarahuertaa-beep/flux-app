@@ -241,6 +241,7 @@ export function enrichMetrica(m) {
     eval_faf_notas: meta.eval_faf_notas ?? m.eval_faf_notas ?? "",
     preferencias_alimentos: meta.preferencias_alimentos ?? m.preferencias_alimentos ?? "",
     aversiones_alimentos: meta.aversiones_alimentos ?? m.aversiones_alimentos ?? "",
+    smae_gustos: meta.smae_gustos ?? m.smae_gustos ?? {},
     r24h_desayuno: meta.r24h_desayuno ?? m.r24h_desayuno ?? "",
     r24h_colacion_m: meta.r24h_colacion_m ?? m.r24h_colacion_m ?? "",
     r24h_comida: meta.r24h_comida ?? m.r24h_comida ?? "",
@@ -337,6 +338,7 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.horario_ejercicio !== undefined && rawData.horario_ejercicio !== "") extraMeta.horario_ejercicio = rawData.horario_ejercicio;
   if (rawData.preferencias_alimentos !== undefined && rawData.preferencias_alimentos !== "") extraMeta.preferencias_alimentos = rawData.preferencias_alimentos;
   if (rawData.aversiones_alimentos !== undefined && rawData.aversiones_alimentos !== "") extraMeta.aversiones_alimentos = rawData.aversiones_alimentos;
+  if (rawData.smae_gustos) extraMeta.smae_gustos = rawData.smae_gustos;
   if (rawData.r24h_desayuno !== undefined && rawData.r24h_desayuno !== "") extraMeta.r24h_desayuno = rawData.r24h_desayuno;
   if (rawData.r24h_colacion_m !== undefined && rawData.r24h_colacion_m !== "") extraMeta.r24h_colacion_m = rawData.r24h_colacion_m;
   if (rawData.r24h_comida !== undefined && rawData.r24h_comida !== "") extraMeta.r24h_comida = rawData.r24h_comida;
@@ -1223,6 +1225,7 @@ export function generateSmartMacroPrescription({
 
     preferencias: enriched?.preferencias_alimentos || anamnesis?.preferencias_alimentos || "",
     aversiones: enriched?.aversiones_alimentos || anamnesis?.aversiones_alimentos || "",
+    smaeGustos: enriched?.smae_gustos || null,
     fafNotas: enriched?.eval_faf_notas || "",
     r24h: r24hObj,
   };
