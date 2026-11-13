@@ -4523,11 +4523,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                             <span className="text-xs font-bold text-[#0B1929] whitespace-nowrap" title={grp.nombre}>
                                               {grp.corto}
                                             </span>
-                                            {eqVal > 0 && (
-                                              <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
-                                                {eqVal} eq
-                                              </span>
-                                            )}
                                           </div>
                                           <div className="text-[10px] text-gray-500 font-mono mt-0.5 whitespace-nowrap">
                                             1 eq = {grp.kcal} kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
