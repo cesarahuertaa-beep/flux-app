@@ -4427,6 +4427,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         const activeGroups = SMAE_GROUPS.filter((g) => (Number(effectiveSmaeDistribution[g.id]) || 0) > 0);
                         const targetK = Number(activePrescription?.targetKcal) || 0;
                         const adequacyPct = targetK > 0 ? Math.round((smaeTotals.kcal / targetK) * 100) : 100;
+                        const syncSourceLabel = prescriptionMode === "ia"
+                          ? "Con IA"
+                          : prescriptionMode === "manual"
+                          ? "Manual"
+                          : "Matemático";
+
                         return (
                           <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-3.5 space-y-3 shadow-2xs">
                             {/* Encabezado: Título y Acciones alineadas sin desbordamiento */}
@@ -4439,10 +4445,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   </span>
                                 </div>
                                 <p className="text-[10px] text-emerald-800/80 font-medium mt-0.5">
-                                  {isCustomSmaeActive ? "Ajuste manual" : `Sincronizado (${activePrescription.modeLabel})`}:{" "}
-                                  <strong className="font-mono text-emerald-950">
+                                  {isCustomSmaeActive ? (
+                                    <span>
+                                      <strong className="text-emerald-950 font-bold">Ajuste manual</strong> •{" "}
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      Sincronizado: <strong className="text-emerald-950 font-bold">{syncSourceLabel}</strong> •{" "}
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-emerald-900">
                                     {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
-                                  </strong>
+                                  </span>
                                 </p>
                               </div>
 
@@ -4469,56 +4483,65 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               </div>
                             </div>
 
-                            {/* Rejilla simétrica de 2 columnas para los equivalentes activos */}
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {activeGroups.map((g) => (
-                                <div
-                                  key={g.id}
-                                  className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200/70 shadow-2xs"
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-xs shrink-0">{g.icono}</span>
-                                    <span className="text-[11px] font-bold text-[#0B1929] truncate">{g.corto}</span>
+                            {/* VISTA 1: Compacta (Rejilla simétrica de 2 columnas para los equivalentes activos) */}
+                            {!showStep5SmaeTable && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {activeGroups.map((g) => (
+                                  <div
+                                    key={g.id}
+                                    className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200/70 shadow-2xs"
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-xs shrink-0">{g.icono}</span>
+                                      <span className="text-[11px] font-bold text-[#0B1929] truncate">{g.corto}</span>
+                                    </div>
+                                    <span className="text-xs font-mono font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">
+                                      {effectiveSmaeDistribution[g.id]}
+                                    </span>
                                   </div>
-                                  <span className="text-xs font-mono font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">
-                                    {effectiveSmaeDistribution[g.id]}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                                ))}
+                              </div>
+                            )}
 
-                            {/* Tabla expandible de ajuste por grupo SMAE */}
+                            {/* VISTA 2: Personalización expandida (1 sola columna, espaciosa, sin nombres cortados) */}
                             {showStep5SmaeTable && (
-                              <div className="pt-2 border-t border-emerald-200/60 space-y-2">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-0.5">
+                              <div className="space-y-2 pt-1 border-t border-emerald-200/60 animate-in fade-in duration-150">
+                                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                                   {SMAE_GROUPS.map((grp) => {
                                     const eqVal = Number(effectiveSmaeDistribution[grp.id]) || 0;
                                     return (
                                       <div
                                         key={grp.id}
-                                        className={`flex items-center justify-between gap-1.5 p-2 rounded-lg border transition-all ${
+                                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border transition-all ${
                                           eqVal > 0
                                             ? "bg-white border-emerald-300 shadow-2xs"
-                                            : "bg-white/60 border-gray-200 opacity-75"
+                                            : "bg-white/60 border-gray-200 opacity-65 hover:opacity-100"
                                         }`}
                                       >
                                         <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-xs">{grp.icono}</span>
-                                            <span className="text-[11px] font-bold text-[#0B1929] truncate" title={grp.nombre}>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-sm shrink-0">{grp.icono}</span>
+                                            <span className="text-xs font-bold text-[#0B1929] whitespace-nowrap" title={grp.nombre}>
                                               {grp.corto}
                                             </span>
+                                            {eqVal > 0 && (
+                                              <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
+                                                {eqVal} eq
+                                              </span>
+                                            )}
                                           </div>
-                                          <div className="text-[9px] text-gray-500 font-mono">
-                                            1eq={grp.kcal}kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
+                                          <div className="text-[10px] text-gray-500 font-mono mt-0.5 whitespace-nowrap">
+                                            1 eq = {grp.kcal} kcal · {grp.proteina}P · {grp.carbohidratos}C · {grp.grasas}G
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
                                           <button
                                             type="button"
                                             disabled={isReadOnly || eqVal <= 0}
                                             onClick={() => adjustStep5Smae(grp.id, -0.5)}
-                                            className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                            className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center justify-center disabled:opacity-30 cursor-pointer active:scale-95 transition-transform"
+                                            title="Restar 0.5 eq"
                                           >
                                             -
                                           </button>
@@ -4529,7 +4552,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                             type="button"
                                             disabled={isReadOnly}
                                             onClick={() => adjustStep5Smae(grp.id, 0.5)}
-                                            className="w-5 h-5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                            className="w-6 h-6 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center disabled:opacity-30 cursor-pointer active:scale-95 transition-transform"
+                                            title="Sumar 0.5 eq"
                                           >
                                             +
                                           </button>
@@ -4538,8 +4562,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     );
                                   })}
                                 </div>
-                                <div className="flex items-center justify-between text-[10px] font-mono text-emerald-900 bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200/70">
-                                  <span>Aporte SMAE:</span>
+
+                                <div className="flex items-center justify-between text-[11px] font-mono text-emerald-900 bg-white/90 px-3 py-2 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                  <span className="font-bold">Aporte SMAE:</span>
                                   <strong>
                                     {smaeTotals.kcal} kcal · {smaeTotals.proteina}g P · {smaeTotals.carbohidratos}g C · {smaeTotals.grasas}g G
                                   </strong>
@@ -4560,7 +4585,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             className="mt-0.5 rounded border-indigo-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
                           />
                           <span className="text-[11px] font-semibold text-[#0B1929] leading-snug">
-                            Sincronizar automáticamente estas metas ({activePrescription.targetKcal} kcal · {activePrescription.modeLabel}) al Plan Nutricional activo al guardar
+                            Sincronizar automáticamente estas metas ({activePrescription.targetKcal} kcal · {prescriptionMode === "ia" ? "Con IA" : prescriptionMode === "manual" ? "Manual" : "Matemático"}) al Plan Nutricional activo al guardar
                           </span>
                         </label>
                       )}
