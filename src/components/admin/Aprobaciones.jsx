@@ -52,13 +52,14 @@ export default function Aprobaciones({ setMsg }) {
       onConfirm: async () => {
         try {
           const cleanEmail = sol.email.trim();
+          const targetCedula = sol.tipo === "nutriologo_estudiante" ? null : (sol.cedula?.trim() || null);
           const { existingProfiles: existingProfs } = await checkAndCleanOrphanedEmail(cleanEmail);
 
           if (existingProfs && existingProfs.length > 0) {
             await dbPatch(`profiles?id=eq.${existingProfs[0].id}`, {
               role: sol.tipo,
               nombre: sol.nombre,
-              cedula: sol.cedula || "",
+              cedula: targetCedula,
               nombre_marca: sol.nombre_marca || sol.nombre,
               mapa_url: sol.mapa_url || "",
               activo: true
@@ -70,14 +71,14 @@ export default function Aprobaciones({ setMsg }) {
                 role: sol.tipo,
                 nombre: sol.nombre,
                 nombre_marca: sol.nombre_marca || sol.nombre,
-                cedula: sol.cedula || "",
+                cedula: targetCedula,
                 mapa_url: sol.mapa_url || ""
               });
               if (authUser?.id) {
                 await dbPatch(`profiles?id=eq.${authUser.id}`, {
                   role: sol.tipo,
                   nombre: sol.nombre,
-                  cedula: sol.cedula || "",
+                  cedula: targetCedula,
                   nombre_marca: sol.nombre_marca || sol.nombre,
                   mapa_url: sol.mapa_url || "",
                   activo: true
@@ -90,7 +91,7 @@ export default function Aprobaciones({ setMsg }) {
                   await dbPatch(`profiles?id=eq.${profsRetry[0].id}`, {
                     role: sol.tipo,
                     nombre: sol.nombre,
-                    cedula: sol.cedula || "",
+                    cedula: targetCedula,
                     nombre_marca: sol.nombre_marca || sol.nombre,
                     mapa_url: sol.mapa_url || "",
                     activo: true
@@ -247,7 +248,12 @@ export default function Aprobaciones({ setMsg }) {
               
               <div className="bg-[#F0F4FA] p-3 rounded-xl flex flex-col gap-2">
                 <div className="text-sm">
-                  <span className="font-bold text-[#6B7A8D]">Cédula:</span> {s.cedula || 'No especificada'}
+                  <span className="font-bold text-[#6B7A8D]">Cédula:</span>{" "}
+                  {s.tipo === "nutriologo_estudiante" ? (
+                    <span className="text-[#6B7A8D] italic">N/A (Estudiante de Nutrición)</span>
+                  ) : (
+                    s.cedula || "No especificada"
+                  )}
                 </div>
                 <div className="text-sm">
                   <span className="font-bold text-[#6B7A8D]">Marca/Consultorio:</span> {s.nombre_marca || 'No especificada'}

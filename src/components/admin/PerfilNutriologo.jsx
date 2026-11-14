@@ -25,8 +25,11 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
-  const isSuperadmin = role ==="superadmin";
-  const isTeam = role ==="staff" || role ==="administrativo";
+  const [profileRole, setProfileRole] = useState(() => role || _peekP?.role || (typeof localStorage !== "undefined" ? localStorage.getItem("flux_role") : "") || "");
+  const effectiveRole = role || profileRole || _peekP?.role || (typeof localStorage !== "undefined" ? localStorage.getItem("flux_role") : "");
+  const isSuperadmin = effectiveRole === "superadmin";
+  const isTeam = effectiveRole === "staff" || effectiveRole === "administrativo";
+  const isEstudiante = effectiveRole === "nutriologo_estudiante";
 
   const [currentMultiRoles, setCurrentMultiRoles] = useState(multiRoles || []);
 
@@ -93,6 +96,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
       const rows = await dbGetFresh(`profiles?id=eq.${profileId}`);
       if (rows.length > 0) {
         const p = rows[0];
+        if (p.role) setProfileRole(p.role);
         let resolvedEmail = p.email || "";
         if (!resolvedEmail) {
           try {
@@ -274,7 +278,11 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
     setSavingBusiness(true);
     try {
       if (bossId) {
-        await dbPatch(`profiles?id=eq.${bossId}`, formData);
+        const payload = { ...formData };
+        if (isEstudiante) {
+          payload.cedula = null;
+        }
+        await dbPatch(`profiles?id=eq.${bossId}`, payload);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("flux:brand-updated"));
         }
@@ -380,6 +388,7 @@ export default function PerfilNutriologo({ profileId, onLogout, role, onChangeRo
         loading={loading} 
         isSaving={savingBusiness}
         isSuperadmin={isSuperadmin}
+        isEstudiante={isEstudiante}
       >
         {/* Datos de Cobro (SPEI): Exclusivo para Superadmin/Team en PWA/Web (Oculto en Play Store por políticas de tienda) */}
         {!isPlayApp && (isSuperadmin || isTeam) && (

@@ -6,7 +6,7 @@ import { showFluxAlert } from "../ui/ConfirmModal";
 import BrandColorPicker from "../ui/BrandColorPicker";
 import PhotoUploadBox from "../ui/PhotoUploadBox";
 
-export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin }) {
+export default function IdentidadEmpresarialCard({ form, setForm, loading, onSave, isSaving, children, isSuperadmin, isEstudiante = false }) {
   const [uploading, setUploading] = useState(false);
   const [tempLogoFile, setTempLogoFile] = useState(null);
 
@@ -113,17 +113,19 @@ export default function IdentidadEmpresarialCard({ form, setForm, loading, onSav
             placeholder="Ej: Nutrición Deportiva"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-[#0B1929] mb-1">Cédula Profesional</label>
-          <input 
-            type="text" 
-            value={form.cedula} 
-            onChange={e => setForm({...form, cedula: e.target.value})}
-            onBlur={() => onSave(form)}
-            className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
-            placeholder="Opcional"
-          />
-        </div>
+        {!isEstudiante && (
+          <div>
+            <label className="block text-sm font-medium text-[#0B1929] mb-1">Cédula Profesional</label>
+            <input 
+              type="text" 
+              value={form.cedula} 
+              onChange={e => setForm({...form, cedula: e.target.value})}
+              onBlur={() => onSave(form)}
+              className="w-full min-w-0 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[#0B1929] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:bg-white transition-all"
+              placeholder="Opcional"
+            />
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-[#0B1929] mb-1">Ubicación (Texto corto para el PDF)</label>
           <input 
