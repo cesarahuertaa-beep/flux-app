@@ -401,16 +401,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       const c = { ...cs[mealIdx] };
       const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
       while (opts.length <= optIdx) opts.push("");
-      const existing = (opts[optIdx] || "").trim();
-      const nextText = existing ? `${existing}\n${lines}` : lines;
-      opts[optIdx] = nextText;
+      opts[optIdx] = lines;
       c.opciones = opts;
       const { opcion1, opcion2 } = formatMealOptions(opts);
       c.opcion1 = opcion1;
       c.opcion2 = opcion2;
 
       if (optIdx === 0) {
-        const nextSmaeMap = { ...(c.smaeMap || {}) };
+        const nextSmaeMap = {};
         details.forEach((d) => {
           if (d.smaeGroup && d.smaeGroup !== "libres" && d.smaeGroup !== "libre" && d.equivalents > 0) {
             nextSmaeMap[d.smaeGroup] = Math.round(((Number(nextSmaeMap[d.smaeGroup]) || 0) + d.equivalents) * 10) / 10;
@@ -418,10 +416,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         });
         c.smaeMap = nextSmaeMap;
         const smaeTotals = calculateSmaeTotals(nextSmaeMap);
-        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : Math.round((Number(c.calorias) || 0) + totalKcal);
-        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : Math.round((Number(c.proteina) || 0) + totalProt);
-        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : Math.round((Number(c.carbohidratos) || 0) + totalCarbs);
-        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : Math.round((Number(c.grasas) || 0) + totalGrasas);
+        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : totalKcal;
+        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : totalProt;
+        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : totalCarbs;
+        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : totalGrasas;
         c.modoEdicion = "manual";
       }
       c.opcionesModoEdicion = {
@@ -460,37 +458,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setAiGeneratingDishMap(prev => ({ ...prev, [optKey]: true }));
     setAiGeneratingDishIndex(mealIdx);
     try {
-      const metaKcal = Number(macros.calorias) || smartPrescription?.targetKcal || 0;
-      const otherMealsKcal = diaForm.comidas.reduce((sum, item, idx) => idx !== mealIdx ? sum + (Number(item.calorias) || 0) : sum, 0);
-      const remainingForDay = Math.max(0, metaKcal - otherMealsKcal);
+      const nextSmaeMap = {};
+      scaledPack.details.forEach((d) => {
+        if (d.smaeGroup && d.smaeGroup !== "libres" && d.smaeGroup !== "libre" && d.equivalents > 0) {
+          nextSmaeMap[d.smaeGroup] = Math.round(((Number(nextSmaeMap[d.smaeGroup]) || 0) + d.equivalents) * 10) / 10;
+        }
+      });
+      const smaeTotals = calculateSmaeTotals(nextSmaeMap);
 
-      // Prioridad 1: Calorías definidas por el nutriólogo o suma de equivalentes SMAE seleccionados
-      let targetKcal = Number(meal?.calorias) || scaledPack.totalKcal || 0;
-      if (targetKcal <= 0) {
-        // Prioridad 2: Si el nutriólogo aún no definió calorías, calcular para una comida estándar (NUNCA el 100% del día)
-        const numComidasEstimadas = Math.max(diaForm.comidas.length, 3);
-        const porcionEstimada = metaKcal > 0 ? Math.round(metaKcal / numComidasEstimadas) : 500;
-        targetKcal = Math.min(porcionEstimada, remainingForDay > 0 ? remainingForDay : 550);
-        if (targetKcal <= 0) targetKcal = 500;
-      }
-
-      // Calcular macros proporcionales basados en los equivalentes seleccionados o targetKcal
-      let pMeta = scaledPack.totalProt > 0 ? scaledPack.totalProt : null;
-      let cMeta = scaledPack.totalCarbs > 0 ? scaledPack.totalCarbs : null;
-      let fMeta = scaledPack.totalGrasas > 0 ? scaledPack.totalGrasas : null;
-      if (!pMeta && metaKcal > 0) {
-        const ratio = targetKcal / metaKcal;
-        const totalP = Number(macros.proteina || smartPrescription?.proteinG || 160);
-        const totalC = Number(macros.carbohidratos || smartPrescription?.carbsG || 270);
-        const totalF = Number(macros.grasas || smartPrescription?.fatsG || 94);
-        pMeta = Math.round(totalP * ratio);
-        cMeta = Math.round(totalC * ratio);
-        fMeta = Math.round(totalF * ratio);
-      } else if (!pMeta) {
-        pMeta = Math.round((targetKcal * 0.30) / 4);
-        cMeta = Math.round((targetKcal * 0.45) / 4);
-        fMeta = Math.round((targetKcal * 0.25) / 9);
-      }
+      // Las calorías y macros nacen 100% de los equivalentes SMAE seleccionados por literatura
+      const targetKcal = smaeTotals.kcal > 0 ? smaeTotals.kcal : (scaledPack.totalKcal || 500);
+      const pMeta = smaeTotals.kcal > 0 ? smaeTotals.proteina : (scaledPack.totalProt || Math.round((targetKcal * 0.30) / 4));
+      const cMeta = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : (scaledPack.totalCarbs || Math.round((targetKcal * 0.45) / 4));
+      const fMeta = smaeTotals.kcal > 0 ? smaeTotals.grasas : (scaledPack.totalGrasas || Math.round((targetKcal * 0.25) / 9));
 
       const res = await generateDishFromIngredientsWithAi({
         ingredientes: scaledIngredientStrings,
@@ -521,15 +501,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         while (opts.length <= optIdx) opts.push("");
         opts[optIdx] = dishText;
         c.opciones = opts;
+        const { opcion1, opcion2 } = formatMealOptions(opts);
+        c.opcion1 = opcion1;
+        c.opcion2 = opcion2;
         if (optIdx === 0) {
-          c.opcion1 = dishText;
           if (autoPhoto) c.foto_url = autoPhoto;
 
-          // Inyectar calorías y macronutrientes calculados en los campos inferiores
-          if (res.calorias != null) c.calorias = Math.round(Number(res.calorias));
-          if (res.proteina != null) c.proteina = Math.round(Number(res.proteina));
-          if (res.carbohidratos != null) c.carbohidratos = Math.round(Number(res.carbohidratos));
-          if (res.grasas != null) c.grasas = Math.round(Number(res.grasas));
+          // Conservar 1:1 los equivalentes SMAE seleccionados y sus macros oficiales de literatura
+          c.smaeMap = nextSmaeMap;
+          c.calorias = targetKcal;
+          c.proteina = pMeta;
+          c.carbohidratos = cMeta;
+          c.grasas = fMeta;
 
           c.modoEdicion = "manual";
         }
@@ -616,12 +599,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const smartPrescription = useMemo(() => {
     return generateSmartMacroPrescription({
       cliente: selected,
-      metrica: cycleMetrica,
+      metrica: cycleMetrica || latestMetrica,
       clinicalRec,
       ciclo: cicloSel,
       cicloNombre: cicloSel?.nombre || "",
     });
-  }, [selected, cycleMetrica, clinicalRec, cicloSel]);
+  }, [selected, cycleMetrica, latestMetrica, clinicalRec, cicloSel]);
 
   const smartTrainingPrescription = useMemo(() => {
     return generateSmartTrainingPrescription({
@@ -2168,13 +2151,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     return false;
   };
 
+  const getClinicalSuggestedWater = () => {
+    const evalMetrica = cycleMetrica || latestMetrica || null;
+    const pesoActual = parseFloat(evalMetrica?.peso || selected?.peso) || 0;
+    if (pesoActual <= 0) return "2.5";
+    let litros = pesoActual * 0.035;
+    const diasEj = parseFloat(evalMetrica?.dias_ejercicio_actual) || 0;
+    const faf = parseFloat(evalMetrica?.eval_faf || smartPrescription?.faf) || 1.2;
+    if (diasEj >= 5 || faf >= 1.725) {
+      litros += 0.5;
+    } else if (diasEj >= 3 || faf >= 1.55) {
+      litros += 0.3;
+    } else if (diasEj >= 1 || faf >= 1.375) {
+      litros += 0.15;
+    }
+    return (Math.round(litros * 10) / 10).toFixed(1);
+  };
+
   const openNewDia  = () => { 
     if (interceptNoPlan()) return; 
     if (isEstandarLimit(dias.length)) return;
     loadHistorial();
     setEditDia(null); 
-    const pesoActual = cycleMetrica?.peso || latestMetrica?.peso || selected?.peso || null;
-    const suggestedWater = pesoActual ? (Math.round(pesoActual * 0.035 * 10) / 10).toFixed(1) : "2.5";
+    const suggestedWater = getClinicalSuggestedWater();
     setDiaForm({ 
       dia:"", 
       diasSeleccionados:[], 
@@ -2211,7 +2210,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       dia:d.dia, 
       diasSeleccionados: meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : [],
       tituloPersonalizado: meta.titulo || "",
-      aguaLitros: meta.agua || "",
+      aguaLitros: meta.agua || getClinicalSuggestedWater(),
       suplementos: meta.suplementos || "",
       smaeMap: parsedSmae,
       orden:d.orden, 
@@ -4091,12 +4090,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                           {/* Equivalentes SMAE del Ciclo (Definidos en el Paso 5 de la Evaluación) */}
                           {(() => {
-                            const hasCustomSavedSmae =
-                              Boolean(cycleMetrica?.prescribed_macros?.smaeCustomized) &&
-                              smartPrescription.smaeDistribution &&
-                              Object.keys(smartPrescription.smaeDistribution).length > 0;
-                            const smaeDist = hasCustomSavedSmae
-                              ? smartPrescription.smaeDistribution
+                            const evalMetricaForSmae = cycleMetrica || latestMetrica || null;
+                            const savedEvalSmae =
+                              evalMetricaForSmae?.prescribed_macros?.smaeDistribution ||
+                              smartPrescription?.smaeDistribution ||
+                              null;
+                            const hasSavedEvalSmae =
+                              savedEvalSmae &&
+                              typeof savedEvalSmae === "object" &&
+                              Object.values(savedEvalSmae).some((v) => Number(v) > 0);
+                            const smaeDist = hasSavedEvalSmae
+                              ? savedEvalSmae
                               : autoDistributeSmaeFromMacros({
                                   calorias: targetKcal,
                                   proteina: activeP,
@@ -5035,7 +5039,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         const diffFat = metaFat > 0 ? metaFat - totFat : 0;
 
         const pesoActual = cycleMetrica?.peso || latestMetrica?.peso || selected?.peso || null;
-        const recWater = pesoActual ? (Math.round(pesoActual * 0.035 * 10) / 10).toFixed(1) : "2.5";
+        const recWater = getClinicalSuggestedWater();
         const evalMetricaForFood = cycleMetrica || latestMetrica || null;
         const patientFoodCtx = {
           aversionesText: evalMetricaForFood?.aversiones_alimentos || "",
@@ -5043,13 +5047,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           expediente: selected?.expediente_clinico || null,
           smaeGustos: evalMetricaForFood?.smae_gustos || smartPrescription?.smaeGustos || null,
         };
-        const hasCustomSavedSmaeDay =
-          Boolean(cycleMetrica?.prescribed_macros?.smaeCustomized) &&
-          smartPrescription?.smaeDistribution &&
-          Object.keys(smartPrescription.smaeDistribution).length > 0;
+        const savedEvalSmaeDay =
+          evalMetricaForFood?.prescribed_macros?.smaeDistribution ||
+          smartPrescription?.smaeDistribution ||
+          null;
+        const hasSavedEvalSmaeDay =
+          savedEvalSmaeDay &&
+          typeof savedEvalSmaeDay === "object" &&
+          Object.values(savedEvalSmaeDay).some((v) => Number(v) > 0);
         const daySmaeTargetMap =
-          hasCustomSavedSmaeDay
-            ? smartPrescription.smaeDistribution
+          hasSavedEvalSmaeDay
+            ? savedEvalSmaeDay
             : metaKcal > 0
             ? autoDistributeSmaeFromMacros({
                 calorias: metaKcal,
@@ -5542,12 +5550,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                           const remainingKcalAfterThis = metaKcal - otherMealsKcal - mealKcal;
                           const remainingPctAfterThis = metaKcal > 0 ? Math.round((remainingKcalAfterThis / metaKcal) * 100) : 0;
                           const opcionesList = c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
-                          const mealSmaeDetected = estimateMealSmaeMap(opcionesList[0] || "");
+                          const mealSmaeDetected = estimateMealSmaeMap(c);
                           const mealSmaeEntries = SMAE_GROUPS.filter((g) => (Number(mealSmaeDetected[g.id]) || 0) > 0);
-                          const suggestedMealSmae = mealSmaeEntries.length === 0
-                            ? suggestMealSmaeSplit(daySmaeTargetMap, diaForm.comidas.length, i)
-                            : {};
-                          const suggestedMealSmaeEntries = SMAE_GROUPS.filter((g) => (Number(suggestedMealSmae[g.id]) || 0) > 0);
 
                           return (
                             <SortableItem key={c._dndId} id={c._dndId}>
@@ -5570,27 +5574,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </span>
                                       )}
 
-                                      {mealSmaeEntries.length > 0 ? (
+                                      {mealSmaeEntries.length > 0 && (
                                         <span
                                           className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center gap-1 animate-in fade-in"
-                                          title="Equivalentes SMAE detectados en esta comida"
+                                          title="Equivalentes SMAE asignados a esta comida"
                                         >
                                           <span>🇲🇽</span>
                                           <span>
                                             {mealSmaeEntries.map((g) => `${mealSmaeDetected[g.id]} ${g.corto}`).join(" · ")}
                                           </span>
                                         </span>
-                                      ) : suggestedMealSmaeEntries.length > 0 && !(opcionesList[0] || "").trim() ? (
-                                        <span
-                                          className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-[#6B7A8D] border border-slate-200/80 flex items-center gap-1"
-                                          title={`Reparto sugerido SMAE para 1/${diaForm.comidas.length} del día`}
-                                        >
-                                          <span>💡 Sugerido (1/{diaForm.comidas.length}):</span>
-                                          <span>
-                                            {suggestedMealSmaeEntries.slice(0, 4).map((g) => `${suggestedMealSmae[g.id]} ${g.corto}`).join(" · ")}
-                                          </span>
-                                        </span>
-                                      ) : null}
+                                      )}
 
                                       {c.macrosCalculadosPorIa && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/70 flex items-center gap-1 animate-in fade-in">
@@ -6051,52 +6045,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })()}
                                         </div>
 
-                                        {/* Pie del Constructor: Meta calórica + Insertar Equivalentes Directo (0ms) + Generar con IA */}
-                                        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
-                                          {/* A la izquierda: Input de Meta Calórica */}
-                                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <div className="flex items-center gap-1 shrink-0 text-xs font-bold text-[#0B1929]">
-                                              <Flame className="w-4 h-4 text-amber-500 shrink-0" />
-                                              <span>Meta kcal:</span>
-                                            </div>
-                                            <div className="relative w-24 sm:w-28 shrink-0">
-                                              <input 
-                                                type="number"
-                                                min="0"
-                                                step="10"
-                                                className="w-full pl-2.5 pr-8 py-1.5 rounded-lg border border-[#CBD5E1] bg-[#F8FAFC] focus:bg-white text-xs font-bold text-[#0B1929] text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                                                value={c.calorias || ""} 
-                                                onChange={e => updComida(i, "calorias", e.target.value)} 
-                                                placeholder={metaKcal > 0 ? String(Math.round(metaKcal / Math.max(diaForm.comidas.length, 3))) : "500"} 
-                                                title="Calorías objetivo para la receta formulada con estos ingredientes"
-                                              />
-                                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#94A3B8] pointer-events-none">
-                                                kcal
-                                              </span>
-                                            </div>
-                                            {metaKcal > 0 && (
-                                              <span className="text-[11px] text-[#6B7A8D] truncate hidden xl:inline">
-                                                {remainingKcalAfterThis < 0 
-                                                  ? `(${Math.abs(remainingKcalAfterThis)} kcal excedido)` 
-                                                  : remainingKcalAfterThis === 0 
-                                                  ? "(✓ Meta cubierta)" 
-                                                  : `(Quedan ${remainingKcalAfterThis} kcal)`}
-                                              </span>
-                                            )}
-                                          </div>
+                                        {/* Pie del Constructor: Subtotal en vivo de Alimentos SMAE + Insertar Lista SMAE + Redactar con IA */}
+                                        {(() => {
+                                          const liveSel = getScaledSelectedIngredients(i, 0);
+                                          return (
+                                            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                              {/* A la izquierda: Subtotal calculado en vivo por Literatura SMAE */}
+                                              <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                                                {liveSel.details.length > 0 ? (
+                                                  <>
+                                                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-950 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                                      <Flame className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                      <span>Selección: {liveSel.totalEq} eq · {liveSel.totalKcal} kcal</span>
+                                                    </span>
+                                                    <span className="text-[11px] font-mono font-bold text-[#475569]">
+                                                      {liveSel.totalProt}g P · {liveSel.totalCarbs}g C · {liveSel.totalGrasas}g G
+                                                    </span>
+                                                  </>
+                                                ) : (
+                                                  <span className="text-[11px] text-[#6B7A8D]">
+                                                    Marca los alimentos arriba para calcular sus equivalentes y macros exactos de literatura.
+                                                  </span>
+                                                )}
+                                              </div>
 
-                                          {/* A la derecha: Insertar Directo (sin IA) o Generar con IA */}
-                                          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleInsertIngredientsDirectly(i, 0)}
-                                              disabled={(c.ingredientesSeleccionados || []).length === 0}
-                                              className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                              title="Insertar porciones equivalentes SMAE directamente en la comida y sumar sus macros al instante sin usar IA"
-                                            >
-                                              <Check className="w-3.5 h-3.5" />
-                                              <span>Insertar Equivalentes {(c.ingredientesSeleccionados || []).length > 0 ? `(${c.ingredientesSeleccionados.length})` : ""}</span>
-                                            </button>
+                                              {/* A la derecha: Insertar Lista SMAE o Redactar Receta con IA */}
+                                              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleInsertIngredientsDirectly(i, 0)}
+                                                  disabled={liveSel.details.length === 0}
+                                                  className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                  title="Insertar lista con gramos y equivalentes SMAE directamente en la comida"
+                                                >
+                                                  <Check className="w-3.5 h-3.5" />
+                                                  <span>Insertar Lista SMAE {liveSel.details.length > 0 ? `(${liveSel.details.length})` : ""}</span>
+                                                </button>
 
                                             <button
                                               type="button"
@@ -6129,8 +6113,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 </>
                                               )}
                                             </button>
-                                          </div>
-                                        </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     ) : (
                                       /* Modo Manual: Foto con controles a la izquierda y cuadro de texto */
@@ -6669,21 +6655,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })()}
                                                 </div>
 
-                                                {/* Pie del Constructor: Insertar Equivalentes Directo + Generar con IA */}
-                                                <div className="pt-1 flex items-center justify-between gap-2 flex-wrap">
-                                                  <span className="text-[11px] text-[#6B7A8D]">
-                                                    Inserta las porciones SMAE directo o redacta con IA para la Opción {optionLetter}:
-                                                  </span>
-                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
-                                                      disabled={selectedIngs.length === 0}
-                                                      className="text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                                    >
-                                                      <Check className="w-3.5 h-3.5" />
-                                                      <span>Insertar Equivalentes {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
-                                                    </button>
+                                                {/* Pie del Constructor: Subtotal en vivo + Insertar Lista SMAE + Redactar con IA */}
+                                                {(() => {
+                                                  const liveAltSel = getScaledSelectedIngredients(i, actualIdx);
+                                                  return (
+                                                    <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                                      <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                                                        {liveAltSel.details.length > 0 ? (
+                                                          <>
+                                                            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-950 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                                              <Flame className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                              <span>Selección ({optionLetter}): {liveAltSel.totalEq} eq · {liveAltSel.totalKcal} kcal</span>
+                                                            </span>
+                                                            <span className="text-[11px] font-mono font-bold text-[#475569]">
+                                                              {liveAltSel.totalProt}g P · {liveAltSel.totalCarbs}g C · {liveAltSel.totalGrasas}g G
+                                                            </span>
+                                                          </>
+                                                        ) : (
+                                                          <span className="text-[11px] text-[#6B7A8D]">
+                                                            Marca los alimentos para la Opción {optionLetter} y ajusta sus equivalentes:
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                      <div className="flex items-center gap-2 flex-wrap">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
+                                                          disabled={selectedIngs.length === 0}
+                                                          className="text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                        >
+                                                          <Check className="w-3.5 h-3.5" />
+                                                          <span>Insertar Lista SMAE {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                        </button>
                                                     <button
                                                       type="button"
                                                       onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
@@ -6714,9 +6717,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           )}
                                                         </>
                                                       )}
-                                                    </button>
-                                                  </div>
-                                                </div>
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })()}
                                               </div>
                                             ) : (
                                               /* Modo Manual: Sin foto, área de texto completa */

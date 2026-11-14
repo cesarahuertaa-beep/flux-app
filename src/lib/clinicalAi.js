@@ -1497,12 +1497,12 @@ export async function generateDishFromIngredientsWithAi({ ingredientes = [], cli
   if (apiKey) {
     const targetHint = targetMacros?.calorias
       ? `\n═══════════════════════════════════════════════════════════
-META NUTRICIONAL ESTRICTA PARA ESTA SOLA TOMA (1 PERSONA):
-- Calorías meta: ~${targetMacros.calorias} kcal
-- Proteína sugerida: ~${targetMacros.proteina || 35}g
-- Carbohidratos sugeridos: ~${targetMacros.carbohidratos || 50}g
-- Grasas sugeridas: ~${targetMacros.grasas || 15}g
-REGLA DE ORO DE PORCIONES: Calibra las porciones y gramajes individuales de los alimentos para que el platillo alcance APROXIMADAMENTE ~${targetMacros.calorias} kcal. NUNCA generes porciones descomunales ni abarques las calorías de todo el día en una sola comida.`
+META NUTRICIONAL ESTRICTA DE LOS EQUIVALENTES SMAE SELECCIONADOS (1 PERSONA):
+- Calorías exactas de la selección: ${targetMacros.calorias} kcal
+- Proteína: ${targetMacros.proteina || 0}g
+- Carbohidratos: ${targetMacros.carbohidratos || 0}g
+- Grasas: ${targetMacros.grasas || 0}g
+REGLA DE ORO DE PORCIONES: RESPETA ESTRICTAMENTE las porciones, medidas caseras y gramajes que ya vienen indicados en cada ingrediente de la lista seleccionada por el nutriólogo. NO cambies ni alteres esas cantidades; únicamente combínalas en una preparación culinaria deliciosa (solo puedes sugerir condimentos libres en energía como ajo, cebolla, sal, limón, cilantro o especias).`
       : "";
 
     const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
