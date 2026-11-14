@@ -624,34 +624,95 @@ export function parseSmaeString(rawStr = "") {
 }
 
 /**
- * Extrae o embebe el mapa estructurado de equivalentes SMAE dentro del texto de una comida
- * o usa la propiedad explícita `meal.smaeMap` si ya está presente en memoria.
+ * Extrae o embebe el mapa estructurado de equivalentes SMAE y la lista finita de alimentos SMAE (`[INGS:...]`)
+ * dentro del texto de una comida.
  */
-const MEAL_SMAE_TAG_REGEX = /\n?\[SMAE:([a-z0-9_.,=]+)\]$/i;
+const MEAL_SMAE_TAG_REGEX = /\n?\[SMAE:([a-z0-9_.,=]+)\]/i;
+const MEAL_INGS_TAG_REGEX = /\n?\[INGS:([^\]]+)\]/i;
+
+export function serializeMealIngredients(items = []) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return items
+    .map((it) => {
+      const nombre = typeof it === "string" ? it : it?.nombre;
+      const eq = typeof it === "object" && it?.eq != null ? Number(it.eq) : 1;
+      if (!nombre) return null;
+      return `${encodeURIComponent(String(nombre).trim())}=${Math.max(0.5, Math.round(eq * 2) / 2)}`;
+    })
+    .filter(Boolean)
+    .join("|");
+}
+
+export function parseMealIngredientsString(rawStr = "") {
+  if (!rawStr || typeof rawStr !== "string") return [];
+  const list = [];
+  rawStr.split("|").forEach((pair) => {
+    const idx = pair.lastIndexOf("=");
+    if (idx > 0) {
+      try {
+        const nombre = decodeURIComponent(pair.slice(0, idx)).trim();
+        const eq = parseFloat(pair.slice(idx + 1));
+        if (nombre && !isNaN(eq) && eq > 0) {
+          list.push({ nombre, eq: Math.max(0.5, Math.round(eq * 2) / 2) });
+        }
+      } catch {}
+    }
+  });
+  return list;
+}
+
+export function extractMealIngredientsFromText(rawText = "") {
+  const str = String(rawText || "");
+  const m = str.match(MEAL_INGS_TAG_REGEX);
+  const cleanText = stripSmaeTag(str);
+  if (!m) return { cleanText, ingredientes: [] };
+  return {
+    cleanText,
+    ingredientes: parseMealIngredientsString(m[1]),
+  };
+}
+
+export function embedMealIngredientsInText(cleanText = "", items = []) {
+  const stripped = String(cleanText || "").replace(MEAL_INGS_TAG_REGEX, "").trimEnd();
+  const serialized = serializeMealIngredients(items);
+  if (!serialized) return stripped;
+  return `${stripped}\n[INGS:${serialized}]`;
+}
 
 export function extractSmaeMapFromMealText(rawText = "") {
   const str = String(rawText || "");
   const m = str.match(MEAL_SMAE_TAG_REGEX);
-  if (!m) return { cleanText: str, smaeMap: null };
+  const cleanText = stripSmaeTag(str);
+  if (!m) return { cleanText, smaeMap: null };
   return {
-    cleanText: str.replace(MEAL_SMAE_TAG_REGEX, "").trimEnd(),
+    cleanText,
     smaeMap: parseSmaeString(m[1]),
   };
 }
 
-export function embedSmaeMapInMealText(cleanText = "", smaeMap = {}) {
-  const stripped = String(cleanText || "").replace(MEAL_SMAE_TAG_REGEX, "").trimEnd();
+export function embedSmaeMapInMealText(cleanText = "", smaeMap = {}, items = null) {
+  let base = String(cleanText || "")
+    .replace(MEAL_SMAE_TAG_REGEX, "")
+    .trimEnd();
+  if (Array.isArray(items)) {
+    base = base.replace(MEAL_INGS_TAG_REGEX, "").trimEnd();
+    const ingStr = serializeMealIngredients(items);
+    if (ingStr) base = `${base}\n[INGS:${ingStr}]`;
+  }
   const serialized = serializeSmaeMap(smaeMap);
-  if (!serialized) return stripped;
-  return `${stripped}\n[SMAE:${serialized}]`;
+  if (!serialized) return base;
+  return `${base}\n[SMAE:${serialized}]`;
 }
 
 /**
- * Elimina la etiqueta interna [SMAE:...] de cualquier texto de comida.
+ * Elimina las etiquetas internas [SMAE:...] e [INGS:...] de cualquier texto de comida.
  * Úsese SIEMPRE antes de mostrar o enviar texto de comidas al paciente, PDF, lista de compras o IA.
  */
 export function stripSmaeTag(text = "") {
-  return String(text || "").replace(/\n?\[SMAE:[^\]]*\]/gi, "").trim();
+  return String(text || "")
+    .replace(/\n?\[INGS:[^\]]*\]/gi, "")
+    .replace(/\n?\[SMAE:[^\]]*\]/gi, "")
+    .trim();
 }
 
 /**

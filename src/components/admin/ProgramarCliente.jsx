@@ -29,10 +29,10 @@ import { useBackButton } from "../../lib/backButtonHandler";
 import { CachedImage } from "../../lib/mediaCache";
 import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCiclos, generateSmartMacroPrescription, generateSmartTrainingPrescription } from "../../lib/bodyComposition";
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
-import { parseMealOptions, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
-import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText } from "../../lib/smaeData";
-import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
-import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient } from "../../lib/ingredientsCatalog";
+import { parseMealOptions, parseMealOptionsStructured, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
+import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText, embedMealIngredientsInText, extractMealIngredientsFromText } from "../../lib/smaeData";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient, resolveDishStructuredIngredients, computeSmaeFromIngredientItems } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
@@ -244,29 +244,75 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setPaywallOpen(true);
   };
 
+  const applyAutoMacrosToMealOption0 = (c, mealIdx, eqMapOverride = null) => {
+    const names = c.ingredientesSeleccionados || [];
+    const eqSource = c.ingredientesEq?.[0] || {};
+    const items = names.map((ingNombre) => ({
+      nombre: ingNombre,
+      eq: Number(
+        eqSource[ingNombre] ??
+          eqMapOverride?.[`${mealIdx}_0_${ingNombre}`] ??
+          ingredientEqMap[`${mealIdx}_0_${ingNombre}`] ??
+          1
+      ),
+    }));
+    const computed = computeSmaeFromIngredientItems(items);
+    c.smaeMap = computed.smaeMap;
+    c.calorias = computed.totalKcal;
+    c.proteina = computed.totalProt;
+    c.carbohidratos = computed.totalCarbs;
+    c.grasas = computed.totalGrasas;
+    return computed;
+  };
+
   const handleSelectDishFromCatalog = (mealIdx, dish, optIdx = 0) => {
     const optKey = `${mealIdx}_${optIdx}`;
-    setDiaForm(p => {
+    const resolvedIngs = resolveDishStructuredIngredients(dish);
+    const ingNames = resolvedIngs.map((it) => it.nombre);
+    const eqForOpt = {};
+    const eqUpdates = {};
+    resolvedIngs.forEach((it) => {
+      eqForOpt[it.nombre] = it.eq;
+      eqUpdates[`${mealIdx}_${optIdx}_${it.nombre}`] = it.eq;
+    });
+    setIngredientEqMap((prev) => ({ ...prev, ...eqUpdates }));
+
+    setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
-      const recipeText = dish.texto || dish.nombre;
+      const recipeText = dish.texto ? (dish.nombre && !dish.texto.startsWith(dish.nombre) ? `${dish.nombre}\n\n${dish.texto}` : dish.texto) : "";
       const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
       while (opts.length <= optIdx) opts.push("");
       opts[optIdx] = recipeText;
       c.opciones = opts;
+
+      c.opcionesIngredientes = {
+        ...(c.opcionesIngredientes || {}),
+        [optIdx]: ingNames,
+      };
+      c.ingredientesEq = {
+        ...(c.ingredientesEq || {}),
+        [optIdx]: eqForOpt,
+      };
+      c.opcionesPendienteIa = {
+        ...(c.opcionesPendienteIa || {}),
+        [optIdx]: !recipeText.trim(),
+      };
+      c.opcionesIdea = {
+        ...(c.opcionesIdea || {}),
+        [optIdx]: dish.nombre || "",
+      };
+
       if (optIdx === 0) {
+        c.ingredientesSeleccionados = ingNames;
         c.opcion1 = recipeText;
         if (dish.foto_url) c.foto_url = dish.foto_url;
-        const dishSmae =
-          dish.smae_equivalentes && Object.keys(dish.smae_equivalentes).length > 0
-            ? { ...dish.smae_equivalentes }
-            : estimateMealSmaeMap(recipeText);
-        c.smaeMap = dishSmae;
-        const smaeTotals = calculateSmaeTotals(dishSmae);
-        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : (dish.calorias || 0);
-        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : (dish.proteina || 0);
-        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : (dish.carbohidratos || 0);
-        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : (dish.grasas || 0);
+        const computed = computeSmaeFromIngredientItems(resolvedIngs);
+        c.smaeMap = computed.smaeMap;
+        c.calorias = computed.totalKcal > 0 ? computed.totalKcal : (dish.calorias || 0);
+        c.proteina = computed.totalKcal > 0 ? computed.totalProt : (dish.proteina || 0);
+        c.carbohidratos = computed.totalKcal > 0 ? computed.totalCarbs : (dish.carbohidratos || 0);
+        c.grasas = computed.totalKcal > 0 ? computed.totalGrasas : (dish.grasas || 0);
         c.modoEdicion = "manual";
       }
       c.opcionesModoEdicion = {
@@ -276,33 +322,43 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
     });
-    setDishCatalogOpenMap(prev => ({ ...prev, [optKey]: false, [mealIdx]: false }));
+    setDishCatalogOpenMap((prev) => ({ ...prev, [optKey]: false, [mealIdx]: false }));
     const optLetter = String.fromCharCode(65 + optIdx);
     setMsg(
       <div className="flex items-center gap-1.5 text-purple-700">
         <Sparkles className="w-4 h-4 text-purple-600" />
-        <span>Platillo "{dish.nombre}" cargado con sus equivalentes SMAE en Opción {optLetter}.</span>
+        <span>Platillo "{dish.nombre}" cargado con sus alimentos SMAE en Opción {optLetter}.</span>
       </div>
     );
   };
 
   const toggleIngrediente = (mealIdx, ingredienteNombre, optIdx = 0) => {
-    setDiaForm(p => {
+    const eqKey = `${mealIdx}_${optIdx}_${ingredienteNombre}`;
+    setIngredientEqMap((prev) => ({ ...prev, [eqKey]: prev[eqKey] || 1 }));
+    setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
-      const currentList = optIdx === 0
-        ? (c.ingredientesSeleccionados || [])
-        : (c.opcionesIngredientes?.[optIdx] || []);
+      const currentList =
+        optIdx === 0
+          ? c.ingredientesSeleccionados || []
+          : c.opcionesIngredientes?.[optIdx] || [];
       const list = [...currentList];
       const exists = list.includes(ingredienteNombre);
-      if (exists) {
-        const filtered = list.filter(x => x !== ingredienteNombre);
-        if (optIdx === 0) c.ingredientesSeleccionados = filtered;
-        c.opcionesIngredientes = { ...(c.opcionesIngredientes || {}), [optIdx]: filtered };
-      } else {
-        const appended = [...list, ingredienteNombre];
-        if (optIdx === 0) c.ingredientesSeleccionados = appended;
-        c.opcionesIngredientes = { ...(c.opcionesIngredientes || {}), [optIdx]: appended };
+      const nextList = exists
+        ? list.filter((x) => x !== ingredienteNombre)
+        : [...list, ingredienteNombre];
+
+      if (optIdx === 0) c.ingredientesSeleccionados = nextList;
+      c.opcionesIngredientes = { ...(c.opcionesIngredientes || {}), [optIdx]: nextList };
+      const prevOptEq = { ...(c.ingredientesEq?.[optIdx] || {}) };
+      if (!exists && !prevOptEq[ingredienteNombre]) {
+        prevOptEq[ingredienteNombre] = Number(ingredientEqMap[eqKey]) || 1;
+      }
+      c.ingredientesEq = { ...(c.ingredientesEq || {}), [optIdx]: prevOptEq };
+      c.opcionesPendienteIa = { ...(c.opcionesPendienteIa || {}), [optIdx]: true };
+
+      if (optIdx === 0) {
+        applyAutoMacrosToMealOption0(c, mealIdx);
       }
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
@@ -310,15 +366,28 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const clearIngredientes = (mealIdx, optIdx = 0) => {
-    setDiaForm(p => {
+    setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
       if (optIdx === 0) {
         c.ingredientesSeleccionados = [];
+        c.smaeMap = {};
+        c.calorias = 0;
+        c.proteina = 0;
+        c.carbohidratos = 0;
+        c.grasas = 0;
       }
       c.opcionesIngredientes = {
         ...(c.opcionesIngredientes || {}),
         [optIdx]: [],
+      };
+      c.ingredientesEq = {
+        ...(c.ingredientesEq || {}),
+        [optIdx]: {},
+      };
+      c.opcionesPendienteIa = {
+        ...(c.opcionesPendienteIa || {}),
+        [optIdx]: true,
       };
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
@@ -326,7 +395,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   };
 
   const setMealOptionMode = (mealIdx, optIdx, mode) => {
-    setDiaForm(p => {
+    setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
       if (optIdx === 0) {
@@ -343,83 +412,58 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
   const adjustIngredientEq = (mealIdx, optIdx, ingNombre, delta) => {
     const key = `${mealIdx}_${optIdx}_${ingNombre}`;
-    setIngredientEqMap((prev) => {
-      const cur = Number(prev[key]) || 1;
-      const next = Math.max(0.5, Math.min(8, Math.round((cur + delta) * 2) / 2));
-      return { ...prev, [key]: next };
+    const meal = diaForm.comidas?.[mealIdx];
+    const cur = Number(meal?.ingredientesEq?.[optIdx]?.[ingNombre] ?? ingredientEqMap[key] ?? 1);
+    const next = Math.max(0.5, Math.min(8, Math.round((cur + delta) * 2) / 2));
+    setIngredientEqMap((prev) => ({ ...prev, [key]: next }));
+
+    setDiaForm((p) => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const prevOptEq = { ...(c.ingredientesEq?.[optIdx] || {}) };
+      prevOptEq[ingNombre] = next;
+      c.ingredientesEq = { ...(c.ingredientesEq || {}), [optIdx]: prevOptEq };
+      c.opcionesPendienteIa = { ...(c.opcionesPendienteIa || {}), [optIdx]: true };
+      if (optIdx === 0) {
+        applyAutoMacrosToMealOption0(c, mealIdx, { [key]: next });
+      }
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
     });
   };
 
   const getScaledSelectedIngredients = (mealIdx, optIdx = 0) => {
     const meal = diaForm.comidas?.[mealIdx];
-    const items = optIdx === 0
-      ? (meal?.ingredientesSeleccionados || [])
-      : (meal?.opcionesIngredientes?.[optIdx] || []);
-    const catalog = getIngredientesCatalog();
-    let totalKcal = 0;
-    let totalProt = 0;
-    let totalCarbs = 0;
-    let totalGrasas = 0;
-    let totalEq = 0;
-
-    const details = items.map((ingNombre) => {
-      const eq = Number(ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`]) || 1;
-      const found = catalog.find((x) => x.nombre === ingNombre) || { nombre: ingNombre };
-      const scaled = formatIngredientSmaePortion(found, eq);
-      totalKcal += scaled.kcal || 0;
-      totalProt += scaled.proteina || 0;
-      totalCarbs += scaled.carbohidratos || 0;
-      totalGrasas += scaled.grasas || 0;
-      totalEq += scaled.equivalents || 0;
-      return {
-        nombre: ingNombre,
-        eq,
-        ...scaled,
-      };
-    });
-
-    return {
-      details,
-      totalKcal: Math.round(totalKcal),
-      totalProt: Math.round(totalProt),
-      totalCarbs: Math.round(totalCarbs),
-      totalGrasas: Math.round(totalGrasas),
-      totalEq: Math.round(totalEq * 10) / 10,
-    };
+    const items =
+      optIdx === 0
+        ? meal?.ingredientesSeleccionados || []
+        : meal?.opcionesIngredientes?.[optIdx] || [];
+    const eqSource = meal?.ingredientesEq?.[optIdx] || {};
+    const structuredItems = items.map((ingNombre) => ({
+      nombre: ingNombre,
+      eq: Number(eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1),
+    }));
+    return computeSmaeFromIngredientItems(structuredItems);
   };
 
   const handleInsertIngredientsDirectly = (mealIdx, optIdx = 0) => {
-    const { details, totalKcal, totalProt, totalCarbs, totalGrasas } = getScaledSelectedIngredients(mealIdx, optIdx);
+    const { details, smaeMap, totalKcal, totalProt, totalCarbs, totalGrasas } =
+      getScaledSelectedIngredients(mealIdx, optIdx);
     if (details.length === 0) return;
-
-    const lines = details
-      .map((d) => `• ${d.label}${d.smaeCorto ? ` [${d.equivalents} eq ${d.smaeCorto}]` : ""}`)
-      .join("\n");
 
     setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
-      const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
-      while (opts.length <= optIdx) opts.push("");
-      opts[optIdx] = lines;
-      c.opciones = opts;
-      const { opcion1, opcion2 } = formatMealOptions(opts);
-      c.opcion1 = opcion1;
-      c.opcion2 = opcion2;
-
+      c.opcionesPendienteIa = {
+        ...(c.opcionesPendienteIa || {}),
+        [optIdx]: true,
+      };
       if (optIdx === 0) {
-        const nextSmaeMap = {};
-        details.forEach((d) => {
-          if (d.smaeGroup && d.smaeGroup !== "libres" && d.smaeGroup !== "libre" && d.equivalents > 0) {
-            nextSmaeMap[d.smaeGroup] = Math.round(((Number(nextSmaeMap[d.smaeGroup]) || 0) + d.equivalents) * 10) / 10;
-          }
-        });
-        c.smaeMap = nextSmaeMap;
-        const smaeTotals = calculateSmaeTotals(nextSmaeMap);
-        c.calorias = smaeTotals.kcal > 0 ? smaeTotals.kcal : totalKcal;
-        c.proteina = smaeTotals.kcal > 0 ? smaeTotals.proteina : totalProt;
-        c.carbohidratos = smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : totalCarbs;
-        c.grasas = smaeTotals.kcal > 0 ? smaeTotals.grasas : totalGrasas;
+        c.smaeMap = smaeMap;
+        c.calorias = totalKcal;
+        c.proteina = totalProt;
+        c.carbohidratos = totalCarbs;
+        c.grasas = totalGrasas;
         c.modoEdicion = "manual";
       }
       c.opcionesModoEdicion = {
@@ -434,7 +478,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setMsg(
       <div className="flex items-center gap-1.5 text-emerald-700">
         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-        <span>Equivalentes SMAE insertados en Opción {optLetter} (+{totalKcal} kcal)</span>
+        <span>{details.length} alimento(s) SMAE agregados al platillo ({optLetter}) · {totalKcal} kcal</span>
       </div>
     );
   };
@@ -2203,9 +2247,60 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const openEditDia = (d) => { 
     const meta = parseDiaMetadata(d.dia || "");
     const parsedSmae = parseSmaeString(meta.smae || "");
+    const initialEqMap = {};
 
     setEditDia(d); 
     setSmaePanelExpanded(Object.keys(parsedSmae).length > 0);
+    const mappedComidas = (d.comidas || []).map((c, mealIdx) => {
+      const { opciones: structuredOpts, ingredientesPorOpcion } = parseMealOptionsStructured(c);
+      const extractedMealSmae = extractSmaeMapFromMealText(c.opcion1 || "");
+      const finalMealSmae =
+        c.smaeMap && Object.keys(c.smaeMap).length > 0
+          ? { ...c.smaeMap }
+          : extractedMealSmae.smaeMap && Object.keys(extractedMealSmae.smaeMap).length > 0
+          ? extractedMealSmae.smaeMap
+          : {};
+
+      // Si es una comida anterior que tenía smaeMap pero aún no tenía [INGS:...], reconstruir sus alimentos SMAE
+      let ings0 = ingredientesPorOpcion[0] || [];
+      if (ings0.length === 0 && Object.keys(finalMealSmae).length > 0) {
+        ings0 = resolveDishStructuredIngredients({
+          nombre: c.nombre || "",
+          texto: structuredOpts[0] || "",
+          smae_equivalentes: finalMealSmae,
+        });
+      }
+
+      const opcionesIngredientes = {};
+      const ingredientesEq = {};
+      const opcionesPendienteIa = {};
+
+      structuredOpts.forEach((optTxt, optIdx) => {
+        const listForOpt = optIdx === 0 ? ings0 : (ingredientesPorOpcion[optIdx] || []);
+        opcionesIngredientes[optIdx] = listForOpt.map((it) => it.nombre);
+        const eqObj = {};
+        listForOpt.forEach((it) => {
+          eqObj[it.nombre] = it.eq;
+          initialEqMap[`${mealIdx}_${optIdx}_${it.nombre}`] = it.eq;
+        });
+        ingredientesEq[optIdx] = eqObj;
+        opcionesPendienteIa[optIdx] = !String(optTxt || "").trim() && listForOpt.length > 0;
+      });
+
+      return {
+        ...c,
+        _dndId: String(c.id || Math.random().toString(36).slice(2,9)),
+        opciones: structuredOpts.length > 0 ? structuredOpts : [extractedMealSmae.cleanText || c.opcion1 || ""],
+        ingredientesSeleccionados: opcionesIngredientes[0] || [],
+        opcionesIngredientes,
+        ingredientesEq,
+        opcionesPendienteIa,
+        smaeMap: finalMealSmae,
+        alertaClinica: null
+      };
+    });
+
+    setIngredientEqMap((prev) => ({ ...prev, ...initialEqMap }));
     setDiaForm({ 
       dia:d.dia, 
       diasSeleccionados: meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : [],
@@ -2214,36 +2309,95 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       suplementos: meta.suplementos || "",
       smaeMap: parsedSmae,
       orden:d.orden, 
-      comidas:(d.comidas || []).map(c => {
-        const parsedOpts = parseMealOptions(c);
-        const extractedMealSmae = extractSmaeMapFromMealText(c.opcion1 || "");
-        const finalMealSmae =
-          c.smaeMap && Object.keys(c.smaeMap).length > 0
-            ? { ...c.smaeMap }
-            : extractedMealSmae.smaeMap && Object.keys(extractedMealSmae.smaeMap).length > 0
-            ? extractedMealSmae.smaeMap
-            : {};
-        return {
-          ...c,
-          _dndId: String(c.id || Math.random().toString(36).slice(2,9)),
-          opciones: parsedOpts.length > 0 ? parsedOpts : [extractedMealSmae.cleanText || c.opcion1 || ""],
-          smaeMap: finalMealSmae,
-          alertaClinica: null
-        };
-      })
+      comidas: mappedComidas
     }); 
     setShowDiaModal(true); 
   };
 
   const saveDia = async () => {
+    // 0. Detectar comidas/opciones que tienen ingredientes SMAE y requieren redacción automática con IA al guardar
+    const batchItemsToGenerate = [];
+    (diaForm.comidas || []).forEach((c, mealIdx) => {
+      const optsList = c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""];
+      optsList.forEach((optTxt, optIdx) => {
+        const names =
+          optIdx === 0
+            ? c.ingredientesSeleccionados || []
+            : c.opcionesIngredientes?.[optIdx] || [];
+        if (names.length === 0) return;
+        const isPendingIa =
+          Boolean(c.opcionesPendienteIa?.[optIdx]) || !String(optTxt || "").trim();
+        if (!isPendingIa) return;
+
+        const eqSource = c.ingredientesEq?.[optIdx] || {};
+        const structuredItems = names.map((ingNombre) => ({
+          nombre: ingNombre,
+          eq: Number(eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1),
+        }));
+        const computed = computeSmaeFromIngredientItems(structuredItems);
+        batchItemsToGenerate.push({
+          key: `${mealIdx}_${optIdx}`,
+          mealIdx,
+          optIdx,
+          mealNombre: c.nombre || `Comida ${mealIdx + 1}`,
+          dishIdea: c.opcionesIdea?.[optIdx] || c.nombre || "",
+          ingredientes: computed.details.map((d) => d.label || d.nombre),
+          targetMacros: {
+            calorias: computed.totalKcal,
+            proteina: computed.totalProt,
+            carbohidratos: computed.totalCarbs,
+            grasas: computed.totalGrasas,
+          },
+        });
+      });
+    });
+
+    let generatedRecipesMap = {};
+    if (batchItemsToGenerate.length > 0) {
+      setSaving(true);
+      try {
+        generatedRecipesMap = await generateBatchDishesFromIngredientsWithAi({
+          itemsToGenerate: batchItemsToGenerate,
+          cliente: selected,
+          clinicalRec,
+        });
+      } catch (err) {
+        console.warn("Fallback en redacción IA al guardar día:", err);
+      } finally {
+        setSaving(false);
+      }
+    }
+
     const formSnap = {
       ...diaForm,
       diasSeleccionados: [...(diaForm.diasSeleccionados || [])],
-      comidas: (diaForm.comidas || []).map(c => {
-        const { opcion1, opcion2 } = formatMealOptions(c.opciones || [c.opcion1 || ""]);
+      comidas: (diaForm.comidas || []).map((c, mealIdx) => {
+        const rawOpts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+        const serializedOptsWithIngs = rawOpts.map((optTxt, optIdx) => {
+          const genKey = `${mealIdx}_${optIdx}`;
+          const finalCleanTxt = generatedRecipesMap[genKey]?.texto || optTxt || "";
+          const names =
+            optIdx === 0
+              ? c.ingredientesSeleccionados || []
+              : c.opcionesIngredientes?.[optIdx] || [];
+          const eqSource = c.ingredientesEq?.[optIdx] || {};
+          const structuredItems = names.map((ingNombre) => ({
+            nombre: ingNombre,
+            eq: Number(eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1),
+          }));
+          return embedMealIngredientsInText(finalCleanTxt, structuredItems);
+        });
+
+        const cleanOptsForState = rawOpts.map((optTxt, optIdx) => {
+          const genKey = `${mealIdx}_${optIdx}`;
+          return generatedRecipesMap[genKey]?.texto || optTxt || "";
+        });
+
+        const { opcion1, opcion2 } = formatMealOptions(serializedOptsWithIngs);
         const opcion1WithSmae = embedSmaeMapInMealText(opcion1, c.smaeMap || {});
         return {
           ...c,
+          opciones: cleanOptsForState,
           opcion1: opcion1WithSmae,
           opcion2,
         };
@@ -5131,7 +5285,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                   ) : (
                     <Save className="w-4 h-4 shrink-0" />
                   )}
-                  <span className="hidden sm:inline">{saving ? "Guardando…" : "Guardar día"}</span>
+                  <span className="hidden sm:inline">{saving ? "Redactando con IA y guardando…" : "Guardar día"}</span>
                 </button>
               </div>
             </div>
@@ -5658,50 +5812,50 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                           Opción Principal (A)
                                         </span>
-                                        {/* Switch Manual vs Platillo vs Ingredientes */}
-                                        <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
-                                          <button
-                                            type="button"
-                                            onClick={() => setMealOptionMode(i, 0, "manual")}
-                                            className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                              ((c.modoEdicion === "platillo" || c.modoEdicion === "ingredientes") ? c.modoEdicion : "manual") === "manual"
-                                                ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
-                                                : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                            }`}
-                                          >
-                                            <span>✍️</span>
-                                            <span>Manual</span>
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setMealOptionMode(i, 0, "platillo")}
-                                            className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                              c.modoEdicion === "platillo"
-                                                ? "bg-white text-purple-700 shadow-2xs font-bold"
-                                                : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                            }`}
-                                          >
-                                            <span>🍲</span>
-                                            <span>Platillo</span>
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setMealOptionMode(i, 0, "ingredientes")}
-                                            className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                              c.modoEdicion === "ingredientes"
-                                                ? "bg-white text-emerald-700 shadow-2xs font-bold"
-                                                : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                            }`}
-                                          >
-                                            <span>🥑</span>
-                                            <span>Alimentos SMAE</span>
-                                            {c.ingredientesSeleccionados?.length > 0 && (
-                                              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                                                {c.ingredientesSeleccionados.length}
-                                              </span>
-                                            )}
-                                          </button>
-                                        </div>
+                                          {/* Switch Platillo Armado vs Catálogo SMAE vs Biblioteca */}
+                                          <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
+                                            <button
+                                              type="button"
+                                              onClick={() => setMealOptionMode(i, 0, "manual")}
+                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                ((c.modoEdicion === "platillo" || c.modoEdicion === "ingredientes") ? c.modoEdicion : "manual") === "manual"
+                                                  ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
+                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                              }`}
+                                            >
+                                              <span>🍽️</span>
+                                              <span>Platillo Armado</span>
+                                              {c.ingredientesSeleccionados?.length > 0 && (
+                                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+                                                  {c.ingredientesSeleccionados.length}
+                                                </span>
+                                              )}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setMealOptionMode(i, 0, "ingredientes")}
+                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                c.modoEdicion === "ingredientes"
+                                                  ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                              }`}
+                                            >
+                                              <span>🥑</span>
+                                              <span>+ Catálogo SMAE</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setMealOptionMode(i, 0, "platillo")}
+                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                c.modoEdicion === "platillo"
+                                                  ? "bg-white text-purple-700 shadow-2xs font-bold"
+                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                              }`}
+                                            >
+                                              <span>🍲</span>
+                                              <span>Biblioteca</span>
+                                            </button>
+                                          </div>
                                       </div>
                                     </div>
 
@@ -6069,110 +6223,209 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 )}
                                               </div>
 
-                                              {/* A la derecha: Insertar Lista SMAE o Redactar Receta con IA */}
-                                              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleInsertIngredientsDirectly(i, 0)}
-                                                  disabled={liveSel.details.length === 0}
-                                                  className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                                  title="Insertar lista con gramos y equivalentes SMAE directamente en la comida"
-                                                >
-                                                  <Check className="w-3.5 h-3.5" />
-                                                  <span>Insertar Lista SMAE {liveSel.details.length > 0 ? `(${liveSel.details.length})` : ""}</span>
-                                                </button>
+                                                {/* A la derecha: Confirmar y ver en Platillo Armado */}
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleInsertIngredientsDirectly(i, 0)}
+                                                    disabled={liveSel.details.length === 0}
+                                                    className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                    title="Agregar alimentos seleccionados al platillo"
+                                                  >
+                                                    <Check className="w-3.5 h-3.5" />
+                                                    <span>Listo · Ver en Platillo {liveSel.details.length > 0 ? `(${liveSel.details.length})` : ""}</span>
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      ) : (
+                                        /* Vista Principal: Platillo Armado (Alimentos Finitos con - / + arriba y Receta IA Solo Lectura abajo) */
+                                        (() => {
+                                          const liveMainSel = getScaledSelectedIngredients(i, 0);
+                                          const isPendingIa = Boolean(c.opcionesPendienteIa?.[0]) || (!String(opcionesList[0] || "").trim() && liveMainSel.details.length > 0);
+                                          return (
+                                            <div className="space-y-3">
+                                              {/* 1. Arriba: Alimentos SMAE agregados como elementos variables (- / +) */}
+                                              <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
+                                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                  <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <span>🥑</span>
+                                                    <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, 0, "ingredientes")}
+                                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                    >
+                                                      <Plus className="w-3 h-3" />
+                                                      <span>Agregar alimentos SMAE</span>
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, 0, "platillo")}
+                                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1 transition-colors cursor-pointer"
+                                                    >
+                                                      <span>🍲</span>
+                                                      <span>Cargar de Biblioteca</span>
+                                                    </button>
+                                                  </div>
+                                                </div>
 
-                                            <button
-                                              type="button"
-                                              onClick={() => handleGenerateDishFromIngredients(i)}
-                                              disabled={aiGeneratingDishIndex === i || (!isEstandar && (c.ingredientesSeleccionados || []).length === 0)}
-                                              className={`flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all shadow-xs cursor-pointer ${
-                                                isEstandar
-                                                  ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-                                                  : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
-                                              }`}
-                                            >
-                                              {aiGeneratingDishIndex === i ? (
-                                                <>
-                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                  <span>Creando...</span>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  {isEstandar ? (
-                                                    <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                                  ) : (
-                                                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                                                  )}
-                                                  <span>Redactar con IA</span>
-                                                  {isEstandar && (
-                                                    <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
-                                                      PRO
+                                                {liveMainSel.details.length === 0 ? (
+                                                  <div className="p-4 rounded-xl bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-[#6B7A8D]">
+                                                    Selecciona los ingredientes de esta comida desde <strong className="text-emerald-700">+ Catálogo SMAE</strong> o elige un platillo pre-armado de <strong className="text-purple-700">Biblioteca</strong>.
+                                                  </div>
+                                                ) : (
+                                                  <div className="space-y-1.5">
+                                                    {liveMainSel.details.map((det, detIdx) => (
+                                                      <div
+                                                        key={`${det.nombre}_${detIdx}`}
+                                                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-emerald-200/90 shadow-2xs"
+                                                      >
+                                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                          {det.foto && (
+                                                            <img
+                                                              src={det.foto}
+                                                              alt={det.nombre}
+                                                              className="w-7 h-7 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0"
+                                                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                                            />
+                                                          )}
+                                                          <div className="min-w-0 flex-1">
+                                                            <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
+                                                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap">
+                                                              <span className="font-semibold text-emerald-700">{det.smaeCorto}</span>
+                                                              <span>•</span>
+                                                              <span>{det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)</span>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, -0.5)}
+                                                              className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                                                              title="Restar 0.5 equivalentes"
+                                                            >
+                                                              -
+                                                            </button>
+                                                            <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[36px] text-center">
+                                                              {det.eq} eq
+                                                            </span>
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, 0.5)}
+                                                              className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                              title="Sumar 0.5 equivalentes"
+                                                            >
+                                                              +
+                                                            </button>
+                                                          </div>
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => toggleIngrediente(i, det.nombre, 0)}
+                                                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                            title="Quitar alimento"
+                                                          >
+                                                            <X className="w-3.5 h-3.5" />
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* 2. Abajo: Fotografía + Receta generada por IA para el Paciente (Solo Lectura) */}
+                                              <div className="flex flex-row gap-2.5 sm:gap-3.5 items-stretch">
+                                                {c.foto_url ? (
+                                                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-2xs bg-white group">
+                                                    <CachedImage 
+                                                      src={c.foto_url} 
+                                                      alt="Platillo" 
+                                                      className="w-full h-full object-cover" 
+                                                    />
+                                                    <label 
+                                                      className="absolute inset-x-0 bottom-0 py-1 bg-black/65 hover:bg-black/85 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors backdrop-blur-xs"
+                                                      title="Cambiar foto ilustrativa"
+                                                    >
+                                                      <Camera className="w-3 h-3" />
+                                                      <span className="hidden sm:inline">Cambiar</span>
+                                                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                                    </label>
+                                                    <button 
+                                                      type="button" 
+                                                      onClick={() => updComida(i, "foto_url", "")} 
+                                                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 hover:bg-rose-600 text-white transition-colors cursor-pointer shadow-sm"
+                                                      title="Quitar foto"
+                                                    >
+                                                      <X className="w-3 h-3" />
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <label 
+                                                    className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-2xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[var(--brand-primary)] hover:bg-blue-50/30 flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all group"
+                                                    title="Subir foto ilustrativa del platillo"
+                                                  >
+                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] group-hover:text-[var(--brand-primary)] group-hover:border-blue-200 shadow-2xs transition-colors">
+                                                      <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-[#6B7A8D] group-hover:text-[var(--brand-primary)] transition-colors leading-tight">
+                                                      Subir foto
                                                     </span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
+                                                  </label>
+                                                )}
+
+                                                <div className="flex-1 min-w-0 flex flex-col justify-between rounded-xl border border-purple-200/80 bg-purple-50/30 p-2.5 sm:p-3">
+                                                  <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
+                                                      <Sparkles className="w-3 h-3 text-purple-600" />
+                                                      <span>Vista del Paciente (Receta IA · Solo Lectura)</span>
+                                                    </span>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-purple-800 border border-purple-200">
+                                                      {isPendingIa ? "⚡ Se redactará al Guardar" : (opcionesList[0] ? "✓ Redactada con IA" : "Pendiente de alimentos")}
+                                                    </span>
+                                                  </div>
+
+                                                  {opcionesList[0] && !isPendingIa ? (
+                                                    <textarea
+                                                      readOnly
+                                                      className="w-full flex-1 bg-white/90 rounded-lg border border-purple-100 p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
+                                                      rows={3}
+                                                      value={opcionesList[0]}
+                                                    />
+                                                  ) : (
+                                                    <div className="flex-1 flex flex-col justify-center rounded-lg bg-white/80 border border-purple-100 p-2.5 text-xs text-purple-950 leading-relaxed">
+                                                      {liveMainSel.details.length > 0 ? (
+                                                        <>
+                                                          <p className="font-semibold text-purple-800">
+                                                            ✨ Al dar clic en «Guardar día», la IA redactará automáticamente la receta para el paciente con estos gramajes exactos.
+                                                          </p>
+                                                          {opcionesList[0] && (
+                                                            <p className="text-[11px] text-slate-500 mt-1 pt-1 border-t border-purple-100 line-clamp-2 italic">
+                                                              Texto previo: {opcionesList[0]}
+                                                            </p>
+                                                          )}
+                                                        </>
+                                                      ) : (
+                                                        <p className="text-[#6B7A8D] text-[11px]">
+                                                          Agrega los alimentos arriba; al guardar el día se generará aquí la receta descriptiva para el paciente.
+                                                        </p>
+                                                      )}
+                                                    </div>
                                                   )}
-                                                </>
-                                              )}
-                                            </button>
+                                                </div>
                                               </div>
                                             </div>
                                           );
-                                        })()}
-                                      </div>
-                                    ) : (
-                                      /* Modo Manual: Foto con controles a la izquierda y cuadro de texto */
-                                      <div className="flex flex-row gap-2.5 sm:gap-3.5 items-stretch">
-                                        {/* Foto con controles incorporados a la izquierda del cuadro de texto */}
-                                        {c.foto_url ? (
-                                          <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 shrink-0 rounded-2xl overflow-hidden border border-[#E2E8F0] shadow-2xs bg-white group">
-                                            <CachedImage 
-                                              src={c.foto_url} 
-                                              alt="Platillo" 
-                                              className="w-full h-full object-cover" 
-                                            />
-                                            {/* Botón Cambiar Foto */}
-                                            <label 
-                                              className="absolute inset-x-0 bottom-0 py-1 bg-black/65 hover:bg-black/85 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors backdrop-blur-xs"
-                                              title="Cambiar foto ilustrativa"
-                                            >
-                                              <Camera className="w-3 h-3" />
-                                              <span className="hidden sm:inline">Cambiar</span>
-                                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                                            </label>
-                                            {/* Botón Quitar Foto */}
-                                            <button 
-                                              type="button" 
-                                              onClick={() => updComida(i, "foto_url", "")} 
-                                              className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 hover:bg-rose-600 text-white transition-colors cursor-pointer shadow-sm"
-                                              title="Quitar foto"
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          /* Cuadro para subir foto incorporado a la izquierda */
-                                          <label 
-                                            className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 shrink-0 rounded-2xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[var(--brand-primary)] hover:bg-blue-50/30 flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all group"
-                                            title="Subir foto ilustrativa del platillo"
-                                          >
-                                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] group-hover:text-[var(--brand-primary)] group-hover:border-blue-200 shadow-2xs transition-colors">
-                                              <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                            </div>
-                                            <span className="text-[10px] font-bold text-[#6B7A8D] group-hover:text-[var(--brand-primary)] transition-colors leading-tight">
-                                              Subir foto
-                                            </span>
-                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(i, e)} disabled={saving} />
-                                          </label>
-                                        )}
-
-                                        {/* Cuadro donde se describe el alimento */}
-                                        <textarea 
-                                          className="flex-1 min-w-0 w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs sm:text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[96px] sm:min-h-[112px] md:min-h-[128px] resize-y" 
-                                          value={opcionesList[0] || ""} 
-                                          onChange={e => updMealOption(i, 0, e.target.value)} 
-                                          placeholder="Ingredientes, porciones (ej. 3 huevos, 50g avena, 1 plátano) y modo de preparación..." 
-                                        />
-                                      </div>
-                                    )}
+                                        })()
+                                      )}
 
                                     {/* Alerta clínica de alergias o aversiones */}
                                     {c.evaluacionClinica ? (
@@ -6266,50 +6519,50 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   Opción Alternativa ({optionLetter})
                                                 </span>
 
-                                                {/* Switch Manual vs Platillo vs Ingredientes */}
-                                                <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setMealOptionMode(i, actualIdx, "manual")}
-                                                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                      modo === "manual"
-                                                        ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
-                                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                    }`}
-                                                  >
-                                                    <span>✍️</span>
-                                                    <span>Manual</span>
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
-                                                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                      modo === "platillo"
-                                                        ? "bg-white text-purple-700 shadow-2xs font-bold"
-                                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                    }`}
-                                                  >
-                                                    <span>🍲</span>
-                                                    <span>Platillo</span>
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
-                                                    className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                      modo === "ingredientes"
-                                                        ? "bg-white text-emerald-700 shadow-2xs font-bold"
-                                                        : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                    }`}
-                                                  >
-                                                    <span>🥑</span>
-                                                    <span>Alimentos SMAE</span>
-                                                    {selectedIngs.length > 0 && (
-                                                      <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                                                        {selectedIngs.length}
-                                                      </span>
-                                                    )}
-                                                  </button>
-                                                </div>
+                                                  {/* Switch Platillo Armado vs Catálogo SMAE vs Biblioteca */}
+                                                  <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, actualIdx, "manual")}
+                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                        modo === "manual"
+                                                          ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
+                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                                      }`}
+                                                    >
+                                                      <span>🍽️</span>
+                                                      <span>Platillo Armado</span>
+                                                      {selectedIngs.length > 0 && (
+                                                        <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+                                                          {selectedIngs.length}
+                                                        </span>
+                                                      )}
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
+                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                        modo === "ingredientes"
+                                                          ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                                      }`}
+                                                    >
+                                                      <span>🥑</span>
+                                                      <span>+ Catálogo SMAE</span>
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
+                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                        modo === "platillo"
+                                                          ? "bg-white text-purple-700 shadow-2xs font-bold"
+                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                                      }`}
+                                                    >
+                                                      <span>🍲</span>
+                                                      <span>Biblioteca</span>
+                                                    </button>
+                                                  </div>
                                               </div>
 
                                               {/* Botón Quitar Opción Colapsable */}
@@ -6677,61 +6930,130 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           </span>
                                                         )}
                                                       </div>
-                                                      <div className="flex items-center gap-2 flex-wrap">
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
-                                                          disabled={selectedIngs.length === 0}
-                                                          className="text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                                        >
-                                                          <Check className="w-3.5 h-3.5" />
-                                                          <span>Insertar Lista SMAE {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
-                                                        </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => handleGenerateDishFromIngredients(i, actualIdx)}
-                                                      disabled={isGen || (!isEstandar && selectedIngs.length === 0)}
-                                                      className={`text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer ${
-                                                        isEstandar
-                                                          ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-                                                          : "bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
-                                                      }`}
-                                                    >
-                                                      {isGen ? (
-                                                        <>
-                                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                          <span>Creando...</span>
-                                                        </>
-                                                      ) : (
-                                                        <>
-                                                          {isEstandar ? (
-                                                            <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                                          ) : (
-                                                            <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                                                          )}
-                                                          <span>Redactar con IA</span>
-                                                          {isEstandar && (
-                                                            <span className="text-[9px] bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-full font-black ml-0.5">
-                                                              PRO
-                                                            </span>
-                                                          )}
-                                                        </>
-                                                      )}
-                                                        </button>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
+                                                            disabled={selectedIngs.length === 0}
+                                                            className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                          >
+                                                            <Check className="w-3.5 h-3.5" />
+                                                            <span>Listo · Ver en Platillo {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })()}
+                                                </div>
+                                              ) : (
+                                                /* Vista Platillo Armado para Opción Alternativa */
+                                                (() => {
+                                                  const liveAltSel = getScaledSelectedIngredients(i, actualIdx);
+                                                  const isAltPendingIa = Boolean(c.opcionesPendienteIa?.[actualIdx]) || (!String(altText || "").trim() && liveAltSel.details.length > 0);
+                                                  return (
+                                                    <div className="space-y-2.5">
+                                                      <div className="p-2.5 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2">
+                                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                          <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider">
+                                                            🥑 Alimentos Opción {optionLetter} ({liveAltSel.details.length})
+                                                          </span>
+                                                          <div className="flex items-center gap-1.5">
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
+                                                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                              <Plus className="w-3 h-3" />
+                                                              <span>Agregar alimentos SMAE</span>
+                                                            </button>
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
+                                                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                              <span>🍲</span>
+                                                              <span>Biblioteca</span>
+                                                            </button>
+                                                          </div>
+                                                        </div>
+                                                        {liveAltSel.details.length === 0 ? (
+                                                          <div className="p-3 rounded-lg bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-[#6B7A8D]">
+                                                            Selecciona alimentos desde <strong className="text-emerald-700">+ Catálogo SMAE</strong> o <strong className="text-purple-700">Biblioteca</strong> para la Opción {optionLetter}.
+                                                          </div>
+                                                        ) : (
+                                                          <div className="space-y-1.5">
+                                                            {liveAltSel.details.map((det, detIdx) => (
+                                                              <div
+                                                                key={`${det.nombre}_${detIdx}`}
+                                                                className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-emerald-200 shadow-2xs"
+                                                              >
+                                                                <div className="min-w-0 flex-1">
+                                                                  <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
+                                                                  <div className="text-[10px] text-[#6B7A8D]">
+                                                                    <span className="font-semibold text-emerald-700">{det.smaeCorto}</span> · {det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)
+                                                                  </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                  <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                                                                    <button
+                                                                      type="button"
+                                                                      onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, -0.5)}
+                                                                      className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                                                                    >
+                                                                      -
+                                                                    </button>
+                                                                    <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[36px] text-center">
+                                                                      {det.eq} eq
+                                                                    </span>
+                                                                    <button
+                                                                      type="button"
+                                                                      onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, 0.5)}
+                                                                      className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                                    >
+                                                                      +
+                                                                    </button>
+                                                                  </div>
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={() => toggleIngrediente(i, det.nombre, actualIdx)}
+                                                                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                                  >
+                                                                    <X className="w-3.5 h-3.5" />
+                                                                  </button>
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        )}
+                                                      </div>
+
+                                                      <div className="rounded-xl border border-purple-200/80 bg-purple-50/30 p-2.5">
+                                                        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                                                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
+                                                            <Sparkles className="w-3 h-3 text-purple-600" />
+                                                            <span>Vista del Paciente Opción {optionLetter} (Solo Lectura)</span>
+                                                          </span>
+                                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-purple-800 border border-purple-200">
+                                                            {isAltPendingIa ? "⚡ Se redactará al Guardar" : (altText ? "✓ Redactada con IA" : "Pendiente")}
+                                                          </span>
+                                                        </div>
+                                                        {altText && !isAltPendingIa ? (
+                                                          <textarea
+                                                            readOnly
+                                                            className="w-full bg-white/90 rounded-lg border border-purple-100 p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
+                                                            rows={2}
+                                                            value={altText}
+                                                          />
+                                                        ) : (
+                                                          <div className="rounded-lg bg-white/80 border border-purple-100 p-2 text-xs text-purple-900">
+                                                            ✨ La receta de la Opción {optionLetter} se redactará automáticamente con IA al guardar el día.
+                                                          </div>
+                                                        )}
                                                       </div>
                                                     </div>
                                                   );
-                                                })()}
-                                              </div>
-                                            ) : (
-                                              /* Modo Manual: Sin foto, área de texto completa */
-                                              <textarea 
-                                                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)] min-h-[96px] resize-y transition-colors" 
-                                                value={altText || ""} 
-                                                onChange={e => updMealOption(i, actualIdx, e.target.value)} 
-                                                placeholder={`Ingredientes, porciones y preparación de la alternativa ${optionLetter}...`} 
-                                              />
-                                            )}
+                                                })()
+                                              )}
                                           </div>
                                         );
                                       })}
@@ -6783,128 +7105,50 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                     </button>
                                   </div>
 
-                                  {/* Row 4.5: Selector Directo de Equivalentes SMAE de esta Comida */}
-                                  <div className="mb-3.5 p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2">
+                                  {/* Row 4.5 y 5 Unificados: Equivalentes SMAE y Macros Calculados Automáticamente */}
+                                  <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] space-y-2.5">
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-xs font-extrabold text-emerald-950">
-                                          ⚖️ Equivalentes SMAE de esta Comida
-                                        </span>
-                                        <span className="text-[10px] font-semibold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200">
-                                          Calcula macros y suma al Balance Diario
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const rawTxt = opcionesList[0] || c.opcion1 || "";
-                                            const est = estimateMealSmaeMap(rawTxt);
-                                            const totals = calculateSmaeTotals(est);
-                                            setDiaForm((p) => {
-                                              const cs = [...p.comidas];
-                                              const mealCopy = { ...(cs[i] || {}) };
-                                              mealCopy.smaeMap = est;
-                                              if (totals.kcal > 0) {
-                                                mealCopy.calorias = totals.kcal;
-                                                mealCopy.proteina = totals.proteina;
-                                                mealCopy.carbohidratos = totals.carbohidratos;
-                                                mealCopy.grasas = totals.grasas;
-                                              }
-                                              cs[i] = mealCopy;
-                                              return { ...p, comidas: cs };
-                                            });
-                                          }}
-                                          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 cursor-pointer shadow-2xs transition-colors"
-                                          title="Sugerir equivalentes SMAE leyendo el texto escrito arriba"
-                                        >
-                                          <Sparkles className="w-3 h-3 text-emerald-600" />
-                                          <span>Detectar del texto</span>
-                                        </button>
-                                        {c.smaeMap && Object.keys(c.smaeMap).length > 0 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setDiaForm((p) => {
-                                                const cs = [...p.comidas];
-                                                cs[i] = { ...(cs[i] || {}), smaeMap: {} };
-                                                return { ...p, comidas: cs };
-                                              });
-                                            }}
-                                            className="text-[10px] font-semibold px-2 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-colors cursor-pointer"
-                                          >
-                                            Limpiar
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
-                                      {SMAE_GROUPS.filter((g) => g.id !== "libres").map((grp) => {
-                                        const val = Number(c.smaeMap?.[grp.id] || 0);
-                                        return (
-                                          <div
-                                            key={grp.id}
-                                            className={`px-2 py-1.5 rounded-lg border transition-all flex items-center justify-between gap-1 ${
-                                              val > 0
-                                                ? "bg-white border-emerald-400 shadow-2xs"
-                                                : "bg-white/70 border-slate-200/80"
-                                            }`}
-                                          >
+                                      <span className="text-xs font-extrabold text-[#0B1929] flex items-center gap-1.5">
+                                        <span>⚖️</span>
+                                        <span>Aporte Automático SMAE de esta Comida</span>
+                                      </span>
+                                      {mealSmaeEntries.length > 0 ? (
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          {mealSmaeEntries.map((grp) => (
                                             <span
-                                              className="text-[10px] font-bold text-slate-800 truncate"
-                                              title={`${grp.nombre} (${grp.kcal} kcal · ${grp.proteina}P/${grp.carbohidratos}C/${grp.grasas}G)`}
+                                              key={grp.id}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-900"
                                             >
-                                              {grp.icono} {grp.corto}
+                                              <span>{grp.icono}</span>
+                                              <span>{mealSmaeDetected[grp.id]} eq {grp.corto}</span>
                                             </span>
-                                            <div className="flex items-center gap-0.5 shrink-0">
-                                              <button
-                                                type="button"
-                                                onClick={() => updComidaSmaeEq(i, grp.id, -0.5)}
-                                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center cursor-pointer"
-                                              >
-                                                -
-                                              </button>
-                                              <span
-                                                className={`text-[11px] font-mono font-extrabold min-w-[26px] text-center ${
-                                                  val > 0 ? "text-emerald-700" : "text-slate-400"
-                                                }`}
-                                              >
-                                                {val}
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => updComidaSmaeEq(i, grp.id, 0.5)}
-                                                className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
-                                              >
-                                                +
-                                              </button>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-[#6B7A8D]">
+                                          Sin equivalentes asignados aún
+                                        </span>
+                                      )}
                                     </div>
-                                  </div>
 
-                                  {/* Row 5: Macronutrientes por comida */}
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                    {[
-                                      ["calorias", "Calorías (Kcal)"], 
-                                      ["proteina", "Proteína (g)"], 
-                                      ["carbohidratos", "Carbos (g)"], 
-                                      ["grasas", "Grasas (g)"]
-                                    ].map(([f, lb]) => (
-                                      <div key={f} className="bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
-                                        <label className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1 truncate">{lb}</label>
-                                        <input 
-                                          type="number" 
-                                          className="w-full px-2 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#0B1929] text-center focus:outline-none focus:border-[var(--brand-primary)]" 
-                                          value={c[f] || ""} 
-                                          onChange={e => updComida(i, f, e.target.value)} 
-                                          placeholder="0" 
-                                        />
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      <div className="bg-slate-50/80 p-2 rounded-xl border border-[#E2E8F0] text-center">
+                                        <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Calorías</span>
+                                        <span className="text-sm font-extrabold text-[#0B1929]">{c.calorias || 0} kcal</span>
                                       </div>
-                                    ))}
+                                      <div className="bg-red-50/50 p-2 rounded-xl border border-red-100 text-center">
+                                        <span className="block text-[10px] font-bold text-red-600 uppercase tracking-wider">Proteína</span>
+                                        <span className="text-sm font-extrabold text-red-900">{c.proteina || 0} g</span>
+                                      </div>
+                                      <div className="bg-amber-50/50 p-2 rounded-xl border border-amber-100 text-center">
+                                        <span className="block text-[10px] font-bold text-amber-600 uppercase tracking-wider">Carbos</span>
+                                        <span className="text-sm font-extrabold text-amber-900">{c.carbohidratos || 0} g</span>
+                                      </div>
+                                      <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100 text-center">
+                                        <span className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Grasas</span>
+                                        <span className="text-sm font-extrabold text-emerald-900">{c.grasas || 0} g</span>
+                                      </div>
+                                    </div>
                                   </div>
 
                                 </div>

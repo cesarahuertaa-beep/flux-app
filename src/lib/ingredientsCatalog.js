@@ -387,3 +387,141 @@ export function buscarIngredientes(query = "", categoria = "todos") {
     );
   });
 }
+
+/**
+ * Resuelve la lista de ingredientes estructurados [{ nombre, eq }] de un platillo de Biblioteca
+ * o de una comida, reconstruyéndola inteligentemente desde el catálogo SMAE si es un platillo anterior.
+ */
+export function resolveDishStructuredIngredients(dish = {}) {
+  if (!dish) return [];
+  if (Array.isArray(dish.ingredientes_smae) && dish.ingredientes_smae.length > 0) {
+    return dish.ingredientes_smae.map((it) => ({
+      nombre: typeof it === "string" ? it : it.nombre,
+      eq: Math.max(0.5, Math.round((Number(it.eq) || 1) * 2) / 2),
+    })).filter((it) => it.nombre);
+  }
+  if (
+    dish.smae_equivalentes &&
+    Array.isArray(dish.smae_equivalentes._ingredientes) &&
+    dish.smae_equivalentes._ingredientes.length > 0
+  ) {
+    return dish.smae_equivalentes._ingredientes.map((it) => ({
+      nombre: typeof it === "string" ? it : it.nombre,
+      eq: Math.max(0.5, Math.round((Number(it.eq) || 1) * 2) / 2),
+    })).filter((it) => it.nombre);
+  }
+
+  const catalog = getIngredientesCatalog();
+  const normCorpus = normalizar(`${dish.nombre || ""} ${dish.texto || ""} ${dish.opcion1 || ""}`);
+  const smaeMap = dish.smae_equivalentes || dish.smaeMap || {};
+  const result = [];
+
+  Object.entries(smaeMap).forEach(([grpId, rawVal]) => {
+    if (grpId.startsWith("_")) return;
+    const eq = Number(rawVal) || 0;
+    if (eq <= 0) return;
+
+    const groupFoods = catalog.filter((f) => f.smaeGroup === grpId || f.categoria === grpId);
+    const seedFoods = SMAE_FOODS_BY_GROUP[grpId] || [];
+
+    // 1. Buscar coincidencia en las semillas canónicas del grupo por keywords
+    let matchedName = null;
+    for (const sf of seedFoods) {
+      const kws = [sf.nombre, ...(sf.keywords || [])];
+      if (kws.some((kw) => kw && normCorpus.includes(normalizar(kw)))) {
+        const inCat = groupFoods.find((gf) => normalizar(gf.nombre) === normalizar(sf.nombre));
+        matchedName = inCat ? inCat.nombre : sf.nombre;
+        break;
+      }
+    }
+
+    // 2. Si no hubo match en semillas, buscar coincidencia por primera palabra significativa en el catálogo del grupo
+    if (!matchedName) {
+      for (const gf of groupFoods) {
+        const words = normalizar(gf.nombre).split(/\s+/).filter((w) => w.length >= 4);
+        if (words.length > 0 && normCorpus.includes(words[0])) {
+          matchedName = gf.nombre;
+          break;
+        }
+      }
+    }
+
+    // 3. Fallback al alimento base representativo del grupo SMAE
+    if (!matchedName) {
+      matchedName = seedFoods[0]?.nombre || groupFoods[0]?.nombre || null;
+    }
+
+    if (matchedName) {
+      result.push({
+        nombre: matchedName,
+        eq: Math.max(0.5, Math.round(eq * 2) / 2),
+      });
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Calcula los detalles escalados, el mapa de equivalentes SMAE, las etiquetas de alérgenos
+ * y los totales de calorías y macronutrientes a partir de un arreglo [{ nombre, eq }].
+ */
+export function computeSmaeFromIngredientItems(items = []) {
+  const catalog = getIngredientesCatalog();
+  const smaeMap = {};
+  const restrictionSet = new Set();
+  let totalKcal = 0;
+  let totalProt = 0;
+  let totalCarbs = 0;
+  let totalGrasas = 0;
+  let totalEq = 0;
+
+  const details = (Array.isArray(items) ? items : []).map((it) => {
+    const ingNombre = typeof it === "string" ? it : it?.nombre || "";
+    const eq = Math.max(0.5, Math.round((Number(it?.eq) || 1) * 2) / 2);
+    const found =
+      catalog.find((x) => x.nombre === ingNombre) ||
+      catalog.find((x) => normalizar(x.nombre) === normalizar(ingNombre)) || {
+        nombre: ingNombre,
+      };
+    const info = getIngredientSmaeInfo(found);
+    if (Array.isArray(info?.dietTags)) {
+      info.dietTags.forEach((t) => restrictionSet.add(t));
+    }
+    const scaled = formatIngredientSmaePortion(found, eq);
+    if (
+      scaled.smaeGroup &&
+      scaled.smaeGroup !== "libres" &&
+      scaled.smaeGroup !== "libre" &&
+      scaled.equivalents > 0
+    ) {
+      smaeMap[scaled.smaeGroup] =
+        Math.round(((Number(smaeMap[scaled.smaeGroup]) || 0) + scaled.equivalents) * 10) / 10;
+    }
+    totalKcal += scaled.kcal || 0;
+    totalProt += scaled.proteina || 0;
+    totalCarbs += scaled.carbohidratos || 0;
+    totalGrasas += scaled.grasas || 0;
+    totalEq += scaled.equivalents || 0;
+
+    return {
+      nombre: found.nombre || ingNombre,
+      eq,
+      foto: info?.foto || "",
+      porcion1Eq: info?.porcion1Eq || "",
+      dietTags: info?.dietTags || [],
+      ...scaled,
+    };
+  });
+
+  return {
+    details,
+    smaeMap,
+    tagsRestriccion: Array.from(restrictionSet),
+    totalKcal: Math.round(totalKcal),
+    totalProt: Math.round(totalProt),
+    totalCarbs: Math.round(totalCarbs),
+    totalGrasas: Math.round(totalGrasas),
+    totalEq: Math.round(totalEq * 10) / 10,
+  };
+}

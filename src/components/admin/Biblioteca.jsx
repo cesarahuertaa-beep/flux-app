@@ -47,6 +47,14 @@ import {
   estimateMealSmaeMap
 } from "../../lib/smaeData";
 import { DISH_RESTRICTION_OPTIONS } from "../../lib/foodPhotoCatalog";
+import {
+  buscarIngredientes,
+  resolveDishStructuredIngredients,
+  computeSmaeFromIngredientItems,
+  formatIngredientSmaePortion,
+  getIngredientesCatalog,
+} from "../../lib/ingredientsCatalog";
+import { generateDishFromIngredientsWithAi } from "../../lib/clinicalAi";
 
 export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   // ── Sub-pestaña activa ("ejercicios" | "platillos" | "ingredientes") ──
@@ -77,17 +85,22 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   const [uploadingPlatillo, setUploadingPlatillo]     = useState(false);
   const [filtroCatPlatillo, setFiltroCatPlatillo]     = useState("todos");
   const [busquedaPlatillo, setBusquedaPlatillo]       = useState("");
+  const [platilloIngSearch, setPlatilloIngSearch]     = useState("");
+  const [platilloIngCat, setPlatilloIngCat]           = useState("todos");
+  const [showPlatilloIngCatalog, setShowPlatilloIngCatalog] = useState(true);
   const [formPlatillo, setFormPlatillo]               = useState({
     nombre: "",
     categoria: "desayuno",
-    calorias: 345,
-    proteina: 25,
-    carbohidratos: 30,
-    grasas: 14,
+    calorias: 0,
+    proteina: 0,
+    carbohidratos: 0,
+    grasas: 0,
     foto_url: "",
     texto: "",
     keywordsStr: "",
-    smae_equivalentes: { aoa_m: 2, cereales_sg: 2, grasas_sp: 1 },
+    ingredientes_smae: [],
+    pendienteIa: true,
+    smae_equivalentes: {},
     tags_restriccion: []
   });
 
@@ -252,24 +265,46 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ACCIONES DE PLATILLOS ESTRUCTURADOS CON SMAE
+  // ACCIONES DE PLATILLOS ESTRUCTURADOS CON ALIMENTOS SMAE
   // ─────────────────────────────────────────────────────────────────────────────
-  const updatePlatilloSmaeEq = (groupId, delta) => {
+  const syncPlatilloFromIngredients = (prev, nextItems) => {
+    const computed = computeSmaeFromIngredientItems(nextItems);
+    const mergedTags = Array.from(
+      new Set([...(prev.tags_restriccion || []), ...computed.tagsRestriccion])
+    );
+    return {
+      ...prev,
+      ingredientes_smae: nextItems,
+      pendienteIa: true,
+      smae_equivalentes: computed.smaeMap,
+      calorias: computed.totalKcal,
+      proteina: computed.totalProt,
+      carbohidratos: computed.totalCarbs,
+      grasas: computed.totalGrasas,
+      tags_restriccion: mergedTags,
+    };
+  };
+
+  const togglePlatilloIngrediente = (ingNombre) => {
     setFormPlatillo((prev) => {
-      const curr = Number(prev.smae_equivalentes?.[groupId] || 0);
-      const nextVal = Math.max(0, Math.round((curr + delta) * 2) / 2);
-      const nextMap = { ...(prev.smae_equivalentes || {}) };
-      if (nextVal > 0) nextMap[groupId] = nextVal;
-      else delete nextMap[groupId];
-      const totals = calculateSmaeTotals(nextMap);
-      return {
-        ...prev,
-        smae_equivalentes: nextMap,
-        calorias: totals.kcal,
-        proteina: totals.proteina,
-        carbohidratos: totals.carbohidratos,
-        grasas: totals.grasas,
-      };
+      const curr = Array.isArray(prev.ingredientes_smae) ? prev.ingredientes_smae : [];
+      const exists = curr.some((it) => it.nombre === ingNombre);
+      const nextItems = exists
+        ? curr.filter((it) => it.nombre !== ingNombre)
+        : [...curr, { nombre: ingNombre, eq: 1 }];
+      return syncPlatilloFromIngredients(prev, nextItems);
+    });
+  };
+
+  const adjustPlatilloIngredienteEq = (ingNombre, delta) => {
+    setFormPlatillo((prev) => {
+      const curr = Array.isArray(prev.ingredientes_smae) ? prev.ingredientes_smae : [];
+      const nextItems = curr.map((it) => {
+        if (it.nombre !== ingNombre) return it;
+        const nextEq = Math.max(0.5, Math.min(8, Math.round(((Number(it.eq) || 1) + delta) * 2) / 2));
+        return { ...it, eq: nextEq };
+      });
+      return syncPlatilloFromIngredients(prev, nextItems);
     });
   };
 
@@ -285,19 +320,22 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   const openNewPlatillo = () => {
     setEditPlatillo(null);
-    const defaultSmae = { aoa_mb: 3, cereales_sg: 2, verduras: 1, grasas_sp: 1 };
-    const totals = calculateSmaeTotals(defaultSmae);
+    setPlatilloIngSearch("");
+    setPlatilloIngCat("todos");
+    setShowPlatilloIngCatalog(true);
     setFormPlatillo({
       nombre: "",
       categoria: "comida",
-      calorias: totals.kcal,
-      proteina: totals.proteina,
-      carbohidratos: totals.carbohidratos,
-      grasas: totals.grasas,
+      calorias: 0,
+      proteina: 0,
+      carbohidratos: 0,
+      grasas: 0,
       foto_url: "",
       texto: "",
       keywordsStr: "",
-      smae_equivalentes: defaultSmae,
+      ingredientes_smae: [],
+      pendienteIa: true,
+      smae_equivalentes: {},
       tags_restriccion: []
     });
     setShowPlatilloModal(true);
@@ -305,23 +343,27 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
   const openEditPlatillo = (p) => {
     setEditPlatillo(p);
-    const smaeMap =
-      p.smae_equivalentes && Object.keys(p.smae_equivalentes).length > 0
-        ? { ...p.smae_equivalentes }
-        : estimateMealSmaeMap(p.texto || p.nombre || "");
-    const totals = calculateSmaeTotals(smaeMap);
+    setPlatilloIngSearch("");
+    setPlatilloIngCat("todos");
+    const resolvedIngs = resolveDishStructuredIngredients(p);
+    const computed = computeSmaeFromIngredientItems(resolvedIngs);
+    setShowPlatilloIngCatalog(resolvedIngs.length === 0);
     setFormPlatillo({
       nombre: p.nombre || "",
       categoria: p.categoria || "comida",
-      calorias: totals.kcal > 0 ? totals.kcal : (p.calorias != null ? Number(p.calorias) : 400),
-      proteina: totals.kcal > 0 ? totals.proteina : (p.proteina != null ? Number(p.proteina) : 30),
-      carbohidratos: totals.kcal > 0 ? totals.carbohidratos : (p.carbohidratos != null ? Number(p.carbohidratos) : 40),
-      grasas: totals.kcal > 0 ? totals.grasas : (p.grasas != null ? Number(p.grasas) : 12),
+      calorias: computed.totalKcal > 0 ? computed.totalKcal : Number(p.calorias || 0),
+      proteina: computed.totalKcal > 0 ? computed.totalProt : Number(p.proteina || 0),
+      carbohidratos: computed.totalKcal > 0 ? computed.totalCarbs : Number(p.carbohidratos || 0),
+      grasas: computed.totalKcal > 0 ? computed.totalGrasas : Number(p.grasas || 0),
       foto_url: p.foto_url || "",
       texto: p.texto || "",
       keywordsStr: Array.isArray(p.keywords) ? p.keywords.join(", ") : (p.keywords || ""),
-      smae_equivalentes: smaeMap,
-      tags_restriccion: Array.isArray(p.tags_restriccion) ? [...p.tags_restriccion] : []
+      ingredientes_smae: resolvedIngs,
+      pendienteIa: !p.texto || !p.texto.trim(),
+      smae_equivalentes: computed.smaeMap,
+      tags_restriccion: Array.from(
+        new Set([...(Array.isArray(p.tags_restriccion) ? p.tags_restriccion : []), ...computed.tagsRestriccion])
+      ),
     });
     setShowPlatilloModal(true);
   };
@@ -331,32 +373,59 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       setMsg(<div className="flex gap-2 items-center"><AlertCircle className="w-4 h-4 text-yellow-500" /> Escribe el nombre del platillo</div>);
       return;
     }
+    const itemsList = Array.isArray(formPlatillo.ingredientes_smae) ? formPlatillo.ingredientes_smae : [];
+    if (itemsList.length === 0) {
+      setMsg(<div className="flex gap-2 items-center"><AlertCircle className="w-4 h-4 text-yellow-500" /> Selecciona al menos un alimento del catálogo SMAE para este platillo</div>);
+      return;
+    }
     setSavingPlatillo(true);
     try {
+      const computed = computeSmaeFromIngredientItems(itemsList);
+      const ingredientStrings = computed.details.map((d) => d.label || d.nombre);
+
+      let finalTexto = (formPlatillo.texto || "").trim();
+      if (formPlatillo.pendienteIa || !finalTexto) {
+        const aiRes = await generateDishFromIngredientsWithAi({
+          ingredientes: ingredientStrings,
+          dishIdea: formPlatillo.nombre.trim(),
+          targetMacros: {
+            calorias: computed.totalKcal,
+            proteina: computed.totalProt,
+            carbohidratos: computed.totalCarbs,
+            grasas: computed.totalGrasas,
+          },
+        });
+        if (aiRes?.texto) {
+          finalTexto = aiRes.texto.trim();
+        }
+      }
+
       const kws = formPlatillo.keywordsStr
         ? formPlatillo.keywordsStr.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
-        : formPlatillo.nombre.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        : [
+            ...formPlatillo.nombre.toLowerCase().split(/\s+/).filter(w => w.length > 2),
+            ...itemsList.map(it => it.nombre.toLowerCase().split(/\s+/)[0]).filter(Boolean)
+          ];
 
-      const cleanSmae = {};
-      Object.entries(formPlatillo.smae_equivalentes || {}).forEach(([k, v]) => {
-        const num = Number(v || 0);
-        if (num > 0) cleanSmae[k] = num;
-      });
-      const smaeTotals = calculateSmaeTotals(cleanSmae);
+      const cleanSmae = {
+        ...computed.smaeMap,
+        _ingredientes: itemsList.map((it) => ({ nombre: it.nombre, eq: it.eq })),
+      };
 
       const itemPayload = {
         id: editPlatillo ? editPlatillo.id : `dish_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         nombre: formPlatillo.nombre.trim(),
         categoria: formPlatillo.categoria,
         smae_equivalentes: cleanSmae,
-        tags_restriccion: Array.isArray(formPlatillo.tags_restriccion) ? formPlatillo.tags_restriccion : [],
-        calorias: smaeTotals.kcal > 0 ? smaeTotals.kcal : Math.max(0, Math.round(Number(formPlatillo.calorias) || 0)),
-        proteina: smaeTotals.kcal > 0 ? smaeTotals.proteina : Math.max(0, Math.round(Number(formPlatillo.proteina) || 0)),
-        carbohidratos: smaeTotals.kcal > 0 ? smaeTotals.carbohidratos : Math.max(0, Math.round(Number(formPlatillo.carbohidratos) || 0)),
-        grasas: smaeTotals.kcal > 0 ? smaeTotals.grasas : Math.max(0, Math.round(Number(formPlatillo.grasas) || 0)),
+        ingredientes_smae: itemsList.map((it) => ({ nombre: it.nombre, eq: it.eq })),
+        tags_restriccion: Array.isArray(formPlatillo.tags_restriccion) ? formPlatillo.tags_restriccion : computed.tagsRestriccion,
+        calorias: computed.totalKcal,
+        proteina: computed.totalProt,
+        carbohidratos: computed.totalCarbs,
+        grasas: computed.totalGrasas,
         foto_url: formPlatillo.foto_url.trim(),
-        texto: formPlatillo.texto.trim(),
-        keywords: kws,
+        texto: finalTexto,
+        keywords: Array.from(new Set(kws)),
         updated_at: new Date().toISOString()
       };
 
@@ -370,7 +439,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       setPlatillos(updatedList);
       await saveCustomPlatillos(updatedList);
       setShowPlatilloModal(false);
-      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Platillo SMAE guardado en la nube</div>);
+      setMsg(<div className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Platillo SMAE guardado y redactado con IA</div>);
     } catch (e) {
       setMsg("❌ " + e.message);
     }
@@ -1305,143 +1374,259 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 </div>
               </div>
 
-              {/* Receta y preparación libre */}
-              <div>
-                <label className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-1.5">
-                  Receta / Instrucciones de Preparación (Texto Libre)
-                </label>
-                <textarea
-                  rows={3}
-                  value={formPlatillo.texto}
-                  onChange={e => setFormPlatillo(p => ({ ...p, texto: e.target.value }))}
-                  placeholder="Escribe libremente cómo se prepara el platillo, gramajes caseros y pasos de cocción..."
-                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0B1929] outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-all leading-relaxed"
-                />
-              </div>
-
-              {/* Selector de Equivalentes SMAE del Platillo */}
-              <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/80 space-y-2.5">
+              {/* 1. Alimentos Seleccionados en el Platillo (Bloques Variables como en Rutinas) */}
+              <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/80 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
-                      ⚖️ Equivalentes SMAE del Platillo (5ª Ed.)
+                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🥑</span>
+                      <span>Alimentos SMAE del Platillo ({(formPlatillo.ingredientes_smae || []).length})</span>
                     </span>
                     <span className="text-[11px] text-emerald-700">
-                      Selecciona los equivalentes que aporta este platillo; las calorías y macros se calculan solos.
+                      Ajusta los equivalentes con - / + y todo el platillo recalculará gramos, calorías y macros en vivo.
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      const estimated = estimateMealSmaeMap(`${formPlatillo.nombre || ""}\n${formPlatillo.texto || ""}`);
-                      const totals = calculateSmaeTotals(estimated);
-                      setFormPlatillo((prev) => ({
-                        ...prev,
-                        smae_equivalentes: estimated,
-                        calorias: totals.kcal,
-                        proteina: totals.proteina,
-                        carbohidratos: totals.carbohidratos,
-                        grasas: totals.grasas,
-                      }));
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                    onClick={() => setShowPlatilloIngCatalog((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
                   >
-                    <Sparkles className="w-3 h-3 text-emerald-600" />
-                    <span>Sugerir desde texto</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{showPlatilloIngCatalog ? "Ocultar catálogo SMAE" : "Agregar alimentos SMAE"}</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {SMAE_GROUPS.filter((g) => g.id !== "libres").map((grp) => {
-                    const val = Number(formPlatillo.smae_equivalentes?.[grp.id] || 0);
-                    return (
+                {/* Lista de Alimentos Agregados */}
+                {(formPlatillo.ingredientes_smae || []).length === 0 ? (
+                  <div className="p-4 rounded-xl bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-emerald-800">
+                    Aún no has agregado alimentos a este platillo. Selecciona los ingredientes abajo del catálogo oficial SMAE.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {computeSmaeFromIngredientItems(formPlatillo.ingredientes_smae).details.map((det, idx) => (
                       <div
-                        key={grp.id}
-                        className={`p-2 rounded-xl border transition-all flex flex-col justify-between ${
-                          val > 0
-                            ? "bg-white border-emerald-400 shadow-2xs"
-                            : "bg-white/60 border-slate-200/80 opacity-80"
-                        }`}
+                        key={`${det.nombre}_${idx}`}
+                        className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs"
                       >
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <span className="text-[11px] font-bold text-slate-800 truncate" title={grp.nombre}>
-                            {grp.icono} {grp.corto}
-                          </span>
-                          <span className="text-[9px] font-semibold text-slate-400 shrink-0">
-                            {grp.kcal}kcal
-                          </span>
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {det.foto && (
+                            <img
+                              src={det.foto}
+                              alt={det.nombre}
+                              className="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
+                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-emerald-700">{det.smaeCorto}</span>
+                              <span>•</span>
+                              <span>{det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-1 bg-slate-50 rounded-lg p-0.5 border border-slate-200/70">
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                            <button
+                              type="button"
+                              onClick={() => adjustPlatilloIngredienteEq(det.nombre, -0.5)}
+                              className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[38px] text-center">
+                              {det.eq} eq
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => adjustPlatilloIngredienteEq(det.nombre, 0.5)}
+                              className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => updatePlatilloSmaeEq(grp.id, -0.5)}
-                            className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center border border-slate-200/80 cursor-pointer"
+                            onClick={() => togglePlatilloIngrediente(det.nombre)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Quitar alimento del platillo"
                           >
-                            -
-                          </button>
-                          <span className={`text-xs font-extrabold ${val > 0 ? "text-emerald-700" : "text-slate-400"}`}>
-                            {val} eq
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updatePlatilloSmaeEq(grp.id, 0.5)}
-                            className="w-6 h-6 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
-                          >
-                            +
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Buscador desplegable del Catálogo Oficial SMAE */}
+                {showPlatilloIngCatalog && (
+                  <div className="p-3 rounded-xl bg-white border border-emerald-200 space-y-2.5">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={platilloIngSearch}
+                        onChange={(e) => setPlatilloIngSearch(e.target.value)}
+                        placeholder="Buscar alimento SMAE para agregar (ej. Salmón, Arroz, Pechuga, Huevo, Aguacate)..."
+                        className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-emerald-500"
+                      />
+                      {platilloIngSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setPlatilloIngSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                      {CATEGORIAS_INGREDIENTES.map((cat) => {
+                        const active = platilloIngCat === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setPlatilloIngCat(cat.id)}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
+                              active
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                                : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
+                            }`}
+                          >
+                            <span>{cat.icono}</span>
+                            <span>{cat.corto || cat.nombre}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 pr-1">
+                      {buscarIngredientes(platilloIngSearch, platilloIngCat)
+                        .slice(0, 60)
+                        .map((item) => {
+                          const isChecked = (formPlatillo.ingredientes_smae || []).some(
+                            (it) => it.nombre === item.nombre
+                          );
+                          const smaeGrp = item.smaeGroup ? SMAE_GROUPS_MAP[item.smaeGroup] : null;
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => togglePlatilloIngrediente(item.nombre)}
+                              className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
+                                isChecked
+                                  ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400"
+                                  : "bg-[#F8FAFC] border-[#E2E8F0] hover:bg-white hover:border-emerald-300"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="rounded text-emerald-600 w-3.5 h-3.5 pointer-events-none shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-[#0B1929] truncate">{item.nombre}</div>
+                                <div className="text-[10px] text-[#6B7A8D] truncate">
+                                  1 eq: <strong className="text-emerald-700">{item.porcion1Eq}</strong>
+                                  {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Grid de 4 Macros (Auto-calculados por SMAE o editables) */}
-              <div className="p-3.5 bg-gray-50 rounded-2xl border border-[#E2E8F0]">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
-                    Macros Calculados por SMAE
-                  </span>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Sincronizado con Equivalentes
+              {/* 2. Receta / Vista del Paciente (Solo lectura - Generada con IA al Guardar) */}
+              <div className="p-3.5 bg-purple-50/40 rounded-2xl border border-purple-200/80 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Receta para el Paciente (Generada con IA · Solo Lectura)</span>
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                    {formPlatillo.pendienteIa || !formPlatillo.texto
+                      ? "⚡ Se redactará al Guardar"
+                      : "✓ Redactada con IA"}
                   </span>
                 </div>
+                {formPlatillo.texto && !formPlatillo.pendienteIa ? (
+                  <textarea
+                    rows={3}
+                    readOnly
+                    value={formPlatillo.texto}
+                    className="w-full bg-white/90 border border-purple-200 rounded-xl p-3 text-xs text-[#0B1929] outline-none leading-relaxed cursor-default select-text"
+                  />
+                ) : (
+                  <div className="p-3 rounded-xl bg-white/90 border border-purple-200/80 text-xs text-purple-900 leading-relaxed space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5 text-purple-800">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>
+                        Al dar clic en «Guardar platillo SMAE», la IA redactará automáticamente la descripción culinaria respetando las porciones exactas de arriba.
+                      </span>
+                    </p>
+                    {formPlatillo.texto && (
+                      <p className="text-[11px] text-slate-500 pt-1 border-t border-purple-100 italic">
+                        Versión anterior: {formPlatillo.texto}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Resumen Automático de Equivalentes SMAE y Macros Oficiales */}
+              <div className="p-3.5 bg-gray-50 rounded-2xl border border-[#E2E8F0] space-y-2.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                    Equivalentes y Macros Oficiales (Calculados por Literatura SMAE)
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    100% Automático
+                  </span>
+                </div>
+
+                {Object.keys(formPlatillo.smae_equivalentes || {}).filter((k) => !k.startsWith("_") && Number(formPlatillo.smae_equivalentes[k]) > 0).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(formPlatillo.smae_equivalentes || {})
+                      .filter(([k, val]) => !k.startsWith("_") && Number(val) > 0)
+                      .map(([gId, val]) => {
+                        const grp = SMAE_GROUPS_MAP[gId];
+                        if (!grp) return null;
+                        return (
+                          <span
+                            key={gId}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-300 text-[11px] font-bold text-emerald-900 shadow-2xs"
+                          >
+                            <span>{grp.icono}</span>
+                            <span>{val} eq {grp.corto}</span>
+                          </span>
+                        );
+                      })}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Calorías (kcal)</label>
-                    <input
-                      type="number"
-                      value={formPlatillo.calorias}
-                      onChange={e => setFormPlatillo(p => ({ ...p, calorias: e.target.value }))}
-                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                    />
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-2 text-center">
+                    <span className="block text-[10px] font-bold text-slate-500 uppercase">Calorías</span>
+                    <span className="text-sm font-extrabold text-[#0B1929]">{formPlatillo.calorias || 0} kcal</span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-red-600 mb-1">Proteína (g)</label>
-                    <input
-                      type="number"
-                      value={formPlatillo.proteina}
-                      onChange={e => setFormPlatillo(p => ({ ...p, proteina: e.target.value }))}
-                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                    />
+                  <div className="bg-red-50/60 border border-red-100 rounded-xl p-2 text-center">
+                    <span className="block text-[10px] font-bold text-red-600 uppercase">Proteína</span>
+                    <span className="text-sm font-extrabold text-red-900">{formPlatillo.proteina || 0} g</span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-amber-600 mb-1">Carbos (g)</label>
-                    <input
-                      type="number"
-                      value={formPlatillo.carbohidratos}
-                      onChange={e => setFormPlatillo(p => ({ ...p, carbohidratos: e.target.value }))}
-                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                    />
+                  <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2 text-center">
+                    <span className="block text-[10px] font-bold text-amber-600 uppercase">Carbos</span>
+                    <span className="text-sm font-extrabold text-amber-900">{formPlatillo.carbohidratos || 0} g</span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-emerald-600 mb-1">Grasas (g)</label>
-                    <input
-                      type="number"
-                      value={formPlatillo.grasas}
-                      onChange={e => setFormPlatillo(p => ({ ...p, grasas: e.target.value }))}
-                      className="w-full bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-sm font-bold text-[#0B1929] outline-none focus:border-[var(--brand-primary)]"
-                    />
+                  <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2 text-center">
+                    <span className="block text-[10px] font-bold text-emerald-600 uppercase">Grasas</span>
+                    <span className="text-sm font-extrabold text-emerald-900">{formPlatillo.grasas || 0} g</span>
                   </div>
                 </div>
               </div>
@@ -1545,7 +1730,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                 disabled={savingPlatillo || uploadingPlatillo}
                 className="px-4 py-2 bg-[var(--brand-primary)] hover:opacity-90 text-white rounded-xl font-semibold text-sm shadow-sm transition-opacity disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                {savingPlatillo ? "Guardando..." : "Guardar platillo SMAE"}
+                {savingPlatillo ? "Redactando con IA y guardando..." : "Guardar platillo SMAE"}
               </button>
             </div>
           </div>

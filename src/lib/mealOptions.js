@@ -6,7 +6,12 @@
 
 export const OPTION_SEPARATOR = "\n--- OTRA OPCIÓN ---\n";
 
-import { stripSmaeTag, extractSmaeMapFromMealText, embedSmaeMapInMealText } from "./smaeData";
+import {
+  stripSmaeTag,
+  extractSmaeMapFromMealText,
+  embedSmaeMapInMealText,
+  extractMealIngredientsFromText,
+} from "./smaeData";
 
 /**
  * Parsea las opciones de una comida desde opcion1 y opcion2
@@ -19,8 +24,8 @@ export function parseMealOptions(comida) {
   const p1 = cleanSmaeTag(comida.opcion1 || "");
   list.push(p1);
 
-  const p2 = cleanSmaeTag(comida.opcion2 || "");
-  if (p2) {
+  const p2 = String(comida.opcion2 || "");
+  if (p2.trim()) {
     if (p2.includes(OPTION_SEPARATOR)) {
       const parts = p2.split(OPTION_SEPARATOR);
       parts.forEach(part => {
@@ -28,13 +33,45 @@ export function parseMealOptions(comida) {
         if (tr) list.push(tr);
       });
     } else {
-      list.push(p2);
+      const tr = cleanSmaeTag(p2);
+      if (tr) list.push(tr);
     }
   }
 
   // Garantizar siempre al menos la opción principal
   if (list.length === 0) list.push("");
   return list;
+}
+
+/**
+ * Extrae tanto los textos limpios como las listas de ingredientes SMAE estructurados ([INGS:...])
+ * para cada opción (0 = Principal A, 1 = Alternativa B, etc.)
+ */
+export function parseMealOptionsStructured(comida) {
+  if (!comida) return { opciones: [""], ingredientesPorOpcion: { 0: [] } };
+  const rawParts = [String(comida.opcion1 || "")];
+  const p2 = String(comida.opcion2 || "");
+  if (p2.trim()) {
+    if (p2.includes(OPTION_SEPARATOR)) {
+      p2.split(OPTION_SEPARATOR).forEach((part) => {
+        if (String(part || "").trim()) rawParts.push(String(part));
+      });
+    } else {
+      rawParts.push(p2);
+    }
+  }
+  const opciones = [];
+  const ingredientesPorOpcion = {};
+  rawParts.forEach((rawStr, idx) => {
+    const { cleanText, ingredientes } = extractMealIngredientsFromText(rawStr);
+    opciones.push(cleanText);
+    ingredientesPorOpcion[idx] = ingredientes || [];
+  });
+  if (opciones.length === 0) {
+    opciones.push("");
+    ingredientesPorOpcion[0] = [];
+  }
+  return { opciones, ingredientesPorOpcion };
 }
 
 /**

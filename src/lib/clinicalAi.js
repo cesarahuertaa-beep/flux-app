@@ -1447,12 +1447,13 @@ Debes responder ÚNICAMENTE con un JSON:
  * Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra
  * algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
  */
-export async function generateDishFromIngredientsWithAi({ ingredientes = [], cliente = {}, clinicalRec = null, targetMacros = null }) {
+export async function generateDishFromIngredientsWithAi({ ingredientes = [], dishIdea = "", cliente = {}, clinicalRec = null, targetMacros = null }) {
   const lista = Array.isArray(ingredientes) ? ingredientes : [ingredientes];
   const itemsText = lista.filter(Boolean).join(", ").trim();
   if (!itemsText) {
     throw new Error("Selecciona al menos un ingrediente para generar el platillo.");
   }
+  const cleanIdea = String(dishIdea || "").trim();
 
   const apiKey = getGeminiApiKey();
 
@@ -1462,7 +1463,7 @@ export async function generateDishFromIngredientsWithAi({ ingredientes = [], cli
     const timeoutId = setTimeout(() => controller.abort(), 6000);
     const edgeRes = await invokeEdgeFunction("clinical-ai", {
       action: "dish-from-ingredients",
-      ingredientes: lista,
+      ingredientes: cleanIdea ? [`[Platillo deseado: ${cleanIdea}]`, ...lista] : lista,
       targetMacros,
       geminiKey: apiKey,
     });
@@ -1482,7 +1483,7 @@ export async function generateDishFromIngredientsWithAi({ ingredientes = [], cli
       }
 
       return {
-        titulo: String(edgeRes.titulo).trim(),
+        titulo: cleanIdea || String(edgeRes.titulo).trim(),
         texto: String(edgeRes.texto).trim(),
         calorias: cal,
         proteina: prot,
@@ -1504,9 +1505,12 @@ META NUTRICIONAL ESTRICTA DE LOS EQUIVALENTES SMAE SELECCIONADOS (1 PERSONA):
 - Grasas: ${targetMacros.grasas || 0}g
 REGLA DE ORO DE PORCIONES: RESPETA ESTRICTAMENTE las porciones, medidas caseras y gramajes que ya vienen indicados en cada ingrediente de la lista seleccionada por el nutriólogo. NO cambies ni alteres esas cantidades; únicamente combínalas en una preparación culinaria deliciosa (solo puedes sugerir condimentos libres en energía como ajo, cebolla, sal, limón, cilantro o especias).`
       : "";
+    const ideaHint = cleanIdea
+      ? `\nIDEA / NOMBRE DE PLATILLO INDICADO POR EL NUTRIÓLOGO: "${cleanIdea}" (Respeta este concepto culinario al redactar la preparación).`
+      : "";
 
     const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
-A partir de la siguiente lista de ingredientes seleccionados por el nutriólogo, propón un solo platillo real y conocido del mundo culinario que los combine con armonía gastronómica, especificando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento y calculando su aporte de calorías y macronutrientes.${targetHint}
+A partir de la siguiente lista de ingredientes con gramajes y equivalentes SMAE seleccionados por el nutriólogo, redacta un platillo real y delicioso que los combine con armonía gastronómica, respetando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento seleccionado.${targetHint}${ideaHint}
 
 ═══════════════════════════════════════════════════════════
 EJEMPLO MAESTRO DE TONO, GRAMAJES Y ESTRUCTURA (Imita este estilo exacto):
@@ -1528,12 +1532,12 @@ REGLAS ESTRICTAS DE REDACCIÓN:
 1. "titulo": Nombre atractivo, culinario y real del platillo (ej. "Picadillo clásico de res con arroz blanco y parmesano", "Cazuela cremosa de pollo campirano con vegetales", "Pastel rústico de pollo con puré de papa").
 2. "texto": Un solo texto corrido breve (máximo 4 a 5 líneas) con estas pautas obligatorias:
    a) Debe INICIAR nombrando el platillo gastronómico con calidez y naturalidad: "Tus ingredientes forman unos clásicos [Nombre]...", "Con esta base puedes preparar un delicioso [Nombre]...", o "Tus ingredientes se integran perfectamente en una reconfortante [Nombre]...". NUNCA comiences diciendo impersonalmente "Para preparar este platillo resulta ideal...".
-   b) OBLIGATORIO - GRAMAJES Y VOLÚMENES POR INGREDIENTE: CADA ingrediente utilizado o sugerido DEBE incluir su porción, gramaje o volumen realista para 1 persona (ej. 150g de carne molida, 1 taza / 150g de arroz cocido, 1 pieza de jitomate / 120g, 50g de zanahoria en cubos, 20g de queso parmesano rallado, 1 cucharadita de aceite de oliva, 1 diente de ajo, etc.). Esto es indispensable para el cálculo nutricional.
+   b) OBLIGATORIO - GRAMAJES Y VOLÚMENES POR INGREDIENTE: CADA ingrediente seleccionado DEBE aparecer con su porción, medida casera y gramaje exacto tal como viene en la lista proporcionada.
    c) Explica brevemente cómo se combinan e integran al cocinar (sofrito, hervor, horneado, salteado o ensamble).
-   d) Indica con amabilidad y naturalidad si sobra algún ingrediente que desentone con la armonía del platillo (ej. "el pepino sobra en esta preparación caliente y es mejor reservarlo fresco (1/2 pieza en rodajas) para una ensalada aparte...").
-   e) Sugiere los ingredientes básicos de cocina faltantes para completarlo con éxito con cantidades precisas (ej. 1/4 de cebolla, 1 diente de ajo, 1 cdita de aceite, una pizca de sal).
+   d) Indica con amabilidad y naturalidad si algún ingrediente se acompaña en fresco o por separado.
+   e) Sugiere condimentos básicos de cocina libres en calorías para darle sazón (ej. ajo, cebolla, limón, especias, sal y pimienta).
    f) PROHIBIDO hablar de beneficios nutricionales, vitaminas ni propiedades medicinales. Enfócate 100% en gramajes, técnica culinaria y sabor.
-3. "calorias", "proteina", "carbohidratos", "grasas": Calcula con rigor bromatológico y químico (Kcal ≈ P*4 + C*4 + G*9) el contenido nutricional total del platillo sumando los gramajes indicados en la receta. Devuelve números enteros redondeados.
+3. "calorias", "proteina", "carbohidratos", "grasas": Devuelve los valores nutricionales totales de la selección.
 
 ═══════════════════════════════════════════════════════════
 INGREDIENTES SELECCIONADOS:
@@ -1589,7 +1593,7 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
             }
 
             return {
-              titulo: (parsed.titulo || "Platillo sugerido").trim(),
+              titulo: cleanIdea || (parsed.titulo || "Platillo sugerido").trim(),
               texto: (parsed.texto || "").trim(),
               calorias: cal,
               proteina: prot,
@@ -1603,19 +1607,155 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
     }
   }
 
-  // Tier 3: Respaldo analítico estructurado
-  const titulo = `Guisado casero con ${lista.slice(0, 3).join(", ")}`;
-  const texto = `Tus ingredientes se integran en un guisado casero; cocinando 150g de ${lista[0] || "proteína"} salteada con ${lista.slice(1, 4).join(", ")}, acompañando con 1 cucharadita de aceite de oliva, 1 diente de ajo, sal y pimienta al gusto para redondear el platillo.`;
+  // Tier 3: Respaldo analítico estructurado respetando porciones exactas SMAE
+  const titulo = cleanIdea || `Platillo con ${lista.slice(0, 2).join(" y ")}`;
+  const bulletSummary = lista.join(", ");
+  const texto = `Con esta selección puedes preparar ${titulo.toLowerCase()}: integra ${bulletSummary}, sazonando al gusto con ajo, cebolla, limón, sal y especias naturales libres en calorías.`;
   const est = estimateMealNutritionOffline(`${titulo}. ${texto}`, targetMacros, clinicalRec);
   return {
     titulo,
     texto,
-    calorias: est.calorias,
-    proteina: est.proteina,
-    carbohidratos: est.carbohidratos,
-    grasas: est.grasas,
+    calorias: targetMacros?.calorias || est.calorias,
+    proteina: targetMacros?.proteina || est.proteina,
+    carbohidratos: targetMacros?.carbohidratos || est.carbohidratos,
+    grasas: targetMacros?.grasas || est.grasas,
     origen: "analitico_local",
   };
+}
+
+/**
+ * Genera en 1 sola llamada por lote (Batch IA) las recetas descriptivas para todas las comidas/opciones
+ * que hayan sido creadas o modificadas con ingredientes SMAE al momento de guardar el día.
+ */
+export async function generateBatchDishesFromIngredientsWithAi({
+  itemsToGenerate = [],
+  cliente = {},
+  clinicalRec = null,
+}) {
+  if (!Array.isArray(itemsToGenerate) || itemsToGenerate.length === 0) return {};
+  if (itemsToGenerate.length === 1) {
+    const single = itemsToGenerate[0];
+    const res = await generateDishFromIngredientsWithAi({
+      ingredientes: single.ingredientes,
+      dishIdea: single.dishIdea || "",
+      cliente,
+      clinicalRec,
+      targetMacros: single.targetMacros || null,
+    });
+    const fullText =
+      res.titulo && res.texto && !res.texto.toLowerCase().startsWith(res.titulo.toLowerCase())
+        ? `${res.titulo}\n\n${res.texto}`
+        : res.texto || res.titulo || "";
+    return { [single.key]: { titulo: res.titulo, texto: fullText } };
+  }
+
+  const apiKey = getGeminiApiKey();
+  if (apiKey) {
+    const batchSpec = itemsToGenerate
+      .map(
+        (it, idx) =>
+          `ITEM #${idx + 1} (key: "${it.key}"):
+- Tiempo de comida / Idea: ${it.dishIdea || it.mealNombre || `Comida ${idx + 1}`}
+- Ingredientes y gramajes SMAE exactos (NO alterar cantidades): ${it.ingredientes.join(", ")}
+- Aporte oficial SMAE: ${it.targetMacros?.calorias || 0} kcal (${it.targetMacros?.proteina || 0}g P, ${it.targetMacros?.carbohidratos || 0}g C, ${it.targetMacros?.grasas || 0}g G)`
+      )
+      .join("\n\n");
+
+    const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
+A continuación recibirás ${itemsToGenerate.length} platillos estructurados por el nutriólogo con sus ingredientes y gramajes exactos del Sistema Mexicano de Alimentos Equivalentes (SMAE).
+Para CADA ITEM, redacta un título gastronómico atractivo y una receta breve en un solo párrafo corrido (3 a 4 líneas) dirigida al paciente que explique cómo preparar y combinar exactamente esos ingredientes con sus gramajes exactos (sin cambiar ni alterar ninguna cantidad, solo sugiriendo condimentos libres como ajo, cebolla, limón, sal o especias).
+
+${batchSpec}
+
+Responde ÚNICAMENTE con un objeto JSON válido donde cada llave sea el "key" exacto del item y su valor contenga "titulo" y "texto":
+{
+  "key_del_item": {
+    "titulo": "Nombre culinario del platillo",
+    "texto": "Tus ingredientes forman un delicioso... (incluyendo todos los gramajes exactos seleccionados)"
+  }
+}`;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8500);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: getGenerationConfig(model, true, 0.3),
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = extractGeminiText(data);
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            if (parsed && typeof parsed === "object") {
+              const out = {};
+              itemsToGenerate.forEach((it) => {
+                const entry = parsed[it.key];
+                if (entry && (entry.texto || entry.titulo)) {
+                  const tit = String(entry.titulo || it.dishIdea || "").trim();
+                  const txt = String(entry.texto || "").trim();
+                  const fullText =
+                    tit && txt && !txt.toLowerCase().startsWith(tit.toLowerCase())
+                      ? `${tit}\n\n${txt}`
+                      : txt || tit;
+                  out[it.key] = { titulo: tit, texto: fullText };
+                }
+              });
+              if (Object.keys(out).length > 0) {
+                // Completar cualquiera que haya faltado con el respaldo local
+                itemsToGenerate.forEach((it) => {
+                  if (!out[it.key]) {
+                    const tit = it.dishIdea || `Platillo con ${it.ingredientes.slice(0, 2).join(" y ")}`;
+                    const txt = `Con esta selección puedes preparar ${tit.toLowerCase()}: integra ${it.ingredientes.join(", ")}, sazonando al gusto con especias naturales.`;
+                    out[it.key] = { titulo: tit, texto: `${tit}\n\n${txt}` };
+                  }
+                });
+                return out;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Fallback paralelo / determinístico si no hay conexión directa a Gemini
+  const results = await Promise.all(
+    itemsToGenerate.map(async (it) => {
+      try {
+        const r = await generateDishFromIngredientsWithAi({
+          ingredientes: it.ingredientes,
+          dishIdea: it.dishIdea || "",
+          cliente,
+          clinicalRec,
+          targetMacros: it.targetMacros || null,
+        });
+        const fullText =
+          r.titulo && r.texto && !r.texto.toLowerCase().startsWith(r.titulo.toLowerCase())
+            ? `${r.titulo}\n\n${r.texto}`
+            : r.texto || r.titulo || "";
+        return [it.key, { titulo: r.titulo, texto: fullText }];
+      } catch {
+        const tit = it.dishIdea || `Platillo con ${it.ingredientes.slice(0, 2).join(" y ")}`;
+        const txt = `Con esta selección puedes preparar ${tit.toLowerCase()}: integra ${it.ingredientes.join(", ")}, sazonando al gusto con especias naturales.`;
+        return [it.key, { titulo: tit, texto: `${tit}\n\n${txt}` }];
+      }
+    })
+  );
+  return Object.fromEntries(results);
 }
 
 /**
