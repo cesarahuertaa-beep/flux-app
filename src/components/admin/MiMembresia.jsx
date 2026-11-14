@@ -240,7 +240,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const sameCycleReceipts = validReceipts.filter(r => r.fecha_corte_mes === lastValid.fecha_corte_mes);
       sameCycleReceipts.forEach(r => {
         const adm = Number(r.monto_admin_premium || 0);
-        const tot = Number(r.monto || 0);
+        const tot = Number(r.monto ?? r.monto_pagado ?? 0);
         paidAdminInCurrentCycle += adm;
         paidBaseInCurrentCycle += Math.max(0, tot - adm);
       });

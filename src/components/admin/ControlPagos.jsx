@@ -386,13 +386,13 @@ export default function ControlPagos({ setMsg }) {
   const totalNutriCobrado = useMemo(() => {
     return filtradosNutri
       .filter(r => r.estado === "aprobado")
-      .reduce((sum, r) => sum + (Number(r.monto) || 0), 0);
+      .reduce((sum, r) => sum + (Number(r.monto ?? r.monto_pagado) || 0), 0);
   }, [filtradosNutri]);
 
   const totalCivilCobrado = useMemo(() => {
     return filtradosCivil
       .filter(r => r.estado === "aprobado")
-      .reduce((sum, r) => sum + (Number(r.monto) || 0), 0);
+      .reduce((sum, r) => sum + (Number(r.monto ?? r.monto_pagado) || 0), 0);
   }, [filtradosCivil]);
 
   return (
@@ -636,7 +636,7 @@ export default function ControlPagos({ setMsg }) {
                                 {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
-                                ${Number(r.monto || 0).toFixed(2)}
+                                ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
                               </td>
                               <td className="py-3.5 px-6 text-center">
                                 <div className="flex justify-center">
@@ -702,7 +702,7 @@ export default function ControlPagos({ setMsg }) {
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className="font-black text-emerald-600 text-sm">
-                                ${Number(r.monto || 0).toFixed(2)}
+                                ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
                               </span>
                               <StatusBadge s={r.estado} />
                             </div>
@@ -819,7 +819,7 @@ export default function ControlPagos({ setMsg }) {
                                 {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
-                                ${Number(r.monto || 0).toFixed(2)}
+                                ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
                               </td>
                               <td className="py-3.5 px-6 text-center">
                                 <div className="flex justify-center">
@@ -885,7 +885,7 @@ export default function ControlPagos({ setMsg }) {
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className="font-black text-emerald-600 text-sm">
-                                ${Number(r.monto || 0).toFixed(2)}
+                                ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
                               </span>
                               <StatusBadge s={r.estado} />
                             </div>

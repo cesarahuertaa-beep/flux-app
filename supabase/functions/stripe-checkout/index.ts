@@ -190,7 +190,7 @@ serve(async (req: Request) => {
       // Verificar si tiene un ciclo vigente y solo requiere Upgrade de Nivel a mitad de mes
       const { data: lastRec } = await supabase
         .from("recibos_pago")
-        .select("monto_pagado, fecha_corte_mes, estado")
+        .select("monto, monto_pagado, fecha_corte_mes, estado")
         .eq("nutriologo_id", userId)
         .eq("estado", "aprobado")
         .order("fecha_corte_mes", { ascending: false })
@@ -199,8 +199,9 @@ serve(async (req: Request) => {
 
       if (lastRec?.fecha_corte_mes) {
         const expDate = new Date(`${lastRec.fecha_corte_mes}T23:59:59`);
-        if (new Date() <= expDate && Number(lastRec.monto_pagado) < amountMxn && body?.isUpgrade) {
-          amountMxn = Math.max(10, amountMxn - Number(lastRec.monto_pagado));
+        const prevPaid = Number(lastRec.monto ?? lastRec.monto_pagado ?? 0);
+        if (new Date() <= expDate && prevPaid < amountMxn && body?.isUpgrade) {
+          amountMxn = Math.max(10, amountMxn - prevPaid);
           planTitle = `Upgrade de Nivel FLUX (Diferencia del ciclo actual)`;
           isOneTimeUpgrade = true;
         }

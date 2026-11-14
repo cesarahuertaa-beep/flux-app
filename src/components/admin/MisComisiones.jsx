@@ -94,7 +94,7 @@ export default function MisComisiones({ myId, setMsg }) {
   const nominaActual = nominas.find(n => n.mes_facturacion === filtroMes);
 
   // Total acumulado (monto bruto generado por los nutriólogos) y comisión por fecha de corte
-  const totalGenerado = filtrados.reduce((acc, r) => acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)), 0);
+  const totalGenerado = filtrados.reduce((acc, r) => acc + Math.max(0, (Number(r.monto ?? r.monto_pagado) || 0) - (Number(r.monto_admin_premium) || 0)), 0);
   const miPago = useMemo(() => {
     if (filtroMes !== "todos" && nominaActual?.monto != null) {
       return Number(nominaActual.monto);
@@ -116,7 +116,7 @@ export default function MisComisiones({ myId, setMsg }) {
           const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
           const customPct = myComp?.comisionPct != null ? Number(myComp.comisionPct) : (Number(rateForCut.comision_pct) || 32);
           const pct = customPct / 100;
-          return acc + Math.max(0, (Number(r.monto) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;
+          return acc + Math.max(0, (Number(r.monto ?? r.monto_pagado) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;
         }, 0)
       : 0;
 

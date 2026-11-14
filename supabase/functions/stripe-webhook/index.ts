@@ -87,7 +87,7 @@ serve(async (req: Request) => {
       const isUpgrade = obj?.metadata?.is_upgrade === "true";
       const { data: lastReceipt } = await supabase
         .from("recibos_pago")
-        .select("fecha_corte_mes, monto_pagado")
+        .select("fecha_corte_mes, monto, monto_pagado")
         .eq("nutriologo_id", profile.id)
         .eq("estado", "aprobado")
         .order("fecha_corte_mes", { ascending: false })
@@ -99,9 +99,10 @@ serve(async (req: Request) => {
           ? lastReceipt.fecha_corte_mes
           : addDaysISO(lastReceipt?.fecha_corte_mes || null, 30);
 
+      const prevMonto = Number(lastReceipt?.monto ?? lastReceipt?.monto_pagado ?? 0);
       const totalPaidForCycle =
-        isUpgrade && lastReceipt?.monto_pagado
-          ? Number(lastReceipt.monto_pagado) + amountPaidMxn
+        isUpgrade && prevMonto > 0
+          ? prevMonto + amountPaidMxn
           : amountPaidMxn > 0
           ? amountPaidMxn
           : 499;
@@ -115,6 +116,7 @@ serve(async (req: Request) => {
         nutriologo_id: profile.id,
         fecha_corte_mes: nextCutoff,
         clientes_activos: clientCount || 0,
+        monto: totalPaidForCycle,
         monto_pagado: totalPaidForCycle,
         comprobante_url: receiptUrl,
         estado: "aprobado",
@@ -162,10 +164,13 @@ serve(async (req: Request) => {
 
       const nextCutoff = addDaysISO(lastCivilReceipt?.fecha_corte_mes || null, 30);
 
+      const finalCivilAmount = amountPaidMxn > 0 ? amountPaidMxn : 75;
+
       await supabase.from("recibos_pago_civil").insert({
         cliente_id: cliente.id,
         fecha_corte_mes: nextCutoff,
-        monto_pagado: amountPaidMxn > 0 ? amountPaidMxn : 75,
+        monto: finalCivilAmount,
+        monto_pagado: finalCivilAmount,
         comprobante_url: receiptUrl,
         estado: "aprobado",
       });
