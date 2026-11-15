@@ -440,11 +440,6 @@ export default function ExpedienteClinicoModal({
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
-
-              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200/70 text-xs text-blue-900 leading-relaxed">
-                <span className="font-bold block text-blue-950 mb-0.5">Información Atemporal Permanente</span>
-                Los datos de esta ficha y sus antecedentes clínicos permanecen a lo largo del tiempo. Las preferencias de comidas, recordatorio de 24 horas y hábitos de la etapa se evalúan directamente en cada plan de progreso.
-              </div>
             </div>
           )}
 
