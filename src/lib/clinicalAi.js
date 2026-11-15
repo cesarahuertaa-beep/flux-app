@@ -1447,52 +1447,61 @@ Debes responder ÚNICAMENTE con un JSON:
  * Ponle el nombre del platillo como título y redacta un solo texto corrido breve que indique si sobra
  * algún ingrediente y sugiera los básicos que falten para completarlo, sin describir beneficios ni propiedades.
  */
-export async function generateDishFromIngredientsWithAi({ ingredientes = [], dishIdea = "", cliente = {}, clinicalRec = null, targetMacros = null }) {
+export async function generateDishFromIngredientsWithAi({
+  ingredientes = [],
+  dishIdea = "",
+  baseDish = null,
+  cliente = {},
+  clinicalRec = null,
+  targetMacros = null,
+}) {
   const lista = Array.isArray(ingredientes) ? ingredientes : [ingredientes];
   const itemsText = lista.filter(Boolean).join(", ").trim();
   if (!itemsText) {
     throw new Error("Selecciona al menos un ingrediente para generar el platillo.");
   }
-  const cleanIdea = String(dishIdea || "").trim();
+  const cleanIdea = String(baseDish?.nombre || dishIdea || "").trim();
 
   const apiKey = getGeminiApiKey();
 
-  // Tier 1: Supabase Edge Function
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    const edgeRes = await invokeEdgeFunction("clinical-ai", {
-      action: "dish-from-ingredients",
-      ingredientes: cleanIdea ? [`[Platillo deseado: ${cleanIdea}]`, ...lista] : lista,
-      targetMacros,
-      geminiKey: apiKey,
-    });
-    clearTimeout(timeoutId);
-    if (edgeRes?.titulo && edgeRes?.texto) {
-      let cal = edgeRes.calorias != null ? Math.round(Number(edgeRes.calorias)) : null;
-      let prot = edgeRes.proteina != null ? Math.round(Number(edgeRes.proteina)) : null;
-      let carb = edgeRes.carbohidratos != null ? Math.round(Number(edgeRes.carbohidratos)) : null;
-      let fat = edgeRes.grasas != null ? Math.round(Number(edgeRes.grasas)) : null;
+  // Tier 1: Supabase Edge Function (solo cuando no hay receta base específica de Biblioteca que adaptar)
+  if (!baseDish?.texto) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const edgeRes = await invokeEdgeFunction("clinical-ai", {
+        action: "dish-from-ingredients",
+        ingredientes: cleanIdea ? [`[Platillo deseado: ${cleanIdea}]`, ...lista] : lista,
+        targetMacros,
+        geminiKey: apiKey,
+      });
+      clearTimeout(timeoutId);
+      if (edgeRes?.titulo && edgeRes?.texto) {
+        let cal = edgeRes.calorias != null ? Math.round(Number(edgeRes.calorias)) : null;
+        let prot = edgeRes.proteina != null ? Math.round(Number(edgeRes.proteina)) : null;
+        let carb = edgeRes.carbohidratos != null ? Math.round(Number(edgeRes.carbohidratos)) : null;
+        let fat = edgeRes.grasas != null ? Math.round(Number(edgeRes.grasas)) : null;
 
-      if (cal == null || prot == null) {
-        const est = estimateMealNutritionOffline(`${edgeRes.titulo}. ${edgeRes.texto}`, targetMacros, clinicalRec);
-        cal = est.calorias;
-        prot = est.proteina;
-        carb = est.carbohidratos;
-        fat = est.grasas;
+        if (cal == null || prot == null) {
+          const est = estimateMealNutritionOffline(`${edgeRes.titulo}. ${edgeRes.texto}`, targetMacros, clinicalRec);
+          cal = est.calorias;
+          prot = est.proteina;
+          carb = est.carbohidratos;
+          fat = est.grasas;
+        }
+
+        return {
+          titulo: cleanIdea || String(edgeRes.titulo).trim(),
+          texto: String(edgeRes.texto).trim(),
+          calorias: cal,
+          proteina: prot,
+          carbohidratos: carb,
+          grasas: fat,
+          origen: edgeRes.origen || "edge_function",
+        };
       }
-
-      return {
-        titulo: cleanIdea || String(edgeRes.titulo).trim(),
-        texto: String(edgeRes.texto).trim(),
-        calorias: cal,
-        proteina: prot,
-        carbohidratos: carb,
-        grasas: fat,
-        origen: edgeRes.origen || "edge_function",
-      };
-    }
-  } catch {}
+    } catch {}
+  }
 
   // Tier 2: Gemini Direct
   if (apiKey) {
@@ -1505,12 +1514,20 @@ META NUTRICIONAL ESTRICTA DE LOS EQUIVALENTES SMAE SELECCIONADOS (1 PERSONA):
 - Grasas: ${targetMacros.grasas || 0}g
 REGLA DE ORO DE PORCIONES: RESPETA ESTRICTAMENTE las porciones, medidas caseras y gramajes que ya vienen indicados en cada ingrediente de la lista seleccionada por el nutriólogo. NO cambies ni alteres esas cantidades; únicamente combínalas en una preparación culinaria deliciosa (solo puedes sugerir condimentos libres en energía como ajo, cebolla, sal, limón, cilantro o especias).`
       : "";
-    const ideaHint = cleanIdea
+    const baseDishHint = baseDish?.nombre || baseDish?.texto
+      ? `\n═══════════════════════════════════════════════════════════
+PLATILLO BASE CARGADO DE LA BIBLIOTECA (MODIFICADO POR EL NUTRIÓLOGO):
+- Platillo principal original: "${baseDish.nombre || cleanIdea}"
+- Receta original en Biblioteca: "${baseDish.texto || ""}"
+- Ingredientes del platillo principal (con gramajes actualizados): ${(baseDish.baseIngredientes || lista).join(", ")}
+- Alimentos extra agregados por el nutriólogo: ${(baseDish.extraIngredientes || []).length > 0 ? baseDish.extraIngredientes.join(", ") : "Ninguno (solo ajuste de porciones del platillo base)"}
+INSTRUCCIÓN OBLIGATORIA DE ADAPTACIÓN: Conserva la identidad, estilo culinario y pasos de preparación de la receta base de la Biblioteca («${baseDish.nombre || cleanIdea}»). Actualiza en el texto las cantidades o gramajes modificados de sus ingredientes originales e integra de forma natural los alimentos extra agregados como parte del platillo o como acompañamiento/guarnición del mismo tiempo de comida.`
+      : cleanIdea
       ? `\nIDEA / NOMBRE DE PLATILLO INDICADO POR EL NUTRIÓLOGO: "${cleanIdea}" (Respeta este concepto culinario al redactar la preparación).`
       : "";
 
     const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
-A partir de la siguiente lista de ingredientes con gramajes y equivalentes SMAE seleccionados por el nutriólogo, redacta un platillo real y delicioso que los combine con armonía gastronómica, respetando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento seleccionado.${targetHint}${ideaHint}
+A partir de la siguiente lista de ingredientes con gramajes y equivalentes SMAE seleccionados por el nutriólogo, redacta un platillo real y delicioso que los combine con armonía gastronómica, respetando SIEMPRE las porciones, gramajes o volúmenes exactos de cada alimento seleccionado.${targetHint}${baseDishHint}
 
 ═══════════════════════════════════════════════════════════
 EJEMPLO MAESTRO DE TONO, GRAMAJES Y ESTRUCTURA (Imita este estilo exacto):
@@ -1607,10 +1624,19 @@ Responde ÚNICAMENTE en formato JSON con llaves dobles válidas:
     }
   }
 
-  // Tier 3: Respaldo analítico estructurado respetando porciones exactas SMAE
+  // Tier 3: Respaldo analítico estructurado respetando porciones exactas SMAE y platillo base si existe
   const titulo = cleanIdea || `Platillo con ${lista.slice(0, 2).join(" y ")}`;
   const bulletSummary = lista.join(", ");
-  const texto = `Con esta selección puedes preparar ${titulo.toLowerCase()}: integra ${bulletSummary}, sazonando al gusto con ajo, cebolla, limón, sal y especias naturales libres en calorías.`;
+  let texto = "";
+  if (baseDish?.texto) {
+    const extraTxt =
+      Array.isArray(baseDish.extraIngredientes) && baseDish.extraIngredientes.length > 0
+        ? ` Acompaña o integra además con ${baseDish.extraIngredientes.join(", ")}.`
+        : "";
+    texto = `${baseDish.texto.trim()} (Porciones ajustadas para tu plan: ${bulletSummary}).${extraTxt}`;
+  } else {
+    texto = `Con esta selección puedes preparar ${titulo.toLowerCase()}: integra ${bulletSummary}, sazonando al gusto con ajo, cebolla, limón, sal y especias naturales libres en calorías.`;
+  }
   const est = estimateMealNutritionOffline(`${titulo}. ${texto}`, targetMacros, clinicalRec);
   return {
     titulo,
@@ -1638,6 +1664,7 @@ export async function generateBatchDishesFromIngredientsWithAi({
     const res = await generateDishFromIngredientsWithAi({
       ingredientes: single.ingredientes,
       dishIdea: single.dishIdea || "",
+      baseDish: single.baseDish || null,
       cliente,
       clinicalRec,
       targetMacros: single.targetMacros || null,
@@ -1652,18 +1679,24 @@ export async function generateBatchDishesFromIngredientsWithAi({
   const apiKey = getGeminiApiKey();
   if (apiKey) {
     const batchSpec = itemsToGenerate
-      .map(
-        (it, idx) =>
-          `ITEM #${idx + 1} (key: "${it.key}"):
+      .map((it, idx) => {
+        const baseBlock = it.baseDish?.nombre || it.baseDish?.texto
+          ? `\n- PLATILLO BASE DE BIBLIOTECA A RESPETAR: "${it.baseDish.nombre || it.dishIdea}"
+- Receta base original: "${it.baseDish.texto || ""}"
+- Ingredientes del platillo base (con gramajes ajustados): ${(it.baseDish.baseIngredientes || it.ingredientes).join(", ")}
+- Alimentos extra agregados por el nutriólogo: ${(it.baseDish.extraIngredientes || []).length > 0 ? it.baseDish.extraIngredientes.join(", ") : "Ninguno (solo ajuste de porciones)"}
+- Instrucción de adaptación: Conserva el título y preparación del platillo base, actualizando las porciones ajustadas e integrando los extras como parte o acompañamiento del platillo.`
+          : "";
+        return `ITEM #${idx + 1} (key: "${it.key}"):
 - Tiempo de comida / Idea: ${it.dishIdea || it.mealNombre || `Comida ${idx + 1}`}
-- Ingredientes y gramajes SMAE exactos (NO alterar cantidades): ${it.ingredientes.join(", ")}
-- Aporte oficial SMAE: ${it.targetMacros?.calorias || 0} kcal (${it.targetMacros?.proteina || 0}g P, ${it.targetMacros?.carbohidratos || 0}g C, ${it.targetMacros?.grasas || 0}g G)`
-      )
+- Ingredientes y gramajes SMAE totales (NO alterar cantidades): ${it.ingredientes.join(", ")}
+- Aporte oficial SMAE: ${it.targetMacros?.calorias || 0} kcal (${it.targetMacros?.proteina || 0}g P, ${it.targetMacros?.carbohidratos || 0}g C, ${it.targetMacros?.grasas || 0}g G)${baseBlock}`;
+      })
       .join("\n\n");
 
     const prompt = `Eres un chef profesional y nutriólogo clínico de FLUX.
 A continuación recibirás ${itemsToGenerate.length} platillos estructurados por el nutriólogo con sus ingredientes y gramajes exactos del Sistema Mexicano de Alimentos Equivalentes (SMAE).
-Para CADA ITEM, redacta un título gastronómico atractivo y una receta breve en un solo párrafo corrido (3 a 4 líneas) dirigida al paciente que explique cómo preparar y combinar exactamente esos ingredientes con sus gramajes exactos (sin cambiar ni alterar ninguna cantidad, solo sugiriendo condimentos libres como ajo, cebolla, limón, sal o especias).
+Para CADA ITEM, redacta un título gastronómico atractivo y una receta breve en un solo párrafo corrido (3 a 4 líneas) dirigida al paciente que explique cómo preparar y combinar exactamente esos ingredientes con sus gramajes exactos (sin cambiar ni alterar ninguna cantidad, solo sugiriendo condimentos libres como ajo, cebolla, limón, sal o especias). Si un ITEM indica un "PLATILLO BASE DE BIBLIOTECA A RESPETAR", conserva ese platillo principal y su preparación original, actualizando únicamente las cantidades ajustadas e integrando los alimentos extra como acompañamiento o complemento natural.
 
 ${batchSpec}
 
@@ -1739,6 +1772,7 @@ Responde ÚNICAMENTE con un objeto JSON válido donde cada llave sea el "key" ex
         const r = await generateDishFromIngredientsWithAi({
           ingredientes: it.ingredientes,
           dishIdea: it.dishIdea || "",
+          baseDish: it.baseDish || null,
           cliente,
           clinicalRec,
           targetMacros: it.targetMacros || null,

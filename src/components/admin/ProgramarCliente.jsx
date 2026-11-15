@@ -302,6 +302,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         ...(c.opcionesIdea || {}),
         [optIdx]: dish.nombre || "",
       };
+      c.opcionesPlatilloBase = {
+        ...(c.opcionesPlatilloBase || {}),
+        [optIdx]: {
+          nombre: dish.nombre || "",
+          texto: recipeText || dish.texto || "",
+          baseNames: ingNames,
+        },
+      };
 
       if (optIdx === 0) {
         c.ingredientesSeleccionados = ingNames;
@@ -357,6 +365,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       c.ingredientesEq = { ...(c.ingredientesEq || {}), [optIdx]: prevOptEq };
       c.opcionesPendienteIa = { ...(c.opcionesPendienteIa || {}), [optIdx]: true };
 
+      if (nextList.length === 0 && c.opcionesPlatilloBase?.[optIdx]) {
+        const nextBase = { ...(c.opcionesPlatilloBase || {}) };
+        delete nextBase[optIdx];
+        c.opcionesPlatilloBase = nextBase;
+      }
       if (optIdx === 0) {
         applyAutoMacrosToMealOption0(c, mealIdx);
       }
@@ -369,7 +382,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setDiaForm((p) => {
       const cs = [...p.comidas];
       const c = { ...cs[mealIdx] };
+      const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+      if (opts[optIdx] !== undefined) opts[optIdx] = "";
+      c.opciones = opts;
       if (optIdx === 0) {
+        c.opcion1 = "";
         c.ingredientesSeleccionados = [];
         c.smaeMap = {};
         c.calorias = 0;
@@ -389,6 +406,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
         ...(c.opcionesPendienteIa || {}),
         [optIdx]: true,
       };
+      if (c.opcionesPlatilloBase?.[optIdx]) {
+        const nextBase = { ...(c.opcionesPlatilloBase || {}) };
+        delete nextBase[optIdx];
+        c.opcionesPlatilloBase = nextBase;
+      }
       cs[mealIdx] = c;
       return { ...p, comidas: cs };
     });
@@ -2383,12 +2405,30 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           eq: Number(eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1),
         }));
         const computed = computeSmaeFromIngredientItems(structuredItems);
+        const baseMeta = c.opcionesPlatilloBase?.[optIdx] || null;
+        let baseDishPayload = null;
+        if (baseMeta && (baseMeta.nombre || baseMeta.texto)) {
+          const baseSet = new Set(baseMeta.baseNames || []);
+          const baseIngs = computed.details
+            .filter((d) => baseSet.has(d.nombre))
+            .map((d) => d.label || d.nombre);
+          const extraIngs = computed.details
+            .filter((d) => !baseSet.has(d.nombre))
+            .map((d) => d.label || d.nombre);
+          baseDishPayload = {
+            nombre: baseMeta.nombre,
+            texto: baseMeta.texto,
+            baseIngredientes: baseIngs.length > 0 ? baseIngs : computed.details.map((d) => d.label || d.nombre),
+            extraIngredientes: extraIngs,
+          };
+        }
         batchItemsToGenerate.push({
           key: `${mealIdx}_${optIdx}`,
           mealIdx,
           optIdx,
           mealNombre: c.nombre || `Comida ${mealIdx + 1}`,
-          dishIdea: c.opcionesIdea?.[optIdx] || c.nombre || "",
+          dishIdea: baseMeta?.nombre || c.opcionesIdea?.[optIdx] || c.nombre || "",
+          baseDish: baseDishPayload,
           ingredientes: computed.details.map((d) => d.label || d.nombre),
           targetMacros: {
             calorias: computed.totalKcal,
@@ -5776,17 +5816,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </span>
                                       )}
 
-                                      {mealSmaeEntries.length > 0 && (
-                                        <span
-                                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center gap-1 animate-in fade-in"
-                                          title="Equivalentes SMAE asignados a esta comida"
-                                        >
-                                          <span>🇲🇽</span>
-                                          <span>
-                                            {mealSmaeEntries.map((g) => `${mealSmaeDetected[g.id]} ${g.corto}`).join(" · ")}
-                                          </span>
-                                        </span>
-                                      )}
+
 
                                       {c.macrosCalculadosPorIa && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/70 flex items-center gap-1 animate-in fade-in">
@@ -5856,54 +5886,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   {/* Row 2: Opción Principal (A) con Switch Manual, Platillo e Ingredientes */}
                                   <div className="mb-3.5 p-0 border-0 bg-transparent md:p-3.5 md:rounded-xl md:bg-white md:border md:border-[#E2E8F0]">
                                     <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                                      <div className="flex items-center gap-2.5 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                           Opción Principal (A)
                                         </span>
-                                          {/* Switch Platillo Armado vs Catálogo SMAE vs Biblioteca */}
-                                          <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
-                                            <button
-                                              type="button"
-                                              onClick={() => setMealOptionMode(i, 0, "manual")}
-                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                ((c.modoEdicion === "platillo" || c.modoEdicion === "ingredientes") ? c.modoEdicion : "manual") === "manual"
-                                                  ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
-                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                              }`}
-                                            >
-                                              <span>🍽️</span>
-                                              <span>Platillo Armado</span>
-                                              {c.ingredientesSeleccionados?.length > 0 && (
-                                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
-                                                  {c.ingredientesSeleccionados.length}
-                                                </span>
-                                              )}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => setMealOptionMode(i, 0, "ingredientes")}
-                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                c.modoEdicion === "ingredientes"
-                                                  ? "bg-white text-emerald-700 shadow-2xs font-bold"
-                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                              }`}
-                                            >
-                                              <span>🥑</span>
-                                              <span>+ Catálogo SMAE</span>
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => setMealOptionMode(i, 0, "platillo")}
-                                              className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                c.modoEdicion === "platillo"
-                                                  ? "bg-white text-purple-700 shadow-2xs font-bold"
-                                                  : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                              }`}
-                                            >
-                                              <span>🍲</span>
-                                              <span>Biblioteca</span>
-                                            </button>
-                                          </div>
+                                        {c.opcionesPlatilloBase?.[0]?.nombre && (
+                                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                            <span>🍲</span>
+                                            <span>Receta base: {c.opcionesPlatilloBase[0].nombre}</span>
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
 
@@ -6046,10 +6038,25 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })()}
                                         </div>
                                       </div>
-                                    ) : c.modoEdicion === "ingredientes" ? (
-                                      /* Constructor por Ingredientes + Equivalentes SMAE Integrado */
-                                      <div className="space-y-2.5">
-                                        {/* Barra de búsqueda */}
+                                      ) : c.modoEdicion === "ingredientes" ? (
+                                        /* Constructor por Ingredientes + Equivalentes SMAE Integrado */
+                                        <div className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200 space-y-2.5 animate-in fade-in">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                              <span>🥑</span>
+                                              <span>Catálogo Oficial de Alimentos Equivalentes SMAE</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => setMealOptionMode(i, 0, "manual")}
+                                              className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg bg-white border border-gray-200 cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                                              title="Volver al platillo"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                              <span>Cerrar catálogo</span>
+                                            </button>
+                                          </div>
+                                          {/* Barra de búsqueda */}
                                         <div className="relative">
                                           <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                           <input
@@ -6101,13 +6108,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
                                                 {c.ingredientesSeleccionados.length} ingredientes / equivalentes SMAE seleccionados (ajusta las porciones con - / +):
                                               </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => updComida(i, "ingredientesSeleccionados", [])}
-                                                className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
-                                              >
-                                                Limpiar selección
-                                              </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => clearIngredientes(i, 0)}
+                                                  className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
+                                                >
+                                                  Limpiar selección
+                                                </button>
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
                                               {c.ingredientesSeleccionados.map((ing, ingIdx) => {
@@ -6304,39 +6311,58 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           const isPendingIa = Boolean(c.opcionesPendienteIa?.[0]) || (!String(opcionesList[0] || "").trim() && liveMainSel.details.length > 0);
                                           return (
                                             <div className="space-y-3">
-                                              {/* 1. Arriba: Alimentos SMAE agregados como elementos variables (- / +) */}
-                                              <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
-                                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                  <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
-                                                    <span>🥑</span>
-                                                    <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
-                                                  </span>
-                                                  <div className="flex items-center gap-1.5">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setMealOptionMode(i, 0, "ingredientes")}
-                                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                                                    >
-                                                      <Plus className="w-3 h-3" />
-                                                      <span>Agregar alimentos SMAE</span>
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setMealOptionMode(i, 0, "platillo")}
-                                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1 transition-colors cursor-pointer"
-                                                    >
-                                                      <span>🍲</span>
-                                                      <span>Cargar de Biblioteca</span>
-                                                    </button>
-                                                  </div>
-                                                </div>
-
+                                              {/* 1. Arriba: Estado inicial (2 caminos claros) vs Alimentos SMAE seleccionados */}
+                                              <div className="p-3.5 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
                                                 {liveMainSel.details.length === 0 ? (
-                                                  <div className="p-4 rounded-xl bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-[#6B7A8D]">
-                                                    Selecciona los ingredientes de esta comida desde <strong className="text-emerald-700">+ Catálogo SMAE</strong> o elige un platillo pre-armado de <strong className="text-purple-700">Biblioteca</strong>.
+                                                  <div className="p-4 rounded-xl bg-white/90 border border-emerald-200/80 text-center space-y-3">
+                                                    <p className="text-xs sm:text-sm font-bold text-[#0B1929]">
+                                                      ¿Cómo deseas construir el alimento de Comida {i + 1}{c.nombre?.trim() ? ` (${c.nombre.trim()})` : ""}?
+                                                    </p>
+                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setMealOptionMode(i, 0, "ingredientes")}
+                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                                                      >
+                                                        <span>🥑</span>
+                                                        <span>Construirlo con equivalentes SMAE</span>
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setMealOptionMode(i, 0, "platillo")}
+                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                                                      >
+                                                        <span>🍲</span>
+                                                        <span>Cargar receta prescrita de la Biblioteca</span>
+                                                      </button>
+                                                    </div>
                                                   </div>
                                                 ) : (
-                                                  <div className="space-y-1.5">
+                                                  <>
+                                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                      <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span>🥑</span>
+                                                        <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
+                                                      </span>
+                                                      <div className="flex items-center gap-2">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => clearIngredientes(i, 0)}
+                                                          className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 underline cursor-pointer"
+                                                        >
+                                                          Limpiar todo
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setMealOptionMode(i, 0, "ingredientes")}
+                                                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                        >
+                                                          <Plus className="w-3 h-3" />
+                                                          <span>Agregar más alimentos SMAE</span>
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
                                                     {liveMainSel.details.map((det, detIdx) => (
                                                       <div
                                                         key={`${det.nombre}_${detIdx}`}
@@ -6405,7 +6431,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         </div>
                                                       </div>
                                                     ))}
-                                                  </div>
+                                                    </div>
+                                                  </>
                                                 )}
                                               </div>
 
@@ -6455,9 +6482,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
                                                       <Sparkles className="w-3 h-3 text-purple-600" />
                                                       <span>Vista del Paciente (Receta IA · Solo Lectura)</span>
-                                                    </span>
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-purple-800 border border-purple-200">
-                                                      {isPendingIa ? "⚡ Se redactará al Guardar" : (opcionesList[0] ? "✓ Redactada con IA" : "Pendiente de alimentos")}
                                                     </span>
                                                   </div>
 
@@ -6580,58 +6604,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                                         return (
                                           <div key={actualIdx} className="p-3.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs">
-                                            {/* Header de la Opción Alternativa */}
-                                            <div className="flex items-center justify-between gap-2 mb-3">
-                                              <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                                                  Opción Alternativa ({optionLetter})
-                                                </span>
-
-                                                  {/* Switch Platillo Armado vs Catálogo SMAE vs Biblioteca */}
-                                                  <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0]">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setMealOptionMode(i, actualIdx, "manual")}
-                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                        modo === "manual"
-                                                          ? "bg-white text-[var(--brand-primary)] shadow-2xs font-bold"
-                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                      }`}
-                                                    >
-                                                      <span>🍽️</span>
-                                                      <span>Platillo Armado</span>
-                                                      {selectedIngs.length > 0 && (
-                                                        <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
-                                                          {selectedIngs.length}
-                                                        </span>
-                                                      )}
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
-                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                        modo === "ingredientes"
-                                                          ? "bg-white text-emerald-700 shadow-2xs font-bold"
-                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                      }`}
-                                                    >
-                                                      <span>🥑</span>
-                                                      <span>+ Catálogo SMAE</span>
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
-                                                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                                                        modo === "platillo"
-                                                          ? "bg-white text-purple-700 shadow-2xs font-bold"
-                                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
-                                                      }`}
-                                                    >
+                                              {/* Header de la Opción Alternativa */}
+                                              <div className="flex items-center justify-between gap-2 mb-3">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                                                    Opción Alternativa ({optionLetter})
+                                                  </span>
+                                                  {c.opcionesPlatilloBase?.[actualIdx]?.nombre && (
+                                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
                                                       <span>🍲</span>
-                                                      <span>Biblioteca</span>
-                                                    </button>
-                                                  </div>
-                                              </div>
+                                                      <span>Receta base: {c.opcionesPlatilloBase[actualIdx].nombre}</span>
+                                                    </span>
+                                                  )}
+                                                </div>
 
                                               {/* Botón Quitar Opción Colapsable */}
                                               <button
@@ -6781,10 +6766,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })()}
                                                 </div>
                                               </div>
-                                            ) : modo === "ingredientes" ? (
-                                              /* Constructor por Ingredientes + Equivalentes SMAE */
-                                              <div className="space-y-2.5">
-                                                {/* Barra de búsqueda de ingredientes */}
+                                              ) : modo === "ingredientes" ? (
+                                                /* Constructor por Ingredientes + Equivalentes SMAE */
+                                                <div className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200 space-y-2.5 animate-in fade-in">
+                                                  <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                                      <span>🥑</span>
+                                                      <span>Catálogo SMAE (Opción {optionLetter})</span>
+                                                    </span>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setMealOptionMode(i, actualIdx, "manual")}
+                                                      className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg bg-white border border-gray-200 cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                                                    >
+                                                      <X className="w-3.5 h-3.5" />
+                                                      <span>Cerrar catálogo</span>
+                                                    </button>
+                                                  </div>
+                                                  {/* Barra de búsqueda de ingredientes */}
                                                 <div className="relative">
                                                   <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                                   <input
@@ -7031,36 +7030,56 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   const isAltPendingIa = Boolean(c.opcionesPendienteIa?.[actualIdx]) || (!String(altText || "").trim() && liveAltSel.details.length > 0);
                                                   return (
                                                     <div className="space-y-2.5">
-                                                      <div className="p-2.5 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2">
-                                                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                          <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider">
-                                                            🥑 Alimentos Opción {optionLetter} ({liveAltSel.details.length})
-                                                          </span>
-                                                          <div className="flex items-center gap-1.5">
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
-                                                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer"
-                                                            >
-                                                              <Plus className="w-3 h-3" />
-                                                              <span>Agregar alimentos SMAE</span>
-                                                            </button>
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
-                                                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1 cursor-pointer"
-                                                            >
-                                                              <span>🍲</span>
-                                                              <span>Biblioteca</span>
-                                                            </button>
-                                                          </div>
-                                                        </div>
+                                                      <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
                                                         {liveAltSel.details.length === 0 ? (
-                                                          <div className="p-3 rounded-lg bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-[#6B7A8D]">
-                                                            Selecciona alimentos desde <strong className="text-emerald-700">+ Catálogo SMAE</strong> o <strong className="text-purple-700">Biblioteca</strong> para la Opción {optionLetter}.
+                                                          <div className="p-3.5 rounded-xl bg-white/90 border border-emerald-200/80 text-center space-y-2.5">
+                                                            <p className="text-xs font-bold text-[#0B1929]">
+                                                              ¿Cómo deseas construir la Opción Alternativa ({optionLetter})?
+                                                            </p>
+                                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
+                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                                              >
+                                                                <span>🥑</span>
+                                                                <span>Construirlo con equivalentes SMAE</span>
+                                                              </button>
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
+                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                                              >
+                                                                <span>🍲</span>
+                                                                <span>Cargar receta prescrita de la Biblioteca</span>
+                                                              </button>
+                                                            </div>
                                                           </div>
                                                         ) : (
-                                                          <div className="space-y-1.5">
+                                                          <>
+                                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                              <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider">
+                                                                🥑 Alimentos Opción {optionLetter} ({liveAltSel.details.length})
+                                                              </span>
+                                                              <div className="flex items-center gap-2">
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => clearIngredientes(i, actualIdx)}
+                                                                  className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 underline cursor-pointer"
+                                                                >
+                                                                  Limpiar todo
+                                                                </button>
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
+                                                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer"
+                                                                >
+                                                                  <Plus className="w-3 h-3" />
+                                                                  <span>Agregar más alimentos SMAE</span>
+                                                                </button>
+                                                              </div>
+                                                            </div>
+                                                            <div className="space-y-1.5">
                                                             {liveAltSel.details.map((det, detIdx) => (
                                                               <div
                                                                 key={`${det.nombre}_${detIdx}`}
@@ -7115,7 +7134,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                                 </div>
                                                               </div>
                                                             ))}
-                                                          </div>
+                                                            </div>
+                                                          </>
                                                         )}
                                                       </div>
 
@@ -7124,9 +7144,6 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
                                                             <Sparkles className="w-3 h-3 text-purple-600" />
                                                             <span>Vista del Paciente Opción {optionLetter} (Solo Lectura)</span>
-                                                          </span>
-                                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-purple-800 border border-purple-200">
-                                                            {isAltPendingIa ? "⚡ Se redactará al Guardar" : (altText ? "✓ Redactada con IA" : "Pendiente")}
                                                           </span>
                                                         </div>
                                                         {altText && !isAltPendingIa ? (
