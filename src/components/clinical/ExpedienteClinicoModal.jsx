@@ -318,7 +318,7 @@ export default function ExpedienteClinicoModal({
           </button>
         </div>
 
-        {/* Sub-tabs de navegación de las 2 áreas del Expediente Atemporal */}
+        {/* Sub-tabs de navegación de las 2 áreas del Expediente Clínico */}
         <div className="px-4 py-2.5 md:px-5 md:py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-1.5 w-full sm:w-auto">
             {[
@@ -352,7 +352,7 @@ export default function ExpedienteClinicoModal({
           {historiaStep === "perfil" && (
             <div className="space-y-4">
               <div className="bg-transparent border-0 rounded-none p-0 md:bg-[#F8FAFC] md:border md:border-[#E2E8F0] md:rounded-2xl md:p-4 space-y-3.5">
-                <span className="block text-xs font-bold text-[#0B1929] uppercase tracking-wider">
+                <span className="block text-xs font-bold text-[#0B1929]">
                   Ficha de Identificación del Paciente
                 </span>
                 
@@ -488,32 +488,74 @@ export default function ExpedienteClinicoModal({
                 />
               </div>
 
-              {/* Alergias y Digestión */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Alergias o intolerancias alimentarias crónicas
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.alergias_intolerancias || ""}
-                    onChange={(e) => updAnamnesis("alergias_intolerancias", e.target.value)}
-                    placeholder="Ej. Lactosa, mariscos, cacahuate, celiaquía/gluten..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                    Síntomas digestivos o gastrointestinales crónicos
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.sintomas_gi || ""}
-                    onChange={(e) => updAnamnesis("sintomas_gi", e.target.value)}
-                    placeholder="Ej. Normal, reflujo gastroesofágico frecuente, colitis, estreñimiento..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
+              {/* Salud hormonal y ciclo menstrual */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Salud hormonal y ciclo menstrual (si aplica)
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.salud_hormonal_ciclo || ""}
+                  onChange={(e) => updAnamnesis("salud_hormonal_ciclo", e.target.value)}
+                  placeholder="Ej. Ciclo regular de 28-30 días, SOP, uso de anticonceptivos hormonales, menopausia..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Historial de peso y dietas previas */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Historial de peso y dietas previas
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.historial_dietas_peso || ""}
+                  onChange={(e) => updAnamnesis("historial_dietas_peso", e.target.value)}
+                  placeholder="Ej. Ha seguido dietas keto o hipocalóricas con rebote, peso habitual adulto 75-80 kg..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Horas y calidad de sueño */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Horas y calidad habitual de sueño
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.calidad_sueno || ""}
+                  onChange={(e) => updAnamnesis("calidad_sueno", e.target.value)}
+                  placeholder="Ej. 6-7 horas de sueño continuo, turnos nocturnos rotativos, insomnio ocasional..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Alergias o intolerancias */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Alergias o intolerancias alimentarias crónicas
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.alergias_intolerancias || ""}
+                  onChange={(e) => updAnamnesis("alergias_intolerancias", e.target.value)}
+                  placeholder="Ej. Lactosa, mariscos, cacahuate, celiaquía/gluten..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
+              </div>
+
+              {/* Síntomas digestivos */}
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Síntomas digestivos o gastrointestinales crónicos
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.sintomas_gi || ""}
+                  onChange={(e) => updAnamnesis("sintomas_gi", e.target.value)}
+                  placeholder="Ej. Normal, reflujo gastroesofágico frecuente, colitis, estreñimiento..."
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                />
               </div>
 
               {/* Cirugías o lesiones */}

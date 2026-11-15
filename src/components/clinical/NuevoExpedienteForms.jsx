@@ -461,7 +461,7 @@ export function NuevoExpedienteForms({
                   Llenar en consulta ahora
                 </h3>
                 <p className="text-xs text-[#6B7A8D] leading-relaxed">
-                  Completa los datos de identificación y antecedentes médicos inamovibles. Podrás guardar borrador en cualquier momento.
+                  Completa los datos de identificación y antecedentes médicos y clínicos. Podrás guardar borrador en cualquier momento.
                 </p>
               </div>
               <div className="mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--brand-primary)]">
@@ -528,12 +528,12 @@ export function NuevoExpedienteForms({
             ¡Cuestionario solicitado a {cliente.nombre}!
           </h2>
           <p className="text-sm text-[#6B7A8D] max-w-md mx-auto mb-6 leading-relaxed">
-            Se ha activado la solicitud en su aplicación FLUX. El paciente podrá responder sus datos personales y antecedentes médicos inamovibles desde su dispositivo.
+            Se ha activado la solicitud en su aplicación FLUX. El paciente podrá responder sus datos personales y antecedentes médicos y clínicos desde su dispositivo.
           </p>
 
           {/* Tarjeta de invitación WhatsApp */}
           <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-[#0B1929]">
+            <div className="flex items-center gap-2 mb-2 text-xs font-bold text-[#0B1929]">
               <MessageCircle className="w-4 h-4 text-[#25D366]" />
               <span>Recordatorio por WhatsApp (Recomendado)</span>
             </div>
@@ -674,7 +674,7 @@ export function NuevoExpedienteForms({
   }
 
   // ══════════════════════════════════════════════════════════════
-  // FORMULARIO DE 2 PÁGINAS ATEMPORALES (HISTORIAL CLÍNICO ESTRUCTURAL)
+  // FORMULARIO DE 2 PÁGINAS (HISTORIAL CLÍNICO Y ANTECEDENTES)
   // ══════════════════════════════════════════════════════════════
   const progressPct = step === 1 ? 50 : 100;
 
@@ -684,7 +684,7 @@ export function NuevoExpedienteForms({
       {/* ── Top Bar con Barra de Progreso ── */}
       <div className="bg-white rounded-none md:rounded-2xl border-b md:border border-[#E2E8F0] px-4 py-2.5 sm:p-5 shadow-none md:shadow-2xs">
         <div className="flex items-center justify-between gap-3 mb-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)] bg-blue-50 px-2.5 py-0.5 rounded-lg">
+          <span className="text-xs font-semibold text-[var(--brand-primary)] bg-blue-50 px-2.5 py-0.5 rounded-lg">
             Paso {step} de 2
           </span>
 
@@ -703,7 +703,7 @@ export function NuevoExpedienteForms({
 
         <h2 className="text-sm sm:text-base font-bold text-[#0B1929] mb-2 sm:mb-3">
           {step === 1 && (isPersonal ? "Tus Datos y Contacto" : "Ficha de Identificación del Paciente")}
-          {step === 2 && (isPersonal ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos Inamovibles")}
+          {step === 2 && (isPersonal ? "Tu Historial Clínico y Salud" : "Antecedentes Médicos y Clínicos")}
         </h2>
 
         {/* Barra de progreso visual */}
@@ -749,14 +749,14 @@ export function NuevoExpedienteForms({
               <p className="text-[11px] sm:text-xs text-[#6B7A8D]">
                 {isPersonal
                   ? "Información básica y biológica que servirá de base permanente para tu seguimiento."
-                  : "Información demográfica, de contacto y perfil biológico inmutable del paciente."}
+                  : "Información demográfica, de contacto y perfil biológico del paciente."}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  Nombre Completo
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Nombre completo
                 </label>
                 <input
                   type="text"
@@ -768,8 +768,8 @@ export function NuevoExpedienteForms({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  Correo Electrónico (Inamovible)
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Correo electrónico
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -783,7 +783,7 @@ export function NuevoExpedienteForms({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
                   Teléfono / WhatsApp
                 </label>
                 <div className="relative">
@@ -799,8 +799,8 @@ export function NuevoExpedienteForms({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  Género Biológico
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  Género biológico
                 </label>
                 <CustomSelect
                   value={perfil.sexo}
@@ -812,8 +812,8 @@ export function NuevoExpedienteForms({
 
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">
-                    Fecha de Nacimiento
+                  <label className="text-xs font-bold text-[#0B1929]">
+                    Fecha de nacimiento
                   </label>
                   {edadCalc !== null && (
                     <span className="text-xs font-extrabold text-[var(--brand-primary)] bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
@@ -843,21 +843,21 @@ export function NuevoExpedienteForms({
             <div>
               <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mb-0.5 sm:mb-1 flex items-center gap-2">
                 <HeartPulse className="w-4 h-4 text-red-500" />
-                {isPersonal ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos Inamovibles"}
+                {isPersonal ? "Tu Historial Médico y de Salud" : "Antecedentes Médicos y Clínicos"}
               </h3>
               <p className="text-[11px] sm:text-xs text-[#6B7A8D]">
                 {isPatientMode
                   ? "Esta información le permite a tu especialista cuidar tu salud y adaptar tus requerimientos permanentemente."
                   : isMiPlan
                   ? "Esta información sirve de base permanente para cuidar tu salud y adaptar tus requerimientos permanentemente."
-                  : "Condiciones de salud atemporales que guían la seguridad clínica en todos sus ciclos."}
+                  : "Condiciones de salud que guían la seguridad clínica en todos sus ciclos."}
               </p>
             </div>
 
             <div className="space-y-3 sm:space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPersonal ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o Diagnósticos Médicos"}
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Padeces alguna enfermedad, condición o diagnóstico médico?" : "Patologías o diagnósticos médicos"}
                 </label>
                 <textarea
                   rows={2}
@@ -869,8 +869,8 @@ export function NuevoExpedienteForms({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPersonal ? "Antecedentes familiares de salud (Padres o abuelos con diabetes, hipertensión, etc.)" : "Antecedentes Heredo-Familiares"}
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "Antecedentes familiares de salud (Padres o abuelos con diabetes, hipertensión, etc.)" : "Antecedentes heredo-familiares"}
                 </label>
                 <textarea
                   rows={2}
@@ -882,8 +882,8 @@ export function NuevoExpedienteForms({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPersonal ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación Actual y/o Suplementos Prescritos"}
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Tomas algún medicamento recetado o suplemento actualmente?" : "Medicación actual y/o suplementos prescritos"}
                 </label>
                 <textarea
                   rows={2}
@@ -894,37 +894,74 @@ export function NuevoExpedienteForms({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPersonal ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o Intolerancias Alimentarias Crónicas"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.alergias_intolerancias || ""}
-                    onChange={(e) => updAnam("alergias_intolerancias", e.target.value)}
-                    className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPersonal ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPersonal ? "¿Sueles presentar molestias digestivas crónicas?" : "Síntomas Gastrointestinales Crónicos"}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={anamnesis.sintomas_gi || ""}
-                    onChange={(e) => updAnam("sintomas_gi", e.target.value)}
-                    className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPersonal ? "Ej. Reflujo nocturno, distensión vespertina, estreñimiento frecuente..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Presentas alguna condición hormonal o particularidad en tu ciclo menstrual? (Si aplica)" : "Salud hormonal y ciclo menstrual (si aplica)"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.salud_hormonal_ciclo || ""}
+                  onChange={(e) => updAnam("salud_hormonal_ciclo", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. Ciclo regular de 28-30 días, anticonceptivos hormonales, SOP, menopausia, no aplica..." : "Ej. Ciclo regular de 28-30 días, SOP, uso de anticonceptivos hormonales, menopausia..."}
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPersonal ? "¿Has tenido cirugías previas o tienes alguna lesión física crónica?" : "Cirugías Previas o Lesiones Físicas Crónicas"}
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Has realizado planes de alimentación o dietas previas? ¿Cómo ha sido tu historial de peso?" : "Historial de peso y dietas previas"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.historial_dietas_peso || ""}
+                  onChange={(e) => updAnam("historial_dietas_peso", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. He seguido dietas bajas en carbohidratos con efecto rebote, peso habitual adulto 75-80 kg..." : "Ej. Ha seguido dietas keto o hipocalóricas con rebote, peso habitual adulto 75-80 kg..."}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Cuántas horas sueles dormir habitualmente y cómo calificarías tu descanso?" : "Horas y calidad habitual de sueño"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.calidad_sueno || ""}
+                  onChange={(e) => updAnam("calidad_sueno", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. 6-7 horas de sueño continuo, turnos rotativos, insomnio ocasional..." : "Ej. 6-7 horas de sueño continuo, turnos nocturnos rotativos, insomnio ocasional..."}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Tienes alguna alergia o intolerancia a alimentos?" : "Alergias o intolerancias alimentarias crónicas"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={anamnesis.alergias_intolerancias || ""}
+                  onChange={(e) => updAnam("alergias_intolerancias", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. Intolerante a la lactosa, alergia a mariscos, frutos secos, ninguna..." : "Ej. Lactosa, mariscos, frutos secos, gluten..."}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Sueles presentar molestias digestivas crónicas?" : "Síntomas gastrointestinales crónicos"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={anamnesis.sintomas_gi || ""}
+                  onChange={(e) => updAnam("sintomas_gi", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. Reflujo nocturno, distensión vespertina, estreñimiento frecuente..." : "Ej. Reflujo nocturno, distensión vespertina, estreñimiento..."}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Has tenido cirugías previas o tienes alguna lesión física crónica?" : "Cirugías previas o lesiones físicas crónicas"}
                 </label>
                 <input
                   type="text"
@@ -935,37 +972,35 @@ export function NuevoExpedienteForms({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPersonal ? "¿A qué te dedicas y cómo es tu actividad laboral habitual?" : "Ocupación y Nivel de Actividad Laboral"}
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.ocupacion_actividad || ""}
-                    onChange={(e) => updAnam("ocupacion_actividad", e.target.value)}
-                    className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder={isPersonal ? "Ej. Oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Trabajo activo"}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                    {isPersonal ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo Habitual de Alcohol / Tabaco"}
-                  </label>
-                  <input
-                    type="text"
-                    value={anamnesis.consumo_alcohol_tabaco || ""}
-                    onChange={(e) => updAnam("consumo_alcohol_tabaco", e.target.value)}
-                    className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                    placeholder="Ej. Social fines de semana (cerveza) / No fuma"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿A qué te dedicas y cómo es tu actividad laboral habitual?" : "Ocupación y nivel de actividad laboral"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.ocupacion_actividad || ""}
+                  onChange={(e) => updAnam("ocupacion_actividad", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder={isPersonal ? "Ej. Oficina sentado 8h / Trabajo activo de pie / Estudiante..." : "Ej. Ingeniero de software (sedentario 8h) / Trabajo activo"}
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">
-                  {isPersonal ? "¿Algún antecedente o comentario adicional importante para tu expediente?" : "Notas y Acuerdos Clínicos Permanentes"}
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Consumes alcohol o tabaco en ocasiones? (Opcional)" : "Consumo habitual de alcohol / tabaco"}
+                </label>
+                <input
+                  type="text"
+                  value={anamnesis.consumo_alcohol_tabaco || ""}
+                  onChange={(e) => updAnam("consumo_alcohol_tabaco", e.target.value)}
+                  className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  placeholder="Ej. Social fines de semana (cerveza) / No fuma"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                  {isPersonal ? "¿Algún antecedente o comentario adicional importante para tu expediente?" : "Notas y acuerdos clínicos permanentes"}
                 </label>
                 <textarea
                   rows={2}

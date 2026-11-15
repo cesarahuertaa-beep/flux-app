@@ -1058,16 +1058,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     }
   };
 
+  const activeSpecialistId = selected?.nutriologo_id || profileId || null;
+  useEffect(() => {
+    historialLoadedRef.current = false;
+  }, [activeSpecialistId]);
+
   const loadHistorial = useCallback(async () => {
     if (!clientes || clientes.length === 0 || historialLoadedRef.current) return;
+    const ownClientes = activeSpecialistId
+      ? clientes.filter((c) => String(c.nutriologo_id) === String(activeSpecialistId))
+      : clientes;
+    if (ownClientes.length === 0) {
+      setHistorialDias([]);
+      setHistorialRutinas([]);
+      return;
+    }
     historialLoadedRef.current = true;
     try {
-      const ids = clientes.map(c => c.id).join(",");
+      const ids = ownClientes.map(c => c.id).join(",");
       const [hr, hn] = await Promise.all([
-        dbGet(`rutinas?cliente_id=eq.${selected?.id || clientes[0].id}`).catch(() => []),
+        dbGet(`rutinas?cliente_id=eq.${selected?.id || ownClientes[0].id}`).catch(() => []),
         dbGet(`nutricion?cliente_id=in.(${ids})`).catch(() => []),
       ]);
-      // Cargar todas las rutinas en segundo plano sin bloquear
+      // Cargar todas las rutinas del especialista en segundo plano sin bloquear
       dbGet(`rutinas?cliente_id=in.(${ids})`).then(allHr => {
         if (allHr) setHistorialRutinas(allHr);
       }).catch(() => {});
@@ -1087,7 +1100,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     } catch(e) { 
       historialLoadedRef.current = false;
     }
-  }, [clientes, selected?.id]);
+  }, [clientes, selected?.id, activeSpecialistId]);
 
   const formatWeightForInput = (val, unit) => {
     if ((unit || "kg") === "lb" && val && !isNaN(val)) {
@@ -1153,26 +1166,59 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     try {
       const coms = await dbGet(`comidas?dia_id=eq.${did}&order=orden.asc`);
       const meta = parseDiaMetadata(d.dia || "");
+      const importedEqMap = {};
+      const mappedComidas = (coms || []).map((x, mealIdx) => {
+        const { opciones: structuredOpts, ingredientesPorOpcion } = parseMealOptionsStructured(x);
+        const extractedMealSmae = extractSmaeMapFromMealText(x.opcion1 || "");
+        const opcionesIngredientes = {};
+        const ingredientesEq = {};
+        const opcionesPendienteIa = {};
+        const opcionesIdea = {};
+
+        structuredOpts.forEach((optTxt, optIdx) => {
+          const listForOpt = ingredientesPorOpcion[optIdx] || [];
+          opcionesIngredientes[optIdx] = listForOpt.map((it) => it.nombre);
+          const eqObj = {};
+          listForOpt.forEach((it) => {
+            eqObj[it.nombre] = it.eq;
+            importedEqMap[`${mealIdx}_${optIdx}_${it.nombre}`] = it.eq;
+          });
+          ingredientesEq[optIdx] = eqObj;
+          opcionesPendienteIa[optIdx] = false;
+          if (typeof optTxt === "string" && optTxt.includes("\n\n")) {
+            const firstLine = optTxt.split("\n\n")[0].trim();
+            if (firstLine && firstLine.length <= 90 && !firstLine.startsWith("•")) {
+              opcionesIdea[optIdx] = firstLine;
+            }
+          }
+        });
+
+        const copy = {
+          ...x,
+          _dndId: Math.random().toString(36).slice(2, 9),
+          opciones: structuredOpts.length > 0 ? structuredOpts : [extractedMealSmae.cleanText || x.opcion1 || ""],
+          ingredientesSeleccionados: opcionesIngredientes[0] || [],
+          opcionesIngredientes,
+          ingredientesEq,
+          opcionesPendienteIa,
+          opcionesIdea,
+          smaeMap: extractedMealSmae.smaeMap || {},
+          alertaClinica: null,
+        };
+        delete copy.id;
+        delete copy.dia_id;
+        return copy;
+      });
+      setIngredientEqMap((prev) => ({ ...prev, ...importedEqMap }));
       setDiaForm(p => ({
         ...p,
         dia: (d.dia || "") + " (Copia)",
         diasSeleccionados: p.diasSeleccionados?.length > 0 ? p.diasSeleccionados : (meta.dayCode && meta.dayCode !== "S/D" ? [meta.dayCode] : []),
-        tituloPersonalizado: meta.titulo ? `${meta.titulo} (Copia)` : "Día importado",
+        tituloPersonalizado: meta.titulo || "",
         aguaLitros: meta.agua || p.aguaLitros || "",
         suplementos: meta.suplementos || p.suplementos || "",
         smaeMap: meta.smae ? parseSmaeString(meta.smae) : (p.smaeMap || {}),
-        comidas: (coms || []).map(x => {
-          const parsedOpts = parseMealOptions(x);
-          const copy = { 
-            ...x, 
-            _dndId: Math.random().toString(36).slice(2, 9),
-            opciones: parsedOpts.length > 0 ? parsedOpts : [x.opcion1 || ""],
-            alertaClinica: null
-          };
-          delete copy.id;
-          delete copy.dia_id;
-          return copy;
-        })
+        comidas: mappedComidas,
       }));
       setMsg(<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Día cargado del historial</div>);
     } catch(err) { 
@@ -5443,10 +5489,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                         placeholder="-- Seleccionar día preexistente --"
                         options={[
                           { value: "", label: "-- Seleccionar día preexistente --" },
-                          ...historialDias.map(hd => ({
-                            value: hd.id,
-                            label: `${(hd.dia || "").split('|').length > 1 ? (hd.dia || "").split('|').join(' - ') : (hd.dia || "Sin título")} (de ${getClientName(hd.cliente_id)})`
-                          }))
+                          ...historialDias.map(hd => {
+                            const meta = parseDiaMetadata(hd.dia || "");
+                            const dayCode = (meta.dayCode && meta.dayCode !== "S/D") ? meta.dayCode.trim().toUpperCase() : "S/D";
+                            const titulo = (meta.titulo || "").trim();
+                            const patientName = getClientName(hd.cliente_id);
+                            return {
+                              value: hd.id,
+                              label: titulo
+                                ? `${dayCode} - ${titulo} - ${patientName}`
+                                : `${dayCode} - ${patientName}`,
+                            };
+                          })
                         ]}
                       />
                     </div>
@@ -7451,10 +7505,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                       placeholder="-- Seleccionar rutina preexistente --"
                       options={[
                         { value: "", label: "-- Seleccionar rutina preexistente --" },
-                        ...historialRutinas.map(hr => ({
-                          value: hr.id,
-                          label: `${(hr.nombre || "").split('|').length > 1 ? (hr.nombre || "").split('|').join(' - ') : (hr.nombre || "Sin título")} (de ${getClientName(hr.cliente_id)})`
-                        }))
+                        ...historialRutinas.map(hr => {
+                          const rawParts = String(hr.nombre || "").split("|");
+                          const firstPart = (rawParts[0] || "").trim().toUpperCase();
+                          const isDayCode = ["LUN","MAR","MIE","JUE","VIE","SAB","DOM","S/D"].includes(firstPart);
+                          const dayCode = isDayCode ? firstPart : "S/D";
+                          const titulo = (isDayCode ? rawParts.slice(1).join(" ").trim() : String(hr.nombre || "").trim());
+                          const patientName = getClientName(hr.cliente_id);
+                          return {
+                            value: hr.id,
+                            label: titulo
+                              ? `${dayCode} - ${titulo} - ${patientName}`
+                              : `${dayCode} - ${patientName}`,
+                          };
+                        })
                       ]}
                     />
                   </div>

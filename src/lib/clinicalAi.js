@@ -513,13 +513,16 @@ export async function auditMacroPrescriptionWithAi({
 Tu tarea es AUDITAR CON RIGOR CLÍNICO Y PRECISIÓN LA PRESCRIPCIÓN ENERGÉTICA Y DE MACRONUTRIENTES para un paciente real.
 
 ═══════════════════════════════════════════════════════════
-1. EXPEDIENTE MÉDICO CLÍNICO (Atemporal / Antecedentes)
+1. EXPEDIENTE MÉDICO CLÍNICO (Antecedentes)
 ═══════════════════════════════════════════════════════════
 - Paciente: ${cliente.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo) ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
 - Patologías y diagnósticos: ${anamnesis.patologias || "Ninguna reportada"}
 - Alergias e intolerancias alimentarias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Medicación y suplementación: ${anamnesis.medicacion_suplementos || "Ninguna"}
-- Antecedentes familiares y lesiones: ${anamnesis.antecedentes_familiares || "Ninguno"} / ${anamnesis.cirugias_lesiones || "Ninguna"}
+- Antecedentes familiares y lesiones: ${anamnesis.antecedentes_heredofamiliares || anamnesis.antecedentes_familiares || "Ninguno"} / ${anamnesis.cirugias_lesiones || "Ninguna"}
+- Salud hormonal y ciclo menstrual: ${anamnesis.salud_hormonal_ciclo || "No especificada / No aplica"}
+- Historial de peso y dietas previas: ${anamnesis.historial_dietas_peso || "No especificado"}
+- Sueño y ritmo de descanso: ${anamnesis.calidad_sueno || "No especificado"}
 
 ═══════════════════════════════════════════════════════════
 2. PASO 1: CHECK-IN Y SENSACIONES ACTUALES DEL PACIENTE

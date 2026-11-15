@@ -109,7 +109,7 @@ export function CustomSelect({
                     : "text-[#0B1929] hover:bg-gray-50"
                 }`}
               >
-                <span className="truncate">{opt.label}</span>
+                <span className="line-clamp-2 whitespace-normal leading-snug">{opt.label}</span>
                 {isSelected && (
                   <Check className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0 ml-2" />
                 )}

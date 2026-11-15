@@ -3,13 +3,16 @@ import { dbGet, dbPatch, storageUpload, storageRemoveMany, broadcastTableChange,
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export const EMPTY_ANAMNESIS = {
-  // Antecedentes Médicos y Patológicos Atemporales
+  // Antecedentes Médicos y Clínicos
   patologias: "",
   antecedentes_heredofamiliares: "",
   medicacion_suplementos: "",
   alergias_intolerancias: "",
   sintomas_gi: "",
   cirugias_lesiones: "",
+  salud_hormonal_ciclo: "",
+  historial_dietas_peso: "",
+  calidad_sueno: "",
   ocupacion_actividad: "",
   consumo_alcohol_tabaco: "",
   notas_consulta: "",
