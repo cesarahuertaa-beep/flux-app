@@ -922,14 +922,14 @@ export function NuevoExpedienteForms({
 
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  {isPersonal ? "¿Cuántas horas sueles dormir habitualmente y cómo calificarías tu descanso?" : "Horas y calidad habitual de sueño"}
+                  {isPersonal ? "¿Presentas trastornos del sueño, insomnio frecuente o trabajas en turnos nocturnos?" : "Trastornos del sueño o turnos laborales"}
                 </label>
                 <input
                   type="text"
                   value={anamnesis.calidad_sueno || ""}
                   onChange={(e) => updAnam("calidad_sueno", e.target.value)}
                   className="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
-                  placeholder={isPersonal ? "Ej. 6-7 horas de sueño continuo, turnos rotativos, insomnio ocasional..." : "Ej. 6-7 horas de sueño continuo, turnos nocturnos rotativos, insomnio ocasional..."}
+                  placeholder={isPersonal ? "Ej. Ninguno, insomnio crónico, apnea del sueño, turnos nocturnos rotativos..." : "Ej. Sin trastornos, apnea del sueño, insomnio crónico, turnos nocturnos rotativos..."}
                 />
               </div>
 

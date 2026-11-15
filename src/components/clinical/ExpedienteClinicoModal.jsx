@@ -516,16 +516,16 @@ export default function ExpedienteClinicoModal({
                 />
               </div>
 
-              {/* Horas y calidad de sueño */}
+              {/* Trastornos del sueño o turnos laborales */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1929] mb-1">
-                  Horas y calidad habitual de sueño
+                  Trastornos del sueño o turnos laborales
                 </label>
                 <input
                   type="text"
                   value={anamnesis.calidad_sueno || ""}
                   onChange={(e) => updAnamnesis("calidad_sueno", e.target.value)}
-                  placeholder="Ej. 6-7 horas de sueño continuo, turnos nocturnos rotativos, insomnio ocasional..."
+                  placeholder="Ej. Sin trastornos, apnea del sueño, insomnio crónico, turnos nocturnos rotativos..."
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-sm text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>

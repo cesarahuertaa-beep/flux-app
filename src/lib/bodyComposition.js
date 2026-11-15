@@ -959,7 +959,27 @@ export function generateSmartMacroPrescription({
   let goalPct = goalInfo.pct;
 
   // 4. CÁLCULO MATEMÁTICO PURO (ESTÁNDAR CLÍNICO ESTRICTO)
-  // Basado exclusivamente en TMB teórica × FAF × Preset de objetivo matemático
+  // Basado en TMB teórica × FAF × Preset de objetivo, ajustado por composición corporal (Peso Ajustado en obesidad)
+  const imc = peso > 0 && estatura > 0 ? peso / Math.pow(estatura / 100, 2) : 0;
+  const hasHighFat =
+    (sexo === "M" && grasaPct >= 28) ||
+    (sexo === "F" && grasaPct >= 35) ||
+    imc >= 30;
+
+  let baseProtGKg = goalInfo.pct < 0 ? 1.8 : goalInfo.pct > 0 ? 1.9 : 1.5;
+  let baseFatGKg = goalInfo.pct < 0 ? 0.85 : 0.9;
+
+  if (hasHighFat && peso > 0) {
+    // En obesidad o adiposidad elevada se evita sobrestimar g/kg sobre peso total usando Peso Ajustado (Devine + 0.25)
+    const idealWeight = (sexo === "F" ? 45.5 : 50) + 0.91 * Math.max(0, estatura - 152.4);
+    const adjustedWeight = idealWeight > 0 && peso > idealWeight
+      ? idealWeight + 0.25 * (peso - idealWeight)
+      : peso * 0.85;
+    const refWeight = mlg > 0 ? Math.max(adjustedWeight, mlg * 1.15) : adjustedWeight;
+    baseProtGKg = Number(((refWeight * baseProtGKg) / peso).toFixed(2));
+    baseFatGKg = Number(((refWeight * baseFatGKg) / peso).toFixed(2));
+  }
+
   const calcMatematico = calculateEnergyPrescription({
     formula,
     peso,
@@ -971,8 +991,8 @@ export function generateSmartMacroPrescription({
     faf: fafInfo.value,
     goalPct: goalInfo.pct,
     mode: "g_kg",
-    protGKg: 2.0,
-    fatGKg: 0.9,
+    protGKg: baseProtGKg,
+    fatGKg: baseFatGKg,
   });
 
   // Contexto del paciente para auditoría real por IA generativa (Gemini)

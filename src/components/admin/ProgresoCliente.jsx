@@ -3479,139 +3479,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </div>
                 </div>
 
-                {/* Paso 4: Enfoque u Objetivos del Paciente */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                        <Target className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[var(--brand-primary)] uppercase tracking-wider">
-                            Paso 4
-                          </span>
-                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
-                            Enfoque u Objetivos del Paciente
-                          </h3>
-                        </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
-                          Parámetros dinámicos exclusivos del plan actual para fijar el programa calórico y de macronutrientes de acuerdo a los objetivos generales del paciente.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Objetivo de la Etapa */}
-                  <div className="pt-1">
-                    <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
-                      Objetivo Nutricional de este Ciclo
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {GOAL_PRESETS.map((g) => {
-                        const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
-                        return (
-                          <button
-                            key={g.id}
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && updForm("eval_objetivo", g.id)}
-                            className={`text-left p-2.5 rounded-xl border transition-all ${
-                              isReadOnly ? "cursor-default" : "cursor-pointer"
-                            } ${
-                              isSelected
-                                ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
-                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                                {g.title}
-                              </span>
-                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                                isSelected
-                                  ? "bg-[var(--brand-primary)] text-white"
-                                  : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
-                              }`}>
-                                {g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`}
-                              </span>
-                            </div>
-                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
-                              {g.desc}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Factor de Actividad Física (FAF) Proyectado conectado a Entrenamiento */}
-                  <div className="pt-2 border-t border-[#F0F4FA]">
-                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                      <label className="block text-xs font-bold text-[#6B7A8D]">
-                        Factor de Actividad Física (FAF) Proyectado
-                      </label>
-                      {suggestedFafFromTraining.days > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
-                          <Dumbbell className="w-3 h-3" />
-                          <span>Calculado de entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                      {ACTIVITY_FACTORS.map((f) => {
-                        const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
-                        const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
-                        return (
-                          <button
-                            key={f.value}
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && updForm("eval_faf", String(f.value))}
-                            className={`text-left p-2.5 rounded-xl border transition-all ${
-                              isReadOnly ? "cursor-default" : "cursor-pointer"
-                            } ${
-                              isSelected
-                                ? "bg-amber-50/90 border-amber-400 text-[#0B1929] shadow-2xs"
-                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className={`text-xs font-bold ${isSelected ? "text-amber-700" : "text-[#0B1929]"}`}>
-                                {f.label}
-                              </span>
-                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                                isSelected ? "bg-amber-500 text-white" : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
-                              }`}>
-                                {f.value}
-                              </span>
-                            </div>
-                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
-                              {f.desc}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Notas de actividad física y disponibilidad */}
-                    <div className="mt-3">
-                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1">
-                        Notas de actividad física y disponibilidad (opcional)
-                      </label>
-                      <textarea
-                        disabled={isReadOnly}
-                        value={form.eval_faf_notas || ""}
-                        onChange={(e) => updForm("eval_faf_notas", e.target.value)}
-                        placeholder="Ej. Paciente menciona que entrena de lunes a jueves de 5 a 7 pm (4 días), o no tiene tiempo para entrenar entre semana..."
-                        rows={2}
-                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white resize-none transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Paso 5: Mediciones Corporales y Antropometría */}
+                {/* Paso 4: Mediciones Corporales y Antropometría */}
                 <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
@@ -3620,7 +3488,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </div>
                       <div className="min-w-0 flex-1">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wider inline-block">
-                          Paso 5
+                          Paso 4
                         </span>
 
                         <h3 className="text-sm sm:text-base font-bold text-[#0B1929] mt-1 sm:mt-0.5">
@@ -3851,6 +3719,138 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Paso 5: Enfoque y Prescripción del Ciclo */}
+                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Target className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[var(--brand-primary)] uppercase tracking-wider">
+                            Paso 5
+                          </span>
+                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                            Enfoque y Prescripción del Ciclo
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                          Parámetros dinámicos exclusivos del plan actual para fijar el programa calórico y de macronutrientes de acuerdo a los objetivos generales del paciente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Objetivo de la Etapa */}
+                  <div className="pt-1">
+                    <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
+                      Objetivo Nutricional de este Ciclo
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {GOAL_PRESETS.map((g) => {
+                        const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("eval_objetivo", g.id)}
+                            className={`text-left p-2.5 rounded-xl border transition-all ${
+                              isReadOnly ? "cursor-default" : "cursor-pointer"
+                            } ${
+                              isSelected
+                                ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
+                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                                {g.title}
+                              </span>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                isSelected
+                                  ? "bg-[var(--brand-primary)] text-white"
+                                  : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                              }`}>
+                                {g.pct > 0 ? `+${g.pct}%` : `${g.pct}%`}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                              {g.desc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Factor de Actividad Física (FAF) Proyectado conectado a Entrenamiento */}
+                  <div className="pt-2 border-t border-[#F0F4FA]">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                      <label className="block text-xs font-bold text-[#6B7A8D]">
+                        Factor de Actividad Física (FAF) Proyectado
+                      </label>
+                      {suggestedFafFromTraining.days > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
+                          <Dumbbell className="w-3 h-3" />
+                          <span>Calculado de entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {ACTIVITY_FACTORS.map((f) => {
+                        const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
+                        const isSelected = Math.abs(currentFafNum - f.value) < 0.02;
+                        return (
+                          <button
+                            key={f.value}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("eval_faf", String(f.value))}
+                            className={`text-left p-2.5 rounded-xl border transition-all ${
+                              isReadOnly ? "cursor-default" : "cursor-pointer"
+                            } ${
+                              isSelected
+                                ? "bg-amber-50/90 border-amber-400 text-[#0B1929] shadow-2xs"
+                                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`text-xs font-bold ${isSelected ? "text-amber-700" : "text-[#0B1929]"}`}>
+                                {f.label}
+                              </span>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                                isSelected ? "bg-amber-500 text-white" : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
+                              }`}>
+                                {f.value}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#6B7A8D] mt-0.5 truncate">
+                              {f.desc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Notas de actividad física y disponibilidad */}
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-[#6B7A8D] mb-1">
+                        Notas de actividad física y disponibilidad (opcional)
+                      </label>
+                      <textarea
+                        disabled={isReadOnly}
+                        value={form.eval_faf_notas || ""}
+                        onChange={(e) => updForm("eval_faf_notas", e.target.value)}
+                        placeholder="Ej. Paciente menciona que entrena de lunes a jueves de 5 a 7 pm (4 días), o no tiene tiempo para entrenar entre semana..."
+                        rows={2}
+                        className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white resize-none transition-colors"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
