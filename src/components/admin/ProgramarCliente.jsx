@@ -5536,38 +5536,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     })}
                   </div>
 
-                  {/* Macro Gap Tracking Box */}
-                  {metaKcal > 0 && (
+                  {/* Macro Gap Tracking Box (Aviso solo si excede la meta diaria) */}
+                  {metaKcal > 0 && diffKcal < 0 && (
                     <div className="mt-4 pt-3.5 border-t border-[#F0F4FA]">
-                      {diffKcal === 0 ? (
-                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>¡Meta calórica diaria alcanzada con precisión!</span>
-                        </div>
-                      ) : diffKcal > 0 ? (
-                        <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/70 text-xs text-blue-900">
-                          <div className="font-bold flex items-center justify-between text-blue-950 mb-1">
-                            <span>Faltan por asignar:</span>
-                            <span className="font-extrabold text-blue-700">{diffKcal} kcal</span>
-                          </div>
-                          <div className="text-[11px] text-blue-800 flex items-center gap-2">
-                            <span>P: {diffProt > 0 ? `${diffProt}g` : '0g'}</span>
-                            <span>•</span>
-                            <span>C: {diffCarbs > 0 ? `${diffCarbs}g` : '0g'}</span>
-                            <span>•</span>
-                            <span>G: {diffFat > 0 ? `${diffFat}g` : '0g'}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span className="font-bold">Excedido por +{Math.abs(diffKcal)} kcal sobre la meta diaria</span>
-                        </div>
-                      )}
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span className="font-bold">Excedido por +{Math.abs(diffKcal)} kcal sobre la meta diaria</span>
+                      </div>
                     </div>
                   )}
 
-                  {/* Avance de Equivalentes SMAE del Día (Conectado a la Evaluación del Ciclo) */}
+                  {/* Avance de Equivalentes SMAE del Día */}
                   {(() => {
                     const targetSmaeMap = daySmaeTargetMap;
                     const usedSmaeMap = estimateDaySmaeUsage(diaForm.comidas);
@@ -5577,39 +5556,42 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                     if (activeGroups.length === 0) return null;
 
                     return (
-                      <div className="mt-4 pt-3.5 border-t border-[#F0F4FA] space-y-2">
+                      <div className="mt-4 pt-3.5 border-t border-[#F0F4FA] space-y-2.5">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1">
-                            <span>🇲🇽</span>
-                            <span>Equivalentes SMAE (Usados / Meta Evaluación)</span>
+                          <span className="text-[10px] font-extrabold text-[#6B7A8D] uppercase tracking-wider">
+                            Equivalentes SMAE
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {activeGroups.map((g) => {
                             const used = Number(usedSmaeMap[g.id]) || 0;
                             const target = Number(targetSmaeMap[g.id]) || 0;
                             const isComplete = target > 0 && Math.abs(used - target) <= 0.5;
                             const isOver = target > 0 && used > target + 0.5;
                             return (
-                              <span
+                              <div
                                 key={g.id}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-semibold ${
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
                                   isComplete
-                                    ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                                    ? "bg-emerald-50/80 border-emerald-300 text-emerald-900"
                                     : isOver
-                                    ? "bg-amber-50 border-amber-300 text-amber-900"
+                                    ? "bg-amber-50/80 border-amber-300 text-amber-900"
                                     : "bg-[#F8FAFC] border-[#E2E8F0] text-[#0B1929]"
                                 }`}
                                 title={g.nombre}
                               >
-                                <span>{g.icono}</span>
-                                <span>{g.corto}:</span>
-                                <strong className="font-mono">
-                                  {used}
-                                  {target > 0 ? `/${target}` : ""}
-                                </strong>
-                                {isComplete && <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />}
-                              </span>
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <span>{g.icono}</span>
+                                  <span className="truncate">{g.corto}</span>
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0 font-mono font-bold">
+                                  <span>
+                                    {used}
+                                    {target > 0 ? `/${target}` : ""}
+                                  </span>
+                                  {isComplete && <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />}
+                                </div>
+                              </div>
                             );
                           })}
                         </div>

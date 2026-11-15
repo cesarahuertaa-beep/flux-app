@@ -256,6 +256,141 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
+function buildAdherenceSnapshot({
+  cicloEvaluado = null,
+  nutriDiasCiclo = [],
+  nutriProgresoRows = [],
+  rutinasCiclo = [],
+  progresoRows = [],
+}) {
+  const cicloNombreRaw = String(cicloEvaluado?.nombre || "").split("|")[0].trim();
+  const cicloNombre = cicloNombreRaw || "Plan actual";
+
+  // 1. Nutrición e Hidratación filtrada al ciclo evaluado
+  const validDiaIds = new Set((nutriDiasCiclo || []).map((d) => String(d.id)));
+  const filteredNutri = (nutriProgresoRows || []).filter(
+    (r) => r && r.dia_id != null && validDiaIds.has(String(r.dia_id))
+  );
+
+  let totalComidas = 0;
+  let comidasRealizadas = 0;
+  let totalAguaMl = 0;
+  let totalMetaAguaMl = 0;
+  let diasRegistrados = 0;
+  const nutriByWeekMap = {};
+
+  filteredNutri.forEach((r) => {
+    const cTotal = Number(r.comidas_total) || 0;
+    const cDone = Number(r.comidas_realizadas) || 0;
+    const agua = Number(r.agua_ml) || 0;
+    const metaAgua = Number(r.meta_agua_ml) || 2000;
+    if (cTotal > 0 || agua > 0) {
+      diasRegistrados++;
+      const sem = Number(r.semana) || 1;
+      if (!nutriByWeekMap[sem]) {
+        nutriByWeekMap[sem] = { semana: sem, comidasTotal: 0, comidasRealizadas: 0, aguaMl: 0, metaAguaMl: 0, dias: 0 };
+      }
+      nutriByWeekMap[sem].comidasTotal += cTotal;
+      nutriByWeekMap[sem].comidasRealizadas += cDone;
+      nutriByWeekMap[sem].aguaMl += agua;
+      nutriByWeekMap[sem].metaAguaMl += metaAgua;
+      nutriByWeekMap[sem].dias += 1;
+    }
+    totalComidas += cTotal;
+    comidasRealizadas += cDone;
+    totalAguaMl += agua;
+    totalMetaAguaMl += metaAgua;
+  });
+
+  const pctComidas = totalComidas > 0 ? Math.min(100, Math.round((comidasRealizadas / totalComidas) * 100)) : 0;
+  const pctAgua = totalMetaAguaMl > 0 ? Math.min(100, Math.round((totalAguaMl / totalMetaAguaMl) * 100)) : 0;
+  const promedioAguaL = diasRegistrados > 0 ? (totalAguaMl / (diasRegistrados * 1000)).toFixed(1) : "0.0";
+
+  const nutriSemanas = Object.values(nutriByWeekMap)
+    .sort((a, b) => a.semana - b.semana)
+    .map((w) => ({
+      semana: w.semana,
+      pctComidas: w.comidasTotal > 0 ? Math.min(100, Math.round((w.comidasRealizadas / w.comidasTotal) * 100)) : 0,
+      pctAgua: w.metaAguaMl > 0 ? Math.min(100, Math.round((w.aguaMl / w.metaAguaMl) * 100)) : 0,
+      dias: w.dias,
+    }));
+
+  // 2. Entrenamiento filtrado al ciclo evaluado
+  const rs = Array.isArray(rutinasCiclo) ? rutinasCiclo : [];
+  const uDays = new Set();
+  const ejToRutina = {};
+  rs.forEach((r) => {
+    const parts = (r.nombre || "").split("|");
+    const dayTag = parts.length > 1 ? parts[0] : "";
+    if (dayTag && dayTag !== "S/D") uDays.add(dayTag.toLowerCase());
+    (r.ejercicios || []).forEach((e) => {
+      ejToRutina[String(e.id)] = r.id;
+    });
+  });
+  const daysAssigned = rs.length > 0 ? (uDays.size > 0 ? uDays.size : rs.length) : 0;
+
+  const sessionKeys = new Set();
+  const weeksWithWorkouts = new Set();
+  const sessionsByWeek = {};
+  (progresoRows || []).forEach((p) => {
+    if (!p || p.valor === undefined || p.valor === null || p.valor === "") return;
+    const rId = ejToRutina[String(p.ejercicio_id)];
+    const sem = Number(p.semana) || 1;
+    if (!rId) return;
+    const sKey = `${rId}-${sem}`;
+    if (!sessionKeys.has(sKey)) {
+      sessionKeys.add(sKey);
+      weeksWithWorkouts.add(sem);
+      sessionsByWeek[sem] = (sessionsByWeek[sem] || 0) + 1;
+    }
+  });
+
+  const maxWeekLogged = weeksWithWorkouts.size > 0 ? Math.max(...Array.from(weeksWithWorkouts)) : 0;
+  const maxNutriWeek = nutriSemanas.length > 0 ? Math.max(...nutriSemanas.map((w) => w.semana)) : 0;
+  const semanasActivas = Math.max(maxWeekLogged, maxNutriWeek, 1);
+  const sesionesCompletadas = sessionKeys.size;
+  const sesionesEsperadas = daysAssigned * semanasActivas;
+  const pctEntreno = sesionesEsperadas > 0 ? Math.min(100, Math.round((sesionesCompletadas / sesionesEsperadas) * 100)) : 0;
+
+  const entrenoSemanas = [];
+  if (daysAssigned > 0) {
+    for (let s = 1; s <= Math.min(Math.max(semanasActivas, 1), 6); s++) {
+      const done = sessionsByWeek[s] || 0;
+      entrenoSemanas.push({
+        semana: s,
+        completadas: done,
+        esperadas: daysAssigned,
+        pct: Math.min(100, Math.round((done / daysAssigned) * 100)),
+      });
+    }
+  }
+
+  return {
+    ciclo_evaluado_id: cicloEvaluado?.id || null,
+    ciclo_evaluado_nombre: cicloNombre,
+    capturado_en: new Date().toISOString(),
+    nutricion: {
+      hasPlan: (nutriDiasCiclo || []).length > 0,
+      dias_registrados: diasRegistrados,
+      pct_comidas: pctComidas,
+      comidas_realizadas: comidasRealizadas,
+      comidas_total: totalComidas,
+      pct_agua: pctAgua,
+      promedio_agua_l: promedioAguaL,
+      semanas: nutriSemanas,
+    },
+    entrenamiento: {
+      hasPlan: daysAssigned > 0,
+      dias_asignados: daysAssigned,
+      semanas_evaluadas: semanasActivas,
+      sesiones_completadas: sesionesCompletadas,
+      sesiones_esperadas: sesionesEsperadas,
+      pct_cumplimiento: pctEntreno,
+      semanas: entrenoSemanas,
+    },
+  };
+}
+
 export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, initialNutriDias, initialRutinas, isReadOnly: propReadOnly }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const isFreemium = isCivil && selected?.plan_tipo !== "premium";
@@ -348,6 +483,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [draggedSmaeId, setDraggedSmaeId] = useState(null);
   const [showSmaeBoardInFollowUp, setShowSmaeBoardInFollowUp] = useState(false);
   const [showFullR24hInFollowUp, setShowFullR24hInFollowUp] = useState(false);
+  const [adherenceSnapshot, setAdherenceSnapshot] = useState(null);
+  const [loadingAdherenceSnapshot, setLoadingAdherenceSnapshot] = useState(false);
 
   const getSmaeGroupPref = (groupId) => (form.smae_gustos && form.smae_gustos[groupId]) || "neutro";
   const setSmaeGroupPref = (groupId, pref) => {
@@ -865,6 +1002,84 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     return () => window.removeEventListener("flux:expediente-updated", onExpedienteUpdated);
   }, [selected?.id]);
 
+  const fetchFreshAdherenceSnapshot = useCallback(async (targetCicloObj) => {
+    if (!selected?.id) return;
+    setLoadingAdherenceSnapshot(true);
+    try {
+      const fetchCicloResources = async (cObj) => {
+        const cFilter = cObj?.id ? `ciclo_id=eq.${cObj.id}` : `ciclo_id=is.null`;
+        const [ns, rs] = await Promise.all([
+          dbGetFresh(`nutricion?cliente_id=eq.${selected.id}&${cFilter}`).catch(() => []),
+          dbGetFresh(`rutinas?cliente_id=eq.${selected.id}&${cFilter}&select=*,ejercicios(*)&order=orden.asc`).catch(() => []),
+        ]);
+
+        let ds = [];
+        if (Array.isArray(ns) && ns.length > 0) {
+          ds = await dbGetFresh(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`).catch(() => []);
+        }
+
+        const rsFull = Array.isArray(rs) ? rs : [];
+        const allEjIds = rsFull.flatMap((r) => (r.ejercicios || []).map((e) => e.id)).filter(Boolean);
+        let ps = [];
+        if (allEjIds.length > 0) {
+          ps = await dbGetFresh(`progreso?cliente_id=eq.${selected.id}&ejercicio_id=in.(${allEjIds.join(",")})&limit=3000`).catch(() => []);
+        }
+        return { ds: ds || [], rs: rsFull, ps: ps || [] };
+      };
+
+      const npRows = await dbGetFresh(`nutricion_progreso?cliente_id=eq.${selected.id}&limit=1000`).catch(() => []);
+      const validNp = Array.isArray(npRows) ? npRows : [];
+
+      const currentRes = await fetchCicloResources(targetCicloObj);
+      const currDiaIds = new Set(currentRes.ds.map((d) => String(d.id)));
+      const currHasNutriActivity = validNp.some((r) => r && r.dia_id != null && currDiaIds.has(String(r.dia_id)) && ((Number(r.comidas_total) || 0) > 0 || (Number(r.agua_ml) || 0) > 0));
+      const currHasEntrenoActivity = currentRes.ps.some((p) => p && p.valor !== undefined && p.valor !== null && p.valor !== "");
+
+      let cicloEvaluado = targetCicloObj;
+      let chosenRes = currentRes;
+
+      // Si el ciclo actual recién se creó (0 actividad) y existe un ciclo previo, evaluamos el ciclo inmediato anterior
+      if (!currHasNutriActivity && !currHasEntrenoActivity) {
+        const allCiclos = await dbGetFresh(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => ciclos || []);
+        const list = Array.isArray(allCiclos) && allCiclos.length > 0 ? allCiclos : (ciclos || []);
+        const prevCiclo = list.find((c) => String(c.id) !== String(targetCicloObj?.id));
+        if (prevCiclo) {
+          const prevRes = await fetchCicloResources(prevCiclo);
+          cicloEvaluado = prevCiclo;
+          chosenRes = prevRes;
+        }
+      }
+
+      const snapshot = buildAdherenceSnapshot({
+        cicloEvaluado,
+        nutriDiasCiclo: chosenRes.ds,
+        nutriProgresoRows: validNp,
+        rutinasCiclo: chosenRes.rs,
+        progresoRows: chosenRes.ps,
+      });
+
+      setAdherenceSnapshot(snapshot);
+      if (snapshot?.nutricion?.dias_registrados > 0) {
+        setForm((prev) => ({
+          ...prev,
+          consumo_agua_estimado: prev.consumo_agua_estimado && !prev.consumo_agua_estimado.includes("según registro en app")
+            ? prev.consumo_agua_estimado
+            : `${snapshot.nutricion.promedio_agua_l} L/día (según registro en app)`,
+        }));
+      }
+      if (snapshot?.entrenamiento?.dias_asignados > 0) {
+        setForm((prev) => ({
+          ...prev,
+          dias_ejercicio_actual: prev.dias_ejercicio_actual || String(snapshot.entrenamiento.dias_asignados),
+        }));
+      }
+    } catch (err) {
+      console.warn("Error consultando snapshot de adherencia:", err);
+    } finally {
+      setLoadingAdherenceSnapshot(false);
+    }
+  }, [selected?.id, ciclos]);
+
   const openNewEvaluation = useCallback((explicitCiclo = null) => {
     const base = emptyForm();
     const targetCiclo = explicitCiclo || cicloActivo || cicloSel;
@@ -913,18 +1128,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       base.aversiones_alimentos = latestPrev.aversiones_alimentos;
     }
 
-    // Pre-llenar agua desde app en seguimientos (si existen registros en nutriProgreso)
     if (latestPrev) {
-      const npVals = Object.values(nutriProgreso || {}).filter(Boolean);
-      const waterDays = npVals.filter((r) => (Number(r.agua_ml) || 0) > 0);
-      if (waterDays.length > 0) {
-        const sumMl = waterDays.reduce((acc, r) => acc + (Number(r.agua_ml) || 0), 0);
-        const avgL = (sumMl / (waterDays.length * 1000)).toFixed(1);
-        base.consumo_agua_estimado = `${avgL} L/día (según registro en app)`;
-      } else if (latestPrev.consumo_agua_estimado) {
-        base.consumo_agua_estimado = latestPrev.consumo_agua_estimado;
-      }
-
       if (trainingDays > 0) {
         base.dias_ejercicio_actual = String(trainingDays);
       } else if (latestPrev.dias_ejercicio_actual) {
@@ -932,6 +1136,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       }
       if (latestPrev.horario_ejercicio) {
         base.horario_ejercicio = latestPrev.horario_ejercicio;
+      }
+      if (latestPrev.consumo_agua_estimado) {
+        base.consumo_agua_estimado = latestPrev.consumo_agua_estimado;
       }
     }
 
@@ -941,6 +1148,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setForm(base);
     setShowSmaeBoardInFollowUp(false);
     setShowFullR24hInFollowUp(false);
+    setAdherenceSnapshot(null);
+    if (latestPrev) {
+      fetchFreshAdherenceSnapshot(targetCiclo);
+    }
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
     setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
