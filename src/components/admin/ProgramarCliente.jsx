@@ -5887,11 +5887,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                   <div className="mb-3.5 p-0 border-0 bg-transparent md:p-3.5 md:rounded-xl md:bg-white md:border md:border-[#E2E8F0]">
                                     <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/25">
                                           Opción Principal (A)
                                         </span>
                                         {c.opcionesPlatilloBase?.[0]?.nombre && (
-                                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] flex items-center gap-1">
                                             <span>🍲</span>
                                             <span>Receta base: {c.opcionesPlatilloBase[0].nombre}</span>
                                           </span>
@@ -5901,32 +5901,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
                                     {c.modoEdicion === "platillo" ? (
                                       /* Modo Platillo: Catálogo de Platillos FLUX */
-                                      <div className="mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
-                                        <div className="flex items-center justify-between gap-2 mb-2">
-                                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                                            <Utensils className="w-3.5 h-3.5 text-purple-600" />
-                                            Catálogo de Platillos FLUX
+                                      <div className="mb-3 p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in transition-all">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                            <Utensils className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                            <span>Catálogo de Platillos FLUX</span>
                                           </span>
                                           <button
                                             type="button"
                                             onClick={() => setMealOptionMode(i, 0, "manual")}
-                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer flex items-center gap-1 text-xs"
-                                            title="Volver a modo manual"
+                                            className="text-[#6B7A8D] hover:text-[#0B1929] px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer flex items-center gap-1 text-xs font-semibold transition-colors"
+                                            title="Volver al platillo"
                                           >
                                             <X className="w-3.5 h-3.5" />
-                                            <span className="hidden sm:inline">Cerrar</span>
+                                            <span>Cerrar catálogo</span>
                                           </button>
                                         </div>
 
                                         {/* Barra de búsqueda */}
-                                        <div className="relative mb-2">
+                                        <div className="relative">
                                           <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                           <input
                                             type="text"
                                             value={dishCatalogSearchMap[i] || ""}
                                             onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
                                             placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón, Chilaquiles)..."
-                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
+                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                           />
                                           {dishCatalogSearchMap[i] && (
                                             <button
@@ -5940,7 +5940,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </div>
 
                                         {/* Filtros de Categorías */}
-                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
+                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                                           {CATEGORIAS_PLATILLOS.map(cat => {
                                             const activeCat = dishCatalogCatMap[i] || "todos";
                                             const isSelected = activeCat === cat.id;
@@ -5951,7 +5951,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [i]: cat.id }))}
                                                 className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
                                                   isSelected
-                                                    ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                                                    ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                                     : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                 }`}
                                               >
@@ -5962,8 +5962,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })}
                                         </div>
 
-                                        {/* Grid de Platillos en formato visual similar a ingredientes (Pre-filtrado con Evaluación del Paciente) */}
-                                        <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
+                                        {/* Grid de Platillos directo (sin caja gris intermedia) a 2 columnas amplias */}
+                                        <div className="max-h-72 overflow-y-auto pr-0.5">
                                           {(() => {
                                             const rawPlatillos = buscarPlatillosCatalogo(
                                               dishCatalogSearchMap[i] || "",
@@ -5990,17 +5990,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               });
 
                                             return (
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 {platillosEvaluados.map(({ item, evalRes }) => (
                                                   <div
                                                     key={item.id}
                                                     onClick={() => handleSelectDishFromCatalog(i, item, 0)}
-                                                    className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all group ${
+                                                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border bg-white cursor-pointer select-none transition-all group ${
                                                       evalRes.status === "evitar"
                                                         ? "border-rose-200 bg-rose-50/40 opacity-75 hover:opacity-100"
                                                         : evalRes.status === "favorito"
                                                         ? "border-emerald-300 bg-emerald-50/30 hover:border-emerald-400"
-                                                        : "border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50"
+                                                        : "border-[#E2E8F0] hover:border-[var(--brand-primary)]"
                                                     }`}
                                                   >
                                                     <img
@@ -6010,12 +6010,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       loading="lazy"
                                                     />
                                                     <div className="min-w-0 flex-1">
-                                                      <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
+                                                      <p className="text-xs font-bold text-[#0B1929] leading-snug line-clamp-2">
                                                         {item.nombre}
                                                       </p>
                                                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                                         {item.calorias && (
-                                                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                          <span className="text-[10px] font-extrabold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-1.5 py-0.5 rounded">
                                                             {item.calorias} kcal
                                                           </span>
                                                         )}
@@ -6040,16 +6040,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       </div>
                                       ) : c.modoEdicion === "ingredientes" ? (
                                         /* Constructor por Ingredientes + Equivalentes SMAE Integrado */
-                                        <div className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200 space-y-2.5 animate-in fade-in">
+                                        <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in">
                                           <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                            <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                               <span>🥑</span>
                                               <span>Catálogo Oficial de Alimentos Equivalentes SMAE</span>
                                             </span>
                                             <button
                                               type="button"
                                               onClick={() => setMealOptionMode(i, 0, "manual")}
-                                              className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg bg-white border border-gray-200 cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                                              className="text-[#6B7A8D] hover:text-[#0B1929] px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer flex items-center gap-1 text-xs font-semibold transition-colors"
                                               title="Volver al platillo"
                                             >
                                               <X className="w-3.5 h-3.5" />
@@ -6064,13 +6064,13 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             value={ingredientSearchMap[i] || ""}
                                             onChange={e => setIngredientSearchMap(prev => ({ ...prev, [i]: e.target.value }))}
                                             placeholder="Buscar ingrediente o equivalente SMAE (ej. Tortilla, Pechuga, Aguacate, Huevo)..."
-                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                                            className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                           />
                                           {ingredientSearchMap[i] && (
                                             <button
                                               type="button"
                                               onClick={() => setIngredientSearchMap(prev => ({ ...prev, [i]: "" }))}
-                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
                                             >
                                               <X className="w-3.5 h-3.5" />
                                             </button>
@@ -6078,7 +6078,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                         </div>
 
                                         {/* Filtros de Categorías */}
-                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                                           {CATEGORIAS_INGREDIENTES.map(cat => {
                                             const activeCat = ingredientCatMap[i] || "todos";
                                             const isSelected = activeCat === cat.id;
@@ -6087,7 +6087,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 key={cat.id}
                                                 type="button"
                                                 onClick={() => setIngredientCatMap(prev => ({ ...prev, [i]: cat.id }))}
-                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border ${
+                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
                                                   isSelected
                                                     ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                                     : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
@@ -6100,86 +6100,49 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })}
                                         </div>
 
-                                        {/* Bandeja de seleccionados con Steppers de Equivalentes SMAE (- / + 0.5 eq) */}
+                                        {/* Bandeja compacta de etiquetas seleccionadas (sin steppers duplicados) */}
                                         {c.ingredientesSeleccionados?.length > 0 && (
-                                          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                                          <div className="p-2.5 rounded-xl bg-white border border-[#E2E8F0] space-y-1.5">
                                             <div className="flex items-center justify-between gap-2">
-                                              <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
-                                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                {c.ingredientesSeleccionados.length} ingredientes / equivalentes SMAE seleccionados (ajusta las porciones con - / +):
+                                              <span className="text-[11px] font-bold text-[#0B1929] flex items-center gap-1">
+                                                <Check className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                                <span>{c.ingredientesSeleccionados.length} alimentos seleccionados:</span>
                                               </span>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => clearIngredientes(i, 0)}
-                                                  className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
-                                                >
-                                                  Limpiar selección
-                                                </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => clearIngredientes(i, 0)}
+                                                className="text-[10px] text-[#6B7A8D] hover:text-rose-600 font-semibold underline cursor-pointer"
+                                              >
+                                                Limpiar selección
+                                              </button>
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
                                               {c.ingredientesSeleccionados.map((ing, ingIdx) => {
                                                 const ingName = typeof ing === "string" ? ing : (ing?.nombre || ing?.label || "");
                                                 if (!ingName) return null;
-                                                const catItem = getIngredientesCatalog().find((x) => x.nombre === ingName) || { nombre: ingName };
-                                                const eqVal = Number(ingredientEqMap[`${i}_0_${ingName}`]) || 1;
-                                                const portionObj = formatIngredientSmaePortion(catItem, eqVal);
-                                                const rawPortion = typeof portionObj === "string" ? portionObj : portionObj?.label;
-                                                const portionLabel = typeof rawPortion === "string" && rawPortion ? rawPortion : ingName;
                                                 return (
-                                                  <div
+                                                  <span
                                                     key={`${ingName}_${ingIdx}`}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand-primary)]/10 border border-[var(--brand-primary)]/25 text-xs font-semibold text-[#0B1929]"
                                                   >
-                                                    <span className="truncate max-w-[230px]" title={portionLabel}>
-                                                      {portionLabel}
-                                                    </span>
-                                                      <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => adjustIngredientEq(i, 0, ingName, -0.5)}
-                                                          className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                          title="Restar 0.5 equivalentes"
-                                                        >
-                                                          -
-                                                        </button>
-                                                        <input
-                                                          type="number"
-                                                          step="0.1"
-                                                          min="0.1"
-                                                          max="20"
-                                                          value={c.ingredientesEq?.[0]?.[ingName] ?? ingredientEqMap[`${i}_0_${ingName}`] ?? eqVal}
-                                                          onChange={(e) => setIngredientEqDirect(i, 0, ingName, e.target.value)}
-                                                          onBlur={(e) => commitIngredientEqDirect(i, 0, ingName, e.target.value)}
-                                                          className="w-10 px-0.5 py-0 text-[10px] font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                          title="Escribe un equivalente exacto (ej. 0.6) o usa - / + en pasos de 0.5"
-                                                        />
-                                                        <span className="text-[9px] font-mono font-bold text-emerald-800">eq</span>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => adjustIngredientEq(i, 0, ingName, 0.5)}
-                                                          className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                          title="Sumar 0.5 equivalentes"
-                                                        >
-                                                          +
-                                                        </button>
-                                                      </div>
+                                                    <span>{ingName}</span>
                                                     <button
                                                       type="button"
                                                       onClick={() => toggleIngrediente(i, ingName)}
-                                                      className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                      className="text-[#6B7A8D] hover:text-rose-600 transition-colors cursor-pointer"
                                                       title="Quitar alimento"
                                                     >
                                                       <X className="w-3.5 h-3.5" />
                                                     </button>
-                                                  </div>
+                                                  </span>
                                                 );
                                               })}
                                             </div>
                                           </div>
                                         )}
 
-                                        {/* Grid de Ingredientes con Porción Oficial SMAE + Pre-filtrado de Consulta */}
-                                        <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-60 overflow-y-auto">
+                                        {/* Grid de Ingredientes directo (sin recuadro gris intermedio) a 2 columnas con nombres completos */}
+                                        <div className="max-h-72 overflow-y-auto pr-0.5">
                                           {(() => {
                                             const rawItems = buscarIngredientes(
                                               ingredientSearchMap[i] || "",
@@ -6203,7 +6166,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               });
 
                                             return (
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 {evaluatedItems.map(({ item, evalRes }) => {
                                                   const isChecked = (c.ingredientesSeleccionados || []).includes(item.nombre);
                                                   const smaeGrp = item.smaeGroup ? SMAE_GROUPS_MAP[item.smaeGroup] : null;
@@ -6211,47 +6174,47 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     <div
                                                       key={item.id}
                                                       onClick={() => toggleIngrediente(i, item.nombre)}
-                                                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
+                                                      className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
                                                         isChecked
-                                                          ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                          ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]"
                                                           : evalRes.status === "evitar"
                                                           ? "bg-rose-50/40 border-rose-200 opacity-75 hover:opacity-100"
                                                           : evalRes.status === "favorito"
                                                           ? "bg-emerald-50/30 border-emerald-200 hover:border-emerald-300"
-                                                          : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
+                                                          : "bg-white border-[#E2E8F0] hover:border-[var(--brand-primary)]/50"
                                                       }`}
                                                     >
                                                       <input
                                                         type="checkbox"
                                                         checked={isChecked}
                                                         onChange={() => {}}
-                                                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer shrink-0"
+                                                        className="mt-0.5 rounded accent-[var(--brand-primary)] w-3.5 h-3.5 cursor-pointer shrink-0"
                                                       />
                                                       <img
                                                         src={item.foto}
                                                         alt={item.nombre}
-                                                        className="w-7 h-7 object-contain rounded shrink-0 bg-white"
+                                                        className="w-8 h-8 object-contain rounded-lg shrink-0 bg-[#F8FAFC] border border-[#E2E8F0]/60"
                                                         loading="lazy"
                                                         onError={e => { e.currentTarget.style.display = 'none'; }}
                                                       />
                                                       <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-1">
-                                                          <span className="text-xs font-bold text-[#0B1929] truncate" title={item.nombre}>
+                                                        <div className="flex items-start justify-between gap-1.5">
+                                                          <span className="text-xs font-bold text-[#0B1929] leading-snug line-clamp-2">
                                                             {item.nombre}
                                                           </span>
                                                           {evalRes.status === "favorito" && (
-                                                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
                                                               ⭐
                                                             </span>
                                                           )}
                                                           {evalRes.status === "evitar" && (
-                                                            <span className="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
                                                               🚫 Evitar
                                                             </span>
                                                           )}
                                                         </div>
-                                                        <div className="text-[10px] text-[#6B7A8D] truncate">
-                                                          1 eq: <strong className="text-emerald-700">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
+                                                        <div className="text-[11px] text-[#6B7A8D] leading-snug mt-0.5">
+                                                          1 eq: <strong className="text-[var(--brand-primary)]">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
                                                           {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
                                                         </div>
                                                       </div>
@@ -6263,17 +6226,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           })()}
                                         </div>
 
-                                        {/* Pie del Constructor: Subtotal en vivo de Alimentos SMAE + Insertar Lista SMAE + Redactar con IA */}
+                                        {/* Pie del Constructor: Subtotal en vivo de Alimentos SMAE + Confirmar */}
                                         {(() => {
                                           const liveSel = getScaledSelectedIngredients(i, 0);
                                           return (
-                                            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 shadow-2xs">
-                                              {/* A la izquierda: Subtotal calculado en vivo por Literatura SMAE */}
+                                            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-[#E2E8F0] shadow-2xs">
                                               <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                                                 {liveSel.details.length > 0 ? (
                                                   <>
-                                                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-950 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                                      <Flame className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2.5 py-1 rounded-lg border border-[var(--brand-primary)]/25">
+                                                      <Flame className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
                                                       <span>Selección: {liveSel.totalEq} eq · {liveSel.totalKcal} kcal</span>
                                                     </span>
                                                     <span className="text-[11px] font-mono font-bold text-[#475569]">
@@ -6282,27 +6244,26 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   </>
                                                 ) : (
                                                   <span className="text-[11px] text-[#6B7A8D]">
-                                                    Marca los alimentos arriba para calcular sus equivalentes y macros exactos de literatura.
+                                                    Marca los alimentos arriba para agregarlos al platillo y ajustar sus equivalentes.
                                                   </span>
                                                 )}
                                               </div>
 
-                                                {/* A la derecha: Confirmar y ver en Platillo Armado */}
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleInsertIngredientsDirectly(i, 0)}
-                                                    disabled={liveSel.details.length === 0}
-                                                    className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                                    title="Agregar alimentos seleccionados al platillo"
-                                                  >
-                                                    <Check className="w-3.5 h-3.5" />
-                                                    <span>Listo · Ver en Platillo {liveSel.details.length > 0 ? `(${liveSel.details.length})` : ""}</span>
-                                                  </button>
-                                                </div>
+                                              <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleInsertIngredientsDirectly(i, 0)}
+                                                  disabled={liveSel.details.length === 0}
+                                                  className="flex-1 sm:flex-none text-xs font-bold flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                  title="Confirmar alimentos seleccionados"
+                                                >
+                                                  <Check className="w-3.5 h-3.5" />
+                                                  <span>Listo · Ver en Platillo {liveSel.details.length > 0 ? `(${liveSel.details.length})` : ""}</span>
+                                                </button>
                                               </div>
-                                            );
-                                          })()}
+                                            </div>
+                                          );
+                                        })()}
                                         </div>
                                       ) : (
                                         /* Vista Principal: Platillo Armado (Alimentos Finitos con - / + arriba y Receta IA Solo Lectura abajo) */
@@ -6312,9 +6273,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           return (
                                             <div className="space-y-3">
                                               {/* 1. Arriba: Estado inicial (2 caminos claros) vs Alimentos SMAE seleccionados */}
-                                              <div className="p-3.5 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
+                                              <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2.5">
                                                 {liveMainSel.details.length === 0 ? (
-                                                  <div className="p-4 rounded-xl bg-white/90 border border-emerald-200/80 text-center space-y-3">
+                                                  <div className="p-4 rounded-xl bg-white border border-[#E2E8F0] text-center space-y-3">
                                                     <p className="text-xs sm:text-sm font-bold text-[#0B1929]">
                                                       ¿Cómo deseas construir el alimento de Comida {i + 1}{c.nombre?.trim() ? ` (${c.nombre.trim()})` : ""}?
                                                     </p>
@@ -6322,7 +6283,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       <button
                                                         type="button"
                                                         onClick={() => setMealOptionMode(i, 0, "ingredientes")}
-                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-[var(--brand-primary)] hover:opacity-90 text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
                                                       >
                                                         <span>🥑</span>
                                                         <span>Construirlo con equivalentes SMAE</span>
@@ -6330,7 +6291,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       <button
                                                         type="button"
                                                         onClick={() => setMealOptionMode(i, 0, "platillo")}
-                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                                                        className="text-xs font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                                                       >
                                                         <span>🍲</span>
                                                         <span>Cargar receta prescrita de la Biblioteca</span>
@@ -6340,7 +6301,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 ) : (
                                                   <>
                                                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                      <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                      <span className="text-[11px] font-extrabold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
                                                         <span>🥑</span>
                                                         <span>Alimentos seleccionados ({liveMainSel.details.length})</span>
                                                       </span>
@@ -6348,14 +6309,14 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         <button
                                                           type="button"
                                                           onClick={() => clearIngredientes(i, 0)}
-                                                          className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 underline cursor-pointer"
+                                                          className="text-[11px] font-semibold text-[#6B7A8D] hover:text-rose-600 underline cursor-pointer"
                                                         >
                                                           Limpiar todo
                                                         </button>
                                                         <button
                                                           type="button"
                                                           onClick={() => setMealOptionMode(i, 0, "ingredientes")}
-                                                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--brand-primary)] hover:opacity-90 text-white flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                                                         >
                                                           <Plus className="w-3 h-3" />
                                                           <span>Agregar más alimentos SMAE</span>
@@ -6366,21 +6327,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     {liveMainSel.details.map((det, detIdx) => (
                                                       <div
                                                         key={`${det.nombre}_${detIdx}`}
-                                                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-emerald-200/90 shadow-2xs"
+                                                        className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs"
                                                       >
-                                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                           {det.foto && (
                                                             <img
                                                               src={det.foto}
                                                               alt={det.nombre}
-                                                              className="w-7 h-7 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0"
+                                                              className="w-8 h-8 rounded-lg object-contain bg-[#F8FAFC] border border-[#E2E8F0] shrink-0"
                                                               onError={(e) => { e.currentTarget.style.display = "none"; }}
                                                             />
                                                           )}
                                                           <div className="min-w-0 flex-1">
-                                                            <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
-                                                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap">
-                                                              <span className="font-semibold text-emerald-700">{det.smaeCorto}</span>
+                                                            <div className="text-xs font-bold text-[#0B1929] leading-snug">{det.label}</div>
+                                                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                              <span className="font-semibold text-[var(--brand-primary)]">{det.smaeCorto}</span>
                                                               <span>•</span>
                                                               <span>{det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)</span>
                                                             </div>
@@ -6388,38 +6349,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         </div>
 
                                                         <div className="flex items-center gap-1.5 shrink-0">
-                                                            <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => adjustIngredientEq(i, 0, det.nombre, -0.5)}
-                                                                className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
-                                                                title="Restar 0.5 equivalentes"
-                                                              >
-                                                                -
-                                                              </button>
-                                                              <div className="inline-flex items-center">
-                                                                <input
-                                                                  type="number"
-                                                                  step="0.1"
-                                                                  min="0.1"
-                                                                  max="20"
-                                                                  value={det.rawEq !== undefined ? det.rawEq : det.eq}
-                                                                  onChange={(e) => setIngredientEqDirect(i, 0, det.nombre, e.target.value)}
-                                                                  onBlur={(e) => commitIngredientEqDirect(i, 0, det.nombre, e.target.value)}
-                                                                  className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                  title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
-                                                                />
-                                                                <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
-                                                              </div>
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => adjustIngredientEq(i, 0, det.nombre, 0.5)}
-                                                                className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
-                                                                title="Sumar 0.5 equivalentes"
-                                                              >
-                                                                +
-                                                              </button>
+                                                          <div className="inline-flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-1.5 py-0.5">
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, -0.5)}
+                                                              className="w-5 h-5 rounded bg-white hover:bg-slate-100 text-[#0B1929] font-bold text-xs flex items-center justify-center border border-[#E2E8F0] cursor-pointer"
+                                                              title="Restar 0.5 equivalentes"
+                                                            >
+                                                              -
+                                                            </button>
+                                                            <div className="inline-flex items-center">
+                                                              <input
+                                                                type="number"
+                                                                step="0.1"
+                                                                min="0.1"
+                                                                max="20"
+                                                                value={det.rawEq !== undefined ? det.rawEq : det.eq}
+                                                                onChange={(e) => setIngredientEqDirect(i, 0, det.nombre, e.target.value)}
+                                                                onBlur={(e) => commitIngredientEqDirect(i, 0, det.nombre, e.target.value)}
+                                                                className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-[#0B1929] text-center bg-white border border-[#E2E8F0] rounded focus:outline-none focus:border-[var(--brand-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
+                                                              />
+                                                              <span className="text-[10px] font-mono font-bold text-[#6B7A8D] ml-0.5">eq</span>
                                                             </div>
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, 0.5)}
+                                                              className="w-5 h-5 rounded bg-[var(--brand-primary)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                              title="Sumar 0.5 equivalentes"
+                                                            >
+                                                              +
+                                                            </button>
+                                                          </div>
                                                           <button
                                                             type="button"
                                                             onClick={() => toggleIngrediente(i, det.nombre, 0)}
@@ -6464,10 +6425,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   </div>
                                                 ) : (
                                                   <label 
-                                                    className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-2xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[var(--brand-primary)] hover:bg-blue-50/30 flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all group"
+                                                    className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-2xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] hover:border-[var(--brand-primary)] flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all group"
                                                     title="Subir foto ilustrativa del platillo"
                                                   >
-                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] group-hover:text-[var(--brand-primary)] group-hover:border-blue-200 shadow-2xs transition-colors">
+                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] group-hover:text-[var(--brand-primary)] shadow-2xs transition-colors">
                                                       <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                     </div>
                                                     <span className="text-[10px] font-bold text-[#6B7A8D] group-hover:text-[var(--brand-primary)] transition-colors leading-tight">
@@ -6477,10 +6438,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   </label>
                                                 )}
 
-                                                <div className="flex-1 min-w-0 flex flex-col justify-between rounded-xl border border-purple-200/80 bg-purple-50/30 p-2.5 sm:p-3">
+                                                <div className="flex-1 min-w-0 flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-2.5 sm:p-3">
                                                   <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
-                                                      <Sparkles className="w-3 h-3 text-purple-600" />
+                                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0B1929] flex items-center gap-1">
+                                                      <Sparkles className="w-3 h-3 text-[var(--brand-primary)]" />
                                                       <span>Vista del Paciente (Receta IA · Solo Lectura)</span>
                                                     </span>
                                                   </div>
@@ -6488,19 +6449,19 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   {opcionesList[0] && !isPendingIa ? (
                                                     <textarea
                                                       readOnly
-                                                      className="w-full flex-1 bg-white/90 rounded-lg border border-purple-100 p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
+                                                      className="w-full flex-1 bg-white rounded-lg border border-[#E2E8F0] p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
                                                       rows={3}
                                                       value={opcionesList[0]}
                                                     />
                                                   ) : (
-                                                    <div className="flex-1 flex flex-col justify-center rounded-lg bg-white/80 border border-purple-100 p-2.5 text-xs text-purple-950 leading-relaxed">
+                                                    <div className="flex-1 flex flex-col justify-center rounded-lg bg-white border border-[#E2E8F0] p-2.5 text-xs text-[#0B1929] leading-relaxed">
                                                       {liveMainSel.details.length > 0 ? (
                                                         <>
-                                                          <p className="font-semibold text-purple-800">
+                                                          <p className="font-semibold text-[var(--brand-primary)]">
                                                             ✨ Al dar clic en «Guardar día», la IA redactará automáticamente la receta para el paciente con estos gramajes exactos.
                                                           </p>
                                                           {opcionesList[0] && (
-                                                            <p className="text-[11px] text-slate-500 mt-1 pt-1 border-t border-purple-100 line-clamp-2 italic">
+                                                            <p className="text-[11px] text-[#6B7A8D] mt-1 pt-1 border-t border-[#E2E8F0] line-clamp-2 italic">
                                                               Texto previo: {opcionesList[0]}
                                                             </p>
                                                           )}
@@ -6607,11 +6568,11 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               {/* Header de la Opción Alternativa */}
                                               <div className="flex items-center justify-between gap-2 mb-3">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                  <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                                                  <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/25">
                                                     Opción Alternativa ({optionLetter})
                                                   </span>
                                                   {c.opcionesPlatilloBase?.[actualIdx]?.nombre && (
-                                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] flex items-center gap-1">
                                                       <span>🍲</span>
                                                       <span>Receta base: {c.opcionesPlatilloBase[actualIdx].nombre}</span>
                                                     </span>
@@ -6633,32 +6594,32 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                             {/* Modo Platillo vs Modo Ingredientes vs Modo Manual */}
                                             {modo === "platillo" ? (
                                               /* Modo Platillo: Catálogo de Platillos FLUX para esta opción alternativa */
-                                              <div className="mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-200 animate-in fade-in transition-all">
-                                                <div className="flex items-center justify-between gap-2 mb-2">
-                                                  <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                                                    <Utensils className="w-3.5 h-3.5 text-purple-600" />
-                                                    Catálogo de Platillos FLUX (Opción {optionLetter})
+                                              <div className="mb-3 p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in transition-all">
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                                    <Utensils className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                                    <span>Catálogo de Platillos FLUX (Opción {optionLetter})</span>
                                                   </span>
                                                   <button
                                                     type="button"
                                                     onClick={() => setMealOptionMode(i, actualIdx, "manual")}
-                                                    className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer flex items-center gap-1 text-xs"
-                                                    title="Volver a modo manual"
+                                                    className="text-[#6B7A8D] hover:text-[#0B1929] px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                                                    title="Volver al platillo"
                                                   >
                                                     <X className="w-3.5 h-3.5" />
-                                                    <span className="hidden sm:inline">Cerrar</span>
+                                                    <span>Cerrar catálogo</span>
                                                   </button>
                                                 </div>
 
                                                 {/* Barra de búsqueda */}
-                                                <div className="relative mb-2">
+                                                <div className="relative">
                                                   <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                                   <input
                                                     type="text"
                                                     value={catSearch}
                                                     onChange={e => setDishCatalogSearchMap(prev => ({ ...prev, [optKey]: e.target.value }))}
                                                     placeholder="Buscar platillo (ej. Huevo, Pollo con arroz, Avena, Salmón)..."
-                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-purple-500"
+                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                                   />
                                                   {catSearch && (
                                                     <button
@@ -6672,7 +6633,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 </div>
 
                                                 {/* Filtros de Categorías */}
-                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2.5 no-scrollbar">
+                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                                                   {CATEGORIAS_PLATILLOS.map(cat => {
                                                     const isSelected = catActive === cat.id;
                                                     return (
@@ -6682,7 +6643,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         onClick={() => setDishCatalogCatMap(prev => ({ ...prev, [optKey]: cat.id }))}
                                                         className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
                                                           isSelected
-                                                            ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                                                            ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                                             : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50 hover:text-[#0B1929]"
                                                         }`}
                                                       >
@@ -6693,8 +6654,8 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })}
                                                 </div>
 
-                                                {/* Grid de Platillos */}
-                                                <div className="border border-[#E2E8F0] rounded-xl bg-white p-2.5 max-h-56 overflow-y-auto">
+                                                {/* Grid de Platillos directo a 2 columnas */}
+                                                <div className="max-h-72 overflow-y-auto pr-0.5">
                                                   {(() => {
                                                     const rawPlatillos = buscarPlatillosCatalogo(catSearch, catActive);
                                                     if (rawPlatillos.length === 0) {
@@ -6718,17 +6679,17 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       });
 
                                                     return (
-                                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                         {platillosEvaluados.map(({ item, evalRes }) => (
                                                           <div
                                                             key={item.id}
                                                             onClick={() => handleSelectDishFromCatalog(i, item, actualIdx)}
-                                                            className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all group ${
+                                                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border bg-white cursor-pointer select-none transition-all group ${
                                                               evalRes.status === "evitar"
                                                                 ? "border-rose-200 bg-rose-50/40 opacity-75 hover:opacity-100"
                                                                 : evalRes.status === "favorito"
                                                                 ? "border-emerald-300 bg-emerald-50/30 hover:border-emerald-400"
-                                                                : "border-[#E2E8F0] hover:border-purple-300 hover:bg-purple-50/50"
+                                                                : "border-[#E2E8F0] hover:border-[var(--brand-primary)]"
                                                             }`}
                                                           >
                                                             <img
@@ -6738,12 +6699,12 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                              loading="lazy"
                                                             />
                                                             <div className="min-w-0 flex-1">
-                                                              <p className="text-xs font-bold text-[#0B1929] leading-tight line-clamp-2">
+                                                              <p className="text-xs font-bold text-[#0B1929] leading-snug line-clamp-2">
                                                                 {item.nombre}
                                                               </p>
                                                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                                                 {item.calorias && (
-                                                                  <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                                  <span className="text-[10px] font-extrabold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-1.5 py-0.5 rounded">
                                                                     {item.calorias} kcal
                                                                   </span>
                                                                 )}
@@ -6768,16 +6729,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                               </div>
                                               ) : modo === "ingredientes" ? (
                                                 /* Constructor por Ingredientes + Equivalentes SMAE */
-                                                <div className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200 space-y-2.5 animate-in fade-in">
+                                                <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2.5 animate-in fade-in">
                                                   <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                                    <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                                       <span>🥑</span>
                                                       <span>Catálogo SMAE (Opción {optionLetter})</span>
                                                     </span>
                                                     <button
                                                       type="button"
                                                       onClick={() => setMealOptionMode(i, actualIdx, "manual")}
-                                                      className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg bg-white border border-gray-200 cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                                                      className="text-[#6B7A8D] hover:text-[#0B1929] px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] cursor-pointer flex items-center gap-1 text-xs font-semibold"
                                                     >
                                                       <X className="w-3.5 h-3.5" />
                                                       <span>Cerrar catálogo</span>
@@ -6791,7 +6752,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     value={ingSearch}
                                                     onChange={e => setIngredientSearchMap(prev => ({ ...prev, [optKey]: e.target.value }))}
                                                     placeholder="Buscar ingrediente o equivalente SMAE (ej. Pollo, Arroz, Brócoli, Avena)..."
-                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                                                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                                                   />
                                                   {ingSearch && (
                                                     <button
@@ -6805,7 +6766,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                 </div>
 
                                                 {/* Filtros de Categorías de Ingredientes */}
-                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                                                   {CATEGORIAS_INGREDIENTES.map(cat => {
                                                     const isSelected = ingActive === cat.id;
                                                     return (
@@ -6826,18 +6787,18 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })}
                                                 </div>
 
-                                                {/* Bandeja de seleccionados con Steppers de Equivalentes SMAE */}
+                                                {/* Bandeja compacta de etiquetas seleccionadas (sin steppers duplicados) */}
                                                 {selectedIngs.length > 0 && (
-                                                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                                                  <div className="p-2.5 rounded-xl bg-white border border-[#E2E8F0] space-y-1.5">
                                                     <div className="flex items-center justify-between gap-2">
-                                                      <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
-                                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                        {selectedIngs.length} ingredientes / equivalentes SMAE seleccionados:
+                                                      <span className="text-[11px] font-bold text-[#0B1929] flex items-center gap-1">
+                                                        <Check className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                                                        <span>{selectedIngs.length} alimentos seleccionados:</span>
                                                       </span>
                                                       <button
                                                         type="button"
                                                         onClick={() => clearIngredientes(i, actualIdx)}
-                                                        className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
+                                                        className="text-[10px] text-[#6B7A8D] hover:text-rose-600 font-semibold underline cursor-pointer"
                                                       >
                                                         Limpiar selección
                                                       </button>
@@ -6846,66 +6807,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       {selectedIngs.map((ing, ingIdx) => {
                                                         const ingName = typeof ing === "string" ? ing : (ing?.nombre || ing?.label || "");
                                                         if (!ingName) return null;
-                                                        const catItem = getIngredientesCatalog().find((x) => x.nombre === ingName) || { nombre: ingName };
-                                                        const eqVal = Number(ingredientEqMap[`${i}_${actualIdx}_${ingName}`]) || 1;
-                                                        const portionObj = formatIngredientSmaePortion(catItem, eqVal);
-                                                        const rawPortion = typeof portionObj === "string" ? portionObj : portionObj?.label;
-                                                        const portionLabel = typeof rawPortion === "string" && rawPortion ? rawPortion : ingName;
                                                         return (
-                                                          <div
+                                                          <span
                                                             key={`${ingName}_${ingIdx}`}
-                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-950 shadow-2xs"
+                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand-primary)]/10 border border-[var(--brand-primary)]/25 text-xs font-semibold text-[#0B1929]"
                                                           >
-                                                            <span className="truncate max-w-[230px]" title={portionLabel}>
-                                                              {portionLabel}
-                                                            </span>
-                                                              <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => adjustIngredientEq(i, actualIdx, ingName, -0.5)}
-                                                                  className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                                  title="Restar 0.5 equivalentes"
-                                                                >
-                                                                  -
-                                                                </button>
-                                                                <input
-                                                                  type="number"
-                                                                  step="0.1"
-                                                                  min="0.1"
-                                                                  max="20"
-                                                                  value={c.ingredientesEq?.[actualIdx]?.[ingName] ?? ingredientEqMap[`${i}_${actualIdx}_${ingName}`] ?? eqVal}
-                                                                  onChange={(e) => setIngredientEqDirect(i, actualIdx, ingName, e.target.value)}
-                                                                  onBlur={(e) => commitIngredientEqDirect(i, actualIdx, ingName, e.target.value)}
-                                                                  className="w-10 px-0.5 py-0 text-[10px] font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                  title="Escribe un equivalente exacto (ej. 0.6) o usa - / + en pasos de 0.5"
-                                                                />
-                                                                <span className="text-[9px] font-mono font-bold text-emerald-800">eq</span>
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => adjustIngredientEq(i, actualIdx, ingName, 0.5)}
-                                                                  className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                                  title="Sumar 0.5 equivalentes"
-                                                                >
-                                                                  +
-                                                                </button>
-                                                              </div>
+                                                            <span>{ingName}</span>
                                                             <button
                                                               type="button"
                                                               onClick={() => toggleIngrediente(i, ingName, actualIdx)}
-                                                              className="text-emerald-500 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                                              className="text-[#6B7A8D] hover:text-rose-600 transition-colors cursor-pointer"
                                                               title="Quitar alimento"
                                                             >
                                                               <X className="w-3.5 h-3.5" />
                                                             </button>
-                                                          </div>
+                                                          </span>
                                                         );
                                                       })}
                                                     </div>
                                                   </div>
                                                 )}
 
-                                                {/* Grid de Ingredientes con Checkboxes + Porción Oficial SMAE */}
-                                                <div className="border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] p-2.5 max-h-60 overflow-y-auto">
+                                                {/* Grid de Ingredientes directo (sin recuadro gris intermedio) a 2 columnas con nombres completos */}
+                                                <div className="max-h-72 overflow-y-auto pr-0.5">
                                                   {(() => {
                                                     const rawItems = buscarIngredientes(ingSearch, ingActive);
                                                     if (rawItems.length === 0) {
@@ -6926,7 +6850,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                       });
 
                                                     return (
-                                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                         {evaluatedItems.map(({ item, evalRes }) => {
                                                           const isChecked = selectedIngs.includes(item.nombre);
                                                           const smaeGrp = item.smaeGroup ? SMAE_GROUPS_MAP[item.smaeGroup] : null;
@@ -6934,47 +6858,47 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             <div
                                                               key={item.id}
                                                               onClick={() => toggleIngrediente(i, item.nombre, actualIdx)}
-                                                              className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
+                                                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
                                                                 isChecked
-                                                                  ? "bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-400"
+                                                                  ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]"
                                                                   : evalRes.status === "evitar"
                                                                   ? "bg-rose-50/40 border-rose-200 opacity-75 hover:opacity-100"
                                                                   : evalRes.status === "favorito"
                                                                   ? "bg-emerald-50/30 border-emerald-200 hover:border-emerald-300"
-                                                                  : "bg-white border-[#E2E8F0] hover:border-gray-300 hover:bg-gray-50"
+                                                                  : "bg-white border-[#E2E8F0] hover:border-[var(--brand-primary)]/50"
                                                               }`}
                                                             >
                                                               <input
                                                                 type="checkbox"
                                                                 checked={isChecked}
                                                                 onChange={() => {}}
-                                                                className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer shrink-0"
+                                                                className="mt-0.5 rounded accent-[var(--brand-primary)] w-3.5 h-3.5 cursor-pointer shrink-0"
                                                               />
                                                               <img
                                                                 src={item.foto}
                                                                 alt={item.nombre}
-                                                                className="w-7 h-7 object-contain rounded shrink-0 bg-white"
+                                                                className="w-8 h-8 object-contain rounded-lg shrink-0 bg-[#F8FAFC] border border-[#E2E8F0]/60"
                                                                 loading="lazy"
                                                                 onError={e => { e.currentTarget.style.display = 'none'; }}
                                                               />
                                                               <div className="min-w-0 flex-1">
-                                                                <div className="flex items-center gap-1">
-                                                                  <span className="text-xs font-bold text-[#0B1929] truncate" title={item.nombre}>
+                                                                <div className="flex items-start justify-between gap-1.5">
+                                                                  <span className="text-xs font-bold text-[#0B1929] leading-snug line-clamp-2">
                                                                     {item.nombre}
                                                                   </span>
                                                                   {evalRes.status === "favorito" && (
-                                                                    <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0" title={evalRes.reason}>
                                                                       ⭐
                                                                     </span>
                                                                   )}
                                                                   {evalRes.status === "evitar" && (
-                                                                    <span className="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold shrink-0" title={evalRes.reason}>
                                                                       🚫 Evitar
                                                                     </span>
                                                                   )}
                                                                 </div>
-                                                                <div className="text-[10px] text-[#6B7A8D] truncate">
-                                                                  1 eq: <strong className="text-emerald-700">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
+                                                                <div className="text-[11px] text-[#6B7A8D] leading-snug mt-0.5">
+                                                                  1 eq: <strong className="text-[var(--brand-primary)]">{item.porcion1Eq || `${item.gramosBase || 100} g`}</strong>
                                                                   {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
                                                                 </div>
                                                               </div>
@@ -6986,16 +6910,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   })()}
                                                 </div>
 
-                                                {/* Pie del Constructor: Subtotal en vivo + Insertar Lista SMAE + Redactar con IA */}
+                                                {/* Pie del Constructor: Subtotal en vivo + Confirmar */}
                                                 {(() => {
                                                   const liveAltSel = getScaledSelectedIngredients(i, actualIdx);
                                                   return (
-                                                    <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+                                                    <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-[#E2E8F0] shadow-2xs">
                                                       <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                                                         {liveAltSel.details.length > 0 ? (
                                                           <>
-                                                            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-950 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                                              <Flame className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2.5 py-1 rounded-lg border border-[var(--brand-primary)]/25">
+                                                              <Flame className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
                                                               <span>Selección ({optionLetter}): {liveAltSel.totalEq} eq · {liveAltSel.totalKcal} kcal</span>
                                                             </span>
                                                             <span className="text-[11px] font-mono font-bold text-[#475569]">
@@ -7004,24 +6928,24 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                           </>
                                                         ) : (
                                                           <span className="text-[11px] text-[#6B7A8D]">
-                                                            Marca los alimentos para la Opción {optionLetter} y ajusta sus equivalentes:
+                                                            Marca los alimentos para la Opción {optionLetter} para agregarlos al platillo.
                                                           </span>
                                                         )}
                                                       </div>
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
-                                                            disabled={selectedIngs.length === 0}
-                                                            className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-                                                          >
-                                                            <Check className="w-3.5 h-3.5" />
-                                                            <span>Listo · Ver en Platillo {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
-                                                          </button>
-                                                        </div>
+                                                      <div className="flex items-center gap-2 shrink-0">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => handleInsertIngredientsDirectly(i, actualIdx)}
+                                                          disabled={selectedIngs.length === 0}
+                                                          className="text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--brand-primary)] text-white hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
+                                                        >
+                                                          <Check className="w-3.5 h-3.5" />
+                                                          <span>Listo · Ver en Platillo {selectedIngs.length > 0 ? `(${selectedIngs.length})` : ""}</span>
+                                                        </button>
                                                       </div>
-                                                    );
-                                                  })()}
+                                                    </div>
+                                                  );
+                                                })()}
                                                 </div>
                                               ) : (
                                                 /* Vista Platillo Armado para Opción Alternativa */
@@ -7030,9 +6954,9 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                   const isAltPendingIa = Boolean(c.opcionesPendienteIa?.[actualIdx]) || (!String(altText || "").trim() && liveAltSel.details.length > 0);
                                                   return (
                                                     <div className="space-y-2.5">
-                                                      <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/80 space-y-2.5">
+                                                      <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2.5">
                                                         {liveAltSel.details.length === 0 ? (
-                                                          <div className="p-3.5 rounded-xl bg-white/90 border border-emerald-200/80 text-center space-y-2.5">
+                                                          <div className="p-3.5 rounded-xl bg-white border border-[#E2E8F0] text-center space-y-2.5">
                                                             <p className="text-xs font-bold text-[#0B1929]">
                                                               ¿Cómo deseas construir la Opción Alternativa ({optionLetter})?
                                                             </p>
@@ -7040,7 +6964,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               <button
                                                                 type="button"
                                                                 onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
-                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] hover:opacity-90 text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                                                               >
                                                                 <span>🥑</span>
                                                                 <span>Construirlo con equivalentes SMAE</span>
@@ -7048,7 +6972,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                               <button
                                                                 type="button"
                                                                 onClick={() => setMealOptionMode(i, actualIdx, "platillo")}
-                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                                                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-white hover:bg-[#F8FAFC] text-[#0B1929] border border-[#E2E8F0] hover:border-[var(--brand-primary)] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                                                               >
                                                                 <span>🍲</span>
                                                                 <span>Cargar receta prescrita de la Biblioteca</span>
@@ -7058,21 +6982,21 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         ) : (
                                                           <>
                                                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                              <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider">
+                                                              <span className="text-[11px] font-extrabold text-[#0B1929] uppercase tracking-wider">
                                                                 🥑 Alimentos Opción {optionLetter} ({liveAltSel.details.length})
                                                               </span>
                                                               <div className="flex items-center gap-2">
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => clearIngredientes(i, actualIdx)}
-                                                                  className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 underline cursor-pointer"
+                                                                  className="text-[11px] font-semibold text-[#6B7A8D] hover:text-rose-600 underline cursor-pointer"
                                                                 >
                                                                   Limpiar todo
                                                                 </button>
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => setMealOptionMode(i, actualIdx, "ingredientes")}
-                                                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer"
+                                                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--brand-primary)] hover:opacity-90 text-white flex items-center gap-1 cursor-pointer"
                                                                 >
                                                                   <Plus className="w-3 h-3" />
                                                                   <span>Agregar más alimentos SMAE</span>
@@ -7083,20 +7007,20 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             {liveAltSel.details.map((det, detIdx) => (
                                                               <div
                                                                 key={`${det.nombre}_${detIdx}`}
-                                                                className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-emerald-200 shadow-2xs"
+                                                                className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs"
                                                               >
                                                                 <div className="min-w-0 flex-1">
-                                                                  <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
-                                                                  <div className="text-[10px] text-[#6B7A8D]">
-                                                                    <span className="font-semibold text-emerald-700">{det.smaeCorto}</span> · {det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)
+                                                                  <div className="text-xs font-bold text-[#0B1929] leading-snug">{det.label}</div>
+                                                                  <div className="text-[10px] text-[#6B7A8D] mt-0.5">
+                                                                    <span className="font-semibold text-[var(--brand-primary)]">{det.smaeCorto}</span> · {det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)
                                                                   </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5 shrink-0">
-                                                                  <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                                                                  <div className="inline-flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-1.5 py-0.5">
                                                                     <button
                                                                       type="button"
                                                                       onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, -0.5)}
-                                                                      className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                                                                      className="w-5 h-5 rounded bg-white hover:bg-slate-100 text-[#0B1929] font-bold text-xs flex items-center justify-center border border-[#E2E8F0] cursor-pointer"
                                                                       title="Restar 0.5 equivalentes"
                                                                     >
                                                                       -
@@ -7110,15 +7034,15 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                                         value={det.rawEq !== undefined ? det.rawEq : det.eq}
                                                                         onChange={(e) => setIngredientEqDirect(i, actualIdx, det.nombre, e.target.value)}
                                                                         onBlur={(e) => commitIngredientEqDirect(i, actualIdx, det.nombre, e.target.value)}
-                                                                        className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                        className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-[#0B1929] text-center bg-white border border-[#E2E8F0] rounded focus:outline-none focus:border-[var(--brand-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                         title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
                                                                       />
-                                                                      <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
+                                                                      <span className="text-[10px] font-mono font-bold text-[#6B7A8D] ml-0.5">eq</span>
                                                                     </div>
                                                                     <button
                                                                       type="button"
                                                                       onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, 0.5)}
-                                                                      className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                                      className="w-5 h-5 rounded bg-[var(--brand-primary)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
                                                                       title="Sumar 0.5 equivalentes"
                                                                     >
                                                                       +
@@ -7139,22 +7063,22 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         )}
                                                       </div>
 
-                                                      <div className="rounded-xl border border-purple-200/80 bg-purple-50/30 p-2.5">
+                                                      <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-2.5">
                                                         <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                                                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1">
-                                                            <Sparkles className="w-3 h-3 text-purple-600" />
+                                                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0B1929] flex items-center gap-1">
+                                                            <Sparkles className="w-3 h-3 text-[var(--brand-primary)]" />
                                                             <span>Vista del Paciente Opción {optionLetter} (Solo Lectura)</span>
                                                           </span>
                                                         </div>
                                                         {altText && !isAltPendingIa ? (
                                                           <textarea
                                                             readOnly
-                                                            className="w-full bg-white/90 rounded-lg border border-purple-100 p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
+                                                            className="w-full bg-white rounded-lg border border-[#E2E8F0] p-2 text-xs text-[#0B1929] outline-none resize-none leading-relaxed cursor-default"
                                                             rows={2}
                                                             value={altText}
                                                           />
                                                         ) : (
-                                                          <div className="rounded-lg bg-white/80 border border-purple-100 p-2 text-xs text-purple-900">
+                                                          <div className="rounded-lg bg-white border border-[#E2E8F0] p-2 text-xs text-[var(--brand-primary)] font-semibold">
                                                             ✨ La receta de la Opción {optionLetter} se redactará automáticamente con IA al guardar el día.
                                                           </div>
                                                         )}
@@ -7187,7 +7111,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                       className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-semibold border ${
                                         isEstandar
                                           ? "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 cursor-pointer"
-                                          : "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 disabled:opacity-50 cursor-pointer"
+                                          : "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/15 border-[var(--brand-primary)]/25 disabled:opacity-50 cursor-pointer"
                                       }`}
                                       title={isEstandar ? "Función exclusiva de FLUX Pro" : "Genera automáticamente una alternativa que iguala con precisión los mismos macros de la Opción A"}
                                     >
@@ -7201,7 +7125,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           {isEstandar ? (
                                             <Lock className="w-3.5 h-3.5 text-slate-500" />
                                           ) : (
-                                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                                            <Sparkles className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
                                           )}
                                           <span>Generar Alternativa con IA</span>
                                           {isEstandar && (
@@ -7226,7 +7150,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                           {mealSmaeEntries.map((grp) => (
                                             <span
                                               key={grp.id}
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-900"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--brand-primary)]/10 border border-[var(--brand-primary)]/25 text-[10px] font-bold text-[var(--brand-primary)]"
                                             >
                                               <span>{grp.icono}</span>
                                               <span>{mealSmaeDetected[grp.id]} eq {grp.corto}</span>

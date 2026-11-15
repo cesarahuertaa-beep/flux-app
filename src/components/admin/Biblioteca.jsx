@@ -1403,21 +1403,21 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
 
               {/* 1. Alimentos Seleccionados en el Platillo (Bloques Variables como en Rutinas) */}
-              <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/80 space-y-3">
+              <div className="p-3.5 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
                       <span>🥑</span>
                       <span>Alimentos SMAE del Platillo ({(formPlatillo.ingredientes_smae || []).length})</span>
                     </span>
-                    <span className="text-[11px] text-emerald-700">
+                    <span className="text-[11px] text-[#6B7A8D]">
                       Ajusta los equivalentes con - / + y todo el platillo recalculará gramos, calorías y macros en vivo.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowPlatilloIngCatalog((v) => !v)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-primary)] hover:opacity-90 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>{showPlatilloIngCatalog ? "Ocultar catálogo SMAE" : "Agregar alimentos SMAE"}</span>
@@ -1426,7 +1426,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
                 {/* Lista de Alimentos Agregados */}
                 {(formPlatillo.ingredientes_smae || []).length === 0 ? (
-                  <div className="p-4 rounded-xl bg-white/80 border border-dashed border-emerald-300 text-center text-xs text-emerald-800">
+                  <div className="p-4 rounded-xl bg-white border border-dashed border-[#CBD5E1] text-center text-xs text-[#6B7A8D]">
                     Aún no has agregado alimentos a este platillo. Selecciona los ingredientes abajo del catálogo oficial SMAE.
                   </div>
                 ) : (
@@ -1434,20 +1434,20 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                     {computeSmaeFromIngredientItems(formPlatillo.ingredientes_smae).details.map((det, idx) => (
                       <div
                         key={`${det.nombre}_${idx}`}
-                        className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs"
+                        className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs"
                       >
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           {det.foto && (
                             <img
                               src={det.foto}
                               alt={det.nombre}
-                              className="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0"
+                              className="w-8 h-8 rounded-lg object-contain bg-[#F8FAFC] border border-[#E2E8F0] shrink-0"
                             />
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold text-[#0B1929] truncate">{det.label}</div>
-                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-emerald-700">{det.smaeCorto}</span>
+                            <div className="text-xs font-bold text-[#0B1929] leading-snug">{det.label}</div>
+                            <div className="text-[10px] text-[#6B7A8D] flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <span className="font-semibold text-[var(--brand-primary)]">{det.smaeCorto}</span>
                               <span>•</span>
                               <span>{det.kcal} kcal ({det.proteina}g P · {det.carbohidratos}g C · {det.grasas}g G)</span>
                             </div>
@@ -1455,11 +1455,11 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                          <div className="inline-flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-1.5 py-0.5">
                             <button
                               type="button"
                               onClick={() => adjustPlatilloIngredienteEq(det.nombre, -0.5)}
-                              className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                              className="w-5 h-5 rounded bg-white hover:bg-slate-100 text-[#0B1929] font-bold text-xs flex items-center justify-center border border-[#E2E8F0] cursor-pointer"
                               title="Restar 0.5 equivalentes"
                             >
                               -
@@ -1473,15 +1473,15 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                                 value={det.rawEq !== undefined ? det.rawEq : det.eq}
                                 onChange={(e) => setPlatilloIngredienteEqDirect(det.nombre, e.target.value)}
                                 onBlur={(e) => commitPlatilloIngredienteEqDirect(det.nombre, e.target.value)}
-                                className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-[#0B1929] text-center bg-white border border-[#E2E8F0] rounded focus:outline-none focus:border-[var(--brand-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
                               />
-                              <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
+                              <span className="text-[10px] font-mono font-bold text-[#6B7A8D] ml-0.5">eq</span>
                             </div>
                             <button
                               type="button"
                               onClick={() => adjustPlatilloIngredienteEq(det.nombre, 0.5)}
-                              className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                              className="w-5 h-5 rounded bg-[var(--brand-primary)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
                               title="Sumar 0.5 equivalentes"
                             >
                               +
@@ -1503,7 +1503,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
 
                 {/* Buscador desplegable del Catálogo Oficial SMAE */}
                 {showPlatilloIngCatalog && (
-                  <div className="p-3 rounded-xl bg-white border border-emerald-200 space-y-2.5">
+                  <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] space-y-2.5">
                     <div className="relative">
                       <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
@@ -1511,7 +1511,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         value={platilloIngSearch}
                         onChange={(e) => setPlatilloIngSearch(e.target.value)}
                         placeholder="Buscar alimento SMAE para agregar (ej. Salmón, Arroz, Pechuga, Huevo, Aguacate)..."
-                        className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-emerald-500"
+                        className="w-full pl-9 pr-8 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white text-xs text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                       />
                       {platilloIngSearch && (
                         <button
@@ -1534,7 +1534,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                             onClick={() => setPlatilloIngCat(cat.id)}
                             className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 transition-all flex items-center gap-1 border cursor-pointer ${
                               active
-                                ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                                ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-2xs"
                                 : "bg-white text-[#6B7A8D] border-[#E2E8F0] hover:bg-gray-50"
                             }`}
                           >
@@ -1545,7 +1545,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                       })}
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 pr-1">
+                    <div className="max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 pr-0.5">
                       {buscarIngredientes(platilloIngSearch, platilloIngCat)
                         .slice(0, 60)
                         .map((item) => {
@@ -1557,22 +1557,22 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                             <div
                               key={item.id}
                               onClick={() => togglePlatilloIngrediente(item.nombre)}
-                              className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
+                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
                                 isChecked
-                                  ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400"
-                                  : "bg-[#F8FAFC] border-[#E2E8F0] hover:bg-white hover:border-emerald-300"
+                                  ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]"
+                                  : "bg-[#F8FAFC] border-[#E2E8F0] hover:bg-white hover:border-[var(--brand-primary)]/50"
                               }`}
                             >
                               <input
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={() => {}}
-                                className="rounded text-emerald-600 w-3.5 h-3.5 pointer-events-none shrink-0"
+                                className="mt-0.5 rounded accent-[var(--brand-primary)] w-3.5 h-3.5 pointer-events-none shrink-0"
                               />
                               <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold text-[#0B1929] truncate">{item.nombre}</div>
-                                <div className="text-[10px] text-[#6B7A8D] truncate">
-                                  1 eq: <strong className="text-emerald-700">{item.porcion1Eq}</strong>
+                                <div className="text-xs font-bold text-[#0B1929] leading-snug line-clamp-2">{item.nombre}</div>
+                                <div className="text-[11px] text-[#6B7A8D] leading-snug mt-0.5">
+                                  1 eq: <strong className="text-[var(--brand-primary)]">{item.porcion1Eq}</strong>
                                   {smaeGrp ? ` · ${smaeGrp.corto}` : ""}
                                 </div>
                               </div>
@@ -1585,35 +1585,30 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
 
               {/* 2. Receta / Vista del Paciente (Solo lectura - Generada con IA al Guardar) */}
-              <div className="p-3.5 bg-purple-50/40 rounded-2xl border border-purple-200/80 space-y-2">
+              <div className="p-3.5 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] space-y-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <label className="text-xs font-bold text-[#0B1929] uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
                     <span>Receta para el Paciente (Generada con IA · Solo Lectura)</span>
                   </label>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                    {formPlatillo.pendienteIa || !formPlatillo.texto
-                      ? "⚡ Se redactará al Guardar"
-                      : "✓ Redactada con IA"}
-                  </span>
                 </div>
                 {formPlatillo.texto && !formPlatillo.pendienteIa ? (
                   <textarea
                     rows={3}
                     readOnly
                     value={formPlatillo.texto}
-                    className="w-full bg-white/90 border border-purple-200 rounded-xl p-3 text-xs text-[#0B1929] outline-none leading-relaxed cursor-default select-text"
+                    className="w-full bg-white border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0B1929] outline-none leading-relaxed cursor-default select-text"
                   />
                 ) : (
-                  <div className="p-3 rounded-xl bg-white/90 border border-purple-200/80 text-xs text-purple-900 leading-relaxed space-y-1">
-                    <p className="font-semibold flex items-center gap-1.5 text-purple-800">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] text-xs text-[#0B1929] leading-relaxed space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5 text-[var(--brand-primary)]">
+                      <Sparkles className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
                       <span>
                         Al dar clic en «Guardar platillo SMAE», la IA redactará automáticamente la descripción culinaria respetando las porciones exactas de arriba.
                       </span>
                     </p>
                     {formPlatillo.texto && (
-                      <p className="text-[11px] text-slate-500 pt-1 border-t border-purple-100 italic">
+                      <p className="text-[11px] text-[#6B7A8D] pt-1 border-t border-[#E2E8F0] italic">
                         Versión anterior: {formPlatillo.texto}
                       </p>
                     )}
@@ -1622,12 +1617,12 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
               </div>
 
               {/* 3. Resumen Automático de Equivalentes SMAE y Macros Oficiales */}
-              <div className="p-3.5 bg-gray-50 rounded-2xl border border-[#E2E8F0] space-y-2.5">
+              <div className="p-3.5 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] space-y-2.5">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="text-xs font-bold text-[#0B1929] uppercase tracking-wider">
                     Equivalentes y Macros Oficiales (Calculados por Literatura SMAE)
                   </span>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="text-[10px] font-semibold text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2 py-0.5 rounded-full border border-[var(--brand-primary)]/25">
                     100% Automático
                   </span>
                 </div>
@@ -1642,7 +1637,7 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                         return (
                           <span
                             key={gId}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-emerald-300 text-[11px] font-bold text-emerald-900 shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-[var(--brand-primary)]/30 text-[11px] font-bold text-[var(--brand-primary)] shadow-2xs"
                           >
                             <span>{grp.icono}</span>
                             <span>{val} eq {grp.corto}</span>
