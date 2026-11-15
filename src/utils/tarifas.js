@@ -114,6 +114,7 @@ export async function createDynamicStripeSession({
   userId = "",
   email = "",
   isUpgrade = false,
+  tier = 0,
 } = {}) {
   const supaUrl = import.meta.env.VITE_SUPABASE_URL;
   const supaKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -132,6 +133,7 @@ export async function createDynamicStripeSession({
       userId,
       email,
       isUpgrade,
+      tier,
       returnUrl,
     }),
   });
@@ -199,13 +201,11 @@ export function getRatesForCutoff(cfgRow, cutoffDateOrStr) {
 }
 
 /**
- * Resuelve el nivel, monto mensual del bloque y capacidad de pacientes
- * para un Nutriólogo (Titulado o Estudiante) según sus pacientes activos y las tarifas vigentes.
+ * Resuelve las especificaciones del plan según el número de nivel (1, 2 o 3)
+ * para un Nutriólogo o Estudiante.
  */
-export function resolveNutriPlanByVolume(activeCount = 0, isEstudiante = false, rates = DEFAULT_RATES) {
+export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAULT_RATES) {
   const r = normalizeRateItem(rates);
-  const count = Math.max(0, Number(activeCount) || 0);
-
   if (isEstudiante) {
     return {
       tier: 1,
@@ -217,26 +217,12 @@ export function resolveNutriPlanByVolume(activeCount = 0, isEstudiante = false, 
       nextTierLabel: "Nivel 1 Profesional",
       nextTierPrice: r.nutri_tier1,
       nextTierMax: r.tier1_max,
-      isOverLimit: count > r.estudiante_max
-    };
-  }
-
-  if (count <= r.tier1_max) {
-    return {
-      tier: 1,
-      tierLabel: "Nivel 1",
-      rangeLabel: `1 a ${r.tier1_max} pacientes`,
-      minPatients: 1,
-      maxPatients: r.tier1_max,
-      blockPrice: r.nutri_tier1,
-      nextTierLabel: "Nivel 2",
-      nextTierPrice: r.nutri_tier2,
-      nextTierMax: r.tier2_max,
       isOverLimit: false
     };
   }
 
-  if (count <= r.tier2_max) {
+  const t = Number(tier) || 1;
+  if (t === 2) {
     return {
       tier: 2,
       tierLabel: "Nivel 2",
@@ -251,16 +237,58 @@ export function resolveNutriPlanByVolume(activeCount = 0, isEstudiante = false, 
     };
   }
 
+  if (t === 3) {
+    return {
+      tier: 3,
+      tierLabel: "Nivel 3",
+      rangeLabel: `${r.tier2_max + 1}+ pacientes (Ilimitado)`,
+      minPatients: r.tier2_max + 1,
+      maxPatients: null,
+      blockPrice: r.nutri_tier3,
+      nextTierLabel: null,
+      nextTierPrice: null,
+      nextTierMax: null,
+      isOverLimit: false
+    };
+  }
+
   return {
-    tier: 3,
-    tierLabel: "Nivel 3",
-    rangeLabel: `${r.tier2_max + 1}+ pacientes (Ilimitado)`,
-    minPatients: r.tier2_max + 1,
-    maxPatients: null,
-    blockPrice: r.nutri_tier3,
-    nextTierLabel: null,
-    nextTierPrice: null,
-    nextTierMax: null,
+    tier: 1,
+    tierLabel: "Nivel 1",
+    rangeLabel: `1 a ${r.tier1_max} pacientes`,
+    minPatients: 1,
+    maxPatients: r.tier1_max,
+    blockPrice: r.nutri_tier1,
+    nextTierLabel: "Nivel 2",
+    nextTierPrice: r.nutri_tier2,
+    nextTierMax: r.tier2_max,
     isOverLimit: false
   };
+}
+
+/**
+ * Resuelve el nivel, monto mensual del bloque y capacidad de pacientes
+ * para un Nutriólogo (Titulado o Estudiante) según sus pacientes activos y las tarifas vigentes.
+ */
+export function resolveNutriPlanByVolume(activeCount = 0, isEstudiante = false, rates = DEFAULT_RATES) {
+  const r = normalizeRateItem(rates);
+  const count = Math.max(0, Number(activeCount) || 0);
+
+  if (isEstudiante) {
+    const plan = getNutriPlanByTier(1, true, r);
+    return {
+      ...plan,
+      isOverLimit: count > r.estudiante_max
+    };
+  }
+
+  if (count <= r.tier1_max) {
+    return getNutriPlanByTier(1, false, r);
+  }
+
+  if (count <= r.tier2_max) {
+    return getNutriPlanByTier(2, false, r);
+  }
+
+  return getNutriPlanByTier(3, false, r);
 }

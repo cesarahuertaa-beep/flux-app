@@ -46,6 +46,7 @@ serve(async (req: Request) => {
     const userId = body?.userId || "";
     const email = (body?.email || "").trim().toLowerCase();
     const returnUrl = body?.returnUrl || "https://fluxsport.app";
+    const requestedTier = Number(body?.tier || 0);
 
     // 1. Acción: Abrir Portal de Clientes de Stripe (para administrar o cancelar tarjeta domiciliada)
     if (action === "portal") {
@@ -169,16 +170,16 @@ serve(async (req: Request) => {
       const t3Max = Number(rates.tier3_max ?? 60);
       const estMax = Number(rates.estudiante_max ?? 15);
 
-      if (isStudent && clientCount <= estMax) {
+      if (isStudent && clientCount <= estMax && (requestedTier <= 1 || !requestedTier)) {
         amountMxn = Number(rates.estudiante_flat ?? 239);
         planTitle = `FLUX Plan Estudiante (1 a ${estMax} pacientes)`;
-      } else if (clientCount <= t1Max) {
+      } else if (clientCount <= t1Max && (requestedTier <= 1 || !requestedTier)) {
         amountMxn = Number(rates.tier1 ?? 499);
         planTitle = `FLUX Nivel 1 — Inicial (1 a ${t1Max} pacientes)`;
-      } else if (clientCount <= t2Max) {
+      } else if (clientCount <= t2Max && (requestedTier <= 2 || !requestedTier)) {
         amountMxn = Number(rates.tier2 ?? 699);
         planTitle = `FLUX Nivel 2 — Crecimiento (${t1Max + 1} a ${t2Max} pacientes)`;
-      } else if (clientCount <= t3Max) {
+      } else if (clientCount <= t3Max || requestedTier === 3) {
         amountMxn = Number(rates.tier3 ?? 949);
         planTitle = `FLUX Nivel 3 — Consolidado (${t2Max + 1} a ${t3Max} pacientes)`;
       } else {

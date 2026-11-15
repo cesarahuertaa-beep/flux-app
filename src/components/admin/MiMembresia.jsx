@@ -19,7 +19,7 @@ import {
   ExternalLink,
   ArrowUpCircle
 } from "lucide-react";
-import { getRatesForCutoff, resolveNutriPlanByVolume, buildCardCheckoutUrl, createDynamicStripeSession } from "../../utils/tarifas";
+import { getRatesForCutoff, resolveNutriPlanByVolume, getNutriPlanByTier, buildCardCheckoutUrl, createDynamicStripeSession } from "../../utils/tarifas";
 import { isNativePlayApp } from "../../lib/playBilling";
 
 /**
@@ -114,15 +114,18 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   }, [profileId]);
 
   const isEstudiante = (roleProp || perfil?.role) === "nutriologo_estudiante";
+  const [selectedTierOverride, setSelectedTierOverride] = useState(null);
 
-  // ── MOTOR UNIFICADO DE BLOQUES MENSUALES (30 DÍAS NATURALES + UPGRADE ESTILO NETFLIX) ──
+  // ── MOTOR UNIFICADO DE BLOQUES MENSUALES (30 DÍAS NATURALES + SELECCIÓN LIBRE DE NIVEL) ──
   const {
-    activeClientsList,
     adminLines,
     adminTotal,
     activeCount,
     planInfo,
     currentTier,
+    paidTier,
+    recommendedTier,
+    minAllowedTier,
     currentRate,
     maxPatients,
     totalAmount,
@@ -233,7 +236,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     const refDate = targetCutoff || (expDate && today >= expDate ? expDate : today);
     const rates = getRatesForCutoff(rawCfg, refDate);
 
-    // Determinar cuánto se ha pagado ya en el ciclo activo actual (para soportar Upgrades a mitad de mes estilo Netflix)
+    // Determinar cuánto se ha pagado ya en el ciclo activo actual (para soportar Upgrades a mitad de mes)
     let paidBaseInCurrentCycle = 0;
     let paidAdminInCurrentCycle = 0;
     if (isCycleActive && !isTrialPeriod && lastValid?.fecha_corte_mes) {
@@ -248,7 +251,37 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
     // Si es Estudiante pero rebasa el límite de estudiante (ej. >15 pac.), evalúa el bloque profesional correspondiente
     const effectiveStudentMode = isEstudiante && activePatientsCount <= rates.estudiante_max;
-    const resolvedPlan = resolveNutriPlanByVolume(activePatientsCount, effectiveStudentMode, rates);
+    const volumePlan = resolveNutriPlanByVolume(activePatientsCount, effectiveStudentMode, rates);
+    const volumeRecommendedTier = volumePlan.tier;
+
+    // Determinar nivel pagado en el ciclo activo
+    let activePaidTier = null;
+    if (isCycleActive && !isTrialPeriod && paidBaseInCurrentCycle > 0) {
+      if (isEstudiante && paidBaseInCurrentCycle < rates.nutri_tier1) {
+        activePaidTier = 1;
+      } else if (paidBaseInCurrentCycle < rates.nutri_tier2) {
+        activePaidTier = 1;
+      } else if (paidBaseInCurrentCycle < rates.nutri_tier3) {
+        activePaidTier = 2;
+      } else {
+        activePaidTier = 3;
+      }
+    }
+
+    // Candado lógico de capacidad mínima según pacientes activos
+    const minTierRequired = volumeRecommendedTier;
+
+    // Nivel seleccionado efectivo
+    let activeSelectedTier = volumeRecommendedTier;
+    if (selectedTierOverride && selectedTierOverride >= minTierRequired) {
+      activeSelectedTier = selectedTierOverride;
+    } else if (activePaidTier && activePaidTier >= minTierRequired) {
+      activeSelectedTier = activePaidTier;
+    } else {
+      activeSelectedTier = volumeRecommendedTier;
+    }
+
+    const resolvedPlan = getNutriPlanByTier(activeSelectedTier, effectiveStudentMode && activeSelectedTier === 1, rates);
 
     // Calcular capacidad máxima pagada actualmente en el ciclo activo
     let paidMaxPac = resolvedPlan.maxPatients;
@@ -274,7 +307,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     }));
     const adminTotalCalc = adminLinesCalc.reduce((acc, l) => acc + l.costo, 0);
 
-    // Verificar si requiere Upgrade a mitad de ciclo (ya pagó un nivel menor pero ahora tiene más pacientes activos)
+    // Verificar si requiere Upgrade a mitad de ciclo (ya pagó un nivel menor pero ahora tiene más pacientes activos o eligió un nivel superior)
     const needsMidCycleUpgrade =
       isCycleActive &&
       !isTrialPeriod &&
@@ -331,7 +364,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       ? effectiveCutoffForReceipt.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
       : "Al registrar 1er paciente";
 
-    const isPaidAndUpToDate = isCycleActive && !needsMidCycleUpgrade;
+    const isPaidAndUpToDate = isCycleActive && !needsMidCycleUpgrade && (activePaidTier ? activeSelectedTier <= activePaidTier : false);
 
     return {
       activeClientsList: activeList,
@@ -339,7 +372,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       adminTotal: adminTotalCalc,
       activeCount: activePatientsCount,
       planInfo: resolvedPlan,
-      currentTier: resolvedPlan.tier,
+      currentTier: activeSelectedTier,
+      paidTier: activePaidTier,
+      recommendedTier: volumeRecommendedTier,
+      minAllowedTier: minTierRequired,
       currentRate: resolvedPlan.blockPrice,
       maxPatients: resolvedPlan.maxPatients,
       totalAmount: amountToPay,
@@ -357,7 +393,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       alreadyPaidInCycle: paidBaseInCurrentCycle,
       paidTierMaxPatients: paidMaxPac
     };
-  }, [clientes, loading, rawCfg, historial, isEstudiante, profileId, patrocinios]);
+  }, [clientes, loading, rawCfg, historial, isEstudiante, profileId, patrocinios, selectedTierOverride]);
 
   const copyToClipboard = (text, type) => {
     if (!text) return;
@@ -444,7 +480,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   // Resolver link manual (opcional) o usar Opción B (API Dinámica de Stripe)
   const currentStripeLink = useMemo(() => {
     if (!activeRates?.domiciliacion_activa) return "";
-    const rawLink = isEstudiante
+    const rawLink = isEstudiante && currentTier === 1
       ? activeRates.stripe_link_estudiante
       : currentTier === 1
       ? activeRates.stripe_link_tier1
@@ -455,7 +491,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   }, [activeRates, isEstudiante, currentTier, profileId, perfil?.email]);
 
   const handleDynamicStripeCheckout = async () => {
-    if (currentStripeLink && !isUpgradeMidCycle && activeClientCount <= (activeRates?.tier3_max || 60)) {
+    if (currentStripeLink && !isUpgradeMidCycle && activeCount <= (activeRates?.tier3_max || 60)) {
       window.open(currentStripeLink, "_blank", "noopener,noreferrer");
       return;
     }
@@ -467,6 +503,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         userId: profileId,
         email: perfil?.email || "",
         isUpgrade: isUpgradeMidCycle,
+        tier: currentTier,
       });
       window.location.href = url;
     } catch (err) {
@@ -497,7 +534,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     }
   };
 
-  // Tarjeta de Facturación en Portal Web (Selector Tarjeta Domiciliada estilo Netflix vs SPEI)
+  // Tarjeta de Facturación en Portal Web (Selector Tarjeta Domiciliada vs SPEI)
   const renderSpeiCard = (customSubtitle) => (
     <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] flex flex-col justify-between">
       <div>
@@ -511,7 +548,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 {isUpgradeMidCycle ? `Upgrade a ${planInfo.tierLabel}` : "Portal de Facturación FLUX"}
               </h3>
               <p className="text-xs text-[#6B7A8D]">
-                {customSubtitle || "Elige pago con tarjeta domiciliada o transferencia SPEI (30 días)."}
+                {customSubtitle || "Elige pago con tarjeta domiciliada o transferencia SPEI."}
               </p>
             </div>
           </div>
@@ -567,8 +604,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               {isUpgradeMidCycle
                 ? "Diferencia por Upgrade"
                 : yaPagado && !hasPendingPayment
-                ? `Tarifa ${planInfo.tierLabel} (30 días)`
-                : "Total a Pagar (30 días)"}
+                ? `Tarifa ${planInfo.tierLabel}`
+                : "Total a Pagar"}
             </span>
             <span className="text-2xl font-black text-[#0B1929]">
               ${totalAmount.toFixed(2)}{" "}
@@ -598,11 +635,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   <span>
                     {isUpgradeMidCycle
                       ? "Pago con Tarjeta (Diferencia de Nivel)"
-                      : "Domiciliación Automática Mensual (Estilo Netflix)"}
+                      : "Domiciliación Automática Mensual"}
                   </span>
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Activación Instantánea
                 </span>
               </div>
               <p className="text-[#6B7A8D] leading-relaxed">
@@ -631,7 +665,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   ? "Conectando con pasarela bancaria..."
                   : isUpgradeMidCycle
                   ? `Pagar Upgrade con Tarjeta • $${totalAmount.toFixed(2)} MXN`
-                  : `Domiciliar Tarjeta • $${totalAmount.toFixed(2)} MXN / 30 días`}
+                  : `Domiciliar Tarjeta • $${totalAmount.toFixed(2)} MXN`}
               </span>
               <ExternalLink size={14} className="opacity-75" />
             </button>
@@ -748,7 +782,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     : isUpgradeMidCycle
                     ? `Subir Comprobante de Upgrade ($${totalAmount.toFixed(2)} MXN)`
                     : yaPagado && !hasPendingPayment
-                    ? "Adelantar Próxima Renovación (30 días)"
+                    ? "Adelantar Próxima Renovación"
                     : "Subir Comprobante de Pago"}
                 </span>
               </button>
@@ -962,46 +996,65 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     title: "Nivel 1",
                     range: `1 a ${activeRates.tier1_max} pac.`,
                     price: activeRates.nutri_tier1,
-                    active: !isEstudiante && currentTier === 1
                   },
                   {
                     tier: 2,
                     title: "Nivel 2",
                     range: `${activeRates.tier1_max + 1} a ${activeRates.tier2_max} pac.`,
                     price: activeRates.nutri_tier2,
-                    active: !isEstudiante && currentTier === 2
                   },
                   {
                     tier: 3,
                     title: "Nivel 3",
                     range: `${activeRates.tier2_max + 1}+ pac. (Ilimitado)`,
                     price: activeRates.nutri_tier3,
-                    active: !isEstudiante && currentTier === 3
                   }
-                ].map(b => (
-                  <div
-                    key={b.tier}
-                    className={`p-3.5 rounded-2xl border transition-all ${
-                      b.active
-                        ? "bg-blue-50/70 border-[var(--brand-primary)] shadow-2xs"
-                        : "bg-white border-[#E2E8F0]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-[#0B1929]">{b.title}</span>
-                      {b.active && (
-                        <span className="text-[10px] font-bold text-[var(--brand-primary)] bg-white px-2 py-0.5 rounded-full border border-blue-200">
-                          Actual
-                        </span>
-                      )}
+                ].map(b => {
+                  const isBlocked = b.tier < minAllowedTier;
+                  const isSelected = currentTier === b.tier;
+                  const isActualPaid = paidTier === b.tier;
+                  const isRecommended = !paidTier && recommendedTier === b.tier;
+
+                  return (
+                    <div
+                      key={b.tier}
+                      onClick={() => {
+                        if (!isBlocked) {
+                          setSelectedTierOverride(b.tier);
+                        }
+                      }}
+                      className={`p-3.5 rounded-2xl border transition-all text-left ${
+                        isBlocked
+                          ? "bg-slate-50 border-slate-200 opacity-45 cursor-not-allowed select-none"
+                          : isSelected
+                          ? "bg-blue-50/70 border-[var(--brand-primary)] shadow-2xs ring-1 ring-[var(--brand-primary)]/20 cursor-pointer"
+                          : "bg-white border-[#E2E8F0] hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-[#0B1929]">{b.title}</span>
+                        {isActualPaid ? (
+                          <span className="text-[10px] font-bold text-[var(--brand-primary)] bg-white px-2 py-0.5 rounded-full border border-blue-200 shadow-2xs">
+                            Actual
+                          </span>
+                        ) : isRecommended ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            Recomendado
+                          </span>
+                        ) : isSelected ? (
+                          <span className="text-[10px] font-bold text-[var(--brand-primary)] bg-white px-2 py-0.5 rounded-full border border-blue-200 shadow-2xs">
+                            Seleccionado
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="block text-[11px] text-[#6B7A8D] mt-0.5">{b.range}</span>
+                      <span className="block text-base font-black text-[#0B1929] mt-2">
+                        ${Number(b.price).toFixed(0)}{" "}
+                        <span className="text-[10px] font-semibold text-[#6B7A8D]">MXN / 30d</span>
+                      </span>
                     </div>
-                    <span className="block text-[11px] text-[#6B7A8D] mt-0.5">{b.range}</span>
-                    <span className="block text-base font-black text-[#0B1929] mt-2">
-                      ${Number(b.price).toFixed(0)}{" "}
-                      <span className="text-[10px] font-semibold text-[#6B7A8D]">MXN / 30d</span>
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1020,77 +1073,16 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 </span>
               </div>
             )}
-          </div>
-
-          {/* Lista de Pacientes Activos en el Ciclo y Resumen del Bloque */}
-          <div className="bg-white rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0] overflow-hidden">
-            <div className="p-4 md:p-6 border-b border-[#E2E8F0] flex items-center justify-between gap-3 bg-white">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-100/70 shadow-2xs">
-                  <FileText size={20} />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-base md:text-lg font-bold text-[#0B1929] leading-tight truncate">
-                    Pacientes Activos en tu Plan
-                  </h2>
-                  <p className="text-xs text-[#6B7A8D] mt-0.5">
-                    {activeClientsList.length === 0
-                      ? "Aún no tienes pacientes activos (0 pacientes = $0 MXN)"
-                      : `${activeClientsList.length} paciente${activeClientsList.length !== 1 ? "s" : ""} ocupando cupo en ${planInfo.tierLabel}`}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
-                  {expirationDate ? "Vencimiento" : "Ciclo"}
-                </span>
-                <span className="text-xs font-bold text-[#0B1929] bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80 inline-block mt-0.5">
-                  {expirationDate
-                    ? expirationDate.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
-                    : "30 días naturales"}
-                </span>
-              </div>
-            </div>
-
-            {activeClientsList.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#6B7A8D]">
-                No tienes pacientes activos en este momento. Puedes usar tu propio plan personal sin ningún costo.
-              </div>
-            ) : (
-              <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto">
-                {activeClientsList.map((c, idx) => (
-                  <div
-                    key={c.id || idx}
-                    className="flex items-center justify-between gap-2.5 p-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0]"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-100">
-                        {c.nombre ? c.nombre.slice(0, 2).toUpperCase() : <Users size={14} />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#0B1929] truncate">{c.nombre}</p>
-                        <p className="text-[10px] text-[#6B7A8D]">
-                          Alta: {c.created_at ? new Date(c.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "Reciente"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
-                      Activo #{idx + 1}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* Administrativos patrocinados (Solo visible con montos en Web) */}
             {!isPlayApp && adminLines.length > 0 && (
-              <div className="border-t border-[#E2E8F0] bg-amber-50/20 p-4 md:p-6 space-y-2">
+              <div className="mt-4 border-t border-[#E2E8F0] pt-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">
                     Administrativos Premium Patrocinados ({adminLines.length})
                   </span>
                   <span className="text-xs font-bold text-amber-800">
-                    +${adminTotal.toFixed(2)} MXN / 30 días
+                    +${adminTotal.toFixed(2)} MXN
                   </span>
                 </div>
               </div>
