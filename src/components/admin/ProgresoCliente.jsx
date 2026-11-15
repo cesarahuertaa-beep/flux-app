@@ -346,6 +346,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [customSmaeMap, setCustomSmaeMap] = useState(null);
   const [showStep5SmaeTable, setShowStep5SmaeTable] = useState(false);
   const [draggedSmaeId, setDraggedSmaeId] = useState(null);
+  const [showSmaeBoardInFollowUp, setShowSmaeBoardInFollowUp] = useState(false);
+  const [showFullR24hInFollowUp, setShowFullR24hInFollowUp] = useState(false);
 
   const getSmaeGroupPref = (groupId) => (form.smae_gustos && form.smae_gustos[groupId]) || "neutro";
   const setSmaeGroupPref = (groupId, pref) => {
@@ -895,6 +897,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     base.eval_faf_notas = "";
 
     const latestPrev = (allLinkedMetricas && allLinkedMetricas[0]) || (metricas && metricas[0]) || null;
+    if (latestPrev?.estatura) {
+      base.estatura = String(latestPrev.estatura);
+    }
+    if (latestPrev?.metodo_evaluacion) {
+      base.metodo_evaluacion = latestPrev.metodo_evaluacion;
+    }
     if (latestPrev?.smae_gustos && typeof latestPrev.smae_gustos === "object") {
       base.smae_gustos = { ...latestPrev.smae_gustos };
     }
@@ -905,10 +913,34 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       base.aversiones_alimentos = latestPrev.aversiones_alimentos;
     }
 
+    // Pre-llenar agua desde app en seguimientos (si existen registros en nutriProgreso)
+    if (latestPrev) {
+      const npVals = Object.values(nutriProgreso || {}).filter(Boolean);
+      const waterDays = npVals.filter((r) => (Number(r.agua_ml) || 0) > 0);
+      if (waterDays.length > 0) {
+        const sumMl = waterDays.reduce((acc, r) => acc + (Number(r.agua_ml) || 0), 0);
+        const avgL = (sumMl / (waterDays.length * 1000)).toFixed(1);
+        base.consumo_agua_estimado = `${avgL} L/día (según registro en app)`;
+      } else if (latestPrev.consumo_agua_estimado) {
+        base.consumo_agua_estimado = latestPrev.consumo_agua_estimado;
+      }
+
+      if (trainingDays > 0) {
+        base.dias_ejercicio_actual = String(trainingDays);
+      } else if (latestPrev.dias_ejercicio_actual) {
+        base.dias_ejercicio_actual = String(latestPrev.dias_ejercicio_actual);
+      }
+      if (latestPrev.horario_ejercicio) {
+        base.horario_ejercicio = latestPrev.horario_ejercicio;
+      }
+    }
+
     const clin = clinicalRec || peekClinicalRecord(selected?.id);
     setEvalSexo(normalizeSexo(selected?.genero || selected?.sexo || clin?.anamnesis?.genero));
     setEvalEdad(calcEdadFromBirthdate(selected?.fecha_nacimiento || clin?.anamnesis?.fecha_nacimiento, 25));
     setForm(base);
+    setShowSmaeBoardInFollowUp(false);
+    setShowFullR24hInFollowUp(false);
     setAutoSyncMacros(true);
     setPrescriptionMode("matematico");
     setManualMacros({ targetKcal: "", proteinG: "", carbsG: "", fatsG: "" });
@@ -1389,7 +1421,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     };
   }, [nutriDias, nutriProgreso]);
 
-  const isFirstEvaluationEver = !editingId && allLinkedMetricas.length === 0;
+  const trainingAdherenceSummary = useMemo(() => {
+    if (!Array.isArray(rutinas) || rutinas.length === 0) return null;
+    const completedSessionKeys = new Set();
+    const ejToRutina = {};
+    rutinas.forEach((r) => {
+      (r.ejercicios || []).forEach((e) => {
+        ejToRutina[String(e.id)] = r.id;
+      });
+    });
+    Object.entries(progreso || {}).forEach(([key, val]) => {
+      if (val === undefined || val === null || val === "") return;
+      const parts = key.split("-");
+      const rId = ejToRutina[parts[0]];
+      const semana = parts[1];
+      if (rId && semana) completedSessionKeys.add(`${rId}-${semana}`);
+    });
+    const sessionsLogged = completedSessionKeys.size;
+    return {
+      daysAssigned: routineDaysCount,
+      sessionsLogged,
+      summaryText: `${routineDaysCount} días/sem asignados · ${sessionsLogged} ${sessionsLogged === 1 ? "sesión registrada" : "sesiones registradas"} en app`,
+    };
+  }, [rutinas, progreso, routineDaysCount]);
+
+  const isFirstEvaluationEver = !editingId
+    ? allLinkedMetricas.length === 0
+    : (allLinkedMetricas.length <= 1 || String(allLinkedMetricas[allLinkedMetricas.length - 1]?.id) === String(editingId));
 
   const saveMetrica = async () => {
     setSaving(true);
@@ -2811,9 +2869,26 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                   </button>
                   <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
-                      {isReadOnly ? "Consultar Evaluación Corporal" : editingId ? "Editar Evaluación Corporal" : "Nueva Evaluación Corporal"}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-bold text-[#0B1929] truncate">
+                        {isReadOnly
+                          ? "Consultar Evaluación Corporal"
+                          : editingId
+                          ? "Editar Evaluación Corporal"
+                          : isFirstEvaluationEver
+                          ? "Nueva Evaluación Inicial"
+                          : "Nueva Evaluación de Seguimiento"}
+                      </h2>
+                      {!isReadOnly && (
+                        <span className={`hidden md:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                          isFirstEvaluationEver
+                            ? "bg-blue-50 text-[var(--brand-primary)] border-blue-200"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}>
+                          {isFirstEvaluationEver ? "1ª Consulta" : "Seguimiento"}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[11px] text-[#6B7A8D] hidden sm:block truncate">
                       {selected?.nombre} • {getMetodoLabel(form.metodo_evaluacion)}
                     </div>
@@ -3123,14 +3198,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
                           <span>Sensaciones y adherencia del ciclo previo</span>
                         </label>
-                        {adherenceSummary?.summaryText && (
+                        {(adherenceSummary?.summaryText || trainingAdherenceSummary?.summaryText) && (
                           <button
                             type="button"
                             disabled={isReadOnly}
                             onClick={() => {
                               if (!isReadOnly) {
                                 const current = (form.checkin_observaciones || "").trim();
-                                const summary = adherenceSummary.summaryText;
+                                const parts = [
+                                  adherenceSummary?.summaryText,
+                                  trainingAdherenceSummary ? `Entrenamiento: ${trainingAdherenceSummary.summaryText}` : null,
+                                ].filter(Boolean);
+                                const summary = parts.join(" | ");
                                 updForm(
                                   "checkin_observaciones",
                                   current && !current.includes(summary) ? `${current} | ${summary}` : summary
@@ -3145,11 +3224,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         )}
                       </div>
 
-                      {adherenceSummary && (
-                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 flex items-center justify-between gap-2 flex-wrap">
-                          <span>
-                            <strong>Registro en app:</strong> {adherenceSummary.summaryText}
-                          </span>
+                      {(adherenceSummary || trainingAdherenceSummary) && (
+                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 space-y-1">
+                          {adherenceSummary && (
+                            <div>
+                              <strong>Nutrición en app:</strong> {adherenceSummary.summaryText}
+                            </div>
+                          )}
+                          {trainingAdherenceSummary && (
+                            <div>
+                              <strong>Entrenamiento en app:</strong> {trainingAdherenceSummary.summaryText}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -3187,19 +3273,71 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </div>
                     </div>
 
-                    {!isReadOnly && Object.keys(form.smae_gustos || {}).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={resetAllSmaePrefs}
-                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 cursor-pointer flex items-center gap-1 shrink-0 transition-colors shadow-2xs"
-                        title="Restablecer todos los grupos a Neutro"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span className="hidden sm:inline">Restablecer a neutro</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!isFirstEvaluationEver && showSmaeBoardInFollowUp && (
+                        <button
+                          type="button"
+                          onClick={() => setShowSmaeBoardInFollowUp(false)}
+                          className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer flex items-center gap-1 transition-colors shadow-2xs"
+                        >
+                          <span>Contraer</span>
+                        </button>
+                      )}
+                      {!isReadOnly && (isFirstEvaluationEver || showSmaeBoardInFollowUp) && Object.keys(form.smae_gustos || {}).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={resetAllSmaePrefs}
+                          className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 cursor-pointer flex items-center gap-1 shrink-0 transition-colors shadow-2xs"
+                          title="Restablecer todos los grupos a Neutro"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span className="hidden sm:inline">Restablecer a neutro</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
+                  {/* Resumen Compacto en Seguimiento (Colapsado por defecto) */}
+                  {!isFirstEvaluationEver && !showSmaeBoardInFollowUp ? (
+                    (() => {
+                      const favCount = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "favorito").length;
+                      const disCount = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "disgusto").length;
+                      const neuCount = SMAE_GROUPS.length - favCount - disCount;
+                      return (
+                        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap text-xs">
+                              <span className="font-bold text-[#0B1929]">Heredado del ciclo anterior:</span>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                                {favCount} Favoritos
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold">
+                                {disCount} Evitar
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[#6B7A8D] text-[11px] font-medium">
+                                {neuCount} Neutro
+                              </span>
+                            </div>
+                            {(form.preferencias_alimentos || form.aversiones_alimentos) && (
+                              <p className="text-[11px] text-[#6B7A8D] truncate">
+                                {form.preferencias_alimentos ? `Gustos: ${form.preferencias_alimentos}` : ""}
+                                {form.preferencias_alimentos && form.aversiones_alimentos ? " · " : ""}
+                                {form.aversiones_alimentos ? `Evitar: ${form.aversiones_alimentos}` : ""}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowSmaeBoardInFollowUp(true)}
+                            className="px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[var(--brand-primary)] text-xs font-bold text-[#0B1929] hover:text-[var(--brand-primary)] transition-colors cursor-pointer shrink-0 shadow-2xs"
+                          >
+                            {isReadOnly ? "Ver tablero completo" : "Modificar preferencias"}
+                          </button>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                  <>
                   {/* TABLERO INTERACTIVO DE 3 ESTADOS (DRAG & DROP / 1-TAP) */}
                   {(() => {
                     const favGroups = SMAE_GROUPS.filter((g) => form.smae_gustos?.[g.id] === "favorito");
@@ -3428,56 +3566,110 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       />
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
 
-                {/* Paso 3: Alimentación Diaria Habitual (R24H) */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                        <Clock className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 uppercase tracking-wider">
-                            Paso 3
-                          </span>
-                          <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
-                            Alimentación Diaria Habitual (R24H)
-                          </h3>
+                {/* Paso 3: Alimentación Diaria Habitual (R24H) o Adherencia en Seguimiento */}
+                {(() => {
+                  const hasR24hFilled = Boolean(
+                    form.r24h_desayuno || form.r24h_colacion_m || form.r24h_comida || form.r24h_colacion_v || form.r24h_cena
+                  );
+                  const showFollowUpView = !isFirstEvaluationEver && !showFullR24hInFollowUp && !hasR24hFilled;
+                  return (
+                    <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 uppercase tracking-wider">
+                                Paso 3
+                              </span>
+                              <h3 className="text-sm sm:text-base font-bold text-[#0B1929]">
+                                {showFollowUpView ? "Adherencia y Desviaciones del Plan" : "Alimentación Diaria Habitual (R24H)"}
+                              </h3>
+                            </div>
+                            <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+                              {showFollowUpView
+                                ? "En consultas de seguimiento ya conocemos el menú asignado. Registra únicamente desviaciones frecuentes o comidas fuera del plan."
+                                : "Comprende qué suele desayunar, comer y cenar el paciente habitualmente a lo largo del día para adaptar el nuevo plan a sus horarios y rutinas reales."}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
-                          Comprende qué suele desayunar, comer y cenar el paciente habitualmente a lo largo del día para adaptar el nuevo plan a sus horarios y rutinas reales.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    {[
-                      { key: "r24h_desayuno", label: "Desayuno", ph: "Ej. 2 huevos con jamón, 2 tortillas y café" },
-                      { key: "r24h_colacion_m", label: "Colación matutina", ph: "Ej. Manzana con almendras o galletas" },
-                      { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pechuga de pollo, 1 taza de arroz, ensalada y agua" },
-                      { key: "r24h_colacion_v", label: "Colación vespertina", ph: "Ej. Yogur griego con fruta o barrita" },
-                      { key: "r24h_cena", label: "Cena", ph: "Ej. 2 quesadillas de panela o cereal con leche" },
-                      { key: "r24h_picoteos", label: "Bebidas habituales y picoteos", ph: "Ej. Refresco regular, 2L de agua natural, café, botanas" },
-                    ].map((item) => (
-                      <div key={item.key}>
-                        <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
-                          {item.label}
-                        </label>
-                        <input
-                          type="text"
-                          readOnly={isReadOnly}
-                          value={form[item.key] || ""}
-                          onChange={(e) => !isReadOnly && updForm(item.key, e.target.value)}
-                          placeholder={item.ph}
-                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                        />
+                        {!isFirstEvaluationEver && !hasR24hFilled && (
+                          <button
+                            type="button"
+                            onClick={() => setShowFullR24hInFollowUp((v) => !v)}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 cursor-pointer shrink-0 transition-colors"
+                          >
+                            {showFullR24hInFollowUp ? "Vista simplificada" : "Capturar R24H completo"}
+                          </button>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      {showFollowUpView ? (
+                        <div className="space-y-3 pt-1">
+                          {adherenceSummary && (
+                            <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/70 text-xs text-purple-950 flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span>
+                                <strong>Apego al menú:</strong> {adherenceSummary.pctComidas}%
+                              </span>
+                              <span>
+                                <strong>Agua registrada:</strong> ~{adherenceSummary.promedioAguaL} L/día ({adherenceSummary.pctAgua}%)
+                              </span>
+                              <span className="text-purple-700 text-[11px]">
+                                ({adherenceSummary.diasRegistrados} días con registro)
+                              </span>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                              ¿Hubo cambios o desviaciones frecuentes fuera del menú? (Opcional)
+                            </label>
+                            <textarea
+                              rows={2}
+                              readOnly={isReadOnly}
+                              value={form.r24h_picoteos || ""}
+                              onChange={(e) => !isReadOnly && updForm("r24h_picoteos", e.target.value)}
+                              placeholder="Ej. Cenas sociales los fines de semana, omitió la colación vespertina por trabajo, aumentó café..."
+                              className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] resize-none ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                          {[
+                            { key: "r24h_desayuno", label: "Desayuno", ph: "Ej. 2 huevos con jamón, 2 tortillas y café" },
+                            { key: "r24h_colacion_m", label: "Colación matutina", ph: "Ej. Manzana con almendras o galletas" },
+                            { key: "r24h_comida", label: "Comida principal", ph: "Ej. Pechuga de pollo, 1 taza de arroz, ensalada y agua" },
+                            { key: "r24h_colacion_v", label: "Colación vespertina", ph: "Ej. Yogur griego con fruta o barrita" },
+                            { key: "r24h_cena", label: "Cena", ph: "Ej. 2 quesadillas de panela o cereal con leche" },
+                            { key: "r24h_picoteos", label: "Bebidas habituales y picoteos", ph: "Ej. Refresco regular, 2L de agua natural, café, botanas" },
+                          ].map((item) => (
+                            <div key={item.key}>
+                              <label className="block text-[11px] font-bold text-[#0B1929] mb-1">
+                                {item.label}
+                              </label>
+                              <input
+                                type="text"
+                                readOnly={isReadOnly}
+                                value={form[item.key] || ""}
+                                onChange={(e) => !isReadOnly && updForm(item.key, e.target.value)}
+                                placeholder={item.ph}
+                                className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#0B1929] ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Paso 4: Mediciones Corporales y Antropometría */}
                 <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-[#E2E8F0] p-4 sm:p-6 shadow-none md:shadow-sm space-y-4">
