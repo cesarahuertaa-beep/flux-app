@@ -8,7 +8,6 @@ import {
   BarChart3,
   CheckCircle2,
   FileText,
-  Info,
   ShieldCheck,
   Copy,
   Check,
@@ -942,8 +941,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
       {/* ── CUERPO PRINCIPAL ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-6 border-b md:border-b-0 border-[#E2E8F0]">
-        {/* Columna Izquierda: Nivel Actual, Escala de Bloques y Pacientes Activos (7 cols) */}
-        <div className="lg:col-span-7 space-y-0 lg:space-y-6">
+        {/* Columna Izquierda: Nivel Actual, Escala de Bloques e Historial de Pagos (7 cols) */}
+        <div className="lg:col-span-7 space-y-4 lg:space-y-6">
           <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-[#0B1929] flex items-center gap-2">
@@ -1088,141 +1087,126 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               </div>
             )}
           </div>
+
+          {/* Historial de Recibos y Comprobantes (Solo en Portal Web) */}
+          {!isPlayApp && (
+            <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[var(--brand-primary)] flex items-center justify-center shrink-0 border border-blue-100">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B1929] leading-tight">
+                    Historial de Recibos y Comprobantes
+                  </h3>
+                  <p className="text-xs text-[#6B7A8D] mt-0.5">
+                    Comprobantes registrados y vigencias cubiertas
+                  </p>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="text-sm text-[#6B7A8D] py-4 text-center">Cargando historial de pagos...</div>
+              ) : historial.length === 0 ? (
+                <div className="text-xs text-[#6B7A8D] bg-slate-50 p-6 rounded-2xl text-center border border-slate-100">
+                  No tienes pagos registrados aún.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse hidden md:table">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100">
+                        <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
+                        <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Vigencia Cubierta</th>
+                        <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Comprobante</th>
+                        <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
+                        <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {historial.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3.5 px-4 text-xs text-[#0B1929] whitespace-nowrap">
+                            {new Date(r.created_at).toLocaleDateString("es-MX")}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-[#6B7A8D] whitespace-nowrap">
+                            {r.fecha_corte_mes
+                              ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+                              : "—"}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs whitespace-nowrap">
+                            {r.comprobante_url && !r.comprobante_url.startsWith("[") ? (
+                              <a
+                                href={r.comprobante_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--brand-primary)] hover:underline"
+                              >
+                                <span>Ver comprobante</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            ) : (
+                              <span className="text-[#6B7A8D] text-xs">Portal FLUX</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap text-sm">
+                            ${Number(r.monto).toFixed(2)}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              r.estado === "aprobado"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : r.estado === "rechazado"
+                                ? "bg-red-50 text-red-600 border border-red-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}>
+                              {r.estado}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Mobile View */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {historial.map(r => (
+                      <div key={r.id} className="py-3.5 space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-sm text-[#0B1929]">${Number(r.monto).toFixed(2)} MXN</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            r.estado === "aprobado"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : r.estado === "rechazado"
+                              ? "bg-red-50 text-red-600"
+                              : "bg-amber-50 text-amber-700"
+                          }`}>
+                            {r.estado}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
+                          <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
+                          <span>
+                            Vigencia:{" "}
+                            {r.fecha_corte_mes
+                              ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Columna Derecha: En App Nativa muestra Tarjeta Multiplataforma estilo Netflix; en Web muestra Portal SPEI */}
+        {/* Columna Derecha: En App Nativa muestra Tarjeta Multiplataforma; en Web muestra Portal SPEI/Tarjeta */}
         <div className="lg:col-span-5 space-y-4">
           {isPlayApp ? renderNativeMultiplatformCard() : renderSpeiCard()}
         </div>
       </div>
-
-      {/* ── REGLAS DE SUSCRIPCIÓN ── */}
-      <div className="bg-slate-50 border-b md:border border-slate-200/80 rounded-none md:rounded-3xl p-5 md:p-6">
-        <h3 className="text-xs font-bold text-[#0B1929] uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Info size={16} className="text-[#6B7A8D]" />
-          <span>Reglas de Vigencia y Días de Gracia</span>
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">Ciclo Mensual</span>
-            <p className="text-sm font-semibold text-[#0B1929]">30 días naturales continuos.</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider mb-1">Cortesía Inicial</span>
-            <p className="text-sm font-bold text-[var(--brand-primary)]">7 días gratis desde tu 1er paciente.</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
-            <span className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Días de Gracia</span>
-            <p className="text-sm font-semibold text-[#0B1929]">2 días adicionales tras vencer.</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-red-100 shadow-sm">
-            <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wider mb-1">Bloqueo Preventivo</span>
-            <p className="text-sm font-semibold text-[#0B1929]">Al 3er día sin renovación.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── HISTORIAL DE PAGOS (Solo en Portal Web) ── */}
-      {!isPlayApp && (
-        <div className="bg-white p-5 md:p-7 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
-          <h3 className="text-base font-bold text-[#0B1929] mb-4">
-            Historial de Recibos y Comprobantes
-          </h3>
-          {loading ? (
-            <div className="text-sm text-[#6B7A8D] py-4 text-center">Cargando historial de pagos...</div>
-          ) : historial.length === 0 ? (
-            <div className="text-xs text-[#6B7A8D] bg-slate-50 p-6 rounded-2xl text-center border border-slate-100">
-              No tienes pagos registrados aún.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse hidden md:table">
-                <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-100">
-                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha</th>
-                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Vigencia Cubierta</th>
-                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Comprobante</th>
-                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
-                    <th className="py-3 px-4 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {historial.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 px-4 text-xs text-[#0B1929] whitespace-nowrap">
-                        {new Date(r.created_at).toLocaleDateString("es-MX")}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-[#6B7A8D] whitespace-nowrap">
-                        {r.fecha_corte_mes
-                          ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
-                          : "—"}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs whitespace-nowrap">
-                        {r.comprobante_url && !r.comprobante_url.startsWith("[") ? (
-                          <a
-                            href={r.comprobante_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--brand-primary)] hover:underline"
-                          >
-                            <span>Ver comprobante</span>
-                            <ExternalLink size={11} />
-                          </a>
-                        ) : (
-                          <span className="text-[#6B7A8D] text-xs">Portal FLUX</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-[#0B1929] text-right whitespace-nowrap text-sm">
-                        ${Number(r.monto).toFixed(2)}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          r.estado === "aprobado"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : r.estado === "rechazado"
-                            ? "bg-red-50 text-red-600 border border-red-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}>
-                          {r.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Mobile View */}
-              <div className="md:hidden divide-y divide-slate-100">
-                {historial.map(r => (
-                  <div key={r.id} className="py-3.5 space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-sm text-[#0B1929]">${Number(r.monto).toFixed(2)} MXN</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        r.estado === "aprobado"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : r.estado === "rechazado"
-                          ? "bg-red-50 text-red-600"
-                          : "bg-amber-50 text-amber-700"
-                      }`}>
-                        {r.estado}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
-                      <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
-                      <span>
-                        Vigencia:{" "}
-                        {r.fecha_corte_mes
-                          ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
