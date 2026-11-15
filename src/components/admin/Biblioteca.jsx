@@ -301,8 +301,36 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
       const curr = Array.isArray(prev.ingredientes_smae) ? prev.ingredientes_smae : [];
       const nextItems = curr.map((it) => {
         if (it.nombre !== ingNombre) return it;
-        const nextEq = Math.max(0.5, Math.min(8, Math.round(((Number(it.eq) || 1) + delta) * 2) / 2));
+        const curVal = parseFloat(it.eq);
+        const base = !isNaN(curVal) && curVal > 0 ? curVal : 1;
+        const nextEq = Math.max(0.1, Math.min(20, Math.round((base + delta) * 100) / 100));
         return { ...it, eq: nextEq };
+      });
+      return syncPlatilloFromIngredients(prev, nextItems);
+    });
+  };
+
+  const setPlatilloIngredienteEqDirect = (ingNombre, rawVal) => {
+    setFormPlatillo((prev) => {
+      const curr = Array.isArray(prev.ingredientes_smae) ? prev.ingredientes_smae : [];
+      const nextItems = curr.map((it) => {
+        if (it.nombre !== ingNombre) return it;
+        return { ...it, eq: rawVal };
+      });
+      return syncPlatilloFromIngredients(prev, nextItems);
+    });
+  };
+
+  const commitPlatilloIngredienteEqDirect = (ingNombre, rawVal) => {
+    const parsed = parseFloat(rawVal);
+    const normalized = !isNaN(parsed) && parsed > 0
+      ? Math.max(0.1, Math.min(20, Math.round(parsed * 100) / 100))
+      : 0.5;
+    setFormPlatillo((prev) => {
+      const curr = Array.isArray(prev.ingredientes_smae) ? prev.ingredientes_smae : [];
+      const nextItems = curr.map((it) => {
+        if (it.nombre !== ingNombre) return it;
+        return { ...it, eq: normalized };
       });
       return syncPlatilloFromIngredients(prev, nextItems);
     });
@@ -1432,16 +1460,29 @@ export function Biblioteca({ biblioteca, onUpdate, setMsg, isSuperadmin }) {
                               type="button"
                               onClick={() => adjustPlatilloIngredienteEq(det.nombre, -0.5)}
                               className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                              title="Restar 0.5 equivalentes"
                             >
                               -
                             </button>
-                            <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[38px] text-center">
-                              {det.eq} eq
-                            </span>
+                            <div className="inline-flex items-center">
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                max="20"
+                                value={det.rawEq !== undefined ? det.rawEq : det.eq}
+                                onChange={(e) => setPlatilloIngredienteEqDirect(det.nombre, e.target.value)}
+                                onBlur={(e) => commitPlatilloIngredienteEqDirect(det.nombre, e.target.value)}
+                                className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
+                              />
+                              <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
+                            </div>
                             <button
                               type="button"
                               onClick={() => adjustPlatilloIngredienteEq(det.nombre, 0.5)}
                               className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                              title="Sumar 0.5 equivalentes"
                             >
                               +
                             </button>

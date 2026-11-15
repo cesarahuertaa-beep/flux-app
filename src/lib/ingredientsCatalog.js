@@ -202,7 +202,10 @@ export function formatIngredientSmaePortion(ing, equivalents = 1) {
     };
   }
 
-  const eq = Math.max(0.5, Math.round(Number(equivalents || 1) * 2) / 2);
+  const parsedEq = parseFloat(equivalents);
+  const eq = !isNaN(parsedEq) && parsedEq > 0
+    ? Math.max(0.1, Math.round(parsedEq * 100) / 100)
+    : 1;
   const gramos = Math.round((info.gramosBase || 30) * eq);
   let portionText = "";
 
@@ -397,7 +400,7 @@ export function resolveDishStructuredIngredients(dish = {}) {
   if (Array.isArray(dish.ingredientes_smae) && dish.ingredientes_smae.length > 0) {
     return dish.ingredientes_smae.map((it) => ({
       nombre: typeof it === "string" ? it : it.nombre,
-      eq: Math.max(0.5, Math.round((Number(it.eq) || 1) * 2) / 2),
+      eq: Math.max(0.1, Math.round((Number(it.eq) || 1) * 100) / 100),
     })).filter((it) => it.nombre);
   }
   if (
@@ -407,7 +410,7 @@ export function resolveDishStructuredIngredients(dish = {}) {
   ) {
     return dish.smae_equivalentes._ingredientes.map((it) => ({
       nombre: typeof it === "string" ? it : it.nombre,
-      eq: Math.max(0.5, Math.round((Number(it.eq) || 1) * 2) / 2),
+      eq: Math.max(0.1, Math.round((Number(it.eq) || 1) * 100) / 100),
     })).filter((it) => it.nombre);
   }
 
@@ -454,7 +457,7 @@ export function resolveDishStructuredIngredients(dish = {}) {
     if (matchedName) {
       result.push({
         nombre: matchedName,
-        eq: Math.max(0.5, Math.round(eq * 2) / 2),
+        eq: Math.max(0.1, Math.round(eq * 100) / 100),
       });
     }
   });
@@ -478,7 +481,11 @@ export function computeSmaeFromIngredientItems(items = []) {
 
   const details = (Array.isArray(items) ? items : []).map((it) => {
     const ingNombre = typeof it === "string" ? it : it?.nombre || "";
-    const eq = Math.max(0.5, Math.round((Number(it?.eq) || 1) * 2) / 2);
+    const rawEqVal = typeof it === "object" && it?.eq !== undefined ? it.eq : 1;
+    const parsedEq = parseFloat(rawEqVal);
+    const eq = !isNaN(parsedEq) && parsedEq > 0
+      ? Math.max(0.1, Math.round(parsedEq * 100) / 100)
+      : 1;
     const found =
       catalog.find((x) => x.nombre === ingNombre) ||
       catalog.find((x) => normalizar(x.nombre) === normalizar(ingNombre)) || {
@@ -496,7 +503,7 @@ export function computeSmaeFromIngredientItems(items = []) {
       scaled.equivalents > 0
     ) {
       smaeMap[scaled.smaeGroup] =
-        Math.round(((Number(smaeMap[scaled.smaeGroup]) || 0) + scaled.equivalents) * 10) / 10;
+        Math.round(((Number(smaeMap[scaled.smaeGroup]) || 0) + scaled.equivalents) * 100) / 100;
     }
     totalKcal += scaled.kcal || 0;
     totalProt += scaled.proteina || 0;
@@ -507,6 +514,7 @@ export function computeSmaeFromIngredientItems(items = []) {
     return {
       nombre: found.nombre || ingNombre,
       eq,
+      rawEq: rawEqVal,
       foto: info?.foto || "",
       porcion1Eq: info?.porcion1Eq || "",
       dietTags: info?.dietTags || [],
@@ -522,6 +530,6 @@ export function computeSmaeFromIngredientItems(items = []) {
     totalProt: Math.round(totalProt),
     totalCarbs: Math.round(totalCarbs),
     totalGrasas: Math.round(totalGrasas),
-    totalEq: Math.round(totalEq * 10) / 10,
+    totalEq: Math.round(totalEq * 100) / 100,
   };
 }

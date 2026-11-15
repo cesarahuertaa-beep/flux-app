@@ -637,7 +637,7 @@ export function serializeMealIngredients(items = []) {
       const nombre = typeof it === "string" ? it : it?.nombre;
       const eq = typeof it === "object" && it?.eq != null ? Number(it.eq) : 1;
       if (!nombre) return null;
-      return `${encodeURIComponent(String(nombre).trim())}=${Math.max(0.5, Math.round(eq * 2) / 2)}`;
+      return `${encodeURIComponent(String(nombre).trim())}=${Math.max(0.1, Math.round((eq || 1) * 100) / 100)}`;
     })
     .filter(Boolean)
     .join("|");
@@ -653,7 +653,7 @@ export function parseMealIngredientsString(rawStr = "") {
         const nombre = decodeURIComponent(pair.slice(0, idx)).trim();
         const eq = parseFloat(pair.slice(idx + 1));
         if (nombre && !isNaN(eq) && eq > 0) {
-          list.push({ nombre, eq: Math.max(0.5, Math.round(eq * 2) / 2) });
+          list.push({ nombre, eq: Math.max(0.1, Math.round(eq * 100) / 100) });
         }
       } catch {}
     }
@@ -720,7 +720,7 @@ export function stripSmaeTag(text = "") {
  */
 export function formatScaledSmaePortion(food, equivalents = 1) {
   if (!food) return "";
-  const eq = Math.max(0.5, Math.round(Number(equivalents || 1) * 2) / 2);
+  const eq = Math.max(0.1, Math.round((Number(equivalents) || 1) * 100) / 100);
   const gramos = Math.round((food.gramosBase || 30) * eq);
 
   if (food.unidadBase === "g" || food.unidadBase === "ml") {

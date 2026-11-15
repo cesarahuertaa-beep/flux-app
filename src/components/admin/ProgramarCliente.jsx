@@ -413,8 +413,10 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
   const adjustIngredientEq = (mealIdx, optIdx, ingNombre, delta) => {
     const key = `${mealIdx}_${optIdx}_${ingNombre}`;
     const meal = diaForm.comidas?.[mealIdx];
-    const cur = Number(meal?.ingredientesEq?.[optIdx]?.[ingNombre] ?? ingredientEqMap[key] ?? 1);
-    const next = Math.max(0.5, Math.min(8, Math.round((cur + delta) * 2) / 2));
+    const rawCur = meal?.ingredientesEq?.[optIdx]?.[ingNombre] ?? ingredientEqMap[key] ?? 1;
+    const cur = parseFloat(rawCur);
+    const base = !isNaN(cur) && cur > 0 ? cur : 1;
+    const next = Math.max(0.1, Math.min(20, Math.round((base + delta) * 100) / 100));
     setIngredientEqMap((prev) => ({ ...prev, [key]: next }));
 
     setDiaForm((p) => {
@@ -432,6 +434,52 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     });
   };
 
+  const setIngredientEqDirect = (mealIdx, optIdx, ingNombre, rawVal) => {
+    const key = `${mealIdx}_${optIdx}_${ingNombre}`;
+    setIngredientEqMap((prev) => ({ ...prev, [key]: rawVal }));
+    const parsed = parseFloat(rawVal);
+    const numericForCalc = !isNaN(parsed) && parsed > 0
+      ? Math.max(0.1, Math.min(20, Math.round(parsed * 100) / 100))
+      : null;
+
+    setDiaForm((p) => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const prevOptEq = { ...(c.ingredientesEq?.[optIdx] || {}) };
+      prevOptEq[ingNombre] = rawVal;
+      c.ingredientesEq = { ...(c.ingredientesEq || {}), [optIdx]: prevOptEq };
+      c.opcionesPendienteIa = { ...(c.opcionesPendienteIa || {}), [optIdx]: true };
+      if (optIdx === 0 && numericForCalc !== null) {
+        applyAutoMacrosToMealOption0(c, mealIdx, { [key]: numericForCalc });
+      }
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+  };
+
+  const commitIngredientEqDirect = (mealIdx, optIdx, ingNombre, rawVal) => {
+    const key = `${mealIdx}_${optIdx}_${ingNombre}`;
+    const parsed = parseFloat(rawVal);
+    const normalized = !isNaN(parsed) && parsed > 0
+      ? Math.max(0.1, Math.min(20, Math.round(parsed * 100) / 100))
+      : 0.5;
+    setIngredientEqMap((prev) => ({ ...prev, [key]: normalized }));
+
+    setDiaForm((p) => {
+      const cs = [...p.comidas];
+      const c = { ...cs[mealIdx] };
+      const prevOptEq = { ...(c.ingredientesEq?.[optIdx] || {}) };
+      prevOptEq[ingNombre] = normalized;
+      c.ingredientesEq = { ...(c.ingredientesEq || {}), [optIdx]: prevOptEq };
+      c.opcionesPendienteIa = { ...(c.opcionesPendienteIa || {}), [optIdx]: true };
+      if (optIdx === 0) {
+        applyAutoMacrosToMealOption0(c, mealIdx, { [key]: normalized });
+      }
+      cs[mealIdx] = c;
+      return { ...p, comidas: cs };
+    });
+  };
+
   const getScaledSelectedIngredients = (mealIdx, optIdx = 0) => {
     const meal = diaForm.comidas?.[mealIdx];
     const items =
@@ -441,7 +489,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     const eqSource = meal?.ingredientesEq?.[optIdx] || {};
     const structuredItems = items.map((ingNombre) => ({
       nombre: ingNombre,
-      eq: Number(eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1),
+      eq: eqSource[ingNombre] ?? ingredientEqMap[`${mealIdx}_${optIdx}_${ingNombre}`] ?? 1,
     }));
     return computeSmaeFromIngredientItems(structuredItems);
   };
@@ -6078,27 +6126,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                     <span className="truncate max-w-[230px]" title={portionLabel}>
                                                       {portionLabel}
                                                     </span>
-                                                    <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
-                                                      <button
-                                                        type="button"
-                                                        onClick={() => adjustIngredientEq(i, 0, ingName, -0.5)}
-                                                        className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                        title="Restar 0.5 equivalentes"
-                                                      >
-                                                        -
-                                                      </button>
-                                                      <span className="text-[10px] font-mono font-extrabold text-emerald-900 px-1">
-                                                        {eqVal}eq
-                                                      </span>
-                                                      <button
-                                                        type="button"
-                                                        onClick={() => adjustIngredientEq(i, 0, ingName, 0.5)}
-                                                        className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                        title="Sumar 0.5 equivalentes"
-                                                      >
-                                                        +
-                                                      </button>
-                                                    </div>
+                                                      <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => adjustIngredientEq(i, 0, ingName, -0.5)}
+                                                          className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                          title="Restar 0.5 equivalentes"
+                                                        >
+                                                          -
+                                                        </button>
+                                                        <input
+                                                          type="number"
+                                                          step="0.1"
+                                                          min="0.1"
+                                                          max="20"
+                                                          value={c.ingredientesEq?.[0]?.[ingName] ?? ingredientEqMap[`${i}_0_${ingName}`] ?? eqVal}
+                                                          onChange={(e) => setIngredientEqDirect(i, 0, ingName, e.target.value)}
+                                                          onBlur={(e) => commitIngredientEqDirect(i, 0, ingName, e.target.value)}
+                                                          className="w-10 px-0.5 py-0 text-[10px] font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                          title="Escribe un equivalente exacto (ej. 0.6) o usa - / + en pasos de 0.5"
+                                                        />
+                                                        <span className="text-[9px] font-mono font-bold text-emerald-800">eq</span>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => adjustIngredientEq(i, 0, ingName, 0.5)}
+                                                          className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                          title="Sumar 0.5 equivalentes"
+                                                        >
+                                                          +
+                                                        </button>
+                                                      </div>
                                                     <button
                                                       type="button"
                                                       onClick={() => toggleIngrediente(i, ingName)}
@@ -6305,27 +6362,38 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                         </div>
 
                                                         <div className="flex items-center gap-1.5 shrink-0">
-                                                          <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, -0.5)}
-                                                              className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
-                                                              title="Restar 0.5 equivalentes"
-                                                            >
-                                                              -
-                                                            </button>
-                                                            <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[36px] text-center">
-                                                              {det.eq} eq
-                                                            </span>
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => adjustIngredientEq(i, 0, det.nombre, 0.5)}
-                                                              className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
-                                                              title="Sumar 0.5 equivalentes"
-                                                            >
-                                                              +
-                                                            </button>
-                                                          </div>
+                                                            <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-0.5">
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => adjustIngredientEq(i, 0, det.nombre, -0.5)}
+                                                                className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                                                                title="Restar 0.5 equivalentes"
+                                                              >
+                                                                -
+                                                              </button>
+                                                              <div className="inline-flex items-center">
+                                                                <input
+                                                                  type="number"
+                                                                  step="0.1"
+                                                                  min="0.1"
+                                                                  max="20"
+                                                                  value={det.rawEq !== undefined ? det.rawEq : det.eq}
+                                                                  onChange={(e) => setIngredientEqDirect(i, 0, det.nombre, e.target.value)}
+                                                                  onBlur={(e) => commitIngredientEqDirect(i, 0, det.nombre, e.target.value)}
+                                                                  className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                  title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
+                                                                />
+                                                                <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
+                                                              </div>
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => adjustIngredientEq(i, 0, det.nombre, 0.5)}
+                                                                className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                                title="Sumar 0.5 equivalentes"
+                                                              >
+                                                                +
+                                                              </button>
+                                                            </div>
                                                           <button
                                                             type="button"
                                                             onClick={() => toggleIngrediente(i, det.nombre, 0)}
@@ -6792,25 +6860,36 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                             <span className="truncate max-w-[230px]" title={portionLabel}>
                                                               {portionLabel}
                                                             </span>
-                                                            <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => adjustIngredientEq(i, actualIdx, ingName, -0.5)}
-                                                                className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                              >
-                                                                -
-                                                              </button>
-                                                              <span className="text-[10px] font-mono font-extrabold text-emerald-900 px-1">
-                                                                {eqVal}eq
-                                                              </span>
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => adjustIngredientEq(i, actualIdx, ingName, 0.5)}
-                                                                className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
-                                                              >
-                                                                +
-                                                              </button>
-                                                            </div>
+                                                              <div className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 rounded-md px-1 py-0.5 ml-0.5">
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => adjustIngredientEq(i, actualIdx, ingName, -0.5)}
+                                                                  className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                                  title="Restar 0.5 equivalentes"
+                                                                >
+                                                                  -
+                                                                </button>
+                                                                <input
+                                                                  type="number"
+                                                                  step="0.1"
+                                                                  min="0.1"
+                                                                  max="20"
+                                                                  value={c.ingredientesEq?.[actualIdx]?.[ingName] ?? ingredientEqMap[`${i}_${actualIdx}_${ingName}`] ?? eqVal}
+                                                                  onChange={(e) => setIngredientEqDirect(i, actualIdx, ingName, e.target.value)}
+                                                                  onBlur={(e) => commitIngredientEqDirect(i, actualIdx, ingName, e.target.value)}
+                                                                  className="w-10 px-0.5 py-0 text-[10px] font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                  title="Escribe un equivalente exacto (ej. 0.6) o usa - / + en pasos de 0.5"
+                                                                />
+                                                                <span className="text-[9px] font-mono font-bold text-emerald-800">eq</span>
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => adjustIngredientEq(i, actualIdx, ingName, 0.5)}
+                                                                  className="w-4 h-4 rounded flex items-center justify-center text-emerald-800 hover:bg-emerald-200 font-bold text-xs cursor-pointer"
+                                                                  title="Sumar 0.5 equivalentes"
+                                                                >
+                                                                  +
+                                                                </button>
+                                                              </div>
                                                             <button
                                                               type="button"
                                                               onClick={() => toggleIngrediente(i, ingName, actualIdx)}
@@ -6999,16 +7078,29 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
                                                                       type="button"
                                                                       onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, -0.5)}
                                                                       className="w-5 h-5 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200/70 cursor-pointer"
+                                                                      title="Restar 0.5 equivalentes"
                                                                     >
                                                                       -
                                                                     </button>
-                                                                    <span className="text-xs font-mono font-extrabold text-emerald-950 min-w-[36px] text-center">
-                                                                      {det.eq} eq
-                                                                    </span>
+                                                                    <div className="inline-flex items-center">
+                                                                      <input
+                                                                        type="number"
+                                                                        step="0.1"
+                                                                        min="0.1"
+                                                                        max="20"
+                                                                        value={det.rawEq !== undefined ? det.rawEq : det.eq}
+                                                                        onChange={(e) => setIngredientEqDirect(i, actualIdx, det.nombre, e.target.value)}
+                                                                        onBlur={(e) => commitIngredientEqDirect(i, actualIdx, det.nombre, e.target.value)}
+                                                                        className="w-11 px-1 py-0.5 text-xs font-mono font-extrabold text-emerald-950 text-center bg-white border border-emerald-200/80 rounded focus:outline-none focus:border-emerald-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                        title="Escribe un equivalente exacto (ej. 0.6, 1.25) o usa - / + en pasos de 0.5"
+                                                                      />
+                                                                      <span className="text-[10px] font-mono font-bold text-emerald-800 ml-0.5">eq</span>
+                                                                    </div>
                                                                     <button
                                                                       type="button"
                                                                       onClick={() => adjustIngredientEq(i, actualIdx, det.nombre, 0.5)}
                                                                       className="w-5 h-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                                                                      title="Sumar 0.5 equivalentes"
                                                                     >
                                                                       +
                                                                     </button>
