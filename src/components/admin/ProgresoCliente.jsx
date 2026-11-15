@@ -266,54 +266,106 @@ function buildAdherenceSnapshot({
   const cicloNombreRaw = String(cicloEvaluado?.nombre || "").split("|")[0].trim();
   const cicloNombre = cicloNombreRaw || "Plan actual";
 
-  // 1. Nutrición e Hidratación filtrada al ciclo evaluado
-  const validDiaIds = new Set((nutriDiasCiclo || []).map((d) => String(d.id)));
-  const filteredNutri = (nutriProgresoRows || []).filter(
-    (r) => r && r.dia_id != null && validDiaIds.has(String(r.dia_id))
-  );
+  // 1. Nutrición e Hidratación filtrada al ciclo evaluado (incluyendo días/semanas nulos como 0/N)
+  const diasList = Array.isArray(nutriDiasCiclo) ? nutriDiasCiclo : [];
+  const validDiaIds = new Set(diasList.map((d) => String(d.id)));
+  const npMap = {};
+  let maxLoggedNutriWeek = 0;
+  let metaAguaBase = 2000;
+
+  (nutriProgresoRows || []).forEach((r) => {
+    if (!r || r.dia_id == null || !validDiaIds.has(String(r.dia_id))) return;
+    const sem = Number(r.semana) || 1;
+    npMap[`${r.dia_id}-${sem}`] = r;
+    if (sem > maxLoggedNutriWeek) maxLoggedNutriWeek = sem;
+    if (Number(r.meta_agua_ml) > 0) metaAguaBase = Number(r.meta_agua_ml);
+  });
+
+  const semanasCalc = getSemanasConFecha((rutinasCiclo && rutinasCiclo[0]) || null, cicloEvaluado);
+  const currentWeekIdx = semanasCalc.findIndex((s) => s.isCurrent);
+  const currentWeekNum = currentWeekIdx !== -1 ? (semanasCalc[currentWeekIdx]?.weekNum || 1) : (semanasCalc[semanasCalc.length - 1]?.weekNum || 1);
+  let validWeeks = currentWeekIdx !== -1
+    ? semanasCalc.filter((s) => s.weekNum <= currentWeekNum)
+    : (semanasCalc.length > 0 ? semanasCalc : [{ weekNum: 1, label: "Sem 1", isCurrent: true }]);
+
+  if (maxLoggedNutriWeek > (validWeeks[validWeeks.length - 1]?.weekNum || 0)) {
+    const existingNums = new Set(validWeeks.map((w) => w.weekNum));
+    for (let w = 1; w <= maxLoggedNutriWeek; w++) {
+      if (!existingNums.has(w)) {
+        const found = semanasCalc.find((s) => s.weekNum === w);
+        validWeeks.push(found || { weekNum: w, label: `Sem ${w}`, isCurrent: false });
+      }
+    }
+    validWeeks.sort((a, b) => a.weekNum - b.weekNum);
+  }
 
   let totalComidas = 0;
   let comidasRealizadas = 0;
   let totalAguaMl = 0;
   let totalMetaAguaMl = 0;
   let diasRegistrados = 0;
-  const nutriByWeekMap = {};
+  let diasTotalesPeriodo = 0;
+  const nutriSemanas = [];
 
-  filteredNutri.forEach((r) => {
-    const cTotal = Number(r.comidas_total) || 0;
-    const cDone = Number(r.comidas_realizadas) || 0;
-    const agua = Number(r.agua_ml) || 0;
-    const metaAgua = Number(r.meta_agua_ml) || 2000;
-    if (cTotal > 0 || agua > 0) {
-      diasRegistrados++;
-      const sem = Number(r.semana) || 1;
-      if (!nutriByWeekMap[sem]) {
-        nutriByWeekMap[sem] = { semana: sem, comidasTotal: 0, comidasRealizadas: 0, aguaMl: 0, metaAguaMl: 0, dias: 0 };
-      }
-      nutriByWeekMap[sem].comidasTotal += cTotal;
-      nutriByWeekMap[sem].comidasRealizadas += cDone;
-      nutriByWeekMap[sem].aguaMl += agua;
-      nutriByWeekMap[sem].metaAguaMl += metaAgua;
-      nutriByWeekMap[sem].dias += 1;
-    }
-    totalComidas += cTotal;
-    comidasRealizadas += cDone;
-    totalAguaMl += agua;
-    totalMetaAguaMl += metaAgua;
-  });
+  if (diasList.length > 0) {
+    validWeeks.forEach((s) => {
+      let semComidas = 0;
+      let semTotalComidas = 0;
+      let semAguaMl = 0;
+      let semMetaAguaMl = 0;
+      let semDiasActivos = 0;
+
+      diasList.forEach((d) => {
+        const r = npMap[`${d.id}-${s.weekNum}`];
+        const totalC = (d.comidas || []).length;
+        const doneMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
+        let doneCount = (d.comidas || []).filter((c, ci) => Boolean(
+          (c.id && doneMap[c.id]) ||
+          doneMap[ci] ||
+          doneMap[String(ci)] ||
+          (c.orden != null && doneMap[c.orden])
+        )).length;
+        if (doneCount === 0 && Number(r?.comidas_realizadas) > 0) {
+          doneCount = totalC > 0 ? Math.min(Number(r.comidas_realizadas), totalC) : Number(r.comidas_realizadas);
+        }
+        const agua = Number(r?.agua_ml) || 0;
+        const metaAgua = Number(r?.meta_agua_ml) || metaAguaBase;
+
+        if (doneCount > 0 || agua > 0) {
+          diasRegistrados++;
+          semDiasActivos++;
+        }
+
+        diasTotalesPeriodo++;
+        semComidas += doneCount;
+        semTotalComidas += totalC;
+        semAguaMl += agua;
+        semMetaAguaMl += metaAgua;
+
+        comidasRealizadas += doneCount;
+        totalComidas += totalC;
+        totalAguaMl += agua;
+        totalMetaAguaMl += metaAgua;
+      });
+
+      nutriSemanas.push({
+        semana: s.weekNum,
+        label: s.label || `Sem ${s.weekNum}`,
+        comidasRealizadas: semComidas,
+        comidasTotal: semTotalComidas,
+        pctComidas: semTotalComidas > 0 ? Math.min(100, Math.round((semComidas / semTotalComidas) * 100)) : 0,
+        promedioAguaL: diasList.length > 0 ? (semAguaMl / (diasList.length * 1000)).toFixed(2) : "0.00",
+        pctAgua: semMetaAguaMl > 0 ? Math.min(100, Math.round((semAguaMl / semMetaAguaMl) * 100)) : 0,
+        dias: semDiasActivos,
+        diasTotales: diasList.length,
+      });
+    });
+  }
 
   const pctComidas = totalComidas > 0 ? Math.min(100, Math.round((comidasRealizadas / totalComidas) * 100)) : 0;
   const pctAgua = totalMetaAguaMl > 0 ? Math.min(100, Math.round((totalAguaMl / totalMetaAguaMl) * 100)) : 0;
-  const promedioAguaL = diasRegistrados > 0 ? (totalAguaMl / (diasRegistrados * 1000)).toFixed(1) : "0.0";
-
-  const nutriSemanas = Object.values(nutriByWeekMap)
-    .sort((a, b) => a.semana - b.semana)
-    .map((w) => ({
-      semana: w.semana,
-      pctComidas: w.comidasTotal > 0 ? Math.min(100, Math.round((w.comidasRealizadas / w.comidasTotal) * 100)) : 0,
-      pctAgua: w.metaAguaMl > 0 ? Math.min(100, Math.round((w.aguaMl / w.metaAguaMl) * 100)) : 0,
-      dias: w.dias,
-    }));
+  const promedioAguaL = diasTotalesPeriodo > 0 ? (totalAguaMl / (diasTotalesPeriodo * 1000)).toFixed(2) : "0.00";
+  const promedioAguaDiasActivosL = diasRegistrados > 0 ? (totalAguaMl / (diasRegistrados * 1000)).toFixed(2) : "0.00";
 
   // 2. Entrenamiento filtrado al ciclo evaluado
   const rs = Array.isArray(rutinasCiclo) ? rutinasCiclo : [];
@@ -370,13 +422,15 @@ function buildAdherenceSnapshot({
     ciclo_evaluado_nombre: cicloNombre,
     capturado_en: new Date().toISOString(),
     nutricion: {
-      hasPlan: (nutriDiasCiclo || []).length > 0,
+      hasPlan: diasList.length > 0,
       dias_registrados: diasRegistrados,
+      dias_totales: diasTotalesPeriodo,
       pct_comidas: pctComidas,
       comidas_realizadas: comidasRealizadas,
       comidas_total: totalComidas,
       pct_agua: pctAgua,
       promedio_agua_l: promedioAguaL,
+      promedio_agua_activos_l: promedioAguaDiasActivosL,
       semanas: nutriSemanas,
     },
     entrenamiento: {
@@ -1015,7 +1069,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
         let ds = [];
         if (Array.isArray(ns) && ns.length > 0) {
-          ds = await dbGetFresh(`nutricion_dias?nutricion_id=eq.${ns[0].id}&order=orden.asc`).catch(() => []);
+          const rawDs = await dbGetFresh(`nutricion_dias?nutricion_id=eq.${ns[0].id}&select=*,comidas(*)&order=orden.asc`).catch(() => []);
+          ds = (rawDs || []).map((d) => ({
+            ...d,
+            comidas: (d.comidas || []).sort((a, b) => (a.orden || 0) - (b.orden || 0)),
+          }));
         }
 
         const rsFull = Array.isArray(rs) ? rs : [];
@@ -1032,7 +1090,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
       const currentRes = await fetchCicloResources(targetCicloObj);
       const currDiaIds = new Set(currentRes.ds.map((d) => String(d.id)));
-      const currHasNutriActivity = validNp.some((r) => r && r.dia_id != null && currDiaIds.has(String(r.dia_id)) && ((Number(r.comidas_total) || 0) > 0 || (Number(r.agua_ml) || 0) > 0));
+      const currHasNutriActivity = validNp.some((r) => {
+        if (!r || r.dia_id == null || !currDiaIds.has(String(r.dia_id))) return false;
+        const hasDoneObj = r.comidas_done && typeof r.comidas_done === "object" && Object.values(r.comidas_done).some(Boolean);
+        return hasDoneObj || (Number(r.comidas_realizadas) || 0) > 0 || (Number(r.agua_ml) || 0) > 0;
+      });
       const currHasEntrenoActivity = currentRes.ps.some((p) => p && p.valor !== undefined && p.valor !== null && p.valor !== "");
 
       let cicloEvaluado = targetCicloObj;
@@ -1689,6 +1751,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       rawData.evalSexo = evalSexo;
       rawData.evalEdad = evalEdad;
       rawData.smae_gustos = form.smae_gustos || {};
+      if (adherenceSnapshot) {
+        rawData.adherencia_snapshot = adherenceSnapshot;
+      }
 
       // Preservar modo de prescripción y resultados de auditoría clínica con IA
       rawData.prescription_mode = prescriptionMode;
@@ -1915,8 +1980,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setEditingId(null); setExistingFotos([]);
     setCustomSmaeMap(null);
     setShowStep5SmaeTable(false);
+    setShowSmaeBoardInFollowUp(false);
+    setShowFullR24hInFollowUp(false);
+    setAdherenceSnapshot(m.adherencia_snapshot || m.adherenciaSnapshot || null);
+    setLoadingAdherenceSnapshot(false);
     setInbodyOcrResult(null);
     setAnalyzingInbody(false);
+    setAdherenceSnapshot(null);
+    setLoadingAdherenceSnapshot(false);
   };
 
   const startEdit = (mRaw) => {
@@ -2043,6 +2114,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       setCustomSmaeMap(null);
     }
     setShowStep5SmaeTable(false);
+    setShowSmaeBoardInFollowUp(false);
+    setShowFullR24hInFollowUp(false);
+    setAdherenceSnapshot(m.adherencia_snapshot || m.adherenciaSnapshot || null);
+    setLoadingAdherenceSnapshot(false);
 
     setIsAuditingAi(false);
     setAiAuditError(null);
@@ -2977,14 +3052,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     s.isCurrent ? "bg-[var(--brand-primary)]/5" : ""
                                   }`}
                                 >
-                                  {hasAny ? (
-                                    <div className="flex flex-col items-center gap-0.5 leading-tight">
-                                      <span className="font-bold text-emerald-600">{doneCount}/{totalC} com.</span>
-                                      <span className="text-[10px] font-semibold text-sky-600">{(agua / 1000).toFixed(2)} L</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[#CBD5E1]">—</span>
-                                  )}
+                                  <div className="flex flex-col items-center gap-0.5 leading-tight">
+                                    <span className={`font-bold ${hasAny ? "text-emerald-600" : "text-[#94A3B8]"}`}>
+                                      {doneCount}/{totalC} com.
+                                    </span>
+                                    <span className={`text-[10px] font-semibold ${hasAny ? "text-sky-600" : "text-[#94A3B8]"}`}>
+                                      {(agua / 1000).toFixed(2)} L
+                                    </span>
+                                  </div>
                                 </td>
                               );
                             })}
@@ -3027,14 +3102,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 s.isCurrent ? "bg-[var(--brand-primary)]/5" : ""
                               }`}
                             >
-                              {hasData ? (
-                                <div className="flex flex-col items-center gap-0.5 leading-tight">
-                                  <span className="font-extrabold text-emerald-700">{semComidas}/{semTotalComidas} com.</span>
-                                  <span className="text-[10px] font-bold text-sky-700">{promAgua} L/día prom.</span>
-                                </div>
-                              ) : (
-                                <span className="text-[#CBD5E1]">—</span>
-                              )}
+                              <div className="flex flex-col items-center gap-0.5 leading-tight">
+                                <span className={`font-extrabold ${hasData ? "text-emerald-700" : "text-[#94A3B8]"}`}>
+                                  {semComidas}/{semTotalComidas} com.
+                                </span>
+                                <span className={`text-[10px] font-bold ${hasData ? "text-sky-700" : "text-[#94A3B8]"}`}>
+                                  {promAgua} L/día prom.
+                                </span>
+                              </div>
                             </td>
                           );
                         })}
@@ -3403,28 +3478,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   {/* Sensaciones y Adherencia del Ciclo (Solo para segundas evaluaciones en adelante) */}
                   {!isFirstEvaluationEver && (
-                    <div className="pt-2 border-t border-blue-100/80 space-y-2.5">
+                    <div className="pt-2 border-t border-blue-100/80 space-y-3">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                           <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
-                          <span>Sensaciones y adherencia del ciclo previo</span>
+                          <span>Sensaciones y adherencia del ciclo evaluado</span>
                         </label>
-                        {(adherenceSummary?.summaryText || trainingAdherenceSummary?.summaryText) && (
+                        {adherenceSnapshot && (adherenceSnapshot.nutricion?.hasPlan || adherenceSnapshot.entrenamiento?.hasPlan) && (
                           <button
                             type="button"
                             disabled={isReadOnly}
                             onClick={() => {
-                              if (!isReadOnly) {
+                              if (!isReadOnly && adherenceSnapshot) {
                                 const current = (form.checkin_observaciones || "").trim();
-                                const parts = [
-                                  adherenceSummary?.summaryText,
-                                  trainingAdherenceSummary ? `Entrenamiento: ${trainingAdherenceSummary.summaryText}` : null,
-                                ].filter(Boolean);
+                                const parts = [];
+                                if (adherenceSnapshot.nutricion?.hasPlan) {
+                                  parts.push(`Dieta (${adherenceSnapshot.ciclo_evaluado_nombre}): ${adherenceSnapshot.nutricion.comidas_realizadas}/${adherenceSnapshot.nutricion.comidas_total} comidas (${adherenceSnapshot.nutricion.pct_comidas}%), agua ${adherenceSnapshot.nutricion.promedio_agua_l} L/día prom. (${adherenceSnapshot.nutricion.pct_agua}%) en ${adherenceSnapshot.nutricion.dias_registrados}/${adherenceSnapshot.nutricion.dias_totales || adherenceSnapshot.nutricion.dias_registrados} días`);
+                                }
+                                if (adherenceSnapshot.entrenamiento?.hasPlan) {
+                                  parts.push(`Entreno: ${adherenceSnapshot.entrenamiento.sesiones_completadas}/${adherenceSnapshot.entrenamiento.sesiones_esperadas} sesiones (${adherenceSnapshot.entrenamiento.pct_cumplimiento}%)`);
+                                }
                                 const summary = parts.join(" | ");
-                                updForm(
-                                  "checkin_observaciones",
-                                  current && !current.includes(summary) ? `${current} | ${summary}` : summary
-                                );
+                                if (summary) {
+                                  updForm(
+                                    "checkin_observaciones",
+                                    current && !current.includes(summary) ? `${current} | ${summary}` : summary
+                                  );
+                                }
                               }
                             }}
                             className="text-[11px] font-bold text-[var(--brand-primary)] hover:underline inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60"
@@ -3435,18 +3515,160 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         )}
                       </div>
 
-                      {(adherenceSummary || trainingAdherenceSummary) && (
-                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 space-y-1">
-                          {adherenceSummary && (
-                            <div>
-                              <strong>Nutrición en app:</strong> {adherenceSummary.summaryText}
+                      {loadingAdherenceSnapshot && (
+                        <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200/60 text-xs text-blue-800 flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-primary)] shrink-0" />
+                          <span>Consultando histórico de nutrición y entrenamiento en la app...</span>
+                        </div>
+                      )}
+
+                      {!loadingAdherenceSnapshot && adherenceSnapshot && (
+                        <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-3">
+                          <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                            <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                              <BarChart2 className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+                              <span>Histórico evaluado: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
+                            </span>
+                            {adherenceSnapshot.capturado_en && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-[#E2E8F0] text-[#6B7A8D]">
+                                Corte: {fmtDate(String(adherenceSnapshot.capturado_en).split("T")[0])}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* Tarjeta Nutrición & Hidratación */}
+                            <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                  <Utensils className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Nutrición e Hidratación</span>
+                                </span>
+                                {adherenceSnapshot.nutricion?.hasPlan && (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                    {adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días reg.
+                                  </span>
+                                )}
+                              </div>
+
+                              {adherenceSnapshot.nutricion?.hasPlan ? (
+                                <div className="space-y-2">
+                                  <div>
+                                    <div className="flex items-center justify-between text-[11px] mb-1">
+                                      <span className="text-[#6B7A8D] font-medium">
+                                        Cumplimiento de menú ({adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com.)
+                                      </span>
+                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_comidas}%</span>
+                                    </div>
+                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-emerald-500 transition-all"
+                                        style={{ width: `${adherenceSnapshot.nutricion.pct_comidas}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex items-center justify-between text-[11px] mb-1">
+                                      <span className="text-[#6B7A8D] font-medium">
+                                        Hidratación ({adherenceSnapshot.nutricion.promedio_agua_l} L/día prom.)
+                                      </span>
+                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_agua}%</span>
+                                    </div>
+                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-blue-500 transition-all"
+                                        style={{ width: `${adherenceSnapshot.nutricion.pct_agua}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {adherenceSnapshot.nutricion.semanas?.length > 0 && (
+                                    <div className="pt-1.5 border-t border-gray-100 grid grid-cols-4 gap-1.5">
+                                      {adherenceSnapshot.nutricion.semanas.map((w) => (
+                                        <div key={w.semana} className="text-center">
+                                          <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                            <div
+                                              className={`w-full rounded-sm ${w.pctComidas > 0 ? "bg-emerald-400" : "bg-slate-200"}`}
+                                              style={{ height: `${Math.max(8, w.pctComidas)}%` }}
+                                            />
+                                          </div>
+                                          <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                            S{w.semana} · {w.pctComidas}%
+                                          </div>
+                                          {w.comidasTotal != null && (
+                                            <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                              {w.comidasRealizadas}/{w.comidasTotal}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-[#6B7A8D] py-1">
+                                  Sin plan de nutrición asignado en la app para este ciclo.
+                                </p>
+                              )}
                             </div>
-                          )}
-                          {trainingAdherenceSummary && (
-                            <div>
-                              <strong>Entrenamiento en app:</strong> {trainingAdherenceSummary.summaryText}
+
+                            {/* Tarjeta Entrenamiento */}
+                            <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                  <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Entrenamiento</span>
+                                </span>
+                                {adherenceSnapshot.entrenamiento?.hasPlan && (
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                    {adherenceSnapshot.entrenamiento.dias_asignados} días/sem
+                                  </span>
+                                )}
+                              </div>
+
+                              {adherenceSnapshot.entrenamiento?.hasPlan ? (
+                                <div className="space-y-2">
+                                  <div>
+                                    <div className="flex items-center justify-between text-[11px] mb-1">
+                                      <span className="text-[#6B7A8D] font-medium">
+                                        Sesiones ({adherenceSnapshot.entrenamiento.sesiones_completadas}/{adherenceSnapshot.entrenamiento.sesiones_esperadas})
+                                      </span>
+                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.entrenamiento.pct_cumplimiento}%</span>
+                                    </div>
+                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-indigo-500 transition-all"
+                                        style={{ width: `${adherenceSnapshot.entrenamiento.pct_cumplimiento}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {adherenceSnapshot.entrenamiento.semanas?.length > 0 && (
+                                    <div className="pt-1.5 border-t border-gray-100 flex items-end gap-2">
+                                      {adherenceSnapshot.entrenamiento.semanas.map((w) => (
+                                        <div key={w.semana} className="flex-1 text-center">
+                                          <div className="h-9 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                            <div
+                                              className="w-full bg-indigo-400 rounded-sm"
+                                              style={{ height: `${Math.max(8, w.pct)}%` }}
+                                            />
+                                          </div>
+                                          <div className="text-[10px] font-semibold text-[#6B7A8D] mt-0.5">
+                                            S{w.semana} · {w.completadas}/{w.esperadas}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-[#6B7A8D] py-1">
+                                  Sin rutinas asignadas en la app para este ciclo.
+                                </p>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       )}
 
@@ -3824,16 +4046,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {showFollowUpView ? (
                         <div className="space-y-3 pt-1">
-                          {adherenceSummary && (
+                          {adherenceSnapshot?.nutricion?.hasPlan && (
                             <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/70 text-xs text-purple-950 flex flex-wrap items-center gap-x-4 gap-y-1">
                               <span>
-                                <strong>Apego al menú:</strong> {adherenceSummary.pctComidas}%
+                                <strong>Apego al menú ({adherenceSnapshot.ciclo_evaluado_nombre}):</strong> {adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com. ({adherenceSnapshot.nutricion.pct_comidas}%)
                               </span>
                               <span>
-                                <strong>Agua registrada:</strong> ~{adherenceSummary.promedioAguaL} L/día ({adherenceSummary.pctAgua}%)
+                                <strong>Hidratación:</strong> {adherenceSnapshot.nutricion.promedio_agua_l} L/día prom. ({adherenceSnapshot.nutricion.pct_agua}%)
                               </span>
                               <span className="text-purple-700 text-[11px]">
-                                ({adherenceSummary.diasRegistrados} días con registro)
+                                ({adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días con registro)
                               </span>
                             </div>
                           )}
