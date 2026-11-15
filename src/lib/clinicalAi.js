@@ -1688,7 +1688,8 @@ export async function generateBatchDishesFromIngredientsWithAi({
 - Instrucción de adaptación: Conserva el título y preparación del platillo base, actualizando las porciones ajustadas e integrando los extras como parte o acompañamiento del platillo.`
           : "";
         return `ITEM #${idx + 1} (key: "${it.key}"):
-- Tiempo de comida / Idea: ${it.dishIdea || it.mealNombre || `Comida ${idx + 1}`}
+- Tiempo de comida: ${it.mealNombre || `Comida ${idx + 1}`}
+- Nombre del platillo indicado por el nutriólogo (RESPETAR esta preparación si se especifica): ${it.dishIdea ? `"${it.dishIdea}"` : "Sugerir según ingredientes"}
 - Ingredientes y gramajes SMAE totales (NO alterar cantidades): ${it.ingredientes.join(", ")}
 - Aporte oficial SMAE: ${it.targetMacros?.calorias || 0} kcal (${it.targetMacros?.proteina || 0}g P, ${it.targetMacros?.carbohidratos || 0}g C, ${it.targetMacros?.grasas || 0}g G)${baseBlock}`;
       })
