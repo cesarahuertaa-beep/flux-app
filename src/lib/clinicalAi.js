@@ -1,4 +1,5 @@
-import { stripSmaeTag } from "./smaeData";
+import { stripSmaeTag, SMAE_GROUPS_MAP } from "./smaeData";
+import { getIngredientesCatalog, normalizar as normIng } from "./ingredientsCatalog";
 // Clinical AI Engine for FLUX
 // Synthesizes clinical intake questionnaires, extracts key highlights, food preferences/aversions,
 // and produces actionable clinical diagnoses for nutritionists and coaches.
@@ -1337,6 +1338,220 @@ Debes responder ÚNICAMENTE con un JSON con esta estructura:
  * Diseña un platillo a partir de ingredientes disponibles / despensa para cuadrar con los macros de la toma.
  * Arquitectura de 3 niveles con fallback analítico.
  */
+export async function generateAlternativeSmaeMealWithAi({
+  mealNombre = "",
+  mealHora = "",
+  mainDishIdea = "",
+  mainIngredients = [],
+  targetSmaeMap = {},
+  candidateFoodsByGroup = {},
+  alreadyUsedFoods = [],
+  clinicalRec = null,
+  cliente = {},
+}) {
+  const catalog = getIngredientesCatalog();
+  const catalogByNorm = new Map();
+  catalog.forEach((it) => {
+    catalogByNorm.set(normIng(it.nombre), it);
+  });
+
+  const activeGroups = Object.entries(targetSmaeMap).filter(
+    ([gId, val]) => !gId.startsWith("_") && (Number(val) || 0) > 0
+  );
+
+  if (activeGroups.length === 0) {
+    throw new Error("Selecciona al menos un alimento SMAE en la Opción Principal (A) para generar una alternativa equivalente.");
+  }
+
+  const resolveCatalogName = (rawName, fallbackGroupId = null) => {
+    const clean = String(rawName || "").trim();
+    if (clean) {
+      const exact = catalogByNorm.get(normIng(clean));
+      if (exact) return exact.nombre;
+      const partial = catalog.find(
+        (x) =>
+          (!fallbackGroupId || x.smaeGroup === fallbackGroupId) &&
+          (normIng(x.nombre).startsWith(normIng(clean)) || normIng(clean).startsWith(normIng(x.nombre)))
+      );
+      if (partial) return partial.nombre;
+    }
+    if (fallbackGroupId && candidateFoodsByGroup[fallbackGroupId]?.length > 0) {
+      return candidateFoodsByGroup[fallbackGroupId][0];
+    }
+    return clean;
+  };
+
+  const apiKey = getGeminiApiKey();
+  const anamnesis = clinicalRec?.anamnesis || {};
+
+  // Selección inteligente ultracompacta con Gemini (~150 tokens de entrada, ~45 tokens de salida)
+  if (apiKey) {
+    const groupLines = activeGroups
+      .map(([gId, rawEq]) => {
+        const eq = Math.round((Number(rawEq) || 1) * 100) / 100;
+        const grpLabel = SMAE_GROUPS_MAP[gId]?.nombre || gId;
+        const cands = candidateFoodsByGroup[gId] || [];
+        return `- ${grpLabel} (${eq} eq): [${cands.map((x) => `"${x}"`).join(", ")}]`;
+      })
+      .join("\n");
+
+    const mainSummary = mainDishIdea
+      ? `${mainDishIdea} (${mainIngredients.map((i) => `${i.eq} eq ${i.nombre}`).join(", ")})`
+      : mainIngredients.map((i) => `${i.eq} eq ${i.nombre}`).join(", ");
+
+    const prompt = `Eres un nutriólogo clínico experto en el Sistema Mexicano de Alimentos Equivalentes (SMAE).
+Diseña una OPCIÓN ALTERNATIVA deliciosa, coherente y distinta a la Opción Principal para la toma "${mealNombre || "Comida"}" (${mealHora || "horario libre"}).
+
+OPCIÓN PRINCIPAL A NO REPETIR:
+${mainSummary}
+${anamnesis.aversiones_alimentos ? `AVERSIONES DEL PACIENTE (PROHIBIDO USAR): ${anamnesis.aversiones_alimentos}` : ""}
+
+GRUPOS SMAE A CUBRIR Y ALIMENTOS PERMITIDOS DEL CATÁLOGO:
+${groupLines}
+
+REGLAS ESTRICTAS:
+1. Elige 1 alimento de la lista permitida por cada grupo listado arriba, asignándole exactamente los equivalentes ("eq") indicados para ese grupo.
+2. Los alimentos elegidos deben combinar gastronómicamente entre sí en un platillo real y apetecible acorde a "${mealNombre || "Comida"}" (${mealHora || ""}).
+3. Escribe el "nombre" del alimento EXACTAMENTE igual a como aparece entre comillas en la lista permitida.
+4. Propón un "nombrePlatillo" atractivo y conciso (ej. "Tostadas horneadas con queso panela y aguacate" o "Bowl de avena con manzana y almendras"). NO redactes la receta aún.
+
+Responde ÚNICAMENTE con este JSON:
+{
+  "nombrePlatillo": "Nombre gastronómico conciso del platillo alternativo",
+  "ingredientes": [
+    { "nombre": "Nombre exacto de la lista", "eq": number }
+  ]
+}`;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: getGenerationConfig(model, true, 0.35),
+            }),
+          }
+        );
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const textRes = extractGeminiText(data);
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            if (Array.isArray(parsed?.ingredientes) && parsed.ingredientes.length > 0) {
+              const validIngs = [];
+              const seenNames = new Set();
+              parsed.ingredientes.forEach((it) => {
+                const resolvedName = resolveCatalogName(it.nombre);
+                const catItem = catalogByNorm.get(normIng(resolvedName));
+                if (catItem && !seenNames.has(catItem.nombre)) {
+                  seenNames.add(catItem.nombre);
+                  const eqVal = Math.max(0.1, Math.round((Number(it.eq) || 1) * 100) / 100);
+                  validIngs.push({ nombre: catItem.nombre, eq: eqVal });
+                }
+              });
+
+              if (validIngs.length > 0) {
+                return {
+                  nombrePlatillo:
+                    String(parsed.nombrePlatillo || "").trim() ||
+                    `Alternativa de ${validIngs.slice(0, 2).map((x) => x.nombre.toLowerCase()).join(" con ")}`,
+                  ingredientes: validIngs,
+                  origen: "gemini_direct",
+                };
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Fallback Culinario Local Estructurado (0 ms, 0 fallos, coherencia gastronómica por toma)
+  const contextText = `${mealNombre || ""} ${mealHora || ""} ${mainDishIdea || ""}`.toLowerCase();
+  const isMorningContext =
+    /desayuno|almuerzo|mañana|colaci[oó]n|snack|licuado|smoothie/i.test(contextText) ||
+    /\b(05|06|07|08|09|10|11):\d{2}\s*am\b/i.test(contextText);
+  const hasFruitOrMilk = activeGroups.some(([gId]) => gId === "frutas" || gId.startsWith("leche_"));
+  const hasVegOrLegume = activeGroups.some(([gId]) => gId === "verduras" || gId === "leguminosas");
+  const isSweetProfile = hasFruitOrMilk && !hasVegOrLegume;
+
+  const pickBestFromCandidates = (gId, candidates = []) => {
+    if (!candidates || candidates.length === 0) return null;
+    if (gId.startsWith("aoa_")) {
+      const prefKeywords = isMorningContext
+        ? ["queso panela", "clara de huevo", "queso cottage", "pechuga de pavo", "queso fresco", "queso oaxaca", "huevo", "pollo"]
+        : ["pechuga de pollo", "filete de pescado", "bistec", "salmón", "atún", "arrachera", "robalo", "queso panela"];
+      for (const kw of prefKeywords) {
+        const hit = candidates.find((c) => normIng(c).includes(normIng(kw)));
+        if (hit) return hit;
+      }
+    }
+    if (gId.startsWith("cereales_")) {
+      const prefKeywords = isSweetProfile
+        ? ["avena", "pan integral", "amaranto", "granola"]
+        : isMorningContext
+        ? ["pan integral", "tortilla de maíz", "tostada de maíz", "avena"]
+        : ["arroz cocido", "tortilla de maíz", "tostada de maíz", "papa cocida", "pasta cocida", "camote"];
+      for (const kw of prefKeywords) {
+        const hit = candidates.find((c) => normIng(c).includes(normIng(kw)));
+        if (hit) return hit;
+      }
+    }
+    if (gId.startsWith("grasas_")) {
+      const prefKeywords = isSweetProfile
+        ? ["almendra", "nuez", "chía", "cacahuate"]
+        : ["aguacate", "aceite de oliva", "aceite de aguacate", "crema ácida"];
+      for (const kw of prefKeywords) {
+        const hit = candidates.find((c) => normIng(c).includes(normIng(kw)));
+        if (hit) return hit;
+      }
+    }
+    return candidates[0];
+  };
+
+  const fallbackIngs = [];
+  activeGroups.forEach(([gId, rawEq]) => {
+    const eq = Math.max(0.1, Math.round((Number(rawEq) || 1) * 100) / 100);
+    const cands = candidateFoodsByGroup[gId] || [];
+    const chosen = pickBestFromCandidates(gId, cands) || resolveCatalogName("", gId);
+    if (chosen) {
+      fallbackIngs.push({ nombre: chosen, eq });
+    }
+  });
+
+  const cleanShortName = (n) =>
+    String(n || "")
+      .replace(/\s+(sin piel|aplanada|en agua drenado|con cáscara|rebanad[oa]|picad[oa]|enter[oa]|al homo|cruda|cocid[oa]|bajo en grasa|extra virgen|lala light|hass).*/i, "")
+      .trim();
+
+  const mainChosenNames = fallbackIngs.slice(0, 3).map((x) => cleanShortName(x.nombre));
+  let fallbackDishTitle = "Platillo alternativo equivalente";
+  if (mainChosenNames.length >= 2) {
+    const first = mainChosenNames[0];
+    const rest = mainChosenNames.slice(1).map((s) => s.toLowerCase());
+    fallbackDishTitle = `${first} con ${joinSpanishList(rest)}`;
+  } else if (mainChosenNames.length === 1) {
+    fallbackDishTitle = mainChosenNames[0];
+  }
+
+  return {
+    nombrePlatillo: fallbackDishTitle,
+    ingredientes: fallbackIngs,
+    origen: "analitico_local",
+  };
+}
+
 export async function generateMealFromPantryWithAi({ ingredientesDisponibles, targetMacros = {}, clinicalRec = null, cliente = {} }) {
   const text = String(ingredientesDisponibles || "").trim();
   if (!text) {

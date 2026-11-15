@@ -533,3 +533,258 @@ export function computeSmaeFromIngredientItems(items = []) {
     totalEq: Math.round(totalEq * 100) / 100,
   };
 }
+
+/**
+ * Selección curada de alimentos cotidianos de alta rotación clínica por grupo SMAE
+ * (100% verificados contra el catálogo maestro para pre-filtrado ultrarrápido y bajo consumo de tokens).
+ */
+export const CURATED_SMAE_STAPLES_BY_GROUP = {
+  verduras: [
+    "Espinaca cocida",
+    "Espinaca cruda",
+    "Brócoli cocido",
+    "Calabacita alargada cruda",
+    "Jitomate",
+    "Nopal cocido",
+    "Pepino con cáscara rebanado",
+    "Lechuga",
+    "Champiñón cocido entero",
+    "Ejotes cocidos picados”",
+    "Espárragos",
+    "Chayote cocido picado",
+    "Pimiento amarillo crudo chico",
+    "Cebolla blanca rebanada",
+  ],
+  frutas: [
+    "Manzana",
+    "Plátano",
+    "Fresa entera",
+    "Papaya picada",
+    "Blueberries",
+    "Mango Ataúlfo",
+    "Naranja",
+    "Pera",
+    "Piña picada",
+    "Melón picado",
+    "Durazno amarillo",
+    "Kiwi",
+    "Guayaba",
+    "Zarzamora",
+  ],
+  cereales_sg: [
+    "Avena cocida",
+    "Avena en hojuelas",
+    "Arroz cocido",
+    "Tortilla de maíz",
+    "Pan integral",
+    "Papa cocida",
+    "Camote al homo",
+    "Pasta cocida",
+    "Tostada de maíz horneada",
+    "Quinoa cruda",
+    "Amaranto tostado",
+    "Elote amarillo cocido",
+    "Bolillo sin migajón",
+  ],
+  cereales_cg: [
+    "Granola con almendras",
+    "Totopos de maíz",
+    "Tostada",
+    "Hot cake con mantequilla congelado",
+  ],
+  leguminosas: [
+    "Frijol promedio cocido",
+    "Frijol molido",
+    "Lenteja cocida",
+    "Garbanzo",
+    "Haba seca cocida",
+    "Alubia cocida chica o grande",
+    "Soya cocida",
+  ],
+  aoa_mb: [
+    "Pechuga de pollo sin piel aplanada",
+    "Clara de huevo",
+    "Atún blanco en agua drenado",
+    "Filete de pescado",
+    "Bistec de res",
+    "Queso Cottage",
+    "Pechuga de pavo",
+    "Camarón cocido",
+    "Róbalo cocido",
+    "Fajita de pollo sin piel cruda",
+  ],
+  aoa_b: [
+    "Queso Panela",
+    "Salmón",
+    "Queso fresco",
+    "Queso Oaxaca Lala Light",
+    "Arrachera de res cocida",
+    "Lomo de cerdo",
+    "Bistec de ternera",
+    "Carne de res promedio",
+    "Tofu firme",
+  ],
+  aoa_m: [
+    "Huevo fresco",
+    "Huevo cocido",
+    "Huevo batido o revuelto cocido",
+    "Carne molida extra magra cocida",
+    "Bistec de bola",
+    "Filete de salmón",
+  ],
+  aoa_a: [
+    "Queso Manchego",
+    "Queso Chihuahua",
+    "Queso Gouda",
+    "Rib Eye",
+    "Carne molida regular cocida",
+    "Cecina de res",
+  ],
+  leche_d: [
+    "Leche descremada",
+    "Yoghurt bajo en grasa",
+    "Yoghurt light",
+    "Leche Alpura Light Extra",
+  ],
+  leche_sd: [
+    "Leche semidescremada",
+    "Yoghurt Oikos estilo griego sabor natural",
+  ],
+  leche_e: [
+    "Leche entera",
+    "Jocoque ligero",
+    "Leche de vaca",
+  ],
+  grasas_sp: [
+    "Aguacate Hass",
+    "Aceite de oliva extra virgen",
+    "Aceite de aguacate",
+    "Aceite de canola",
+    "Aceituna verde con hueso",
+    "Crema ácida",
+    "Mantequilla clarificada",
+    "Queso crema",
+  ],
+  grasas_cp: [
+    "Almendra",
+    "Almendra fileteada",
+    "Nuez",
+    "Cacahuate",
+    "Pistache",
+    "Chía",
+    "Semilla de calabaza",
+    "Ajonjolí tostado",
+  ],
+  azucares_sg: [
+    "Miel de abeja",
+    "Mermelada",
+    "Azúcar mascabado",
+    "Ate de guayaba",
+  ],
+};
+
+/**
+ * Embudo Local (Fase 1): Pre-filtra ~8 a 10 alimentos cotidianos por cada grupo SMAE activo
+ * en la Opción Principal (A), excluyendo los alimentos (y raíces culinarias) ya usados en A/B/C
+ * y excluyendo alergias/aversiones del paciente, priorizando favoritos.
+ */
+export function buildCandidateSmaeFoodsForAlternative({
+  targetSmaeMap = {},
+  usedFoodNames = [],
+  patientFoodCtx = {},
+  maxPerGroup = 10,
+} = {}) {
+  const catalog = getIngredientesCatalog();
+  const catalogByNameNorm = new Map();
+  catalog.forEach((item) => {
+    catalogByNameNorm.set(normalizar(item.nombre), item);
+  });
+
+  const usedExactNorm = new Set(usedFoodNames.map((n) => normalizar(n)));
+  const stopRoots = new Set(["filete", "pechuga", "queso", "aceite", "leche", "carne", "tortilla", "pan", "tostada", "frijol"]);
+  const usedRootWords = new Set();
+  usedFoodNames.forEach((n) => {
+    const words = normalizar(n).split(/\s+/).filter((w) => w.length >= 4);
+    if (words.length > 0) {
+      const root = stopRoots.has(words[0]) && words[1] ? `${words[0]} ${words[1]}` : words[0];
+      usedRootWords.add(root);
+    }
+  });
+
+  const candidateFoodsByGroup = {};
+
+  Object.entries(targetSmaeMap).forEach(([groupId, rawEq]) => {
+    const eq = Number(rawEq) || 0;
+    if (eq <= 0 || groupId.startsWith("_")) return;
+
+    // Para proteínas (AOA), lácteos y grasas, incluir también opciones versátiles hermanas si el subgrupo tiene pocos básicos cotidianos
+    let relatedGroups = [groupId];
+    if (groupId.startsWith("aoa_")) {
+      relatedGroups = [groupId, "aoa_b", "aoa_mb", "aoa_m"];
+    } else if (groupId.startsWith("leche_")) {
+      relatedGroups = [groupId, "leche_d", "leche_sd", "leche_e"];
+    } else if (groupId.startsWith("grasas_")) {
+      relatedGroups = [groupId, "grasas_sp", "grasas_cp"];
+    }
+
+    const stapleNamesPool = [];
+    relatedGroups.forEach((gId) => {
+      (CURATED_SMAE_STAPLES_BY_GROUP[gId] || []).forEach((sName) => {
+        if (!stapleNamesPool.includes(sName)) stapleNamesPool.push(sName);
+      });
+    });
+
+    const resolvedPool = [];
+    const seenNorm = new Set();
+
+    // 1. Agregar primero alimentos favoritos del paciente en el catálogo de ese grupo
+    catalog
+      .filter((item) => item.smaeGroup === groupId)
+      .forEach((item) => {
+        const nNorm = normalizar(item.nombre);
+        if (usedExactNorm.has(nNorm) || seenNorm.has(nNorm)) return;
+        const evalRes = evaluateIngredientForPatient(item, patientFoodCtx);
+        if (evalRes.status === "favorito") {
+          seenNorm.add(nNorm);
+          resolvedPool.push({ item, isSameRoot: false, isExactGroup: true, isFavorite: true });
+        }
+      });
+
+    // 2. Agregar los básicos cotidianos curados verificados en el catálogo
+    stapleNamesPool.forEach((sName) => {
+      const item = catalogByNameNorm.get(normalizar(sName));
+      if (!item) return;
+      const nNorm = normalizar(item.nombre);
+      if (usedExactNorm.has(nNorm) || seenNorm.has(nNorm)) return;
+      const evalRes = evaluateIngredientForPatient(item, patientFoodCtx);
+      if (evalRes.status === "evitar") return;
+
+      const words = nNorm.split(/\s+/).filter((w) => w.length >= 4);
+      const root = words.length > 0 ? (stopRoots.has(words[0]) && words[1] ? `${words[0]} ${words[1]}` : words[0]) : "";
+      const isSameRoot = Boolean(root && usedRootWords.has(root));
+
+      seenNorm.add(nNorm);
+      resolvedPool.push({
+        item,
+        isSameRoot,
+        isExactGroup: item.smaeGroup === groupId,
+        isFavorite: evalRes.status === "favorito",
+      });
+    });
+
+    // Ordenar: 1) No repetir raíz culinaria usada en A, 2) Favoritos del paciente, 3) Mismo subgrupo exacto SMAE
+    resolvedPool.sort((a, b) => {
+      if (a.isSameRoot !== b.isSameRoot) return a.isSameRoot ? 1 : -1;
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      if (a.isExactGroup !== b.isExactGroup) return a.isExactGroup ? -1 : 1;
+      return 0;
+    });
+
+    candidateFoodsByGroup[groupId] = resolvedPool
+      .slice(0, maxPerGroup)
+      .map((entry) => entry.item.nombre);
+  });
+
+  return candidateFoodsByGroup;
+}
+

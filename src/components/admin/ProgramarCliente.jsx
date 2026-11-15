@@ -31,8 +31,8 @@ import { calcEdadFromBirthdate, normalizeSexo, enrichMetrica, linkMetricasToCicl
 import { peekClinicalRecord, fetchClinicalRecord, saveClinicalRecord, hasAnamnesisData, EMPTY_ANAMNESIS } from "../../lib/clinicalRecord";
 import { parseMealOptions, parseMealOptionsStructured, formatMealOptions, formatMealOptionsKeepSmae, parseDiaMetadata, formatDiaMetadata } from "../../lib/mealOptions";
 import { SMAE_GROUPS, SMAE_GROUPS_MAP, SMAE_FOODS_BY_GROUP, calculateSmaeTotals, autoDistributeSmaeFromMacros, serializeSmaeMap, parseSmaeString, formatScaledSmaePortion, estimateMealSmaeMap, estimateDaySmaeUsage, suggestMealSmaeSplit, extractSmaeMapFromMealText, embedSmaeMapInMealText, embedMealIngredientsInText, extractMealIngredientsFromText } from "../../lib/smaeData";
-import { optimizeMealWithAi, generateAlternativeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
-import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient, resolveDishStructuredIngredients, computeSmaeFromIngredientItems } from "../../lib/ingredientsCatalog";
+import { optimizeMealWithAi, generateAlternativeMealWithAi, generateAlternativeSmaeMealWithAi, generateMealFromPantryWithAi, generateDishFromIngredientsWithAi, generateBatchDishesFromIngredientsWithAi, auditFullDayWithAi, computeDualSummarySourceHash, buildFallbackDualSummaries, syncDualDomainSummariesInBackground } from "../../lib/clinicalAi";
+import { buscarIngredientes, CATEGORIAS_INGREDIENTES, INGREDIENTES_CATALOGO, getIngredientesCatalog, formatIngredientSmaePortion, evaluateIngredientForPatient, resolveDishStructuredIngredients, computeSmaeFromIngredientItems, buildCandidateSmaeFoodsForAlternative } from "../../lib/ingredientsCatalog";
 import { searchDishPhotoInCatalog, registerDishPhotoInCatalog, CATALOGO_PLATILLOS_BASE, getPlatillosCatalog, CATEGORIAS_PLATILLOS, buscarPlatillosCatalogo } from "../../lib/foodPhotoCatalog";
 
 import { ProgresoCliente } from "./ProgresoCliente";
@@ -3186,44 +3186,114 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
       return;
     }
     const meal = diaForm.comidas[mealIdx];
-    const mainText = meal?.opciones?.[0] || meal?.opcion1 || "";
-    if (!mainText.trim()) {
-      alert("La Opción Principal debe contener la receta base para que la IA diseñe un equivalente iso-macronutrimental.");
+    const mainSel = getScaledSelectedIngredients(mealIdx, 0);
+    if (!mainSel || mainSel.details.length === 0) {
+      alert("Selecciona primero los alimentos SMAE o carga una receta de la Biblioteca en la Opción Principal (A) para que la IA construya una alternativa con los mismos equivalentes.");
       return;
     }
+
     setAiAltIndex(mealIdx);
     try {
-      const res = await generateAlternativeMealWithAi({
-        mainMealText: mainText,
-        targetMacros: {
-          calorias: meal.calorias,
-          proteina: meal.proteina,
-          carbohidratos: meal.carbohidratos,
-          grasas: meal.grasas,
-        },
-        clinicalRec,
-        cliente: selected
+      // Recolectar alimentos ya utilizados en la Opción A y en cualquier alternativa B, C... existente
+      const usedFoodNames = [...(meal?.ingredientesSeleccionados || [])];
+      if (meal?.opcionesIngredientes && typeof meal.opcionesIngredientes === "object") {
+        Object.values(meal.opcionesIngredientes).forEach((arr) => {
+          if (Array.isArray(arr)) {
+            arr.forEach((n) => {
+              if (n && !usedFoodNames.includes(n)) usedFoodNames.push(n);
+            });
+          }
+        });
+      }
+
+      const evalMetricaForFood = cycleMetrica || latestMetrica || null;
+      const patientFoodCtx = {
+        aversionesText: evalMetricaForFood?.aversiones_alimentos || "",
+        preferenciasText: `${evalMetricaForFood?.preferencias_alimentos || ""} ${evalMetricaForFood?.recordatorio_24h || ""}`,
+        expediente: selected?.expediente_clinico || null,
+        smaeGustos: evalMetricaForFood?.smae_gustos || smartPrescription?.smaeGustos || null,
+      };
+
+      const candidateFoodsByGroup = buildCandidateSmaeFoodsForAlternative({
+        targetSmaeMap: mainSel.smaeMap,
+        usedFoodNames,
+        patientFoodCtx,
+        maxPerGroup: 10,
       });
 
-      if (res?.texto) {
-        setDiaForm(p => {
+      const res = await generateAlternativeSmaeMealWithAi({
+        mealNombre: meal.nombre || `Comida ${mealIdx + 1}`,
+        mealHora: meal.hora || "",
+        mainDishIdea: meal?.opcionesIdea?.[0] || meal?.opcionesPlatilloBase?.[0]?.nombre || "",
+        mainIngredients: mainSel.details,
+        targetSmaeMap: mainSel.smaeMap,
+        candidateFoodsByGroup,
+        alreadyUsedFoods: usedFoodNames,
+        clinicalRec,
+        cliente: selected,
+      });
+
+      if (res?.ingredientes && res.ingredientes.length > 0) {
+        const optsCurrent = [...(meal.opciones && meal.opciones.length > 0 ? meal.opciones : [meal.opcion1 || ""])];
+        const lastIdx = optsCurrent.length - 1;
+        const isLastSlotEmptyAlt =
+          optsCurrent.length > 1 &&
+          !String(optsCurrent[lastIdx] || "").trim() &&
+          (meal?.opcionesIngredientes?.[lastIdx] || []).length === 0;
+        const targetAltIdx = isLastSlotEmptyAlt ? lastIdx : optsCurrent.length;
+
+        const ingNames = res.ingredientes.map((it) => it.nombre);
+        const eqForOpt = {};
+        const eqUpdates = {};
+        res.ingredientes.forEach((it) => {
+          eqForOpt[it.nombre] = it.eq;
+          eqUpdates[`${mealIdx}_${targetAltIdx}_${it.nombre}`] = it.eq;
+        });
+
+        setIngredientEqMap((prev) => ({ ...prev, ...eqUpdates }));
+
+        setDiaForm((p) => {
           const cs = [...p.comidas];
           const c = { ...cs[mealIdx] };
-          const opts = [...(c.opciones || [""])];
-          if (opts.length > 1 && !opts[opts.length - 1].trim()) {
-            opts[opts.length - 1] = res.texto;
-          } else {
-            opts.push(res.texto);
-          }
+          const opts = [...(c.opciones && c.opciones.length > 0 ? c.opciones : [c.opcion1 || ""])];
+          while (opts.length <= targetAltIdx) opts.push("");
+          opts[targetAltIdx] = "";
           c.opciones = opts;
+
+          c.opcionesIdea = {
+            ...(c.opcionesIdea || {}),
+            [targetAltIdx]: res.nombrePlatillo || "",
+          };
+          c.opcionesIngredientes = {
+            ...(c.opcionesIngredientes || {}),
+            [targetAltIdx]: ingNames,
+          };
+          c.ingredientesEq = {
+            ...(c.ingredientesEq || {}),
+            [targetAltIdx]: eqForOpt,
+          };
+          c.opcionesPendienteIa = {
+            ...(c.opcionesPendienteIa || {}),
+            [targetAltIdx]: true,
+          };
+          c.opcionesModoEdicion = {
+            ...(c.opcionesModoEdicion || {}),
+            [targetAltIdx]: "manual",
+          };
           cs[mealIdx] = c;
           return { ...p, comidas: cs };
         });
+
+        const optLetter = String.fromCharCode(65 + targetAltIdx);
         const isLocal = res?.origen === "analitico_local";
         setMsg(
           <div className="flex items-center gap-1.5">
-            <Sparkles className={`w-4 h-4 ${isLocal ? "text-emerald-600" : "text-purple-600"}`} />
-            <span>{isLocal ? "Alternativa equivalente generada (Motor Bromatológico)" : "Alternativa equivalente generada con IA"}</span>
+            <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
+            <span>
+              {isLocal
+                ? `Opción ${optLetter} estructurada generada (${res.nombrePlatillo})`
+                : `Opción ${optLetter} generada con IA (${res.nombrePlatillo})`}
+            </span>
           </div>
         );
       }
