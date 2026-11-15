@@ -17,7 +17,7 @@ import {
   generateSmartTrainingPrescription,
 } from "../../lib/bodyComposition";
 import { createPortal } from "react-dom";
-import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, dbPatch, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
+import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, dbPatch, dbUpsert, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
@@ -367,8 +367,10 @@ function buildAdherenceSnapshot({
   const promedioAguaL = diasTotalesPeriodo > 0 ? (totalAguaMl / (diasTotalesPeriodo * 1000)).toFixed(2) : "0.00";
   const promedioAguaDiasActivosL = diasRegistrados > 0 ? (totalAguaMl / (diasRegistrados * 1000)).toFixed(2) : "0.00";
 
-  // 2. Entrenamiento filtrado al ciclo evaluado
-  const rs = Array.isArray(rutinasCiclo) ? rutinasCiclo : [];
+  // 2. Entrenamiento filtrado al ciclo evaluado (incluyendo semanas nulas como 0/N)
+  const rsRaw = Array.isArray(rutinasCiclo) ? rutinasCiclo : [];
+  const rsWithEx = rsRaw.filter((r) => (r.ejercicios || []).length > 0);
+  const rs = rsWithEx.length > 0 ? rsWithEx : rsRaw;
   const uDays = new Set();
   const ejToRutina = {};
   rs.forEach((r) => {
@@ -385,10 +387,16 @@ function buildAdherenceSnapshot({
   const weeksWithWorkouts = new Set();
   const sessionsByWeek = {};
   (progresoRows || []).forEach((p) => {
-    if (!p || p.valor === undefined || p.valor === null || p.valor === "") return;
+    if (!p || p.valor === undefined || p.valor === null) return;
+    const valStr = String(p.valor).trim();
+    if (!valStr || valStr === "-" || valStr === "—" || valStr === "N/A" || valStr === "Falta" || valStr === "ALT" || valStr === "ORG") return;
+    // Evita que un registro automático de "Falté a esta serie" (reps='Falta', peso='0') marque sesión realizada
+    if (p.tipo === "peso" && Number(valStr) <= 0) return;
     const rId = ejToRutina[String(p.ejercicio_id)];
-    const sem = Number(p.semana) || 1;
     if (!rId) return;
+    // En la tabla `progreso`, `semana` se guarda como índice 0-based (wi = 0 -> Semana 1)
+    const rawSem = Number(p.semana);
+    const sem = Number.isFinite(rawSem) ? rawSem + 1 : 1;
     const sKey = `${rId}-${sem}`;
     if (!sessionKeys.has(sKey)) {
       sessionKeys.add(sKey);
@@ -398,24 +406,36 @@ function buildAdherenceSnapshot({
   });
 
   const maxWeekLogged = weeksWithWorkouts.size > 0 ? Math.max(...Array.from(weeksWithWorkouts)) : 0;
-  const maxNutriWeek = nutriSemanas.length > 0 ? Math.max(...nutriSemanas.map((w) => w.semana)) : 0;
-  const semanasActivas = Math.max(maxWeekLogged, maxNutriWeek, 1);
-  const sesionesCompletadas = sessionKeys.size;
-  const sesionesEsperadas = daysAssigned * semanasActivas;
-  const pctEntreno = sesionesEsperadas > 0 ? Math.min(100, Math.round((sesionesCompletadas / sesionesEsperadas) * 100)) : 0;
+  let validWeeksEntreno = validWeeks.map((w) => ({ ...w }));
+  if (maxWeekLogged > (validWeeksEntreno[validWeeksEntreno.length - 1]?.weekNum || 0)) {
+    const existingNums = new Set(validWeeksEntreno.map((w) => w.weekNum));
+    for (let w = 1; w <= maxWeekLogged; w++) {
+      if (!existingNums.has(w)) {
+        const found = semanasCalc.find((s) => s.weekNum === w);
+        validWeeksEntreno.push(found || { weekNum: w, label: `Sem ${w}`, isCurrent: false });
+      }
+    }
+    validWeeksEntreno.sort((a, b) => a.weekNum - b.weekNum);
+  }
 
+  const semanasActivas = Math.max(validWeeksEntreno.length, 1);
+  let sesionesCompletadas = 0;
   const entrenoSemanas = [];
   if (daysAssigned > 0) {
-    for (let s = 1; s <= Math.min(Math.max(semanasActivas, 1), 6); s++) {
-      const done = sessionsByWeek[s] || 0;
+    validWeeksEntreno.forEach((s) => {
+      const done = Math.min(daysAssigned, sessionsByWeek[s.weekNum] || 0);
+      sesionesCompletadas += done;
       entrenoSemanas.push({
-        semana: s,
+        semana: s.weekNum,
+        label: s.label || `Sem ${s.weekNum}`,
         completadas: done,
         esperadas: daysAssigned,
         pct: Math.min(100, Math.round((done / daysAssigned) * 100)),
       });
-    }
+    });
   }
+  const sesionesEsperadas = daysAssigned * semanasActivas;
+  const pctEntreno = sesionesEsperadas > 0 ? Math.min(100, Math.round((sesionesCompletadas / sesionesEsperadas) * 100)) : 0;
 
   return {
     ciclo_evaluado_id: cicloEvaluado?.id || null,
@@ -728,6 +748,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
   const currentCiclo = cicloActivo || cicloSel;
   const isReadOnly = propReadOnly ?? Boolean(isMiPlan || (currentCiclo && !currentCiclo.activo));
+  const canEditTracking = !(propReadOnly ?? Boolean(currentCiclo && !currentCiclo.activo));
+
+  const [nutriEditModal, setNutriEditModal] = useState(null);
+  const [rutinaEditModal, setRutinaEditModal] = useState(null);
+  const [savingTracking, setSavingTracking] = useState(false);
 
   const cycleInfo = useMemo(() => {
     if (!currentCiclo?.nombre) {
@@ -862,8 +887,222 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   };
 
   useBackButton(!!lightbox, () => setLightbox(null), 100);
+  useBackButton(!!nutriEditModal, () => !savingTracking && setNutriEditModal(null), 60);
+  useBackButton(!!rutinaEditModal, () => !savingTracking && setRutinaEditModal(null), 60);
   useBackButton(showModal, () => setShowModal(false), 20);
   useBackButton(showExpediente, () => setShowExpediente(false), 25);
+
+  const openNutriEditCell = useCallback((dia, semanaObj) => {
+    if (!canEditTracking || !dia || !semanaObj) return;
+    const r = nutriProgreso[`${dia.id}-${semanaObj.weekNum}`];
+    const existingMap = (r && typeof r.comidas_done === "object" && r.comidas_done !== null) ? r.comidas_done : {};
+    const initialDone = {};
+    (dia.comidas || []).forEach((c, ci) => {
+      const key = c.id || String(ci);
+      initialDone[key] = Boolean(
+        (c.id && existingMap[c.id]) ||
+        existingMap[ci] ||
+        existingMap[String(ci)] ||
+        (c.orden != null && existingMap[c.orden])
+      );
+    });
+    const aguaMl = Number(r?.agua_ml) || 0;
+    setNutriEditModal({
+      dia,
+      semanaObj,
+      comidasDone: initialDone,
+      aguaLitros: aguaMl > 0 ? String(Number((aguaMl / 1000).toFixed(2))) : "",
+    });
+  }, [canEditTracking, nutriProgreso]);
+
+  const handleSaveNutriTracking = async () => {
+    if (!nutriEditModal || !selected?.id || savingTracking) return;
+    setSavingTracking(true);
+    try {
+      const { dia, semanaObj, comidasDone, aguaLitros } = nutriEditModal;
+      const weekNum = Number(semanaObj.weekNum) || 1;
+      const comidasList = dia.comidas || [];
+      const existingRec = nutriProgreso[`${dia.id}-${weekNum}`];
+
+      const comidasDonePayload = {};
+      let doneCount = 0;
+      comidasList.forEach((c, ci) => {
+        const key = c.id || String(ci);
+        const isDone = Boolean(comidasDone?.[key]);
+        if (isDone) doneCount++;
+        comidasDonePayload[ci] = isDone;
+        comidasDonePayload[String(ci)] = isDone;
+        if (c.id) comidasDonePayload[c.id] = isDone;
+        if (c.orden != null) comidasDonePayload[c.orden] = isDone;
+      });
+
+      const litrosNum = parseFloat(String(aguaLitros || "0").replace(",", "."));
+      const aguaMl = Math.max(0, Math.round((isNaN(litrosNum) ? 0 : litrosNum) * 1000));
+      const metaAguaMl = Number(existingRec?.meta_agua_ml) ||
+        (selected?.peso ? Math.round((parseFloat(selected.peso) * 35) / 50) * 50 : 2500);
+
+      const record = {
+        cliente_id: selected.id,
+        dia_id: dia.id,
+        semana: weekNum,
+        agua_ml: aguaMl,
+        meta_agua_ml: metaAguaMl,
+        comidas_done: comidasDonePayload,
+        comidas_realizadas: doneCount,
+        total_comidas: comidasList.length,
+        updated_at: new Date().toISOString(),
+      };
+
+      await dbUpsert("nutricion_progreso?on_conflict=cliente_id,dia_id,semana", [record], {
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      });
+
+      const mapKey = `${dia.id}-${weekNum}`;
+      setNutriProgreso((prev) => ({ ...prev, [mapKey]: record }));
+
+      try {
+        localStorage.setItem(
+          `flux_nutri_habits_${selected.id}_s${weekNum}_dia_${dia.id}`,
+          JSON.stringify({ agua: aguaMl, comidasDone: comidasDonePayload })
+        );
+      } catch {}
+
+      window.dispatchEvent(new CustomEvent("flux:plan-updated", { detail: { clienteId: selected.id } }));
+      setNutriEditModal(null);
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span>Registro nutricional actualizado</span>
+        </div>
+      );
+    } catch (err) {
+      console.error("Error guardando tracking nutricional:", err);
+      setMsg("❌ Error al guardar tracking nutricional: " + (err?.message || err));
+    } finally {
+      setSavingTracking(false);
+    }
+  };
+
+  const openRutinaEditCell = useCallback(({ rutina, ej, exObj, vid, si, wi, semanaLabel, focusField = "peso" }) => {
+    if (!canEditTracking || !ej) return;
+    const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
+    const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
+    const isFalta = rVal === "Falta";
+    const formattedPeso = (!isFalta && pVal) ? formatTrackingWeight(pVal, trackingWeightUnit) : "";
+    setRutinaEditModal({
+      rutina,
+      ej,
+      exObj,
+      vid: vid || "original",
+      si,
+      wi,
+      semanaLabel,
+      pesoInput: formattedPeso === "—" ? "" : formattedPeso,
+      repsInput: isFalta ? "" : (rVal === "—" ? "" : String(rVal)),
+      isFalta,
+      unit: trackingWeightUnit,
+      focusField,
+    });
+  }, [canEditTracking, progreso, trackingWeightUnit]);
+
+  const handleSaveRutinaTracking = async (modeOverride = null) => {
+    if (!rutinaEditModal || !selected?.id || savingTracking) return;
+    setSavingTracking(true);
+    try {
+      const { ej, vid, si, wi, pesoInput, repsInput, unit } = rutinaEditModal;
+      const markFalta = modeOverride === "falta" ? true : (modeOverride === "clear" ? false : rutinaEditModal.isFalta);
+      const isClear = modeOverride === "clear";
+
+      let dbPeso = "";
+      let dbReps = "";
+
+      if (isClear) {
+        dbPeso = "";
+        dbReps = "";
+      } else if (markFalta) {
+        dbPeso = "0";
+        dbReps = "Falta";
+      } else {
+        const cleanPeso = String(pesoInput ?? "").trim().replace(",", ".");
+        if (cleanPeso !== "") {
+          const parsed = parseFloat(cleanPeso);
+          if (!isNaN(parsed)) {
+            dbPeso = unit === "lb" ? (parsed * 0.45359237).toFixed(4) : String(parsed);
+          }
+        }
+        dbReps = String(repsInput ?? "").trim();
+      }
+
+      const nowIso = new Date().toISOString();
+      const records = [
+        {
+          ejercicio_id: ej.id,
+          cliente_id: selected.id,
+          semana: parseInt(wi, 10),
+          serie: parseInt(si, 10),
+          tipo: "peso",
+          valor: dbPeso,
+          variante_id: vid || "original",
+          updated_at: nowIso,
+        },
+        {
+          ejercicio_id: ej.id,
+          cliente_id: selected.id,
+          semana: parseInt(wi, 10),
+          serie: parseInt(si, 10),
+          tipo: "reps",
+          valor: dbReps,
+          variante_id: vid || "original",
+          updated_at: nowIso,
+        },
+      ];
+
+      try {
+        await dbUpsert(
+          "progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo,variante_id",
+          records,
+          { headers: { Prefer: "resolution=merge-duplicates,return=minimal" } }
+        );
+      } catch (err) {
+        const errStr = String(err?.message || err || "");
+        if (
+          errStr.includes("57014") ||
+          errStr.includes("statement timeout") ||
+          errStr.includes("on_conflict") ||
+          errStr.includes("constraint")
+        ) {
+          await dbUpsert(
+            "progreso?on_conflict=ejercicio_id,cliente_id,semana,serie,tipo",
+            records,
+            { headers: { Prefer: "resolution=merge-duplicates,return=minimal" } }
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      const vKey = vid || "original";
+      setProgreso((prev) => ({
+        ...prev,
+        [`${ej.id}-${wi}-${si}-peso-${vKey}`]: dbPeso,
+        [`${ej.id}-${wi}-${si}-reps-${vKey}`]: dbReps,
+      }));
+
+      window.dispatchEvent(new CustomEvent("flux:plan-updated", { detail: { clienteId: selected.id } }));
+      setRutinaEditModal(null);
+      setMsg(
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span>{isClear ? "Serie limpiada" : "Registro de serie actualizado"}</span>
+        </div>
+      );
+    } catch (err) {
+      console.error("Error guardando tracking de rutina:", err);
+      setMsg("❌ Error al guardar tracking de rutina: " + (err?.message || err));
+    } finally {
+      setSavingTracking(false);
+    }
+  };
 
   const loadCicloData = useCallback(async (ciclo, force = false) => {
     if (!selected) return;
@@ -1659,64 +1898,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     if (days <= 5) return { value: 1.55, days, label: `${days} días programados (Moderado)` };
     return { value: 1.725, days, label: `${days} días programados (Activo/Intenso)` };
   }, [routineDaysCount, form.dias_ejercicio_actual]);
-
-  const adherenceSummary = useMemo(() => {
-    if (!nutriDias.length || !Object.keys(nutriProgreso).length) return null;
-    let totalComidas = 0;
-    let comidasRealizadas = 0;
-    let totalAguaMl = 0;
-    let totalMetaAguaMl = 0;
-    let diasRegistrados = 0;
-
-    Object.values(nutriProgreso).forEach(r => {
-      if (!r) return;
-      const cTotal = Number(r.comidas_total) || 0;
-      const cDone = Number(r.comidas_realizadas) || 0;
-      const agua = Number(r.agua_ml) || 0;
-      const metaAgua = Number(r.meta_agua_ml) || 2000;
-      if (cTotal > 0 || agua > 0) diasRegistrados++;
-      totalComidas += cTotal;
-      comidasRealizadas += cDone;
-      totalAguaMl += agua;
-      totalMetaAguaMl += metaAgua;
-    });
-
-    if (diasRegistrados === 0) return null;
-    const pctComidas = totalComidas > 0 ? Math.round((comidasRealizadas / totalComidas) * 100) : 0;
-    const pctAgua = totalMetaAguaMl > 0 ? Math.round((totalAguaMl / totalMetaAguaMl) * 100) : 0;
-    const promedioAguaL = (totalAguaMl / (diasRegistrados * 1000)).toFixed(1);
-    return {
-      pctComidas,
-      pctAgua,
-      promedioAguaL,
-      diasRegistrados,
-      summaryText: `Cumplimiento de comidas: ${pctComidas}% • Apego al agua: ${pctAgua}% (~${promedioAguaL} L/día en ${diasRegistrados} días registrados)`
-    };
-  }, [nutriDias, nutriProgreso]);
-
-  const trainingAdherenceSummary = useMemo(() => {
-    if (!Array.isArray(rutinas) || rutinas.length === 0) return null;
-    const completedSessionKeys = new Set();
-    const ejToRutina = {};
-    rutinas.forEach((r) => {
-      (r.ejercicios || []).forEach((e) => {
-        ejToRutina[String(e.id)] = r.id;
-      });
-    });
-    Object.entries(progreso || {}).forEach(([key, val]) => {
-      if (val === undefined || val === null || val === "") return;
-      const parts = key.split("-");
-      const rId = ejToRutina[parts[0]];
-      const semana = parts[1];
-      if (rId && semana) completedSessionKeys.add(`${rId}-${semana}`);
-    });
-    const sessionsLogged = completedSessionKeys.size;
-    return {
-      daysAssigned: routineDaysCount,
-      sessionsLogged,
-      summaryText: `${routineDaysCount} días/sem asignados · ${sessionsLogged} ${sessionsLogged === 1 ? "sesión registrada" : "sesiones registradas"} en app`,
-    };
-  }, [rutinas, progreso, routineDaysCount]);
 
   const isFirstEvaluationEver = !editingId
     ? allLinkedMetricas.length === 0
@@ -2745,14 +2926,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             const numSemanas = Math.max(1, semanas.length);
             const metricColPercent = (62 / (numSemanas * 2)).toFixed(2);
             const tableMinPx = Math.max(740, 240 + 50 + (numSemanas * 2 * 56));
-            const tieneData = r.ejercicios.some(ej => Object.keys(progreso).some(key => key.startsWith(`${ej.id}-`)));
+            const tieneData = r.ejercicios.some(ej =>
+              Object.entries(progreso).some(([key, val]) => key.startsWith(`${ej.id}-`) && val !== "" && val != null)
+            );
+            const showTable = tieneData || (canEditTracking && (r.ejercicios || []).length > 0);
             return (
               <div key={r.id} className="mb-6">
-                <div className="font-bold text-[15px] mb-2.5 text-[var(--brand-primary)] flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4" /> {r.nombre}
-                  {!tieneData&&<span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
+                <div className="font-bold text-[15px] mb-2.5 text-[var(--brand-primary)] flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="w-4 h-4" /> {r.nombre}
+                    {!tieneData && <span className="text-[11px] text-[#6B7A8D] font-normal">Sin registros aún</span>}
+                  </div>
+                  {canEditTracking && (r.ejercicios || []).length > 0 && (
+                    <span className="text-[11px] text-[#6B7A8D] font-medium flex items-center gap-1">
+                      <Edit2 className="w-3 h-3 text-[var(--brand-primary)]" />
+                      Toca cualquier celda de Peso o Reps para editar
+                    </span>
+                  )}
                 </div>
-                {tieneData&&(
+                {showTable && (
                   <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] shadow-sm">
                     <table 
                       className="border-collapse text-[11px] w-full min-w-full bg-white table-fixed" 
@@ -2789,9 +2981,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               key={i} 
                               colSpan={2} 
                               style={{ width: `${(parseFloat(metricColPercent) * 2).toFixed(2)}%` }}
-                              className="bg-gray-50 text-[var(--brand-primary)] px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap"
+                              className={`px-1 py-1.5 border border-[#E2E8F0] text-center text-[10px] font-bold whitespace-nowrap ${
+                                s.isCurrent
+                                  ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]"
+                                  : "bg-gray-50 text-[var(--brand-primary)]"
+                              }`}
                             >
-                              {s.label}
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span>{s.label}</span>
+                                {s.isCurrent && (
+                                  <span className="text-[8px] px-1.5 py-0.2 rounded-full bg-[var(--brand-primary)] text-white font-extrabold uppercase leading-tight">
+                                    Actual
+                                  </span>
+                                )}
+                              </div>
                             </th>
                           ))}
                         </tr>
@@ -2900,32 +3103,59 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   </td>
                                 )}
                                 <td className="px-2 py-1.5 border border-[#E2E8F0] text-center text-[var(--brand-primary)] font-bold font-['Rajdhani']">{si+1}</td>
-                                {semanas.map((_, wi) => {
-                                  const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] ||"";
-                                  const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] ||"";
+                                {semanas.map((s, wi) => {
+                                  const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
+                                  const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
+                                  const isFaltaCell = rVal === "Falta";
                                   
-                                  let emptyText ="—";
-                                  let emptyColorClass ="text-[#CBD5E1]";
-                                  let emptyWeightClass ="font-normal";
+                                  let emptyText = "—";
+                                  let emptyColorClass = "text-[#CBD5E1]";
+                                  let emptyWeightClass = "font-normal";
                                   
                                   if (!pVal && !rVal) {
                                     const otherVariantHasData = activeVariants.some(otherVid => 
                                       otherVid !== vid && (progreso[`${ej.id}-${wi}-${si}-peso-${otherVid}`] || progreso[`${ej.id}-${wi}-${si}-reps-${otherVid}`])
                                     );
                                     if (otherVariantHasData) {
-                                      emptyText = isOriginal ?"ALT" :"ORG";
-                                      emptyColorClass ="text-[#6B7A8D]";
-                                      emptyWeightClass ="font-bold";
+                                      emptyText = isOriginal ? "ALT" : "ORG";
+                                      emptyColorClass = "text-[#6B7A8D]";
+                                      emptyWeightClass = "font-bold";
                                     }
                                   }
 
                                   return (
                                     <Fragment key={`w${wi}`}>
-                                      <td key={`p${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${pVal ?"bg-[var(--brand-primary)]/10" :""}`}>
-                                        <span className={`text-[11px] ${pVal ?"text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{pVal ? formatTrackingWeight(pVal, trackingWeightUnit) : emptyText}</span>
+                                      <td
+                                        key={`p${wi}`}
+                                        onClick={() => canEditTracking && openRutinaEditCell({ rutina: r, ej, exObj, vid, si, wi, semanaLabel: s.label, focusField: "peso" })}
+                                        title={canEditTracking ? `Editar serie ${si + 1} (${s.label})` : ""}
+                                        className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${
+                                          isFaltaCell ? "bg-red-50/60" : (pVal ? "bg-[var(--brand-primary)]/10" : "")
+                                        } ${canEditTracking ? "cursor-pointer hover:bg-[var(--brand-primary)]/15 transition-colors" : ""}`}
+                                      >
+                                        <span className={`text-[11px] ${
+                                          isFaltaCell
+                                            ? "text-red-400 font-semibold"
+                                            : (pVal ? "text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`)
+                                        }`}>
+                                          {isFaltaCell ? "—" : (pVal ? formatTrackingWeight(pVal, trackingWeightUnit) : emptyText)}
+                                        </span>
                                       </td>
-                                      <td key={`r${wi}`} className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${rVal ?"bg-[var(--brand-primary)]/5" :""}`}>
-                                        <span className={`text-[11px] ${rVal ?"text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`}`}>{rVal||emptyText}</span>
+                                      <td
+                                        key={`r${wi}`}
+                                        onClick={() => canEditTracking && openRutinaEditCell({ rutina: r, ej, exObj, vid, si, wi, semanaLabel: s.label, focusField: "reps" })}
+                                        title={canEditTracking ? `Editar serie ${si + 1} (${s.label})` : ""}
+                                        className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${
+                                          isFaltaCell ? "bg-red-50/60" : (rVal ? "bg-[var(--brand-primary)]/5" : "")
+                                        } ${canEditTracking ? "cursor-pointer hover:bg-blue-50 transition-colors" : ""}`}
+                                      >
+                                        <span className={`text-[11px] ${
+                                          isFaltaCell
+                                            ? "text-red-500 font-bold"
+                                            : (rVal ? "text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`)
+                                        }`}>
+                                          {rVal || emptyText}
+                                        </span>
                                       </td>
                                     </Fragment>
                                   );
@@ -2994,6 +3224,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       Plan de {nutriDias.length} {nutriDias.length === 1 ? "día" : "días"} por semana · Comidas cumplidas · Agua registrada
                     </span>
                   </div>
+                  {canEditTracking && (
+                    <span className="text-[11px] text-[#6B7A8D] font-medium flex items-center gap-1">
+                      <Edit2 className="w-3 h-3 text-[var(--brand-primary)]" />
+                      Toca cualquier día para editar comidas o agua
+                    </span>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="border-collapse text-[11px] min-w-full bg-white">
@@ -3048,9 +3284,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               return (
                                 <td
                                   key={s.weekNum}
-                                  className={`px-2 py-2 border-b border-r border-[#E2E8F0] text-center ${
+                                  onClick={() => canEditTracking && openNutriEditCell(d, s)}
+                                  title={canEditTracking ? `Editar ${d.nombre || d.dia_semana || `Día ${idx + 1}`} · ${s.label}` : ""}
+                                  className={`px-2 py-2 border-b border-r border-[#E2E8F0] text-center group relative ${
                                     s.isCurrent ? "bg-[var(--brand-primary)]/5" : ""
-                                  }`}
+                                  } ${canEditTracking ? "cursor-pointer hover:bg-[var(--brand-primary)]/10 transition-colors" : ""}`}
                                 >
                                   <div className="flex flex-col items-center gap-0.5 leading-tight">
                                     <span className={`font-bold ${hasAny ? "text-emerald-600" : "text-[#94A3B8]"}`}>
@@ -3060,6 +3298,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                       {(agua / 1000).toFixed(2)} L
                                     </span>
                                   </div>
+                                  {canEditTracking && (
+                                    <Edit2 className="w-2.5 h-2.5 text-[var(--brand-primary)] opacity-0 group-hover:opacity-70 transition-opacity absolute top-1 right-1 pointer-events-none" />
+                                  )}
                                 </td>
                               );
                             })}
@@ -3645,17 +3886,20 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                   </div>
 
                                   {adherenceSnapshot.entrenamiento.semanas?.length > 0 && (
-                                    <div className="pt-1.5 border-t border-gray-100 flex items-end gap-2">
+                                    <div className="pt-1.5 border-t border-gray-100 grid grid-cols-4 gap-1.5">
                                       {adherenceSnapshot.entrenamiento.semanas.map((w) => (
-                                        <div key={w.semana} className="flex-1 text-center">
-                                          <div className="h-9 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                        <div key={w.semana} className="text-center">
+                                          <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
                                             <div
-                                              className="w-full bg-indigo-400 rounded-sm"
+                                              className={`w-full rounded-sm ${w.pct > 0 ? "bg-indigo-400" : "bg-slate-200"}`}
                                               style={{ height: `${Math.max(8, w.pct)}%` }}
                                             />
                                           </div>
-                                          <div className="text-[10px] font-semibold text-[#6B7A8D] mt-0.5">
-                                            S{w.semana} · {w.completadas}/{w.esperadas}
+                                          <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                            S{w.semana} · {w.pct}%
+                                          </div>
+                                          <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                            {w.completadas}/{w.esperadas}
                                           </div>
                                         </div>
                                       ))}
@@ -5460,6 +5704,341 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         mode="nutriologo"
         onSaved={(saved) => setClinicalRec(saved)}
       />
+
+      {/* Modal: Editar Tracking Nutricional (Comidas y Agua de cualquier semana) */}
+      {nutriEditModal && createPortal(
+        <div
+          onClick={() => !savingTracking && setNutriEditModal(null)}
+          className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl border border-[#E2E8F0] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-4 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <UtensilsCrossed className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <h3 className="text-sm font-bold text-[#0B1929] truncate">
+                    {nutriEditModal.dia.nombre || nutriEditModal.dia.dia_semana || "Día del Plan"}
+                  </h3>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  Semana {nutriEditModal.semanaObj.weekNum} · {nutriEditModal.semanaObj.label}
+                  {nutriEditModal.semanaObj.isCurrent && " (Actual)"}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={savingTracking}
+                onClick={() => setNutriEditModal(null)}
+                className="p-1.5 rounded-lg text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-200/70 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4 overflow-y-auto">
+              {/* Comidas cumplidas */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-[#0B1929]">
+                    Comidas cumplidas (
+                    {(nutriEditModal.dia.comidas || []).filter((c, ci) => nutriEditModal.comidasDone?.[c.id || String(ci)]).length}
+                    /{(nutriEditModal.dia.comidas || []).length})
+                  </span>
+                  {(nutriEditModal.dia.comidas || []).length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allOn = {};
+                          (nutriEditModal.dia.comidas || []).forEach((c, ci) => {
+                            allOn[c.id || String(ci)] = true;
+                          });
+                          setNutriEditModal((prev) => ({ ...prev, comidasDone: allOn }));
+                        }}
+                        className="text-[10px] font-bold px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
+                      >
+                        Marcar todas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNutriEditModal((prev) => ({ ...prev, comidasDone: {} }))}
+                        className="text-[10px] font-bold px-2 py-1 rounded-md bg-gray-100 text-[#6B7A8D] border border-gray-200 hover:bg-gray-200 cursor-pointer"
+                      >
+                        Desmarcar
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {(nutriEditModal.dia.comidas || []).length === 0 ? (
+                  <p className="text-xs text-[#6B7A8D] italic py-2">Este día no tiene comidas asignadas.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(nutriEditModal.dia.comidas || []).map((c, ci) => {
+                      const key = c.id || String(ci);
+                      const checked = Boolean(nutriEditModal.comidasDone?.[key]);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() =>
+                            setNutriEditModal((prev) => ({
+                              ...prev,
+                              comidasDone: {
+                                ...(prev.comidasDone || {}),
+                                [key]: !checked,
+                              },
+                            }))
+                          }
+                          className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                            checked
+                              ? "bg-emerald-50/70 border-emerald-300 text-[#0B1929]"
+                              : "bg-white border-[#E2E8F0] text-[#6B7A8D] hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 transition-colors ${
+                                checked
+                                  ? "bg-emerald-500 border-emerald-500 text-white"
+                                  : "bg-white border-gray-300"
+                              }`}
+                            >
+                              {checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            </div>
+                            <span className={`text-xs font-semibold truncate ${checked ? "text-[#0B1929]" : "text-[#475569]"}`}>
+                              {c.nombre || `Comida ${ci + 1}`}
+                            </span>
+                          </div>
+                          {c.hora && (
+                            <span className="text-[10px] font-mono text-[#6B7A8D] shrink-0">{c.hora}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Agua registrada */}
+              <div className="pt-2 border-t border-[#E2E8F0] space-y-2">
+                <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                  <Droplets className="w-4 h-4 text-sky-500" />
+                  <span>Agua registrada (Litros)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    placeholder="0.00"
+                    value={nutriEditModal.aguaLitros}
+                    onChange={(e) => setNutriEditModal((prev) => ({ ...prev, aguaLitros: e.target.value }))}
+                    className="flex-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm font-bold text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                  <span className="text-xs font-bold text-[#6B7A8D] pr-1">L</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { label: "0 L", action: () => setNutriEditModal((p) => ({ ...p, aguaLitros: "" })) },
+                    {
+                      label: "+0.25 L",
+                      action: () =>
+                        setNutriEditModal((p) => ({
+                          ...p,
+                          aguaLitros: String(Number(((parseFloat(p.aguaLitros || "0") || 0) + 0.25).toFixed(2))),
+                        })),
+                    },
+                    {
+                      label: "+0.50 L",
+                      action: () =>
+                        setNutriEditModal((p) => ({
+                          ...p,
+                          aguaLitros: String(Number(((parseFloat(p.aguaLitros || "0") || 0) + 0.5).toFixed(2))),
+                        })),
+                    },
+                    {
+                      label: "+1.00 L",
+                      action: () =>
+                        setNutriEditModal((p) => ({
+                          ...p,
+                          aguaLitros: String(Number(((parseFloat(p.aguaLitros || "0") || 0) + 1).toFixed(2))),
+                        })),
+                    },
+                  ].map((btn) => (
+                    <button
+                      key={btn.label}
+                      type="button"
+                      onClick={btn.action}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 cursor-pointer"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-3 border-t border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={savingTracking}
+                onClick={() => setNutriEditModal(null)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-gray-200/70 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={savingTracking}
+                onClick={handleSaveNutriTracking}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-95 shadow-sm flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
+              >
+                {savingTracking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Guardar cambios</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Editar Tracking de Rutina (Peso y Reps de cualquier serie/semana) */}
+      {rutinaEditModal && createPortal(
+        <div
+          onClick={() => !savingTracking && setRutinaEditModal(null)}
+          className="fixed inset-0 z-[120] bg-[#0B1929]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl border border-[#E2E8F0] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
+          >
+            <div className="px-4 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4 text-[var(--brand-primary)] shrink-0" />
+                  <h3 className="text-sm font-bold text-[#0B1929] truncate">
+                    {rutinaEditModal.exObj?.nombre || rutinaEditModal.ej?.nombre}
+                  </h3>
+                </div>
+                <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                  Serie {rutinaEditModal.si + 1} · Semana {rutinaEditModal.wi + 1} ({rutinaEditModal.semanaLabel})
+                  {rutinaEditModal.vid !== "original" && " · Alternativa"}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={savingTracking}
+                onClick={() => setRutinaEditModal(null)}
+                className="p-1.5 rounded-lg text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-200/70 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveRutinaTracking();
+              }}
+              className="p-4 space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#0B1929] block">
+                    Peso ({rutinaEditModal.unit.toUpperCase()})
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus={rutinaEditModal.focusField === "peso"}
+                    disabled={rutinaEditModal.isFalta}
+                    placeholder="Ej. 60"
+                    value={rutinaEditModal.pesoInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (!/^-?\d*\.?\d*$/.test(raw) && raw !== "") return;
+                      setRutinaEditModal((prev) => ({ ...prev, pesoInput: raw, isFalta: false }));
+                    }}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm font-bold text-center text-[#0B1929] disabled:opacity-40 focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#0B1929] block">
+                    Repeticiones
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus={rutinaEditModal.focusField === "reps"}
+                    disabled={rutinaEditModal.isFalta}
+                    placeholder="Ej. 10"
+                    value={rutinaEditModal.repsInput}
+                    onChange={(e) =>
+                      setRutinaEditModal((prev) => ({ ...prev, repsInput: e.target.value, isFalta: false }))
+                    }
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm font-bold text-center text-[#0B1929] disabled:opacity-40 focus:outline-none focus:border-[var(--brand-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={savingTracking}
+                  onClick={() =>
+                    setRutinaEditModal((prev) => ({
+                      ...prev,
+                      isFalta: !prev.isFalta,
+                      pesoInput: !prev.isFalta ? "" : prev.pesoInput,
+                      repsInput: !prev.isFalta ? "" : prev.repsInput,
+                    }))
+                  }
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                    rutinaEditModal.isFalta
+                      ? "bg-red-500 text-white border-red-500"
+                      : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                  }`}
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>{rutinaEditModal.isFalta ? "Marcado como Falta" : "Marcar Falta"}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={savingTracking}
+                  onClick={() => handleSaveRutinaTracking("clear")}
+                  className="py-2 px-3 rounded-xl text-xs font-bold bg-gray-100 text-[#6B7A8D] border border-gray-200 hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-[#E2E8F0] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={savingTracking}
+                  onClick={() => setRutinaEditModal(null)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-[#6B7A8D] hover:bg-gray-200/70 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTracking}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-primary)] text-white hover:opacity-95 shadow-sm flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
+                >
+                  {savingTracking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Guardar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Lightbox */}
       {lightbox&&createPortal(
