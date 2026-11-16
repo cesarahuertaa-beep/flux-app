@@ -47,6 +47,7 @@ import {
   autoDistributeSmaeFromMacros,
   calculateSmaeTotals,
 } from "../../lib/smaeData";
+import { parseDiaMetadata } from "../../lib/mealOptions";
 import UpgradeModal from "../ui/UpgradeModal";
 
 const FIELDS_BASICAS = [
@@ -279,6 +280,37 @@ function countActiveRoutineDays(rutinasList) {
   return uniqueDays.size > 0 ? uniqueDays.size : list.length;
 }
 
+const WEEK_DAY_CATALOG = [
+  { code: "LUN", name: "Lunes", aliases: ["LUN", "LUNES"] },
+  { code: "MAR", name: "Martes", aliases: ["MAR", "MARTES"] },
+  { code: "MIE", name: "Miércoles", aliases: ["MIE", "MIÉ", "MIERCOLES", "MIÉRCOLES"] },
+  { code: "JUE", name: "Jueves", aliases: ["JUE", "JUEVES"] },
+  { code: "VIE", name: "Viernes", aliases: ["VIE", "VIERNES"] },
+  { code: "SAB", name: "Sábado", aliases: ["SAB", "SÁB", "SABADO", "SÁBADO"] },
+  { code: "DOM", name: "Domingo", aliases: ["DOM", "DOMINGO"] },
+];
+
+function formatWeekDaysSummary(rawDayCodes) {
+  if (!Array.isArray(rawDayCodes) || rawDayCodes.length === 0) return "";
+  const indexSet = new Set();
+  rawDayCodes.forEach((raw) => {
+    const norm = String(raw || "").trim().toUpperCase();
+    if (!norm || norm === "S/D") return;
+    const idx = WEEK_DAY_CATALOG.findIndex((d) => d.aliases.includes(norm));
+    if (idx !== -1) indexSet.add(idx);
+  });
+  const indices = Array.from(indexSet).sort((a, b) => a - b);
+  if (indices.length === 0) return "";
+  if (indices.length === 1) return WEEK_DAY_CATALOG[indices[0]].name;
+  const isContiguous = indices.every((val, i) => i === 0 || val === indices[i - 1] + 1);
+  if (isContiguous && indices.length >= 3) {
+    return `${WEEK_DAY_CATALOG[indices[0]].name} a ${WEEK_DAY_CATALOG[indices[indices.length - 1]].name}`;
+  }
+  const names = indices.map((i) => WEEK_DAY_CATALOG[i].name);
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+}
+
 function buildAdherenceSnapshot({
   cicloEvaluado = null,
   nutriDiasCiclo = [],
@@ -395,16 +427,23 @@ function buildAdherenceSnapshot({
   const rsWithEx = rsRaw.filter((r) => (r.ejercicios || []).length > 0);
   const rs = rsWithEx.length > 0 ? rsWithEx : rsRaw;
   const uDays = new Set();
+  const entrenoDayCodes = [];
   const ejToRutina = {};
   rs.forEach((r) => {
     const parts = (r.nombre || "").split("|");
-    const dayTag = parts.length > 1 ? parts[0] : "";
-    if (dayTag && dayTag !== "S/D") uDays.add(dayTag.toLowerCase());
+    const dayTag = (parts.length > 1 ? parts[0] : "").trim();
+    if (dayTag && dayTag !== "S/D") {
+      uDays.add(dayTag.toLowerCase());
+      entrenoDayCodes.push(dayTag);
+    }
     (r.ejercicios || []).forEach((e) => {
       ejToRutina[String(e.id)] = r.id;
     });
   });
   const daysAssigned = rs.length > 0 ? (uDays.size > 0 ? uDays.size : rs.length) : 0;
+  const entrenoDiasDetalle = formatWeekDaysSummary(entrenoDayCodes);
+  const nutriDayCodes = diasList.map((d) => parseDiaMetadata(d.dia || d.nombre || "").dayCode);
+  const nutriDiasDetalle = formatWeekDaysSummary(nutriDayCodes);
 
   const sessionKeys = new Set();
   const weeksWithWorkouts = new Set();
@@ -466,6 +505,8 @@ function buildAdherenceSnapshot({
     capturado_en: new Date().toISOString(),
     nutricion: {
       hasPlan: diasList.length > 0,
+      dias_asignados: diasList.length,
+      dias_detalle: nutriDiasDetalle,
       dias_registrados: diasRegistrados,
       dias_totales: diasTotalesPeriodo,
       pct_comidas: pctComidas,
@@ -479,6 +520,7 @@ function buildAdherenceSnapshot({
     entrenamiento: {
       hasPlan: daysAssigned > 0,
       dias_asignados: daysAssigned,
+      dias_detalle: entrenoDiasDetalle,
       semanas_evaluadas: semanasActivas,
       sesiones_completadas: sesionesCompletadas,
       sesiones_esperadas: sesionesEsperadas,
@@ -3819,14 +3861,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           </div>
 
                           <div className="pt-2.5 border-t border-[#E2E8F0]/80 space-y-2.5">
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                 <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
                                 <span>Entrenamiento</span>
                               </span>
                               {adherenceSnapshot.entrenamiento?.hasPlan && (
                                 <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                  {adherenceSnapshot.entrenamiento.dias_asignados} días/sem
+                                  {adherenceSnapshot.entrenamiento.dias_asignados} {adherenceSnapshot.entrenamiento.dias_asignados === 1 ? "día" : "días"}/sem{adherenceSnapshot.entrenamiento.dias_detalle ? ` · ${adherenceSnapshot.entrenamiento.dias_detalle}` : ""}
                                 </span>
                               )}
                             </div>
@@ -4283,17 +4325,30 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               </div>
 
                               <div className="pt-2.5 border-t border-[#E2E8F0]/80 space-y-3">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                                    <Utensils className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Nutrición e Hidratación</span>
-                                  </span>
-                                  {adherenceSnapshot.nutricion?.hasPlan && (
-                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                      {adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días reg.
-                                    </span>
-                                  )}
-                                </div>
+                                {(() => {
+                                  const nutriDiasSem = adherenceSnapshot.nutricion?.dias_asignados ?? adherenceSnapshot.nutricion?.semanas?.[0]?.diasTotales ?? 0;
+                                  const nutriDetalle = adherenceSnapshot.nutricion?.dias_detalle || "";
+                                  return (
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                        <Utensils className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Nutrición e Hidratación</span>
+                                      </span>
+                                      {adherenceSnapshot.nutricion?.hasPlan && (
+                                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                          {nutriDiasSem > 0 && (
+                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                              {nutriDiasSem} {nutriDiasSem === 1 ? "día" : "días"}/sem{nutriDetalle ? ` · ${nutriDetalle}` : ""}
+                                            </span>
+                                          )}
+                                          <span className="text-[10px] font-semibold text-[#6B7A8D] bg-white border border-[#E2E8F0] px-2 py-0.5 rounded-full">
+                                            {adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días reg.
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {adherenceSnapshot.nutricion?.hasPlan ? (
                                   <div className="space-y-3">
