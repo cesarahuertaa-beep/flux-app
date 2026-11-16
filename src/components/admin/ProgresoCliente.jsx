@@ -3861,14 +3861,19 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       )}
 
-                      <textarea
-                        rows={2}
-                        readOnly={isReadOnly}
-                        value={form.checkin_observaciones || ""}
-                        onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
-                        placeholder="Ej. Buena energía a lo largo del día, apego al 90%, sin hambre excesiva ni atracones..."
-                        className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] resize-none shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                      />
+                      <div>
+                        <label className="block text-xs font-bold text-[#0B1929] mb-1">
+                          Justificación de faltas, desviaciones del entrenamiento o sensaciones (Opcional)
+                        </label>
+                        <textarea
+                          rows={2}
+                          readOnly={isReadOnly}
+                          value={form.checkin_observaciones || ""}
+                          onChange={(e) => !isReadOnly && updForm("checkin_observaciones", e.target.value)}
+                          placeholder="Ej. Faltó en semanas 3 y 6 por viaje de trabajo, molestia leve en rodilla en sentadilla, buena energía y recuperación..."
+                          className={`w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#0B1929] resize-none shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4247,7 +4252,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
                                 <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
                                   <BarChart2 className="w-3.5 h-3.5 text-purple-600" />
-                                  <span>Histórico nutricional: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
+                                  <span>Histórico de hidratación y nutrición: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
                                 </span>
                                 {adherenceSnapshot.capturado_en && (
                                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-[#E2E8F0] text-[#6B7A8D]">
@@ -4256,7 +4261,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 )}
                               </div>
 
-                              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                              <div className="pt-2.5 border-t border-[#E2E8F0]/80 space-y-3">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                     <Utensils className="w-3.5 h-3.5 text-emerald-600" />
@@ -4270,63 +4275,97 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 </div>
 
                                 {adherenceSnapshot.nutricion?.hasPlan ? (
-                                  <div className="space-y-2">
-                                    <div>
-                                      <div className="flex items-center justify-between text-[11px] mb-1">
-                                        <span className="text-[#6B7A8D] font-medium">
-                                          Cumplimiento de menú ({adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com.)
-                                        </span>
-                                        <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_comidas}%</span>
+                                  <div className="space-y-3">
+                                    {/* Cumplimiento de menú + desglose semanal */}
+                                    <div className="space-y-2">
+                                      <div>
+                                        <div className="flex items-center justify-between text-[11px] mb-1">
+                                          <span className="text-[#6B7A8D] font-medium">
+                                            Cumplimiento de menú ({adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com.)
+                                          </span>
+                                          <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_comidas}%</span>
+                                        </div>
+                                        <div className="w-full h-2 rounded-full bg-white border border-[#E2E8F0]/80 overflow-hidden">
+                                          <div
+                                            className="h-full rounded-full bg-emerald-500 transition-all"
+                                            style={{ width: `${adherenceSnapshot.nutricion.pct_comidas}%` }}
+                                          />
+                                        </div>
                                       </div>
-                                      <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-                                        <div
-                                          className="h-full rounded-full bg-emerald-500 transition-all"
-                                          style={{ width: `${adherenceSnapshot.nutricion.pct_comidas}%` }}
-                                        />
-                                      </div>
-                                    </div>
 
-                                    <div>
-                                      <div className="flex items-center justify-between text-[11px] mb-1">
-                                        <span className="text-[#6B7A8D] font-medium">
-                                          Hidratación ({adherenceSnapshot.nutricion.promedio_agua_l} L/día prom.)
-                                        </span>
-                                        <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_agua}%</span>
-                                      </div>
-                                      <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-                                        <div
-                                          className="h-full rounded-full bg-blue-500 transition-all"
-                                          style={{ width: `${adherenceSnapshot.nutricion.pct_agua}%` }}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    {adherenceSnapshot.nutricion.semanas?.length > 0 && (
-                                      <div className={`pt-1.5 border-t border-gray-100 grid gap-1.5 ${
-                                        adherenceSnapshot.nutricion.semanas.length > 4
-                                          ? "grid-cols-4 sm:grid-cols-8"
-                                          : "grid-cols-4"
-                                      }`}>
-                                        {adherenceSnapshot.nutricion.semanas.map((w) => (
-                                          <div key={w.semana} className="text-center">
-                                            <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
-                                              <div
-                                                className={`w-full rounded-sm ${w.pctComidas > 0 ? "bg-emerald-400" : "bg-slate-200"}`}
-                                                style={{ height: `${Math.max(8, w.pctComidas)}%` }}
-                                              />
-                                            </div>
-                                            <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
-                                              S{w.semana} · {w.pctComidas}%
-                                            </div>
-                                            {w.comidasTotal != null && (
-                                              <div className="text-[9px] text-[#6B7A8D] leading-tight">
-                                                {w.comidasRealizadas}/{w.comidasTotal}
+                                      {adherenceSnapshot.nutricion.semanas?.length > 0 && (
+                                        <div className={`pt-1.5 border-t border-[#E2E8F0]/70 grid gap-1.5 ${
+                                          adherenceSnapshot.nutricion.semanas.length > 4
+                                            ? "grid-cols-4 sm:grid-cols-8"
+                                            : "grid-cols-4"
+                                        }`}>
+                                          {adherenceSnapshot.nutricion.semanas.map((w) => (
+                                            <div key={`food-${w.semana}`} className="text-center">
+                                              <div className="h-8 bg-white border border-[#E2E8F0]/80 rounded-md flex items-end overflow-hidden p-0.5">
+                                                <div
+                                                  className={`w-full rounded-sm ${w.pctComidas > 0 ? "bg-emerald-400" : "bg-slate-200"}`}
+                                                  style={{ height: `${Math.max(8, w.pctComidas)}%` }}
+                                                />
                                               </div>
-                                            )}
-                                          </div>
-                                        ))}
+                                              <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                                S{w.semana} · {w.pctComidas}%
+                                              </div>
+                                              {w.comidasTotal != null && (
+                                                <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                                  {w.comidasRealizadas}/{w.comidasTotal}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Hidratación + desglose semanal */}
+                                    <div className="pt-2.5 border-t border-[#E2E8F0]/80 space-y-2">
+                                      <div>
+                                        <div className="flex items-center justify-between text-[11px] mb-1">
+                                          <span className="text-[#6B7A8D] font-medium">
+                                            Hidratación ({adherenceSnapshot.nutricion.promedio_agua_l} L/día prom.)
+                                          </span>
+                                          <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_agua}%</span>
+                                        </div>
+                                        <div className="w-full h-2 rounded-full bg-white border border-[#E2E8F0]/80 overflow-hidden">
+                                          <div
+                                            className="h-full rounded-full bg-blue-500 transition-all"
+                                            style={{ width: `${adherenceSnapshot.nutricion.pct_agua}%` }}
+                                          />
+                                        </div>
                                       </div>
-                                    )}
+
+                                      {adherenceSnapshot.nutricion.semanas?.length > 0 && (
+                                        <div className={`pt-1.5 border-t border-[#E2E8F0]/70 grid gap-1.5 ${
+                                          adherenceSnapshot.nutricion.semanas.length > 4
+                                            ? "grid-cols-4 sm:grid-cols-8"
+                                            : "grid-cols-4"
+                                        }`}>
+                                          {adherenceSnapshot.nutricion.semanas.map((w) => {
+                                            const pctW = Number(w.pctAgua) || 0;
+                                            return (
+                                              <div key={`water-${w.semana}`} className="text-center">
+                                                <div className="h-8 bg-white border border-[#E2E8F0]/80 rounded-md flex items-end overflow-hidden p-0.5">
+                                                  <div
+                                                    className={`w-full rounded-sm ${pctW > 0 ? "bg-blue-400" : "bg-slate-200"}`}
+                                                    style={{ height: `${Math.max(8, pctW)}%` }}
+                                                  />
+                                                </div>
+                                                <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                                  S{w.semana} · {pctW}%
+                                                </div>
+                                                <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                                  {w.promedioAguaL || "0.00"} L/d
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 ) : (
                                   <p className="text-[11px] text-[#6B7A8D] py-1">
