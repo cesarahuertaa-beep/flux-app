@@ -21,7 +21,7 @@ import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, d
 import { useBrand } from "../BrandContext";
 import { useBackButton } from "../../lib/backButtonHandler";
 import { generateProgresoPDF } from "../../utils/pdf";
-import { parseFotos, getSemanasConFecha, compressImageIfNeeded } from "../../utils/helpers";
+import { parseFotos, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageIfNeeded } from "../../utils/helpers";
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
@@ -2923,6 +2923,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
             </div>
           ):rutinas.map(r=>{
             const semanas = getSemanasConFecha(r, cicloSel);
+            const startRaw = r?.fecha_inicio || cicloSel?.fecha_inicio || cicloSel?.created_at || r?.created_at;
+            const { currentCycleWeek, isFuture: isCycleFuture } = getCurrentCycleWeekInfo(startRaw);
+            const currentWeekIdx = isCycleFuture ? -1 : Math.max(0, (currentCycleWeek || 1) - 1);
             const numSemanas = Math.max(1, semanas.length);
             const metricColPercent = (62 / (numSemanas * 2)).toFixed(2);
             const tableMinPx = Math.max(740, 240 + 50 + (numSemanas * 2 * 56));
@@ -3023,7 +3026,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {r.ejercicios.map((ej, eji) => {
                           const variantsWithData = new Set(["original"]);
                           for (const key in progreso) {
-                            if (key.startsWith(`${ej.id}-`)) {
+                            if (key.startsWith(`${ej.id}-`) && progreso[key] !== "" && progreso[key] != null) {
                               const match = key.match(/-(?:peso|reps)-(.+)$/);
                               if (match && match[1]) {
                                 variantsWithData.add(match[1]);
@@ -3031,6 +3034,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             }
                           }
                           const activeVariants = Array.from(variantsWithData).sort();
+
+                          const variantWorkedWeek = (targetVid, targetWi) => {
+                            const isTgtOrig = targetVid === "original";
+                            const tgtAltIdx = isTgtOrig ? -1 : parseInt(targetVid.replace("alt_", ""), 10);
+                            const tgtObj = isTgtOrig ? ej : (ej.alternativas || [])[tgtAltIdx] || ej;
+                            const maxSets = Math.max(tgtObj.num_series || 0, ej.num_series || 4);
+                            for (let k = 0; k < maxSets; k++) {
+                              const pv = progreso[`${ej.id}-${targetWi}-${k}-peso-${targetVid}`];
+                              const rv = progreso[`${ej.id}-${targetWi}-${k}-reps-${targetVid}`];
+                              if ((pv !== undefined && pv !== null && pv !== "") || (rv !== undefined && rv !== null && rv !== "")) {
+                                return true;
+                              }
+                            }
+                            return false;
+                          };
 
                           return activeVariants.map((vid) => {
                             const isOriginal = vid ==="original";
@@ -3106,22 +3124,31 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 {semanas.map((s, wi) => {
                                   const pVal = progreso[`${ej.id}-${wi}-${si}-peso-${vid}`] || "";
                                   const rVal = progreso[`${ej.id}-${wi}-${si}-reps-${vid}`] || "";
-                                  const isFaltaCell = rVal === "Falta";
-                                  
+                                  const isManualFalta = rVal === "Falta";
+
                                   let emptyText = "—";
                                   let emptyColorClass = "text-[#CBD5E1]";
                                   let emptyWeightClass = "font-normal";
-                                  
+                                  let isAutoFalta = false;
+
                                   if (!pVal && !rVal) {
-                                    const otherVariantHasData = activeVariants.some(otherVid => 
-                                      otherVid !== vid && (progreso[`${ej.id}-${wi}-${si}-peso-${otherVid}`] || progreso[`${ej.id}-${wi}-${si}-reps-${otherVid}`])
+                                    const otherVariantWorkedWeek = activeVariants.some(
+                                      (otherVid) => otherVid !== vid && variantWorkedWeek(otherVid, wi)
                                     );
-                                    if (otherVariantHasData) {
+                                    if (otherVariantWorkedWeek) {
                                       emptyText = isOriginal ? "ALT" : "ORG";
                                       emptyColorClass = "text-[#6B7A8D]";
                                       emptyWeightClass = "font-bold";
+                                    } else {
+                                      const isWeekClosed = !isCycleFuture && wi < currentWeekIdx;
+                                      const thisVariantWorkedWeek = variantWorkedWeek(vid, wi);
+                                      if (isWeekClosed && (isOriginal || thisVariantWorkedWeek)) {
+                                        isAutoFalta = true;
+                                      }
                                     }
                                   }
+
+                                  const isFaltaCell = isManualFalta || isAutoFalta;
 
                                   return (
                                     <Fragment key={`w${wi}`}>
@@ -3130,12 +3157,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                         onClick={() => canEditTracking && openRutinaEditCell({ rutina: r, ej, exObj, vid, si, wi, semanaLabel: s.label, focusField: "peso" })}
                                         title={canEditTracking ? `Editar serie ${si + 1} (${s.label})` : ""}
                                         className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${
-                                          isFaltaCell ? "bg-red-50/60" : (pVal ? "bg-[var(--brand-primary)]/10" : "")
+                                          isFaltaCell ? "bg-red-50/50" : (pVal ? "bg-[var(--brand-primary)]/10" : "")
                                         } ${canEditTracking ? "cursor-pointer hover:bg-[var(--brand-primary)]/15 transition-colors" : ""}`}
                                       >
                                         <span className={`text-[11px] ${
                                           isFaltaCell
-                                            ? "text-red-400 font-semibold"
+                                            ? "text-red-300 font-semibold"
                                             : (pVal ? "text-[var(--brand-primary)] font-bold" : `${emptyColorClass} ${emptyWeightClass}`)
                                         }`}>
                                           {isFaltaCell ? "—" : (pVal ? formatTrackingWeight(pVal, trackingWeightUnit) : emptyText)}
@@ -3146,7 +3173,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                         onClick={() => canEditTracking && openRutinaEditCell({ rutina: r, ej, exObj, vid, si, wi, semanaLabel: s.label, focusField: "reps" })}
                                         title={canEditTracking ? `Editar serie ${si + 1} (${s.label})` : ""}
                                         className={`px-1 py-1.5 border border-[#E2E8F0] text-center ${
-                                          isFaltaCell ? "bg-red-50/60" : (rVal ? "bg-[var(--brand-primary)]/5" : "")
+                                          isFaltaCell ? "bg-red-50/50" : (rVal ? "bg-[var(--brand-primary)]/5" : "")
                                         } ${canEditTracking ? "cursor-pointer hover:bg-blue-50 transition-colors" : ""}`}
                                       >
                                         <span className={`text-[11px] ${
@@ -3154,7 +3181,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                             ? "text-red-500 font-bold"
                                             : (rVal ? "text-[#3B82F6] font-bold" : `${emptyColorClass} ${emptyWeightClass}`)
                                         }`}>
-                                          {rVal || emptyText}
+                                          {isFaltaCell ? "Falta" : (rVal || emptyText)}
                                         </span>
                                       </td>
                                     </Fragment>
