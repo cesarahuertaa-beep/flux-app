@@ -5,7 +5,7 @@ import {
   Search, Plus, Activity, Edit2, MessageCircle, AlertCircle, X, ShoppingBag, CreditCard, Banknote 
 , UserCheck, Dumbbell, BarChart2, User, CheckCircle2, UtensilsCrossed, Camera, Trash2, Check,
   Clock, Sparkles, ChevronDown,
-  Mail, Phone, Target, ClipboardList
+  Mail, Phone, Target, ClipboardList, Footprints
 } from "lucide-react";
 import { AppLayout } from "../components/ui/AppLayout";
 import BloqueadoNutriologo from "../components/BloqueadoNutriologo";
@@ -238,6 +238,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   myShadowClientRef.current = myShadowClient;
   const lastAthleteTabRef = useRef("nutricion");
   if (tab === "entrenamiento") lastAthleteTabRef.current = "deporte";
+  else if (tab === "pasos") lastAthleteTabRef.current = "pasos";
   else if (tab === "progreso_atleta") lastAthleteTabRef.current = "progreso";
   else if (tab === "nutricion") lastAthleteTabRef.current = "nutricion";
 
@@ -638,7 +639,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
   }, [clientesFilter, myId, isCivil, role, session?.token]);
 
   useEffect(() => {
-    if (!isCivil && !myShadowClient && ["mi_entrenamiento", "nutricion", "entrenamiento", "progreso_atleta"].includes(tab)) {
+    if (!isCivil && !myShadowClient && ["mi_entrenamiento", "nutricion", "entrenamiento", "pasos", "progreso_atleta"].includes(tab)) {
       loadClientes({ silent: true });
     }
   }, [tab, isCivil, myShadowClient, loadClientes]);
@@ -1172,6 +1173,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     { id:"mi_entrenamiento", label:"Mi Plan",             icon: <Activity size={18} strokeWidth={1.5} /> },
     { id:"nutricion",        label:"Nutrición",           icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id:"entrenamiento",    label:"Entrenamiento",       icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id:"pasos",            label:"Pasos",               icon: <Footprints size={18} strokeWidth={1.5} /> },
     { id:"progreso_atleta",  label:"Progreso",            icon: <Camera size={18} strokeWidth={1.5} /> },
   ];
 
@@ -1179,6 +1181,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     { id:"mi_plan",         label:"Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
     { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
     { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    { id:"pasos",           label:"Pasos",         icon: <Footprints size={18} strokeWidth={1.5} /> },
     { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
     { id:"membresia",       label:"Membresía",     icon: <CreditCard size={18} strokeWidth={1.5} /> },
   ]
@@ -1209,6 +1212,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
           { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
           { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+          { id:"pasos",           label:"Pasos",         icon: <Footprints size={18} strokeWidth={1.5} /> },
           { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> }
         ];
 
@@ -2243,9 +2247,9 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       {/* ════════════ END CIVIL PREMIUM TABS ════════════ */}
 
     
-      {((tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ||
-        visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('progreso_atleta')) && (
-        <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'progreso_atleta') ? "flex-1 flex flex-col" : "hidden"}>
+      {((tab === 'nutricion' || tab === 'entrenamiento' || tab === 'pasos' || tab === 'progreso_atleta') ||
+        visitedTabs.has('nutricion') || visitedTabs.has('entrenamiento') || visitedTabs.has('pasos') || visitedTabs.has('progreso_atleta')) && (
+        <div className={(tab === 'nutricion' || tab === 'entrenamiento' || tab === 'pasos' || tab === 'progreso_atleta') ? "flex-1 flex flex-col" : "hidden"}>
           {(isCivil ? clienteData : myShadowClient) ? (
             <Suspense fallback={<div className="p-6 md:p-8 max-w-5xl w-full mx-auto"><ListSkeleton rows={4} /></div>}>
               <ClienteView 
