@@ -268,13 +268,15 @@ const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { y
 
 function countActiveRoutineDays(rutinasList) {
   if (!Array.isArray(rutinasList) || rutinasList.length === 0) return 0;
+  const withEx = rutinasList.filter((r) => (r.ejercicios || []).length > 0);
+  const list = withEx.length > 0 ? withEx : rutinasList;
   const uniqueDays = new Set();
-  rutinasList.forEach((r) => {
+  list.forEach((r) => {
     const parts = (r.nombre || "").split("|");
-    const dayTag = parts.length > 1 ? parts[0] : "";
+    const dayTag = (parts.length > 1 ? parts[0] : "").trim();
     if (dayTag && dayTag !== "S/D") uniqueDays.add(dayTag.toLowerCase());
   });
-  return uniqueDays.size > 0 ? uniqueDays.size : rutinasList.length;
+  return uniqueDays.size > 0 ? uniqueDays.size : list.length;
 }
 
 function buildAdherenceSnapshot({
@@ -1395,11 +1397,23 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       });
 
       setAdherenceSnapshot(snapshot);
-      const activeTrainingDays = countActiveRoutineDays(currentRes.rs);
-      if (activeTrainingDays > 0) {
+      let historicalTrainingDays = snapshot?.entrenamiento?.dias_asignados || countActiveRoutineDays(chosenRes.rs);
+      if (historicalTrainingDays === 0) {
+        const latestRutinas = await dbGetFresh(
+          `rutinas?cliente_id=eq.${selected.id}&select=id,nombre,ciclo_id&order=created_at.desc&limit=40`
+        ).catch(() => []);
+        if (Array.isArray(latestRutinas) && latestRutinas.length > 0) {
+          const latestCicloId = latestRutinas[0]?.ciclo_id ?? null;
+          const sameCycleRutinas = latestRutinas.filter(
+            (r) => String(r.ciclo_id ?? "") === String(latestCicloId ?? "")
+          );
+          historicalTrainingDays = countActiveRoutineDays(sameCycleRutinas);
+        }
+      }
+      if (historicalTrainingDays > 0) {
         setForm((prev) => ({
           ...prev,
-          dias_ejercicio_actual: prev.dias_ejercicio_actual || String(activeTrainingDays),
+          dias_ejercicio_actual: prev.dias_ejercicio_actual || String(historicalTrainingDays),
         }));
       }
     } catch (err) {
@@ -3712,14 +3726,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                       {/* Horas de Sueño */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                          <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Horas de sueño promedio</span>
-                        </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Promedio de descanso por noche.
-                        </p>
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                            <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span>Horas de sueño promedio</span>
+                          </label>
+                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                            Promedio de descanso por noche.
+                          </p>
+                        </div>
                         <input
                           type="number"
                           step="0.5"
@@ -3727,19 +3743,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.horas_sueno || ""}
                           onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
                           placeholder="Ej. 7.5 hrs"
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
                       {/* Días de Ejercicio Actuales */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                          <Dumbbell className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Días de ejercicio actuales</span>
-                        </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Frecuencia semanal de entrenamiento (0 a 7 días).
-                        </p>
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                            <Dumbbell className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Días de ejercicio actuales</span>
+                          </label>
+                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                            Promedio semanal de entrenamiento.
+                          </p>
+                        </div>
                         <input
                           type="number"
                           min="0"
@@ -3748,26 +3766,29 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.dias_ejercicio_actual || ""}
                           onChange={(e) => !isReadOnly && updForm("dias_ejercicio_actual", e.target.value)}
                           placeholder="Ej. 3 o 4 días por semana"
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
 
                       {/* Horario Disponible para Entrenar */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Horario habitual de entreno</span>
-                        </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Momento del día en el que suele entrenar.
-                        </p>
+                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col justify-between gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>Horario habitual de entreno</span>
+                          </label>
+                          <p className="text-[11px] text-[#6B7A8D] leading-snug">
+                            Hora de entrenamiento diaria.
+                          </p>
+                        </div>
                         <input
                           type="text"
                           readOnly={isReadOnly}
                           value={form.horario_ejercicio || ""}
                           onChange={(e) => !isReadOnly && updForm("horario_ejercicio", e.target.value)}
-                          placeholder={prevEvalHorario ? `En la última consulta se comentó: ${prevEvalHorario}` : ""}
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
+                          placeholder={prevEvalHorario ? `Última consulta: ${prevEvalHorario}` : ""}
+                          title={prevEvalHorario ? `En la última consulta se comentó: ${prevEvalHorario}` : undefined}
+                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm placeholder:text-xs text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
                     </div>
