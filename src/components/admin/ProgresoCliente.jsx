@@ -3850,16 +3850,16 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       {loadingAdherenceSnapshot && (
                         <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200/60 text-xs text-blue-800 flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-primary)] shrink-0" />
-                          <span>Consultando histórico de nutrición y entrenamiento en la app...</span>
+                          <span>Consultando histórico de entrenamiento en la app...</span>
                         </div>
                       )}
 
                       {!loadingAdherenceSnapshot && adherenceSnapshot && (
-                        <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-3">
+                        <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-2.5">
                           <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
                             <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
                               <BarChart2 className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-                              <span>Histórico evaluado: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
+                              <span>Histórico de entrenamiento: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
                             </span>
                             {adherenceSnapshot.capturado_en && (
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-[#E2E8F0] text-[#6B7A8D]">
@@ -3868,141 +3868,67 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* Tarjeta Nutrición & Hidratación */}
-                            <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                                  <Utensils className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>Nutrición e Hidratación</span>
+                          {/* Tarjeta Entrenamiento (Paso 1: Hábitos y Actividad Física) */}
+                          <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Entrenamiento</span>
+                              </span>
+                              {adherenceSnapshot.entrenamiento?.hasPlan && (
+                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                  {adherenceSnapshot.entrenamiento.dias_asignados} días/sem
                                 </span>
-                                {adherenceSnapshot.nutricion?.hasPlan && (
-                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                    {adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días reg.
-                                  </span>
-                                )}
-                              </div>
-
-                              {adherenceSnapshot.nutricion?.hasPlan ? (
-                                <div className="space-y-2">
-                                  <div>
-                                    <div className="flex items-center justify-between text-[11px] mb-1">
-                                      <span className="text-[#6B7A8D] font-medium">
-                                        Cumplimiento de menú ({adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com.)
-                                      </span>
-                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_comidas}%</span>
-                                    </div>
-                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-emerald-500 transition-all"
-                                        style={{ width: `${adherenceSnapshot.nutricion.pct_comidas}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <div className="flex items-center justify-between text-[11px] mb-1">
-                                      <span className="text-[#6B7A8D] font-medium">
-                                        Hidratación ({adherenceSnapshot.nutricion.promedio_agua_l} L/día prom.)
-                                      </span>
-                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_agua}%</span>
-                                    </div>
-                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-blue-500 transition-all"
-                                        style={{ width: `${adherenceSnapshot.nutricion.pct_agua}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {adherenceSnapshot.nutricion.semanas?.length > 0 && (
-                                    <div className="pt-1.5 border-t border-gray-100 grid grid-cols-4 gap-1.5">
-                                      {adherenceSnapshot.nutricion.semanas.map((w) => (
-                                        <div key={w.semana} className="text-center">
-                                          <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
-                                            <div
-                                              className={`w-full rounded-sm ${w.pctComidas > 0 ? "bg-emerald-400" : "bg-slate-200"}`}
-                                              style={{ height: `${Math.max(8, w.pctComidas)}%` }}
-                                            />
-                                          </div>
-                                          <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
-                                            S{w.semana} · {w.pctComidas}%
-                                          </div>
-                                          {w.comidasTotal != null && (
-                                            <div className="text-[9px] text-[#6B7A8D] leading-tight">
-                                              {w.comidasRealizadas}/{w.comidasTotal}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-[11px] text-[#6B7A8D] py-1">
-                                  Sin plan de nutrición asignado en la app para este ciclo.
-                                </p>
                               )}
                             </div>
 
-                            {/* Tarjeta Entrenamiento */}
-                            <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                                  <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
-                                  <span>Entrenamiento</span>
-                                </span>
-                                {adherenceSnapshot.entrenamiento?.hasPlan && (
-                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                    {adherenceSnapshot.entrenamiento.dias_asignados} días/sem
-                                  </span>
+                            {adherenceSnapshot.entrenamiento?.hasPlan ? (
+                              <div className="space-y-2">
+                                <div>
+                                  <div className="flex items-center justify-between text-[11px] mb-1">
+                                    <span className="text-[#6B7A8D] font-medium">
+                                      Sesiones ({adherenceSnapshot.entrenamiento.sesiones_completadas}/{adherenceSnapshot.entrenamiento.sesiones_esperadas})
+                                    </span>
+                                    <span className="font-bold text-[#0B1929]">{adherenceSnapshot.entrenamiento.pct_cumplimiento}%</span>
+                                  </div>
+                                  <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-indigo-500 transition-all"
+                                      style={{ width: `${adherenceSnapshot.entrenamiento.pct_cumplimiento}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {adherenceSnapshot.entrenamiento.semanas?.length > 0 && (
+                                  <div className={`pt-1.5 border-t border-gray-100 grid gap-1.5 ${
+                                    adherenceSnapshot.entrenamiento.semanas.length > 4
+                                      ? "grid-cols-4 sm:grid-cols-8"
+                                      : "grid-cols-4"
+                                  }`}>
+                                    {adherenceSnapshot.entrenamiento.semanas.map((w) => (
+                                      <div key={w.semana} className="text-center">
+                                        <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                          <div
+                                            className={`w-full rounded-sm ${w.pct > 0 ? "bg-indigo-400" : "bg-slate-200"}`}
+                                            style={{ height: `${Math.max(8, w.pct)}%` }}
+                                          />
+                                        </div>
+                                        <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                          S{w.semana} · {w.pct}%
+                                        </div>
+                                        <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                          {w.completadas}/{w.esperadas}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
-
-                              {adherenceSnapshot.entrenamiento?.hasPlan ? (
-                                <div className="space-y-2">
-                                  <div>
-                                    <div className="flex items-center justify-between text-[11px] mb-1">
-                                      <span className="text-[#6B7A8D] font-medium">
-                                        Sesiones ({adherenceSnapshot.entrenamiento.sesiones_completadas}/{adherenceSnapshot.entrenamiento.sesiones_esperadas})
-                                      </span>
-                                      <span className="font-bold text-[#0B1929]">{adherenceSnapshot.entrenamiento.pct_cumplimiento}%</span>
-                                    </div>
-                                    <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-indigo-500 transition-all"
-                                        style={{ width: `${adherenceSnapshot.entrenamiento.pct_cumplimiento}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {adherenceSnapshot.entrenamiento.semanas?.length > 0 && (
-                                    <div className="pt-1.5 border-t border-gray-100 grid grid-cols-4 gap-1.5">
-                                      {adherenceSnapshot.entrenamiento.semanas.map((w) => (
-                                        <div key={w.semana} className="text-center">
-                                          <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
-                                            <div
-                                              className={`w-full rounded-sm ${w.pct > 0 ? "bg-indigo-400" : "bg-slate-200"}`}
-                                              style={{ height: `${Math.max(8, w.pct)}%` }}
-                                            />
-                                          </div>
-                                          <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
-                                            S{w.semana} · {w.pct}%
-                                          </div>
-                                          <div className="text-[9px] text-[#6B7A8D] leading-tight">
-                                            {w.completadas}/{w.esperadas}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-[11px] text-[#6B7A8D] py-1">
-                                  Sin rutinas asignadas en la app para este ciclo.
-                                </p>
-                              )}
-                            </div>
+                            ) : (
+                              <p className="text-[11px] text-[#6B7A8D] py-1">
+                                Sin rutinas asignadas en la app para este ciclo.
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -4379,22 +4305,114 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         )}
                       </div>
 
-                      {showFollowUpView ? (
-                        <div className="space-y-3 pt-1">
-                          {adherenceSnapshot?.nutricion?.hasPlan && (
-                            <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/70 text-xs text-purple-950 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span>
-                                <strong>Apego al menú ({adherenceSnapshot.ciclo_evaluado_nombre}):</strong> {adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com. ({adherenceSnapshot.nutricion.pct_comidas}%)
-                              </span>
-                              <span>
-                                <strong>Hidratación:</strong> {adherenceSnapshot.nutricion.promedio_agua_l} L/día prom. ({adherenceSnapshot.nutricion.pct_agua}%)
-                              </span>
-                              <span className="text-purple-700 text-[11px]">
-                                ({adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días con registro)
-                              </span>
+                      {!isFirstEvaluationEver && (
+                        <>
+                          {loadingAdherenceSnapshot && (
+                            <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/60 text-xs text-purple-900 flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
+                              <span>Consultando histórico nutricional en la app...</span>
                             </div>
                           )}
 
+                          {!loadingAdherenceSnapshot && adherenceSnapshot && (
+                            <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 space-y-2.5">
+                              <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                                <span className="font-bold text-[#0B1929] flex items-center gap-1.5">
+                                  <BarChart2 className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>Histórico nutricional: {adherenceSnapshot.ciclo_evaluado_nombre}</span>
+                                </span>
+                                {adherenceSnapshot.capturado_en && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-[#E2E8F0] text-[#6B7A8D]">
+                                    Corte: {fmtDate(String(adherenceSnapshot.capturado_en).split("T")[0])}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
+                                    <Utensils className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Nutrición e Hidratación</span>
+                                  </span>
+                                  {adherenceSnapshot.nutricion?.hasPlan && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                      {adherenceSnapshot.nutricion.dias_registrados}/{adherenceSnapshot.nutricion.dias_totales ?? adherenceSnapshot.nutricion.dias_registrados} días reg.
+                                    </span>
+                                  )}
+                                </div>
+
+                                {adherenceSnapshot.nutricion?.hasPlan ? (
+                                  <div className="space-y-2">
+                                    <div>
+                                      <div className="flex items-center justify-between text-[11px] mb-1">
+                                        <span className="text-[#6B7A8D] font-medium">
+                                          Cumplimiento de menú ({adherenceSnapshot.nutricion.comidas_realizadas}/{adherenceSnapshot.nutricion.comidas_total} com.)
+                                        </span>
+                                        <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_comidas}%</span>
+                                      </div>
+                                      <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full bg-emerald-500 transition-all"
+                                          style={{ width: `${adherenceSnapshot.nutricion.pct_comidas}%` }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center justify-between text-[11px] mb-1">
+                                        <span className="text-[#6B7A8D] font-medium">
+                                          Hidratación ({adherenceSnapshot.nutricion.promedio_agua_l} L/día prom.)
+                                        </span>
+                                        <span className="font-bold text-[#0B1929]">{adherenceSnapshot.nutricion.pct_agua}%</span>
+                                      </div>
+                                      <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full bg-blue-500 transition-all"
+                                          style={{ width: `${adherenceSnapshot.nutricion.pct_agua}%` }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {adherenceSnapshot.nutricion.semanas?.length > 0 && (
+                                      <div className={`pt-1.5 border-t border-gray-100 grid gap-1.5 ${
+                                        adherenceSnapshot.nutricion.semanas.length > 4
+                                          ? "grid-cols-4 sm:grid-cols-8"
+                                          : "grid-cols-4"
+                                      }`}>
+                                        {adherenceSnapshot.nutricion.semanas.map((w) => (
+                                          <div key={w.semana} className="text-center">
+                                            <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                              <div
+                                                className={`w-full rounded-sm ${w.pctComidas > 0 ? "bg-emerald-400" : "bg-slate-200"}`}
+                                                style={{ height: `${Math.max(8, w.pctComidas)}%` }}
+                                              />
+                                            </div>
+                                            <div className="text-[9px] font-bold text-[#0B1929] mt-0.5 leading-tight">
+                                              S{w.semana} · {w.pctComidas}%
+                                            </div>
+                                            {w.comidasTotal != null && (
+                                              <div className="text-[9px] text-[#6B7A8D] leading-tight">
+                                                {w.comidasRealizadas}/{w.comidasTotal}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-[#6B7A8D] py-1">
+                                    Sin plan de nutrición asignado en la app para este ciclo.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {showFollowUpView ? (
+                        <div className="space-y-3 pt-1">
                           <div>
                             <label className="block text-xs font-bold text-[#0B1929] mb-1">
                               ¿Hubo cambios o desviaciones frecuentes fuera del menú? (Opcional)
