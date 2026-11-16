@@ -156,6 +156,7 @@ export default function MacroCalculatorModal({
         estatura: nextEstatura,
         eval_objetivo: nextGoalId,
         eval_faf: nextFafStr,
+        eval_tmb_formula: formula,
         evalSexo: sexo,
         evalEdad: edad,
       };

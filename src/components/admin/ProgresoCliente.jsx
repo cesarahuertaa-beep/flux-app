@@ -16,6 +16,8 @@ import {
   generateSmartMacroPrescription,
   generateSmartTrainingPrescription,
   evaluateWeightGoalPlan,
+  TMB_FORMULAS,
+  BIA_FORMULA_INFO,
 } from "../../lib/bodyComposition";
 import {
   fetchCloudSteps,
@@ -32,7 +34,7 @@ import { parseFotos, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageI
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw, Upload, Footprints
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw, Upload, Footprints, Info
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -181,6 +183,27 @@ export function getGroupsForMethod(metodo, sexo = "M") {
     ];
   }
 
+  if (metodo === "plicometria_faulkner") {
+    return [
+      { label: "Antropometría Base", icon: <Scale className="w-4 h-4" />, fields: [
+        ...FIELDS_BASICAS,
+        ...FIELDS_CIRCUNFERENCIAS_BASE,
+      ]},
+      { label: "4 Pliegues Faulkner (mm)", icon: <Target className="w-4 h-4" />, fields: [
+        { key: "pliegue_triceps", label: "Tricipital (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_subescapular", label: "Subescapular (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_suprailiaco", label: "Suprailíaco (mm)", type: "number", step: "0.1" },
+        { key: "pliegue_abdominal", label: "Abdominal (mm)", type: "number", step: "0.1" },
+      ]},
+      { label: "Perímetros Adicionales (Opcional)", icon: <Ruler className="w-4 h-4" />, fields: [
+        { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
+        { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
+        { key: "muslo", label: "Muslo (cm)", type: "number", step: "0.1" },
+        { key: "pantorrilla", label: "Pantorrilla (cm)", type: "number", step: "0.1" },
+      ]},
+    ];
+  }
+
   // Default: 'manual' (ISAK Completo — 4 componentes + Somatotipo Heath-Carter)
   return [
     { label: "Básicas", icon: <Scale className="w-4 h-4" />, fields: FIELDS_BASICAS },
@@ -242,6 +265,7 @@ const emptyForm = () => ({
   eval_peso_objetivo: "",
   eval_semanas_objetivo: "",
   eval_meta_pasos: "",
+  eval_tmb_formula: "auto",
   ciclo_id: "",
 
   // Hábitos del ciclo y actividad física actual
@@ -626,6 +650,27 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [showFullR24hInFollowUp, setShowFullR24hInFollowUp] = useState(false);
   const [adherenceSnapshot, setAdherenceSnapshot] = useState(null);
   const [loadingAdherenceSnapshot, setLoadingAdherenceSnapshot] = useState(false);
+  const [showFormulaPopover, setShowFormulaPopover] = useState(false);
+  const formulaPopoverRef = useRef(null);
+  const formulaHoverTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showFormulaPopover) return;
+    const onDocDown = (e) => {
+      if (formulaPopoverRef.current && !formulaPopoverRef.current.contains(e.target)) {
+        setShowFormulaPopover(false);
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowFormulaPopover(false);
+    };
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showFormulaPopover]);
 
   const getSmaeGroupPref = (groupId) => (form.smae_gustos && form.smae_gustos[groupId]) || "neutro";
   const setSmaeGroupPref = (groupId, pref) => {
@@ -1523,6 +1568,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setForm(base);
     setShowSmaeBoardInFollowUp(false);
     setShowFullR24hInFollowUp(false);
+    setShowFormulaPopover(false);
     setAdherenceSnapshot(null);
     if (latestPrev) {
       fetchFreshAdherenceSnapshot(targetCiclo);
@@ -1660,9 +1706,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
       metrica: enrichedDraft,
       clinicalRec,
-      cicloNombre: currentCiclo?.nombre || "",
+      ciclo: currentCiclo,
     });
-  }, [form, liveCalculations, selected, evalSexo, evalEdad, clinicalRec, currentCiclo?.nombre]);
+  }, [form, liveCalculations, selected, evalSexo, evalEdad, clinicalRec, currentCiclo]);
 
   const activePrescription = useMemo(() => {
     if (!liveSmartMacros) return null;
@@ -2015,7 +2061,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       const IGNORED_KEYS = new Set(["id", "created_at", "updated_at", "cliente_id", "fotos", "_rawNotas"]);
       const STRING_KEYS = new Set([
         "fecha", "presion_arterial", "notas", "metodo_evaluacion",
-        "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf", "eval_faf_notas",
+        "checkin_observaciones", "checkin_ajustes", "eval_objetivo", "eval_faf", "eval_faf_notas", "eval_tmb_formula",
         "preferencias_alimentos", "aversiones_alimentos",
         "r24h_desayuno", "r24h_colacion_m", "r24h_comida", "r24h_colacion_v", "r24h_cena", "r24h_picoteos",
         "horas_sueno", "consumo_agua_estimado", "nivel_estres",
@@ -2263,6 +2309,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setShowStep5SmaeTable(false);
     setShowSmaeBoardInFollowUp(false);
     setShowFullR24hInFollowUp(false);
+    setShowFormulaPopover(false);
     setInbodyOcrResult(null);
     setAnalyzingInbody(false);
     setAdherenceSnapshot(null);
@@ -3497,7 +3544,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
       {/* ── EDITOR DE EVALUACIÓN CORPORAL A PANTALLA COMPLETA (Master-Detail) ── */}
       {showModal && (() => {
-        const isPlicometria = ["plicometria_jp3", "plicometria_dw4", "manual", "plicometria_isak"].includes(form.metodo_evaluacion);
+        const isPlicometria = ["plicometria_jp3", "plicometria_dw4", "plicometria_faulkner", "manual", "plicometria_isak"].includes(form.metodo_evaluacion);
         const effectiveMethod = isCivil
           ? (form.metodo_evaluacion === "inbody" ? "inbody" : "basico")
           : form.metodo_evaluacion;
@@ -4642,7 +4689,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         {[
                           { id: "plicometria_jp3", label: "3 Pliegues (Jackson-Pollock)" },
                           { id: "plicometria_dw4", label: "4 Pliegues (Durnin-Womersley)" },
-                          { id: "manual", label: "ISAK Completo (4 Componentes + Somatotipo)" },
+                          { id: "plicometria_faulkner", label: "4 Pliegues (Faulkner)" },
+                          { id: "manual", label: "ISAK Completo (Carter 6 + Somatotipo)" },
                         ].map(subP => {
                           const active = form.metodo_evaluacion === subP.id || (subP.id === "manual" && form.metodo_evaluacion === "plicometria_isak");
                           return (
@@ -4663,6 +4711,38 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         })}
                       </div>
                     )}
+
+                    {/* Diagnóstico de completitud del protocolo elegido */}
+                    {(() => {
+                      const diag = liveCalculations?.compositionDiagnostics;
+                      if (!diag || !diag.missingLabels?.length) return null;
+                      const showAlert =
+                        (isPlicometria && diag.hasAny) ||
+                        (effectiveMethod === "basico" && diag.hintTarget) ||
+                        (effectiveMethod === "inbody" && (Boolean(form.peso) || diag.hasAny) && !diag.isComplete);
+                      if (!showAlert) return null;
+                      return (
+                        <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                          <span className="leading-snug">
+                            {isPlicometria ? (
+                              <>
+                                <strong>{diag.protocol}:</strong> faltan {diag.missingLabels.length}{" "}
+                                {diag.missingLabels.length === 1 ? "pliegue" : "pliegues"} ({diag.missingLabels.join(", ")}) para calcular % grasa y MLG. Mientras tanto la TMB se respalda con fórmula general.
+                              </>
+                            ) : effectiveMethod === "inbody" ? (
+                              <>
+                                <strong>Bioimpedancia:</strong> falta {diag.missingLabels.join(" o ")} para usar lectura directa o Katch-McArdle sobre MLG.
+                              </>
+                            ) : (
+                              <>
+                                <strong>{diag.hintTarget}:</strong> falta {diag.missingLabels.join(", ")} para completar la estimación por circunferencias.
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -5073,8 +5153,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                 </div>
 
                 {/* Prescripción de Macros: Matemático, Sugerido IA o Manual */}
-                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-indigo-100 p-4 sm:p-5 shadow-none md:shadow-sm relative overflow-hidden space-y-3.5">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
+                <div className="bg-white rounded-none md:rounded-2xl border-y md:border border-indigo-100 p-4 sm:p-5 shadow-none md:shadow-sm relative space-y-3.5">
+                  <div className="absolute top-0 left-0 right-0 h-1 md:rounded-t-2xl bg-gradient-to-r from-[var(--brand-primary)] via-indigo-500 to-emerald-500" />
                   
                   {/* Cabecera */}
                   <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#F0F4FA]">
@@ -5085,9 +5165,192 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </h3>
                     </div>
                     {liveSmartMacros?.formulaShort && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {liveSmartMacros.formulaShort}
-                      </span>
+                      <div
+                        ref={formulaPopoverRef}
+                        className="relative"
+                        onMouseEnter={() => {
+                          if (formulaHoverTimerRef.current) clearTimeout(formulaHoverTimerRef.current);
+                          setShowFormulaPopover(true);
+                        }}
+                        onMouseLeave={() => {
+                          if (formulaHoverTimerRef.current) clearTimeout(formulaHoverTimerRef.current);
+                          formulaHoverTimerRef.current = setTimeout(() => setShowFormulaPopover(false), 180);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setShowFormulaPopover((v) => !v)}
+                          aria-expanded={showFormulaPopover}
+                          title="Ver ecuación, criterios clínicos y cambiar fórmula TMB"
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                            liveSmartMacros.formulaFallbackWarning
+                              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+                              : liveSmartMacros.formulaMode === "manual"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                          }`}
+                        >
+                          <Info className="w-3 h-3 shrink-0" />
+                          <span>{liveSmartMacros.formulaShort}</span>
+                          <span className="opacity-70 font-semibold">
+                            · {liveSmartMacros.formulaMode === "manual" ? "Manual" : "Auto"}
+                          </span>
+                        </button>
+
+                        {showFormulaPopover && (
+                          <div className="absolute right-0 top-full mt-2 w-[min(92vw,24rem)] bg-white border border-indigo-200 rounded-2xl shadow-xl p-3.5 z-40 text-left space-y-3 max-h-[75vh] overflow-y-auto">
+                            {/* Título y cierre */}
+                            <div className="flex items-start justify-between gap-2 pb-2 border-b border-[#F0F4FA]">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-extrabold text-[#0B1929]">
+                                    {liveSmartMacros.activeFormulaInfo?.label || liveSmartMacros.formulaLabel}
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${
+                                    liveSmartMacros.formulaMode === "manual"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-indigo-100 text-indigo-700"
+                                  }`}>
+                                    {liveSmartMacros.formulaMode === "manual" ? "Elegida manualmente" : "Recomendación auto"}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-snug">
+                                  {liveSmartMacros.activeFormulaInfo?.populationText}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowFormulaPopover(false)}
+                                className="p-1 rounded-lg text-[#6B7A8D] hover:text-[#0B1929] hover:bg-gray-100 cursor-pointer shrink-0"
+                                aria-label="Cerrar detalle de fórmula"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {liveSmartMacros.formulaFallbackWarning && (
+                              <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-1.5 leading-snug">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                <span>{liveSmartMacros.formulaFallbackWarning}</span>
+                              </div>
+                            )}
+
+                            {/* Criterio según Paso 4 */}
+                            <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-[11px] text-[#334155] space-y-1">
+                              <div className="font-bold text-[10px] uppercase tracking-wider text-[var(--brand-primary)]">
+                                Criterio clínico ({getMetodoLabel(form.metodo_evaluacion)})
+                              </div>
+                              <p className="leading-snug">{liveSmartMacros.recommendationReason}</p>
+                            </div>
+
+                            {/* Ecuación y datos sustituidos en vivo */}
+                            <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1.5 text-[11px]">
+                              <div className="font-bold text-[10px] uppercase tracking-wider text-[#6B7A8D]">
+                                Ecuación y datos tomados en vivo
+                              </div>
+                              <div className="text-[10.5px] font-mono text-[#475569] leading-snug break-words">
+                                {liveSmartMacros.activeFormulaInfo?.equationText}
+                              </div>
+                              {liveSmartMacros.tmbSubstituted && (
+                                <div className="pt-1 border-t border-[#E2E8F0] text-[11px] font-bold text-[#0B1929] leading-snug">
+                                  <div>{liveSmartMacros.tmbSubstituted}</div>
+                                  {liveSmartMacros.matematico?.get > 0 && (
+                                    <div className="text-[10.5px] font-semibold text-indigo-700 mt-0.5">
+                                      GET = {liveSmartMacros.matematico.tmb} × {liveSmartMacros.faf} (FAF) = {liveSmartMacros.matematico.get} kcal/día
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {liveSmartMacros.hasHighFatAdjustedProtein && (
+                                <div className="text-[10px] text-[#6B7A8D] pt-0.5 leading-snug">
+                                  * Proteína/grasa base ajustada con Peso Ajustado (IMC/grasa elevada) para no sobrestimar g/kg.
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Selector opcional (veredicto final del nutriólogo) */}
+                            <div className="space-y-2 pt-1 border-t border-[#F0F4FA]">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D]">
+                                  Veredicto del especialista (cambiar ecuación)
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                onClick={() => !isReadOnly && updForm("eval_tmb_formula", "auto")}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors flex items-center justify-between gap-2 ${
+                                  isReadOnly ? "cursor-default" : "cursor-pointer"
+                                } ${
+                                  (form.eval_tmb_formula || "auto") === "auto"
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:border-indigo-300"
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <Sparkles className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">
+                                    Automático ({liveSmartMacros.recommendedFormulaInfo?.shortLabel})
+                                  </span>
+                                </span>
+                                {(form.eval_tmb_formula || "auto") === "auto" && <Check className="w-3.5 h-3.5 shrink-0" />}
+                              </button>
+
+                              {[
+                                { id: "clinicas", title: "Clínicas y Generales", items: TMB_FORMULAS.filter((f) => f.group === "clinicas") },
+                                { id: "composicion", title: "Composición Corporal / Deportivas", items: [BIA_FORMULA_INFO, ...TMB_FORMULAS.filter((f) => f.group === "composicion")] },
+                              ].map((grp) => (
+                                <div key={grp.id} className="space-y-1">
+                                  <div className="text-[10px] font-bold text-[#6B7A8D]">{grp.title}</div>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {grp.items.map((f) => {
+                                      const missingMlg = f.requiresMLG && !(liveSmartMacros.mlg > 0);
+                                      const missingBia = f.requiresInBody && !(liveSmartMacros.biaBmr > 0);
+                                      const unavailable = missingMlg || missingBia;
+                                      const isSelected = (form.eval_tmb_formula || "auto") === f.id;
+                                      return (
+                                        <button
+                                          key={f.id}
+                                          type="button"
+                                          disabled={isReadOnly || unavailable}
+                                          title={
+                                            missingBia
+                                              ? "Requiere método Bioimpedancia con TMB Basal capturado"
+                                              : missingMlg
+                                              ? "Requiere % de grasa / MLG completo en Paso 4"
+                                              : f.populationText
+                                          }
+                                          onClick={() => !isReadOnly && !unavailable && updForm("eval_tmb_formula", f.id)}
+                                          className={`px-2 py-1.5 rounded-lg text-[10.5px] font-bold border text-left transition-colors ${
+                                            unavailable
+                                              ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
+                                              : isSelected
+                                              ? "bg-emerald-50 text-emerald-800 border-emerald-400"
+                                              : isReadOnly
+                                              ? "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] cursor-default"
+                                              : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:border-indigo-300 cursor-pointer"
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="truncate">{f.shortLabel || f.label}</span>
+                                            {isSelected && <Check className="w-3 h-3 text-emerald-600 shrink-0" />}
+                                          </div>
+                                          {unavailable && (
+                                            <div className="text-[9px] font-medium text-gray-400 truncate">
+                                              {missingBia ? "Requiere TMB BIA" : "Requiere MLG"}
+                                            </div>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
