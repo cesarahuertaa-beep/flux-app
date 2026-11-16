@@ -20,8 +20,15 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function verifyStripeSignature(rawBody: string, sigHeader: string, secret: string): Promise<boolean> {
-  if (!sigHeader || !secret) return false;
+async function verifyStripeSignature(
+  rawBytes: Uint8Array,
+  sigHeader: string,
+  rawSecret: string
+): Promise<{ ok: boolean; reason?: string; detail?: Record<string, any> }> {
+  const secret = (rawSecret || "").trim().replace(/^["']|["']$/g, "");
+  if (!secret) return { ok: false, reason: "empty_secret" };
+  if (!sigHeader) return { ok: false, reason: "missing_signature_header" };
+
   const parts = sigHeader.split(",").map((s) => s.trim());
   let timestamp = "";
   const v1Sigs: string[] = [];
@@ -35,13 +42,25 @@ async function verifyStripeSignature(rawBody: string, sigHeader: string, secret:
     else if (k === "v1") v1Sigs.push(v);
   }
 
-  if (!timestamp || v1Sigs.length === 0) return false;
+  if (!timestamp || v1Sigs.length === 0) {
+    return { ok: false, reason: "malformed_signature_header" };
+  }
   const tsNum = Number(timestamp);
-  if (isNaN(tsNum)) return false;
+  if (isNaN(tsNum)) {
+    return { ok: false, reason: "invalid_timestamp" };
+  }
   const nowSec = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowSec - tsNum) > 300) return false; // Tolerancia máxima de 5 minutos
+  const tsDiffSec = Math.abs(nowSec - tsNum);
+  if (tsDiffSec > 600) {
+    return { ok: false, reason: "timestamp_out_of_range", detail: { tsDiffSec } };
+  }
 
   const enc = new TextEncoder();
+  const prefix = enc.encode(`${timestamp}.`);
+  const payloadToSign = new Uint8Array(prefix.length + rawBytes.length);
+  payloadToSign.set(prefix, 0);
+  payloadToSign.set(rawBytes, prefix.length);
+
   const key = await crypto.subtle.importKey(
     "raw",
     enc.encode(secret),
@@ -49,12 +68,25 @@ async function verifyStripeSignature(rawBody: string, sigHeader: string, secret:
     false,
     ["sign"]
   );
-  const signedBuf = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestamp}.${rawBody}`));
+  const signedBuf = await crypto.subtle.sign("HMAC", key, payloadToSign);
   const expectedHex = Array.from(new Uint8Array(signedBuf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return v1Sigs.some((sig) => timingSafeEqual(sig, expectedHex));
+  const matched = v1Sigs.some((sig) => timingSafeEqual(sig, expectedHex));
+  if (!matched) {
+    return {
+      ok: false,
+      reason: "hmac_mismatch",
+      detail: {
+        secretStartsWhsec: secret.startsWith("whsec_"),
+        secretLen: secret.length,
+        hadWhitespace: rawSecret !== secret,
+        tsDiffSec,
+      },
+    };
+  }
+  return { ok: true };
 }
 
 function addDaysISO(baseDateStr: string | null, days: number): string {
@@ -149,11 +181,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    const rawBody = await req.text();
+    const rawBytes = new Uint8Array(await req.arrayBuffer());
+    const rawBody = new TextDecoder().decode(rawBytes);
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 
-    if (!webhookSecret) {
+    if (!webhookSecret.trim()) {
       return new Response(
         JSON.stringify({ error: "Falta configurar STRIPE_WEBHOOK_SECRET en Supabase Secrets." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -161,12 +194,19 @@ serve(async (req: Request) => {
     }
 
     const sigHeader = req.headers.get("stripe-signature") || "";
-    const validSig = await verifyStripeSignature(rawBody, sigHeader, webhookSecret);
-    if (!validSig) {
-      return new Response(JSON.stringify({ error: "Firma stripe-signature inválida." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const sigCheck = await verifyStripeSignature(rawBytes, sigHeader, webhookSecret);
+    if (!sigCheck.ok) {
+      return new Response(
+        JSON.stringify({
+          error: "Firma stripe-signature inválida.",
+          reason: sigCheck.reason,
+          detail: sigCheck.detail || null,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
