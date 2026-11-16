@@ -2,11 +2,20 @@
 // Nativo (Android/iOS vía WebView): lee el sensor de hardware a través de window.FluxStepsNative.
 // PWA/navegador: sin acceso a sensores en segundo plano → solo muestra datos sincronizados desde la app móvil.
 
+import { Capacitor } from "@capacitor/core";
 import { dbGet, dbUpsert } from "./supabase";
 import { ACTIVITY_FACTORS } from "./bodyComposition";
 
 export const DEFAULT_STEP_GOAL = 8000;
 export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fluxsport.app";
+
+export function getStepsPlatform() {
+  try {
+    return Capacitor.getPlatform();
+  } catch {
+    return "web";
+  }
+}
 
 const nativeBridge = () => (typeof window !== "undefined" ? window.FluxStepsNative || null : null);
 
@@ -23,6 +32,8 @@ const safe = (fn, fallback) => {
 
 export const nativeStepsSupported = () => safe(() => nativeBridge().isSupported(), false);
 export const nativeStepsPermission = () => safe(() => nativeBridge().hasPermission(), false);
+export const nativeStepsPermissionBlocked = () => safe(() => nativeBridge().isPermissionBlocked(), false);
+export const openNativeAppSettings = () => safe(() => nativeBridge().openAppSettings(), null);
 export const requestNativeStepsPermission = () => safe(() => nativeBridge().requestPermission(), null);
 export const startNativeSteps = () => safe(() => nativeBridge().start(), null);
 /** Solicita una lectura al sensor (asíncrona); al terminar la app emite el evento 'flux:steps-updated'. */
@@ -81,9 +92,8 @@ export async function syncStepsToCloud(clienteId, history) {
   try {
     synced = JSON.parse(localStorage.getItem(syncedKey(clienteId)) || "{}");
   } catch {}
-  const today = toDateKey();
   const rows = Object.entries(history)
-    .filter(([fecha, pasos]) => pasos > 0 && (synced[fecha] !== pasos || fecha === today))
+    .filter(([fecha, pasos]) => pasos > 0 && synced[fecha] !== pasos)
     .map(([fecha, pasos]) => ({
       cliente_id: clienteId,
       fecha,

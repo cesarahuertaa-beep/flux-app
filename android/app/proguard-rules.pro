@@ -8,10 +8,11 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 
-# Preserve MainActivity bridges, FloatingTimerService and WorkManager sync worker
+# Preserve MainActivity bridges, FloatingTimerService and WorkManager workers
 -keep class com.fluxsport.app.MainActivity$* { *; }
 -keep class com.fluxsport.app.FloatingTimerService { *; }
 -keep class com.fluxsport.app.FluxSyncWorker { *; }
+-keep class com.fluxsport.app.FluxStepsWorker { *; }
 -keep class * extends androidx.work.ListenableWorker {
     public <init>(android.content.Context, android.work.WorkerParameters);
 }

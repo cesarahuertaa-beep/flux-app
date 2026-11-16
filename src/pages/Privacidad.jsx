@@ -37,7 +37,7 @@ export default function Privacidad() {
           <ul className="list-disc pl-5 space-y-1">
             <li>Datos de identificación: nombre, correo electrónico, teléfono.</li>
             <li>Datos de facturación y pago (procesados a través de terceros especializados; Flux Sports no almacena números completos de tarjeta).</li>
-            <li><strong>Datos sensibles de salud:</strong> peso, estatura, composición corporal, fotos de progreso físico, historial médico y nutricional relevante, hábitos alimenticios, resultados de evaluaciones antropométricas o de bioimpedancia, y cualquier otra información que usted o su nutriólogo registren dentro de la app para el seguimiento de su plan.</li>
+            <li><strong>Datos sensibles de salud y actividad física:</strong> peso, estatura, composición corporal, fotos de progreso físico, historial médico y nutricional relevante, hábitos alimenticios, resultados de evaluaciones antropométricas o de bioimpedancia, conteo diario de pasos (obtenido mediante el sensor de actividad física del dispositivo únicamente tras otorgar su permiso expreso) y cualquier otra información que usted o su nutriólogo registren dentro de la app para el seguimiento de su plan.</li>
           </ul>
           <p>
             De conformidad con el artículo 9 de la LFPDPPP, al tratarse de datos sensibles, requerimos su <strong>consentimiento expreso y por escrito</strong>, mismo que otorga al marcar la casilla de aceptación de este Aviso al momento de registrarse en la app.
@@ -71,6 +71,11 @@ export default function Privacidad() {
           </p>
 
           <p>
+            <strong>Permisos de movimiento y contador de pasos (NEAT)</strong><br/>
+            Cuando utiliza la aplicación móvil y concede de forma voluntaria el permiso de reconocimiento de actividad física (<code>ACTIVITY_RECOGNITION</code> en Android / movimiento físico en dispositivos móviles), FLUX lee exclusivamente el contador de pasos diario del sensor de hardware para mostrar su progreso, estimar gasto energético no asociado al ejercicio (NEAT) y permitir que su nutriólogo o entrenador asignado (si aplica) ajuste sus metas calóricas. FLUX nunca recopila ubicación GPS ni rutas de desplazamiento para esta función, ni vende o comparte estos datos con anunciantes o terceros ajenos al servicio. Puede revocar este permiso en cualquier momento desde los Ajustes de su dispositivo.
+          </p>
+
+          <p>
             <strong>Funciones asistidas por Inteligencia Artificial (IA) y Descargo de Responsabilidad Médica</strong><br/>
             La plataforma incluye herramientas opcionales de asistencia clínica y nutricional impulsadas por FLUX IA para generar síntesis de expedientes, sugerencias de distribución de macronutrientes y estructuración de menús. Los parámetros enviados a este motor se procesan de manera segura y efímera exclusivamente para generar la respuesta solicitada dentro de la aplicación, sin venderse a terceros ni utilizarse para entrenar modelos públicos externos. Todas las estimaciones, alertas y sugerencias generadas por IA tienen carácter estrictamente orientativo e informativo, no constituyen un diagnóstico médico definitivo y no sustituyen el juicio profesional de un médico o nutriólogo titulado. Los usuarios cuentan dentro de la aplicación con botones directos («Reportar respuesta IA») para señalar cualquier resultado inexacto o inapropiado.
           </p>
@@ -91,7 +96,7 @@ export default function Privacidad() {
               </li>
             </ol>
             <p className="text-xs text-[#6B7A8D] pt-1">
-              <strong>Alcance de los datos eliminados:</strong> Al eliminar una cuenta de paciente o atleta independiente se borran permanentemente sus datos de perfil, credenciales de acceso, planes asignados, bitácoras de entrenamiento, mediciones corporales y fotografías en almacenamiento en la nube. Si un profesional de nutrición elimina su cuenta, se elimina su perfil profesional y credenciales, manteniendo a salvo las cuentas personales de sus usuarios quienes pasan a modalidad independiente.
+              <strong>Alcance de los datos eliminados:</strong> Al eliminar una cuenta de paciente o atleta independiente se borran permanentemente sus datos de perfil, credenciales de acceso, planes asignados, bitácoras de entrenamiento, registros diarios de pasos/actividad física, mediciones corporales y fotografías en almacenamiento en la nube. Si un profesional de nutrición elimina su cuenta, se elimina su perfil profesional y credenciales, manteniendo a salvo las cuentas personales de sus usuarios quienes pasan a modalidad independiente.
             </p>
             <p className="pt-2">
               Para ejercer otros derechos ARCO o soporte de privacidad, también puede contactarnos en:

@@ -2289,6 +2289,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
                 isAtletaMode={false}
                 isEmbedded={true}
                 embeddedTab={lastAthleteTabRef.current}
+                isEmbeddedVisible={tab === 'nutricion' || tab === 'entrenamiento' || tab === 'pasos' || tab === 'progreso_atleta'}
                 onLogout={onLogout}
               />
             </Suspense>

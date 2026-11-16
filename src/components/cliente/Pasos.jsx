@@ -5,9 +5,12 @@ import {
   DEFAULT_STEP_GOAL,
   PLAY_STORE_URL,
   STEP_LEVELS,
+  getStepsPlatform,
   isNativeStepsAvailable,
   nativeStepsSupported,
   nativeStepsPermission,
+  nativeStepsPermissionBlocked,
+  openNativeAppSettings,
   requestNativeStepsPermission,
   startNativeSteps,
   refreshNativeSteps,
@@ -84,9 +87,12 @@ function StatTile({ icon, label, value, unit }) {
 
 export default function Pasos({ cliente, isActive = true, ultimoPeso = null, metaPasos = null }) {
   const clienteId = cliente?.id;
+  const platform = useMemo(() => getStepsPlatform(), []);
   const native = isNativeStepsAvailable();
   const supported = useMemo(() => (native ? nativeStepsSupported() : false), [native]);
   const [permission, setPermission] = useState(() => (native ? nativeStepsPermission() : false));
+  const [permissionBlocked, setPermissionBlocked] = useState(() => (native ? nativeStepsPermissionBlocked() : false));
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [nativeHistory, setNativeHistory] = useState(() => (native ? getNativeHistory() : {}));
   const [cloudHistory, setCloudHistory] = useState({});
   const [requesting, setRequesting] = useState(false);
@@ -145,8 +151,47 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
 
   useEffect(() => () => pollRef.current && clearInterval(pollRef.current), []);
 
+  // Escuchar respuesta inmediata del diálogo de permiso nativo y re-verificación en onResume
+  useEffect(() => {
+    if (!native) return undefined;
+    const onPermResult = (e) => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      const granted = Boolean(e?.detail?.granted);
+      const permanentlyDenied = Boolean(e?.detail?.permanentlyDenied);
+      setRequesting(false);
+      setPermission(granted);
+      setPermissionBlocked(!granted && permanentlyDenied);
+      setPermissionDenied(!granted && !permanentlyDenied);
+    };
+    const onPermSync = (e) => {
+      const granted = Boolean(e?.detail?.granted);
+      const blocked = Boolean(e?.detail?.blocked);
+      setPermission(granted);
+      setPermissionBlocked(!granted && blocked);
+      if (granted) {
+        setRequesting(false);
+        setPermissionDenied(false);
+        setNativeHistory(getNativeHistory());
+      }
+    };
+    window.addEventListener("flux:steps-permission-result", onPermResult);
+    window.addEventListener("flux:steps-permission-sync", onPermSync);
+    return () => {
+      window.removeEventListener("flux:steps-permission-result", onPermResult);
+      window.removeEventListener("flux:steps-permission-sync", onPermSync);
+    };
+  }, [native]);
+
   const handleRequestPermission = useCallback(() => {
+    if (permissionBlocked) {
+      openNativeAppSettings();
+      return;
+    }
     setRequesting(true);
+    setPermissionDenied(false);
     requestNativeStepsPermission();
     let tries = 0;
     if (pollRef.current) clearInterval(pollRef.current);
@@ -154,14 +199,18 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
       tries++;
       if (nativeStepsPermission()) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
         setPermission(true);
+        setPermissionBlocked(false);
         setRequesting(false);
-      } else if (tries > 60) {
+      } else if (tries >= 15) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
+        setPermissionBlocked(nativeStepsPermissionBlocked());
         setRequesting(false);
       }
     }, 1000);
-  }, []);
+  }, [permissionBlocked]);
 
   const handleSetGoal = (value) => {
     const v = Math.max(1000, Math.min(50000, Math.round(Number(value) || 0)));
@@ -236,7 +285,7 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
         </div>
       </div>
 
-      {/* Aviso PWA / navegador */}
+      {/* Aviso PWA / navegador o iOS sin puente nativo */}
       {!native && (
         <div className="bg-white border border-[var(--brand-primary)]/25 rounded-2xl p-4 sm:p-5 shadow-sm">
           <div className="flex items-start gap-3">
@@ -244,23 +293,28 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
               <Smartphone className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-[#0B1929]">Contador de pasos disponible en la app móvil</p>
-              <p className="text-xs text-[#6B7A8D] mt-1 leading-relaxed">
-                El conteo en segundo plano usa los sensores de movimiento del teléfono, por eso solo funciona en la app FLUX para Android e iOS. Desde el navegador puedes consultar el historial que tu app móvil ya sincronizó.
+              <p className="text-sm font-bold text-[#0B1929]">
+                {platform === "ios"
+                  ? "Conteo automático de pasos próximamente en iPhone"
+                  : "Contador de pasos disponible en la app móvil"}
               </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <a
-                  href={PLAY_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-sm"
-                >
-                  Descargar en Google Play
-                </a>
-                <span className="px-3.5 py-2 rounded-xl bg-[#F1F5F9] text-[#94A3B8] text-xs font-bold border border-[#E2E8F0] cursor-not-allowed">
-                  App Store · Próximamente
-                </span>
-              </div>
+              <p className="text-xs text-[#6B7A8D] mt-1 leading-relaxed">
+                {platform === "ios"
+                  ? "Estamos preparando la integración con los sensores de movimiento de iOS. Si ya sincronizaste pasos desde otro dispositivo vinculado a tu cuenta, puedes consultar tu historial aquí."
+                  : "El conteo en segundo plano utiliza el sensor de movimiento físico del teléfono. Desde el navegador puedes consultar el historial que tu app móvil haya sincronizado."}
+              </p>
+              {platform !== "ios" && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <a
+                    href={PLAY_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-sm"
+                  >
+                    Descargar en Google Play
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -281,10 +335,19 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
             <Activity className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-[#0B1929]">Activa el contador de pasos</p>
-            <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
-              FLUX necesita permiso de "Actividad física" para leer el sensor de movimiento. Solo se guarda el número de pasos por día, nunca tu ubicación.
+            <p className="text-sm font-bold text-[#0B1929]">
+              {permissionBlocked ? "Permiso desactivado en tu dispositivo" : "Activa el contador de pasos"}
             </p>
+            <p className="text-xs text-[#6B7A8D] mt-0.5 leading-relaxed">
+              {permissionBlocked
+                ? `Para medir tus pasos diarios, habilita el permiso "${platform === "ios" ? "Movimiento y actividad física" : "Actividad física"}" dentro de los Ajustes de tu teléfono.`
+                : `FLUX necesita permiso de "${platform === "ios" ? "Movimiento y actividad física" : "Actividad física"}" para leer el sensor de pasos. Solo guardamos el conteo diario de pasos, nunca tu ubicación GPS ni recorridos.`}
+            </p>
+            {permissionDenied && !permissionBlocked && (
+              <p className="text-[11px] font-semibold text-amber-700 mt-1">
+                Permiso no concedido. Puedes intentarlo de nuevo cuando desees activar el contador.
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -292,7 +355,11 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
             disabled={requesting}
             className="px-4 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white text-xs font-bold hover:opacity-90 disabled:opacity-60 transition-opacity shadow-sm cursor-pointer shrink-0"
           >
-            {requesting ? "Esperando permiso..." : "Activar contador"}
+            {permissionBlocked
+              ? "Abrir Ajustes"
+              : requesting
+              ? "Esperando respuesta..."
+              : "Activar contador"}
           </button>
         </div>
       )}
@@ -303,6 +370,11 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
           <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8">
             <StepRing steps={todaySteps} goal={goal} />
             <div className="flex-1 w-full space-y-3">
+              {showTracking && todaySteps === 0 && (
+                <div className="text-[11px] text-[#6B7A8D] bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2">
+                  Sensor activo: tu conteo diario se registra a partir de este momento y avanzará al caminar.
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2.5">
                 <StatTile icon={<MapPin className="w-3 h-3" />} label="Distancia" value={metrics.km} unit="km" />
                 <StatTile icon={<Flame className="w-3 h-3" />} label="Activas" value={fmt(metrics.kcal)} unit="kcal" />
@@ -345,6 +417,9 @@ export default function Pasos({ cliente, isActive = true, ultimoPeso = null, met
                       defaultValue={goal}
                       key={goal}
                       onBlur={(e) => handleSetGoal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
                       className="w-20 px-2 py-1 rounded-lg border border-[#E2E8F0] bg-white text-[11px] font-bold text-center text-[#0B1929] focus:outline-none focus:border-[var(--brand-primary)]"
                       aria-label="Meta personalizada de pasos"
                     />

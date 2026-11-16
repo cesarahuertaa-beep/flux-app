@@ -74,7 +74,7 @@ const offlineAwareNutriUpsert = (records) =>
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
   });
 
-export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, onRolesUpdated, multiRoles, isEmbedded, embeddedTab }) {
+export default function ClienteView({ session, onLogout, isAtletaMode, onBackToAdmin, onChangeRole, onRolesUpdated, multiRoles, isEmbedded, embeddedTab, isEmbeddedVisible = true }) {
   const { data: cliente } = session;
   const brand = useBrand();
 
@@ -595,7 +595,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
           {(tab === "pasos" || visitedTabs.has("pasos")) && (
             <div className={tab === "pasos" ? "flex-1 flex flex-col" : "hidden"}>
-              <Pasos cliente={cliente} isActive={tab === "pasos"} ultimoPeso={ultimoPeso} metaPasos={metaPasos} />
+              <Pasos
+                cliente={cliente}
+                isActive={(!isEmbedded || isEmbeddedVisible) && tab === "pasos"}
+                ultimoPeso={ultimoPeso}
+                metaPasos={metaPasos}
+              />
             </div>
           )}
 

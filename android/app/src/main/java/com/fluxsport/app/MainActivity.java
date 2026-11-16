@@ -227,6 +227,7 @@ public class MainActivity extends BridgeActivity {
         }
         hideFloatingTimerOverlay();
         notifyWebViewSyncComplete();
+        syncStepsStateOnResume();
         if (appUpdateManager != null) {
             try {
                 appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
@@ -354,6 +355,33 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 5502) {
+            boolean granted = FluxStepsHelper.hasPermission(this);
+            boolean permanentlyDenied = !granted
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && !ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACTIVITY_RECOGNITION);
+            FluxStepsHelper.setPermissionBlocked(getApplicationContext(), permanentlyDenied);
+
+            if (granted) {
+                scheduleStepsWorker();
+                new Thread(() -> {
+                    FluxStepsHelper.snapshot(getApplicationContext());
+                    emitStepsWebEvent("flux:steps-updated", null);
+                }).start();
+            }
+
+            try {
+                JSONObject detail = new JSONObject();
+                detail.put("granted", granted);
+                detail.put("permanentlyDenied", permanentlyDenied);
+                emitStepsWebEvent("flux:steps-permission-result", detail.toString());
+            } catch (Exception ignored) {}
+        }
+    }
+
     public class PlayUpdateBridge {
         @JavascriptInterface
         public void checkNow() {
@@ -384,7 +412,13 @@ public class MainActivity extends BridgeActivity {
                     ed.putString("refresh_token", obj.optString("refreshToken", ""));
                 }
                 if (obj.has("role")) ed.putString("role", obj.optString("role", ""));
-                if (obj.has("clientId")) ed.putString("client_id", obj.optString("clientId", ""));
+                if (obj.has("clientId")) {
+                    String cId = obj.optString("clientId", "");
+                    ed.putString("client_id", cId);
+                    if (!cId.isEmpty()) {
+                        FluxStepsHelper.ensureOwnerClient(getApplicationContext(), cId);
+                    }
+                }
                 if (obj.has("profileId")) ed.putString("profile_id", obj.optString("profileId", ""));
                 String nId = obj.optString("nutriologoId", obj.optString("nutriId", ""));
                 if (!nId.isEmpty()) ed.putString("nutri_id", nId);
@@ -780,6 +814,37 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private void emitStepsWebEvent(final String eventName, final String detailJson) {
+        runOnUiThread(() -> {
+            try {
+                if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                    String script = detailJson != null
+                        ? "window.dispatchEvent(new CustomEvent('" + eventName + "', { detail: " + detailJson + " }));"
+                        : "window.dispatchEvent(new CustomEvent('" + eventName + "'));";
+                    MainActivity.this.bridge.getWebView().evaluateJavascript(script, null);
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void syncStepsStateOnResume() {
+        try {
+            boolean supported = FluxStepsHelper.isSupported(getApplicationContext());
+            boolean granted = FluxStepsHelper.hasPermission(getApplicationContext());
+            if (granted) {
+                FluxStepsHelper.setPermissionBlocked(getApplicationContext(), false);
+                if (supported) {
+                    scheduleStepsWorker();
+                }
+            }
+            JSONObject detail = new JSONObject();
+            detail.put("supported", supported);
+            detail.put("granted", granted);
+            detail.put("blocked", FluxStepsHelper.isPermissionBlocked(getApplicationContext()));
+            emitStepsWebEvent("flux:steps-permission-sync", detail.toString());
+        } catch (Exception ignored) {}
+    }
+
     /**
      * Puente nativo del contador de pasos (NEAT). Expone el sensor de hardware TYPE_STEP_COUNTER
      * a la interfaz web: soporte, permiso de reconocimiento de actividad, pasos de hoy e historial.
@@ -793,6 +858,23 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean hasPermission() {
             return FluxStepsHelper.hasPermission(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public boolean isPermissionBlocked() {
+            return FluxStepsHelper.isPermissionBlocked(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public void openAppSettings() {
+            runOnUiThread(() -> {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(Uri.fromParts("package", getPackageName(), null));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception ignored) {}
+            });
         }
 
         @JavascriptInterface
@@ -825,16 +907,7 @@ public class MainActivity extends BridgeActivity {
         public void refresh() {
             new Thread(() -> {
                 FluxStepsHelper.snapshot(getApplicationContext());
-                runOnUiThread(() -> {
-                    try {
-                        if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
-                            MainActivity.this.bridge.getWebView().evaluateJavascript(
-                                "window.dispatchEvent(new CustomEvent('flux:steps-updated'));",
-                                null
-                            );
-                        }
-                    } catch (Exception ignored) {}
-                });
+                emitStepsWebEvent("flux:steps-updated", null);
             }).start();
         }
 

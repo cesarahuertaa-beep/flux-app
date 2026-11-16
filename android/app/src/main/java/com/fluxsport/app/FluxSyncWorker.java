@@ -80,6 +80,37 @@ public class FluxSyncWorker extends Worker {
             // Recargar token por si flushPendingMutations lo renovó tras un 401
             accessToken = prefs.getString("access_token", accessToken);
 
+            // 2.5. SINCRONIZACIÓN SILENCIOSA DE PASOS (NEAT) HACIA SUPABASE EN SEGUNDO PLANO
+            if (!clientId.isEmpty() && FluxStepsHelper.isSupported(ctx) && FluxStepsHelper.hasPermission(ctx)) {
+                try {
+                    FluxStepsHelper.snapshot(ctx);
+                    JSONArray stepRows = FluxStepsHelper.buildUnsyncedCloudRows(ctx, clientId);
+                    if (stepRows.length() > 0) {
+                        int st = sendMutationRequest(
+                            supaUrl, supaKey, accessToken,
+                            "POST", "pasos_diarios?on_conflict=cliente_id,fecha",
+                            stepRows.toString()
+                        );
+                        if (st == 401 && !refreshToken.isEmpty()) {
+                            String newTok = refreshSupabaseToken(prefs, supaUrl, supaKey, refreshToken);
+                            if (newTok != null) {
+                                accessToken = newTok;
+                                st = sendMutationRequest(
+                                    supaUrl, supaKey, accessToken,
+                                    "POST", "pasos_diarios?on_conflict=cliente_id,fecha",
+                                    stepRows.toString()
+                                );
+                            }
+                        }
+                        if (st >= 200 && st < 300) {
+                            FluxStepsHelper.markCloudSynced(ctx, clientId, stepRows);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Error syncing steps in background: " + e.getMessage());
+                }
+            }
+
             JSONObject cacheMap = readExistingCacheFile(ctx);
 
             // 3. NOTIFICACIONES NATIVAS EN BARRA DE ESTADO (Consulta ultraligera ~200 bytes):
