@@ -149,6 +149,7 @@ public class MainActivity extends BridgeActivity {
             this.bridge.getWebView().addJavascriptInterface(new FluxTimerBridge(), "FluxTimerNative");
             this.bridge.getWebView().addJavascriptInterface(new FluxPdfBridge(), "FluxPdfNative");
             this.bridge.getWebView().addJavascriptInterface(new FluxNotificationBridge(), "FluxNotificationsNative");
+            this.bridge.getWebView().addJavascriptInterface(new FluxStepsBridge(), "FluxStepsNative");
         }
 
         // Solicitar permiso de notificaciones en barra de estado en Android 13+ (API 33+)
@@ -171,6 +172,11 @@ public class MainActivity extends BridgeActivity {
 
         // Programar sincronización periódica nativa con WorkManager (incluso con la app cerrada)
         scheduleNativeSync(false);
+
+        // Reanudar el contador de pasos si el permiso ya fue concedido
+        if (FluxStepsHelper.isSupported(this) && FluxStepsHelper.hasPermission(this)) {
+            scheduleStepsWorker();
+        }
 
         // Inicializar Google Play In-App Update oficial
         try {
@@ -756,6 +762,90 @@ public class MainActivity extends BridgeActivity {
                     null
                 );
             }
+        }
+    }
+
+    private void scheduleStepsWorker() {
+        try {
+            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(
+                FluxStepsWorker.class, 15, TimeUnit.MINUTES
+            ).build();
+            WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
+                FluxStepsWorker.UNIQUE_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                req
+            );
+        } catch (Exception e) {
+            Log.w(TAG, "Error programando worker de pasos: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Puente nativo del contador de pasos (NEAT). Expone el sensor de hardware TYPE_STEP_COUNTER
+     * a la interfaz web: soporte, permiso de reconocimiento de actividad, pasos de hoy e historial.
+     */
+    private class FluxStepsBridge {
+        @JavascriptInterface
+        public boolean isSupported() {
+            return FluxStepsHelper.isSupported(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public boolean hasPermission() {
+            return FluxStepsHelper.hasPermission(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public void requestPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                runOnUiThread(() -> {
+                    try {
+                        ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
+                            5502
+                        );
+                    } catch (Exception ignored) {}
+                });
+            }
+        }
+
+        /** Programa el worker periódico y toma una lectura inmediata (en segundo plano). */
+        @JavascriptInterface
+        public void start() {
+            scheduleStepsWorker();
+            refresh();
+        }
+
+        /**
+         * Toma una lectura del sensor en un hilo aparte (no bloquea la interfaz) y avisa a la web
+         * con el evento 'flux:steps-updated' cuando el historial ya está actualizado.
+         */
+        @JavascriptInterface
+        public void refresh() {
+            new Thread(() -> {
+                FluxStepsHelper.snapshot(getApplicationContext());
+                runOnUiThread(() -> {
+                    try {
+                        if (MainActivity.this.bridge != null && MainActivity.this.bridge.getWebView() != null) {
+                            MainActivity.this.bridge.getWebView().evaluateJavascript(
+                                "window.dispatchEvent(new CustomEvent('flux:steps-updated'));",
+                                null
+                            );
+                        }
+                    } catch (Exception ignored) {}
+                });
+            }).start();
+        }
+
+        @JavascriptInterface
+        public int getToday() {
+            return (int) FluxStepsHelper.getToday(getApplicationContext());
+        }
+
+        @JavascriptInterface
+        public String getHistoryJson() {
+            return FluxStepsHelper.getHistoryJson(getApplicationContext());
         }
     }
 

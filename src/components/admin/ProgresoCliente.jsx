@@ -15,7 +15,14 @@ import {
   inferFafFromAnamnesis,
   generateSmartMacroPrescription,
   generateSmartTrainingPrescription,
+  evaluateWeightGoalPlan,
 } from "../../lib/bodyComposition";
+import {
+  fetchCloudSteps,
+  averageSteps,
+  suggestFafWithSteps,
+  DEFAULT_STEP_GOAL,
+} from "../../lib/steps";
 import { createPortal } from "react-dom";
 import { dbPeek, dbGet, dbGetFresh, updateQueryCache, invalidateCache, dbPost, dbPatch, dbUpsert, dbDel, storageUpload, storageDelete } from "../../lib/supabase";
 import { useBrand } from "../BrandContext";
@@ -25,7 +32,7 @@ import { parseFotos, getSemanasConFecha, getCurrentCycleWeekInfo, compressImageI
 import {
   Scale, Microscope, Ruler, Stethoscope, BarChart2, Dumbbell,
   Calendar, Edit2, Eye, Camera, FileText, Activity, BicepsFlexed, Plus, Trash2, Heart, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, Target, Lock,
-  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw, Upload
+  UtensilsCrossed, Droplets, Check, ChevronDown, ClipboardList, ArrowLeft, Save, Layers, Clock, Zap, Utensils, Moon, Sparkles, Flame, Calculator, Ban, Loader2, SlidersHorizontal, RotateCcw, Upload, Footprints
 } from "lucide-react";
 import { EvolutionCharts } from "../ui/EvolutionCharts";
 import { BeforeAfterComparator } from "../ui/BeforeAfterComparator";
@@ -231,6 +238,9 @@ const emptyForm = () => ({
   eval_objetivo: "",
   eval_faf: "",
   eval_faf_notas: "",
+  eval_peso_objetivo: "",
+  eval_semanas_objetivo: "",
+  eval_meta_pasos: "",
   ciclo_id: "",
 
   // Hábitos del ciclo y actividad física actual
@@ -549,6 +559,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     fatsG: ""
   });
   const [manualSimMode, setManualSimMode] = useState("g_kg"); // "g_kg" | "pct"
+  const [gKgDraft, setGKgDraft] = useState({ prot: null, fat: null });
+  const [patientStepsHistory, setPatientStepsHistory] = useState({});
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [isAuditingAi, setIsAuditingAi] = useState(false);
   const [aiAuditError, setAiAuditError] = useState(null);
@@ -735,6 +747,18 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   useEffect(() => {
     deletedIdsRef.current.clear();
   }, [selected?.id]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!selected?.id) {
+      setPatientStepsHistory({});
+      return;
+    }
+    fetchCloudSteps(selected.id, 14).then((hist) => {
+      if (alive) setPatientStepsHistory(hist || {});
+    });
+    return () => { alive = false; };
+  }, [selected?.id, showModal]);
 
   const activeMetricas = useMemo(
     () => metricas.filter(m => !deletedIdsRef.current.has(String(m?.id))),
@@ -1411,6 +1435,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     base.eval_objetivo = fallbackGoal || "recomposicion";
     base.eval_faf = String(calculatedFaf || 1.375);
     base.eval_faf_notas = "";
+    base.eval_semanas_objetivo = String(cycleInfo.semanas || 4);
+    base.eval_meta_pasos = String(DEFAULT_STEP_GOAL);
 
     const latestPrev = (allLinkedMetricas && allLinkedMetricas[0]) || (metricas && metricas[0]) || null;
     if (latestPrev?.estatura) {
@@ -1440,6 +1466,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       }
       if (latestPrev.consumo_agua_estimado) {
         base.consumo_agua_estimado = latestPrev.consumo_agua_estimado;
+      }
+      if (latestPrev.eval_peso_objetivo) {
+        base.eval_peso_objetivo = String(latestPrev.eval_peso_objetivo);
+      }
+      if (latestPrev.eval_meta_pasos) {
+        base.eval_meta_pasos = String(latestPrev.eval_meta_pasos);
       }
     }
 
@@ -1899,6 +1931,32 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     return { value: 1.725, days, label: `${days} días programados (Activo/Intenso)` };
   }, [routineDaysCount, form.dias_ejercicio_actual]);
 
+  const patientStepsStats = useMemo(
+    () => averageSteps(patientStepsHistory, 7, false),
+    [patientStepsHistory]
+  );
+
+  const neatFafSuggestion = useMemo(() => {
+    if (!patientStepsStats || patientStepsStats.avg <= 0) return null;
+    return suggestFafWithSteps({
+      avgSteps: patientStepsStats.avg,
+      trainingFaf: suggestedFafFromTraining.days > 0 ? suggestedFafFromTraining.value : null,
+    });
+  }, [patientStepsStats, suggestedFafFromTraining]);
+
+  const liveWeightGoalPlan = useMemo(() => {
+    const curPeso = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
+    const goalPeso = parseFloat(form.eval_peso_objetivo) || 0;
+    const weeks = parseFloat(form.eval_semanas_objetivo) || cycleInfo.semanas || 4;
+    if (curPeso <= 0 || goalPeso <= 0) return null;
+    return evaluateWeightGoalPlan({
+      peso: curPeso,
+      pesoObjetivo: goalPeso,
+      semanas: weeks,
+      get: liveSmartMacros?.get || 0,
+    });
+  }, [form.peso, selected?.peso, form.eval_peso_objetivo, form.eval_semanas_objetivo, cycleInfo.semanas, liveSmartMacros?.get]);
+
   const isFirstEvaluationEver = !editingId
     ? allLinkedMetricas.length === 0
     : (allLinkedMetricas.length <= 1 || String(allLinkedMetricas[allLinkedMetricas.length - 1]?.id) === String(editingId));
@@ -2222,6 +2280,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
     if (!filled.eval_faf_notas && m.eval_faf_notas) {
       filled.eval_faf_notas = String(m.eval_faf_notas);
+    }
+    if (!filled.eval_semanas_objetivo) {
+      filled.eval_semanas_objetivo = String(cycleInfo.semanas || 4);
+    }
+    if (!filled.eval_meta_pasos) {
+      filled.eval_meta_pasos = String(DEFAULT_STEP_GOAL);
     }
 
     // 3. Cruzar check-in del expediente clínico si faltaban observaciones o escalas
@@ -4640,6 +4704,101 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
+                  {/* Meta Ponderada (Peso Objetivo, Plazo y Meta Diaria de Pasos NEAT) */}
+                  <div className="pt-1 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#6B7A8D] mb-1">
+                          Peso Objetivo (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="25"
+                          max="250"
+                          disabled={isReadOnly}
+                          value={form.eval_peso_objetivo || ""}
+                          onChange={(e) => updForm("eval_peso_objetivo", e.target.value)}
+                          placeholder={form.peso ? `Ej. ${form.peso} kg` : "Ej. 68.0"}
+                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#6B7A8D] mb-1">
+                          Plazo Estimado (semanas)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          max="52"
+                          disabled={isReadOnly}
+                          value={form.eval_semanas_objetivo || ""}
+                          onChange={(e) => updForm("eval_semanas_objetivo", e.target.value)}
+                          placeholder={String(cycleInfo.semanas || 4)}
+                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#6B7A8D] mb-1 flex items-center gap-1">
+                          <Footprints className="w-3 h-3 text-emerald-600" />
+                          <span>Meta de Pasos / día (NEAT)</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="500"
+                          min="1000"
+                          max="35000"
+                          disabled={isReadOnly}
+                          value={form.eval_meta_pasos || ""}
+                          onChange={(e) => updForm("eval_meta_pasos", e.target.value)}
+                          placeholder={String(DEFAULT_STEP_GOAL)}
+                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {liveWeightGoalPlan && (() => {
+                      const recInfo = getGoalPresetInfo(liveWeightGoalPlan.recommendedGoalId);
+                      const isCurrentRec = (form.eval_objetivo || liveSmartMacros?.goalId) === liveWeightGoalPlan.recommendedGoalId;
+                      const styleByStatus =
+                        liveWeightGoalPlan.status === "agresivo"
+                          ? "bg-amber-50/90 border-amber-300 text-amber-950"
+                          : liveWeightGoalPlan.status === "lento"
+                          ? "bg-indigo-50/80 border-indigo-200 text-indigo-950"
+                          : "bg-emerald-50/80 border-emerald-200 text-emerald-950";
+                      return (
+                        <div className={`rounded-xl border px-3 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${styleByStatus}`}>
+                          <div className="flex items-start gap-2 min-w-0">
+                            {liveWeightGoalPlan.status === "agresivo" ? (
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            )}
+                            <p className="text-[11px] leading-relaxed font-medium">
+                              {liveWeightGoalPlan.message}
+                            </p>
+                          </div>
+                          {recInfo && !isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => updForm("eval_objetivo", recInfo.id)}
+                              className={`shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                                isCurrentRec
+                                  ? "bg-white/80 border-emerald-300 text-emerald-800"
+                                  : "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] hover:opacity-90 shadow-2xs"
+                              }`}
+                            >
+                              {isCurrentRec
+                                ? `✓ Aplicado: ${recInfo.title} (${recInfo.pct > 0 ? "+" : ""}${recInfo.pct}%)`
+                                : `Aplicar: ${recInfo.title} (${recInfo.pct > 0 ? "+" : ""}${recInfo.pct}%)`}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                   {/* Objetivo de la Etapa */}
                   <div className="pt-1">
                     <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
@@ -4689,12 +4848,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       <label className="block text-xs font-bold text-[#6B7A8D]">
                         Factor de Actividad Física (FAF) Proyectado
                       </label>
-                      {suggestedFafFromTraining.days > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
-                          <Dumbbell className="w-3 h-3" />
-                          <span>Calculado de entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {suggestedFafFromTraining.days > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
+                            <Dumbbell className="w-3 h-3" />
+                            <span>Entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
+                          </span>
+                        )}
+                        {neatFafSuggestion ? (
+                          <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => !isReadOnly && updForm("eval_faf", String(neatFafSuggestion.suggested.value))}
+                            title="Aplicar FAF combinado con pasos medidos en los últimos 7 días"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer disabled:cursor-default"
+                          >
+                            <Footprints className="w-3 h-3" />
+                            <span>
+                              NEAT 7d: {patientStepsStats.avg.toLocaleString()} pasos/d ({neatFafSuggestion.stepsLevel.label}) → FAF sugerido {neatFafSuggestion.suggested.value}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-[#F8FAFC] text-[#6B7A8D] border border-[#E2E8F0]">
+                            <Footprints className="w-3 h-3 text-[#94A3B8]" />
+                            <span>NEAT sin pasos sincronizados · Meta {(Number(form.eval_meta_pasos) || DEFAULT_STEP_GOAL).toLocaleString()} pasos/d</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {ACTIVITY_FACTORS.map((f) => {
@@ -4990,9 +5170,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               {activePrescription.proteinG}g
                             </div>
                           )}
-                          <div className="text-[10px] text-blue-700 font-semibold truncate">
-                            {activePrescription.protGKg} g/kg · {activePrescription.proteinPct}%
-                          </div>
+                          {prescriptionMode === "manual" && (parseFloat(form.peso) || parseFloat(selected?.peso)) > 0 ? (
+                            <div className="flex items-center justify-center gap-1 mt-0.5">
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0.5"
+                                max="4.5"
+                                disabled={isReadOnly}
+                                value={gKgDraft.prot ?? activePrescription.protGKg}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  setGKgDraft((d) => ({ ...d, prot: raw }));
+                                  const num = parseFloat(raw);
+                                  if (!isNaN(num) && num > 0) handleAdjustProtGKg(num);
+                                }}
+                                onBlur={() => setGKgDraft((d) => ({ ...d, prot: null }))}
+                                className="w-11 text-center text-[10px] font-bold text-blue-900 bg-white border border-blue-200 rounded py-0.5 px-0.5 focus:outline-none"
+                              />
+                              <span className="text-[10px] text-blue-700 font-semibold">
+                                g/kg · {activePrescription.proteinPct}%
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-blue-700 font-semibold truncate">
+                              {activePrescription.protGKg} g/kg · {activePrescription.proteinPct}%
+                            </div>
+                          )}
                         </div>
 
                         {/* Carbos */}
@@ -5040,9 +5244,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               {activePrescription.fatsG}g
                             </div>
                           )}
-                          <div className="text-[10px] text-amber-700 font-semibold truncate">
-                            {activePrescription.fatGKg} g/kg · {activePrescription.fatsPct}%
-                          </div>
+                          {prescriptionMode === "manual" && (parseFloat(form.peso) || parseFloat(selected?.peso)) > 0 ? (
+                            <div className="flex items-center justify-center gap-1 mt-0.5">
+                              <input
+                                type="number"
+                                step="0.05"
+                                min="0.3"
+                                max="3.0"
+                                disabled={isReadOnly}
+                                value={gKgDraft.fat ?? activePrescription.fatGKg}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  setGKgDraft((d) => ({ ...d, fat: raw }));
+                                  const num = parseFloat(raw);
+                                  if (!isNaN(num) && num > 0) handleAdjustFatGKg(num);
+                                }}
+                                onBlur={() => setGKgDraft((d) => ({ ...d, fat: null }))}
+                                className="w-11 text-center text-[10px] font-bold text-amber-900 bg-white border border-amber-200 rounded py-0.5 px-0.5 focus:outline-none"
+                              />
+                              <span className="text-[10px] text-amber-700 font-semibold">
+                                g/kg · {activePrescription.fatsPct}%
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-amber-700 font-semibold truncate">
+                              {activePrescription.fatGKg} g/kg · {activePrescription.fatsPct}%
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -239,6 +239,9 @@ export function enrichMetrica(m) {
     eval_objetivo: meta.eval_objetivo ?? m.eval_objetivo ?? "",
     eval_faf: meta.eval_faf ?? m.eval_faf ?? "",
     eval_faf_notas: meta.eval_faf_notas ?? m.eval_faf_notas ?? "",
+    eval_peso_objetivo: meta.eval_peso_objetivo ?? m.eval_peso_objetivo ?? "",
+    eval_semanas_objetivo: meta.eval_semanas_objetivo ?? m.eval_semanas_objetivo ?? "",
+    eval_meta_pasos: meta.eval_meta_pasos ?? m.eval_meta_pasos ?? "",
     preferencias_alimentos: meta.preferencias_alimentos ?? m.preferencias_alimentos ?? "",
     aversiones_alimentos: meta.aversiones_alimentos ?? m.aversiones_alimentos ?? "",
     smae_gustos: meta.smae_gustos ?? m.smae_gustos ?? {},
@@ -334,6 +337,9 @@ export function prepareMetricaPayload(rawData, calcResult = {}) {
   if (rawData.eval_objetivo !== undefined && rawData.eval_objetivo !== "") extraMeta.eval_objetivo = rawData.eval_objetivo;
   if (rawData.eval_faf !== undefined && rawData.eval_faf !== "") extraMeta.eval_faf = rawData.eval_faf;
   if (rawData.eval_faf_notas !== undefined && rawData.eval_faf_notas !== "") extraMeta.eval_faf_notas = rawData.eval_faf_notas;
+  if (rawData.eval_peso_objetivo !== undefined && rawData.eval_peso_objetivo !== "") extraMeta.eval_peso_objetivo = rawData.eval_peso_objetivo;
+  if (rawData.eval_semanas_objetivo !== undefined && rawData.eval_semanas_objetivo !== "") extraMeta.eval_semanas_objetivo = rawData.eval_semanas_objetivo;
+  if (rawData.eval_meta_pasos !== undefined && rawData.eval_meta_pasos !== "") extraMeta.eval_meta_pasos = rawData.eval_meta_pasos;
   if (rawData.dias_ejercicio_actual !== undefined && rawData.dias_ejercicio_actual !== "") extraMeta.dias_ejercicio_actual = rawData.dias_ejercicio_actual;
   if (rawData.horario_ejercicio !== undefined && rawData.horario_ejercicio !== "") extraMeta.horario_ejercicio = rawData.horario_ejercicio;
   if (rawData.preferencias_alimentos !== undefined && rawData.preferencias_alimentos !== "") extraMeta.preferencias_alimentos = rawData.preferencias_alimentos;
@@ -723,6 +729,74 @@ export function getActivityFactorInfo(val) {
     ACTIVITY_FACTORS.find((af) => Math.abs(af.value - num) < 0.02) ||
     ACTIVITY_FACTORS[2]
   );
+}
+
+/** Energía aproximada por kg de tejido corporal (convención clínica). */
+export const KCAL_PER_KG_LOSS = 7700;
+export const KCAL_PER_KG_GAIN = 7000;
+
+/**
+ * Convierte la meta de peso del paciente (peso objetivo + plazo en semanas) en el déficit/superávit
+ * calórico diario requerido y recomienda el preset de objetivo más cercano, validando que la
+ * velocidad de cambio sea fisiológicamente razonable (ACSM / ISSN: pérdida 0.5–1 % del peso/sem;
+ * ganancia magra ≤ ~0.5 % del peso/sem).
+ */
+export function evaluateWeightGoalPlan({ peso, pesoObjetivo, semanas, get }) {
+  const p = parseFloat(peso) || 0;
+  const t = parseFloat(pesoObjetivo) || 0;
+  const w = parseFloat(semanas) || 0;
+  const g = Number(get) || 0;
+  if (p <= 0 || t <= 0 || w <= 0) return null;
+
+  const deltaKg = Number((t - p).toFixed(1));
+  if (Math.abs(deltaKg) < 0.3) {
+    return {
+      deltaKg: 0, weeklyKg: 0, weeklyPct: 0, dailyKcal: 0, pctOfGet: 0,
+      recommendedGoalId: "maint", status: "ok", suggestedWeeks: null,
+      message: "El peso objetivo es prácticamente igual al actual: se recomienda Mantenimiento / Rendimiento.",
+    };
+  }
+
+  const isLoss = deltaKg < 0;
+  const weeklyKg = deltaKg / w;
+  const weeklyPct = (Math.abs(weeklyKg) / p) * 100;
+  const kcalPerKg = isLoss ? KCAL_PER_KG_LOSS : KCAL_PER_KG_GAIN;
+  const dailyKcal = Math.round((deltaKg * kcalPerKg) / (w * 7));
+  const pctOfGet = g > 0 ? Math.round((dailyKcal / g) * 100) : null;
+
+  const sameSign = GOAL_PRESETS.filter((x) => (isLoss ? x.pct < 0 : x.pct > 0));
+  let recommended = sameSign[0];
+  if (pctOfGet !== null) {
+    recommended = sameSign.reduce((best, cur) =>
+      Math.abs(cur.pct - pctOfGet) < Math.abs(best.pct - pctOfGet) ? cur : best
+    , sameSign[0]);
+  } else {
+    // Sin GET disponible: elegir por velocidad semanal
+    const order = isLoss
+      ? [["cut_10", 0.35], ["cut_15", 0.7], ["cut_20", 99]]
+      : [["bulk_10", 0.3], ["bulk_15", 99]];
+    const hit = order.find(([, lim]) => weeklyPct <= lim);
+    recommended = GOAL_PRESETS.find((x) => x.id === (hit ? hit[0] : order[order.length - 1][0])) || sameSign[0];
+  }
+
+  const maxSafePct = isLoss ? 1.0 : 0.5;
+  const minUsefulPct = isLoss ? 0.25 : 0.1;
+  let status = "ok";
+  if (weeklyPct > maxSafePct || (pctOfGet !== null && Math.abs(pctOfGet) > 25)) status = "agresivo";
+  else if (weeklyPct < minUsefulPct) status = "lento";
+
+  const idealPct = isLoss ? 0.75 : 0.35;
+  const suggestedWeeks = Math.max(1, Math.round(Math.abs(deltaKg) / (p * (idealPct / 100))));
+
+  const verb = isLoss ? "perder" : "ganar";
+  let message = `Para ${verb} ${Math.abs(deltaKg)} kg en ${w} sem se requiere ${isLoss ? "un déficit" : "un superávit"} de ≈${Math.abs(dailyKcal)} kcal/día${pctOfGet !== null ? ` (${pctOfGet > 0 ? "+" : ""}${pctOfGet}% del GET)` : ""} · ritmo ${Math.abs(weeklyKg).toFixed(2)} kg/sem (${weeklyPct.toFixed(2)}% del peso).`;
+  if (status === "agresivo") {
+    message += ` Ritmo agresivo: se sugiere ampliar el plazo a ≈${suggestedWeeks} semanas para preservar masa muscular.`;
+  } else if (status === "lento") {
+    message += ` Ritmo muy gradual: podrías acortar el plazo a ≈${suggestedWeeks} semanas si el paciente lo desea.`;
+  }
+
+  return { deltaKg, weeklyKg, weeklyPct, dailyKcal, pctOfGet, recommendedGoalId: recommended.id, status, suggestedWeeks, message };
 }
 
 /**

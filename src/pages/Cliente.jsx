@@ -6,7 +6,8 @@ import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
 import { getCurrentCycleWeekInfo } from "../utils/helpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
-import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X, Footprints } from "lucide-react";
+import { enrichMetrica } from "../lib/bodyComposition";
 import { ListSkeleton } from "../components/ui/Skeleton";
 
 import { peekClinicalRecord, fetchClinicalRecord } from "../lib/clinicalRecord";
@@ -31,6 +32,7 @@ const CitasCliente = lazyRetry(() => import("../components/CitasCliente").then((
 const Nutrition = lazyRetry(() => import("../components/cliente/Nutrition"));
 const Training = lazyRetry(() => import("../components/cliente/Training"));
 const Progreso = lazyRetry(() => import("../components/cliente/Progreso"));
+const Pasos = lazyRetry(() => import("../components/cliente/Pasos"));
 const UserProfile = lazyRetry(() => import("../components/UserProfile"));
 const PerfilNutriologo = lazyRetry(() => import("../components/admin/PerfilNutriologo"));
 const NuevoExpedienteForms = lazyRetry(() => import("../components/clinical/NuevoExpedienteForms"));
@@ -116,6 +118,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
       import("../components/cliente/Nutrition").catch(() => {});
       import("../components/cliente/Training").catch(() => {});
       import("../components/cliente/Progreso").catch(() => {});
+      import("../components/cliente/Pasos").catch(() => {});
       import("../components/CitasCliente").catch(() => {});
       import("../components/UserProfile").catch(() => {});
     }, 900);
@@ -174,8 +177,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     const met = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) : null;
     return Array.isArray(met) && met.length > 0 && met[0].peso ? parseFloat(met[0].peso) : null;
   });
-  
-  
+  const [metaPasos, setMetaPasos] = useState(() => {
+    const met = cliente?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${cliente.id}&order=fecha.desc&limit=1`) : null;
+    if (Array.isArray(met) && met.length > 0) {
+      const v = Number(enrichMetrica(met[0])?.eval_meta_pasos);
+      return v > 0 ? v : null;
+    }
+    return null;
+  });
+
   const [clinicalRec, setClinicalRec] = useState(() =>
     cliente?.id && cliente?.nutriologo_id ? peekClinicalRecord(cliente.id) : null
   );
@@ -212,6 +222,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       if (met && met.length > 0 && met[0].peso) {
         setUltimoPeso(parseFloat(met[0].peso));
+      }
+      if (met && met.length > 0) {
+        const metaV = Number(enrichMetrica(met[0])?.eval_meta_pasos);
+        setMetaPasos(metaV > 0 ? metaV : null);
       }
 
       if (Array.isArray(npRows)) {
@@ -444,6 +458,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const SIDEBAR_ITEMS = [
     ...(hasNutriService ? [{ id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
     ...(hasEntrenamientoService ? [{ id:"deporte",  label:"Entrenamiento",   icon: <Dumbbell size={18} strokeWidth={1.5} /> }] : []),
+    { id:"pasos",    label:"Pasos",           icon: <Footprints size={18} strokeWidth={1.5} /> },
     { id:"progreso", label:"Progreso",        icon: <Camera size={18} strokeWidth={1.5} /> },
     ...((!isActuallyCivil && cliente?.objetivo !=="Mi entrenamiento personal") ? [
       { id:"citas",    label:"Citas",           icon: <CalendarDays size={18} strokeWidth={1.5} /> }
@@ -576,6 +591,12 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
                 </div>
               )}
             </>
+          )}
+
+          {(tab === "pasos" || visitedTabs.has("pasos")) && (
+            <div className={tab === "pasos" ? "flex-1 flex flex-col" : "hidden"}>
+              <Pasos cliente={cliente} isActive={tab === "pasos"} ultimoPeso={ultimoPeso} metaPasos={metaPasos} />
+            </div>
           )}
 
           {(tab === "progreso" || visitedTabs.has("progreso")) && (
