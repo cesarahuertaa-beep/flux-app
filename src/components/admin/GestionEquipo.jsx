@@ -12,7 +12,7 @@ import {
   dbPatch, dbUpsert, dbDel, getProfileId, updateQueryCache, invalidateCache, syncPersonalData 
 } from "../../lib/supabase";
 import { useBackButton } from "../../lib/backButtonHandler";
-import { getLatestConfiguredRates } from "../../utils/tarifas";
+import { getReceiptChargeMonthKey } from "../../utils/tarifas";
 import { CustomSelect } from "../ui/CustomSelect";
 import { checkAndCleanOrphanedEmail, deleteCollaboratorAccount } from "../../lib/authRoles";
 
@@ -189,12 +189,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   // Interceptor State
   const [conflictUser, setConflictUser] = useState(null);
 
-  // Premium patrocinado (administrativos)
-  const isEstudiante = role === "nutriologo_estudiante";
-  const [patrocinios, setPatrocinios] = useState({}); // miembro_profile_id -> registro activo
-  const [tarifaAdmin, setTarifaAdmin] = useState(50);
-  const [confirmPremium, setConfirmPremium] = useState(null); // { miembro, activar }
-
   // ─── ROLES Y PERMISOS EDITABLES Y GENERADOR ────────────────────────────────
   const [allStaffRoles, setAllStaffRoles] = useState(() => {
     try {
@@ -247,7 +241,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
   useBackButton(!!editingRole, () => { setEditingRole(null); setConfirmDeleteRole(false); }, 40);
   useBackButton(!!showNewRoleModal, () => setShowNewRoleModal(false), 35);
   useBackButton(!!conflictUser, () => setConflictUser(null), 30);
-  useBackButton(!!confirmPremium, () => setConfirmPremium(null), 25);
   useBackButton(showInvite, () => setShowInvite(false), 20);
   useBackButton(!!editUser, () => { setEditUser(null); setShowConfirmDelete(false); setConfirmDeleteText(""); }, 15);
 
@@ -265,19 +258,7 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       );
       setEquipo(myTeam);
 
-      // Patrocinios premium activos + tarifa vigente (solo aplica a nutriólogos)
-      if (!isSuperadmin) {
-        try {
-          const [pats, cfg] = await Promise.all([
-            fetcher(`premium_patrocinado?patrocinador_id=eq.${myId}&desactivado_en=is.null`),
-            fetcher("configuracion_plataforma?id=eq.1")
-          ]);
-          const m = {};
-          (pats || []).forEach(x => { m[x.miembro_profile_id] = x; });
-          setPatrocinios(m);
-          if (cfg && cfg.length > 0) setTarifaAdmin(getLatestConfiguredRates(cfg[0]).admin_premium);
-        } catch { }
-      } else {
+      if (isSuperadmin) {
         // Carga de roles corporativos y compensaciones de staff desde Supabase
         try {
           const [rolesDb, compsDb] = await Promise.all([
@@ -363,7 +344,8 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     const currentMonthStr = new Date().toISOString().substring(0, 7);
     setMeses.add(currentMonthStr);
     nominasRecibos.forEach(r => {
-      if (r.fecha_corte_mes) setMeses.add(r.fecha_corte_mes.substring(0, 7));
+      const mKey = getReceiptChargeMonthKey(r);
+      if (mKey) setMeses.add(mKey);
     });
     Object.values(nominasDb).forEach(n => {
       if (n.mes_facturacion) setMeses.add(n.mes_facturacion);
@@ -405,11 +387,11 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
       );
       const nutriIds = new Set(nutrisAsignados.map(n => n.id));
 
-      // Recibos aprobados del mes
+      // Recibos aprobados del mes real de cobro (incluye pagos anuales completos en el mes cobrado)
       const recibosAprobadosMes = nominasRecibos.filter(r => {
         const isNutri = nutriIds.has(r.nutriologo_id);
         const isAprobado = r.estado === "aprobado";
-        const isMes = r.fecha_corte_mes && r.fecha_corte_mes.startsWith(mes);
+        const isMes = getReceiptChargeMonthKey(r) === mes;
         return isNutri && isAprobado && isMes;
       });
 
@@ -733,21 +715,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
     } catch (e) {
       setMsg("❌ Error al otorgar accesos: " + e.message);
     }
-    setSaving(false);
-  };
-
-  const cambiarPremium = async () => {
-    if (!confirmPremium) return;
-    const { miembro, activar } = confirmPremium;
-    setSaving(true);
-    try {
-      await dbPost(activar ? "rpc/activar_premium_equipo" : "rpc/desactivar_premium_equipo", { p_miembro: miembro.id });
-      setMsg(activar
-        ? `✅ ${miembro.nombre || "El administrativo"} ahora tiene cuenta Premium de atleta`
-        : `Premium retirado a ${miembro.nombre || "el administrativo"}`);
-      setConfirmPremium(null);
-      load();
-    } catch (e) { setMsg("❌ " + e.message); }
     setSaving(false);
   };
 
@@ -1325,33 +1292,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 <span>{editUser.activo !== false ? "Suspender acceso" : "Reactivar acceso"}</span>
               </button>
             </div>
-
-            {/* Premium Patrocinado para Nutriólogos */}
-            {!isSuperadmin && editUser.role === "administrativo" && (
-              <div className="mt-4 pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                    <Crown size={15} className="text-amber-500 shrink-0" />
-                    Beneficio de Atleta Premium
-                  </div>
-                  <p className="text-[11px] text-[#6B7A8D]">
-                    Otorga una cuenta de Atleta Independiente Premium a tu administrativo para sus propios entrenamientos.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmPremium({ miembro: editUser, activar: !patrocinios[editUser.id] })}
-                  className={`px-3.5 py-2 text-xs font-bold border rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
-                    patrocinios[editUser.id] 
-                      ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100" 
-                      : "border-[#CBD5E1] text-[#6B7A8D] bg-white hover:bg-[#F8FAFC]"
-                  }`}
-                >
-                  <Crown size={14} />
-                  {patrocinios[editUser.id] ? "Quitar Premium" : "Otorgar Premium"}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Tarjeta 4: Zona de Peligro (Eliminar Colaborador Homologado en el Cuerpo) */}
@@ -1936,12 +1876,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                               <Crown className="w-3 h-3" /> Premium incluido
                             </span>
                           )}
-
-                          {p.role === "administrativo" && patrocinios[p.id] && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                              <Crown className="w-3 h-3" /> Premium{patrocinios[p.id].gratis ? " (incluido)" : ""}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -2284,39 +2218,6 @@ export function GestionEquipo({ setMsg, profileId, isSuperadmin, role }) {
                 className="px-5 py-2 text-xs font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 transition-opacity shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Check size={14} strokeWidth={2.5} /> Guardar Rol
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal confirmación Premium patrocinado */}
-      {confirmPremium && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0B1929]/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-[#0B1929] flex items-center gap-2 mb-3">
-              <Crown className="w-5 h-5 text-amber-500" />
-              {confirmPremium.activar ? "Activar Premium" : "Quitar Premium"}
-            </h3>
-            {confirmPremium.activar ? (
-              <p className="text-sm text-[#6B7A8D] leading-relaxed mb-5">
-                <strong className="text-[#0B1929]">{confirmPremium.miembro.nombre}</strong> tendrá una cuenta Premium de atleta independiente
-                (desde "Cambiar Perfil"). {isEstudiante
-                  ? <>Como estudiante, este beneficio <strong>no tiene costo</strong> para ti.</>
-                  : <>Se agregarán <strong className="text-[#0B1929]">${Number(tarifaAdmin).toFixed(2)} MXN / mes</strong> a tu facturación, prorrateado como tus pacientes.</>}
-                {" "}Si tu cuenta tiene un adeudo y se bloquea, el Premium se suspende.
-              </p>
-            ) : (
-              <p className="text-sm text-[#6B7A8D] leading-relaxed mb-5">
-                {confirmPremium.miembro.nombre} volverá al plan Estándar. El cobro se calcula con la misma regla de bajas que tus pacientes.
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmPremium(null)} disabled={saving}
-                className="px-4 py-2 text-sm font-bold border border-[#E2E8F0] text-[#6B7A8D] rounded-xl hover:bg-[#F8FAFC]">Cancelar</button>
-              <button onClick={cambiarPremium} disabled={saving}
-                className="px-4 py-2 text-sm font-bold bg-[var(--brand-primary)] text-white rounded-xl hover:opacity-90 disabled:opacity-50">
-                {saving ? "Guardando..." : "Confirmar"}
               </button>
             </div>
           </div>

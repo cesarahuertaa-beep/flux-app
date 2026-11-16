@@ -4,7 +4,17 @@ import {
   CheckCircle2, XCircle, Eye, Banknote, X, Clock, Calendar, 
   Dumbbell, Settings, Save, Zap, Search, ChevronRight, UserCheck, ShieldCheck, CreditCard
 } from "lucide-react";
-import { DEFAULT_RATES, parseTarifasHistory, getLatestConfiguredRates, getNextCutoffDateStr } from "../../utils/tarifas";
+import {
+  DEFAULT_RATES,
+  parseTarifasHistory,
+  getLatestConfiguredRates,
+  getNextCutoffDateStr,
+  getAnnualPrice,
+  getFreeMonthsCount,
+  getAnnualDiscountPct,
+  inferReceiptPeriod,
+  getReceiptChargeMonthKey
+} from "../../utils/tarifas";
 import { ListSkeleton } from "../ui/Skeleton";
 import { CustomSelect } from "../ui/CustomSelect";
 import { useBackButton } from "../../lib/backButtonHandler";
@@ -76,8 +86,9 @@ export default function ControlPagos({ setMsg }) {
     estudiante_max: DEFAULT_RATES.estudiante_max,
     nutri_estudiante: DEFAULT_RATES.nutri_estudiante,
     civil_premium: DEFAULT_RATES.civil_premium,
-    admin_premium: DEFAULT_RATES.admin_premium,
     comision_pct: DEFAULT_RATES.comision_pct,
+    anual_activo: DEFAULT_RATES.anual_activo,
+    meses_anual: DEFAULT_RATES.meses_anual,
     domiciliacion_activa: DEFAULT_RATES.domiciliacion_activa,
     stripe_link_tier1: DEFAULT_RATES.stripe_link_tier1,
     stripe_link_tier2: DEFAULT_RATES.stripe_link_tier2,
@@ -107,8 +118,9 @@ export default function ControlPagos({ setMsg }) {
           estudiante_max: latest.estudiante_max ?? DEFAULT_RATES.estudiante_max,
           nutri_estudiante: latest.nutri_estudiante,
           civil_premium: latest.civil_premium,
-          admin_premium: latest.admin_premium,
           comision_pct: latest.comision_pct,
+          anual_activo: latest.anual_activo ?? true,
+          meses_anual: latest.meses_anual ?? DEFAULT_RATES.meses_anual,
           domiciliacion_activa: latest.domiciliacion_activa ?? true,
           stripe_link_tier1: latest.stripe_link_tier1 || "",
           stripe_link_tier2: latest.stripe_link_tier2 || "",
@@ -140,6 +152,7 @@ export default function ControlPagos({ setMsg }) {
       const t1Max = Math.max(1, Number(ratesForm.tier1_max) || DEFAULT_RATES.tier1_max);
       const t2Max = Math.max(t1Max + 1, Number(ratesForm.tier2_max) || DEFAULT_RATES.tier2_max);
       const estMax = Math.max(1, Number(ratesForm.estudiante_max) || DEFAULT_RATES.estudiante_max);
+      const mesesAnualClean = Math.min(12, Math.max(1, Number(ratesForm.meses_anual) || DEFAULT_RATES.meses_anual));
       const newEntry = {
         nutri_tier1: Number(ratesForm.nutri_tier1) || 0,
         nutri_tier2: Number(ratesForm.nutri_tier2) || 0,
@@ -149,8 +162,9 @@ export default function ControlPagos({ setMsg }) {
         estudiante_max: estMax,
         nutri_estudiante: Number(ratesForm.nutri_estudiante) || 0,
         civil_premium: Number(ratesForm.civil_premium) || 0,
-        admin_premium: Number(ratesForm.admin_premium) || 0,
         comision_pct: Number(ratesForm.comision_pct) || 0,
+        anual_activo: Boolean(ratesForm.anual_activo),
+        meses_anual: mesesAnualClean,
         domiciliacion_activa: Boolean(ratesForm.domiciliacion_activa),
         stripe_link_tier1: String(ratesForm.stripe_link_tier1 || "").trim(),
         stripe_link_tier2: String(ratesForm.stripe_link_tier2 || "").trim(),
@@ -231,10 +245,13 @@ export default function ControlPagos({ setMsg }) {
     };
   }, []);
 
-  // ── Filtros Nutriólogos ─────────────────────────────────────────────────
+  // ── Filtros Nutriólogos (agrupado por mes real de cobro) ──────────────────
   const mesesDisponibles = useMemo(() => {
     const setMeses = new Set();
-    recibos.forEach(r => { if (r.fecha_corte_mes) setMeses.add(r.fecha_corte_mes.substring(0, 7)); });
+    recibos.forEach(r => {
+      const mKey = getReceiptChargeMonthKey(r);
+      if (mKey) setMeses.add(mKey);
+    });
     return Array.from(setMeses).sort().reverse();
   }, [recibos]);
 
@@ -256,7 +273,7 @@ export default function ControlPagos({ setMsg }) {
   const filtradosNutri = useMemo(() => {
     return recibos.filter(r => {
       const matchEstado = filtroEstado === "todos" ? true : r.estado === filtroEstado;
-      const matchMes = filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
+      const matchMes = filtroMes === "todos" ? true : getReceiptChargeMonthKey(r) === filtroMes;
       const nutri = nutriologos[r.nutriologo_id];
       const matchQuery = !busquedaNutri.trim() ? true : (
         (nutri?.nombre || "").toLowerCase().includes(busquedaNutri.toLowerCase()) ||
@@ -269,7 +286,7 @@ export default function ControlPagos({ setMsg }) {
 
   // Contadores Nutriólogos
   const nutriCounts = useMemo(() => {
-    const base = recibos.filter(r => filtroMes === "todos" ? true : (r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes)));
+    const base = recibos.filter(r => filtroMes === "todos" ? true : getReceiptChargeMonthKey(r) === filtroMes);
     return {
       todos: base.length,
       pendiente: base.filter(r => r.estado === "pendiente").length,
@@ -600,7 +617,7 @@ export default function ControlPagos({ setMsg }) {
                         <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Especialista</th>
-                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes de Corte</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Vigencia Hasta</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
@@ -632,8 +649,17 @@ export default function ControlPagos({ setMsg }) {
                                   )}
                                 </div>
                               </td>
-                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
-                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569]">
+                                <div>
+                                  {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                                </div>
+                                <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  inferReceiptPeriod(r) === "anual"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200/80"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                                </span>
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
                                 ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
@@ -712,8 +738,15 @@ export default function ControlPagos({ setMsg }) {
                             <div>
                               <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
-                            <div className="font-medium text-[#475569] capitalize">
-                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                            <div className="font-medium text-[#475569] flex items-center gap-1.5">
+                              <span>
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                              }`}>
+                                {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                              </span>
                             </div>
                           </div>
 
@@ -790,7 +823,7 @@ export default function ControlPagos({ setMsg }) {
                         <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Fecha / Hora</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider">Atleta</th>
-                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Mes Facturado</th>
+                          <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Vigencia Hasta</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-right">Monto</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Estado</th>
                           <th className="py-3 px-6 text-xs font-bold text-[#6B7A8D] uppercase tracking-wider text-center">Acciones</th>
@@ -815,8 +848,17 @@ export default function ControlPagos({ setMsg }) {
                                 <div className="font-bold text-[#0B1929]">{cli?.nombre || "Atleta Independiente"}</div>
                                 <div className="text-xs text-[#6B7A8D]">{cli?.email || "Sin email"}</div>
                               </td>
-                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569] capitalize">
-                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : 'N/A'}
+                              <td className="py-3.5 px-6 text-sm text-center font-medium text-[#475569]">
+                                <div>
+                                  {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                                </div>
+                                <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  inferReceiptPeriod(r) === "anual"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200/80"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                                </span>
                               </td>
                               <td className="py-3.5 px-6 font-black text-emerald-600 text-right text-base">
                                 ${Number(r.monto ?? r.monto_pagado ?? 0).toFixed(2)}
@@ -895,8 +937,15 @@ export default function ControlPagos({ setMsg }) {
                             <div>
                               <span>{new Date(r.created_at).toLocaleDateString('es-MX')}</span> · <span>{new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
-                            <div className="font-medium text-[#475569] capitalize">
-                              {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : 'N/A'}
+                            <div className="font-medium text-[#475569] flex items-center gap-1.5">
+                              <span>
+                                {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                              }`}>
+                                {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                              </span>
                             </div>
                           </div>
 
@@ -1062,24 +1111,6 @@ export default function ControlPagos({ setMsg }) {
                         <span className="text-[11px] text-[#6B7A8D]">MXN</span>
                       </div>
                     </div>
-
-                    <div className="pt-2.5 border-t border-gray-200/70 flex items-center justify-between gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-indigo-700">Administrativo Extra</label>
-                        <span className="text-[10px] text-[#6B7A8D]">Por administrativo patrocinado (30 días)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-[#6B7A8D]">$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={ratesForm.admin_premium}
-                          onChange={e => setRatesForm(p => ({ ...p, admin_premium: e.target.value }))}
-                          className="w-24 bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-sm font-bold text-[#0B1929] text-right outline-none focus:border-[var(--brand-primary)]"
-                        />
-                        <span className="text-[11px] text-[#6B7A8D]">MXN</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -1118,13 +1149,87 @@ export default function ControlPagos({ setMsg }) {
                 </div>
               </div>
 
-              {/* 3. Pasarela de Tarjeta Domiciliada en Portal Web (Estilo Netflix) */}
+              {/* 3. Suscripción Anual (Meses de Regalo) */}
+              <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/70 pb-3">
+                  <div>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929] flex items-center gap-1.5">
+                      <Calendar size={15} className="text-indigo-600" />
+                      <span>3. Plan Anual (365 días · Meses de Regalo)</span>
+                    </span>
+                    <p className="text-[11px] text-[#6B7A8D] mt-0.5">
+                      Permite pagar 12 meses continuos en una sola exhibición o domiciliación anual con descuento automático (por defecto: paga 10 meses y recibe 2 gratis).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setRatesForm(p => ({ ...p, anual_activo: !p.anual_activo }))}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      ratesForm.anual_activo
+                        ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                        : "bg-white text-[#6B7A8D] border-[#E2E8F0]"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${ratesForm.anual_activo ? "bg-indigo-600" : "bg-gray-300"}`} />
+                    <span>{ratesForm.anual_activo ? "Pago Anual Activo" : "Pago Anual Oculto"}</span>
+                  </button>
+                </div>
+
+                {ratesForm.anual_activo && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#E2E8F0]">
+                      <div>
+                        <span className="text-xs font-bold text-[#0B1929] block">Meses cobrados por cada año (12 meses)</span>
+                        <span className="text-[11px] text-[#6B7A8D]">
+                          Equivale a{" "}
+                          <strong className="text-indigo-700">
+                            {getFreeMonthsCount(ratesForm)} {getFreeMonthsCount(ratesForm) === 1 ? "mes gratis" : "meses gratis"} ({getAnnualDiscountPct(ratesForm)}% dto.)
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="12"
+                          step="1"
+                          value={ratesForm.meses_anual}
+                          onChange={e => setRatesForm(p => ({ ...p, meses_anual: e.target.value }))}
+                          className="w-20 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 text-sm font-black text-[#0B1929] text-center outline-none focus:border-indigo-500"
+                        />
+                        <span className="text-xs font-semibold text-[#6B7A8D]">meses / año</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                      {[
+                        { label: "Nivel 1", monthly: ratesForm.nutri_tier1 },
+                        { label: "Nivel 2", monthly: ratesForm.nutri_tier2 },
+                        { label: "Nivel 3", monthly: ratesForm.nutri_tier3 },
+                        { label: "Estudiante", monthly: ratesForm.nutri_estudiante },
+                        { label: "Atleta Civil", monthly: ratesForm.civil_premium },
+                      ].map(item => (
+                        <div key={item.label} className="bg-white rounded-xl border border-[#E2E8F0] p-2.5">
+                          <span className="text-[10px] font-bold text-[#6B7A8D] uppercase block">{item.label}</span>
+                          <span className="text-sm font-black text-indigo-700 block mt-0.5">
+                            ${getAnnualPrice(item.monthly, ratesForm).toLocaleString("es-MX")}
+                          </span>
+                          <span className="text-[10px] text-[#6B7A8D]">MXN / año</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Pasarela de Tarjeta Domiciliada en Portal Web (Estilo Netflix) */}
               <div className="bg-[#F8FAFC] p-4.5 rounded-xl border border-[#E2E8F0] space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/70 pb-3">
                   <div>
                     <span className="text-xs font-extrabold uppercase tracking-wider text-[#0B1929] flex items-center gap-1.5">
                       <CreditCard size={15} className="text-[var(--brand-primary)]" />
-                      <span>3. Tarjeta Domiciliada en Portal Web (Estilo Netflix / Stripe)</span>
+                      <span>4. Tarjeta Domiciliada en Portal Web (Estilo Netflix / Stripe)</span>
                     </span>
                     <p className="text-[11px] text-[#6B7A8D] mt-0.5">
                       Configura los enlaces de suscripción recurrente automática para que los usuarios puedan domiciliar su tarjeta en el portal web además de SPEI.
@@ -1155,8 +1260,8 @@ export default function ControlPagos({ setMsg }) {
                       Los cobros con tarjeta domiciliada (Estilo Netflix), upgrades a mitad de mes y atletas independientes se calculan y cobran en tiempo real leyendo directamente las tarifas y límites de las secciones 1 y 2 superiores. No requieres crear ni pegar enlaces manuales.
                     </p>
                     <div className="flex items-center gap-3 pt-1 text-[10px] text-emerald-700 font-semibold">
-                      <span>• Domiciliación cada 30 días</span>
-                      <span>• Depósito automático a tu cuenta BBVA</span>
+                      <span>• Domiciliación mensual (30d) o anual (365d)</span>
+                      <span>• Upgrades prorrateados en línea</span>
                       <span>• Conciliación y desbloqueo inmediato</span>
                     </div>
                   </div>

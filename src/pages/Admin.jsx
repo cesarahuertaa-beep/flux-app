@@ -194,6 +194,32 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     return () => clearTimeout(timer);
   }, [msg]);
 
+  // Detectar retorno exitoso desde Stripe Checkout (?pago=exitoso)
+  useEffect(() => {
+    let retryTimer = null;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("pago") === "exitoso") {
+        invalidateCache("recibos_pago");
+        invalidateCache("recibos_pago_civil");
+        invalidateCache("profiles");
+        invalidateCache("clientes");
+        hasCheckedPagoRef.current = false;
+        setBloqueado(false);
+        setTab("membresia");
+        setMsg("✓ ¡Pago con tarjeta confirmado! Tu membresía se está actualizando.");
+        url.searchParams.delete("pago");
+        window.history.replaceState({}, "", url.toString());
+        retryTimer = setTimeout(() => {
+          invalidateCache("recibos_pago");
+          invalidateCache("recibos_pago_civil");
+          window.dispatchEvent(new CustomEvent("flux:synced", { detail: { table: "*" } }));
+        }, 2500);
+      }
+    } catch {}
+    return () => { if (retryTimer) clearTimeout(retryTimer); };
+  }, []);
+
   const [biblioteca, setBiblioteca]         = useState(() => Array.isArray(_peekBiblio) ? _peekBiblio : []);
   const [nutriologoMap, setNutrioMap]       = useState({});
   const [searchClientes, setSearchClientes] = useState("");
@@ -271,7 +297,7 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           try {
             const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen,plan_tipo,activo`);
             const origen = fresh?.[0]?.premium_origen;
-            if (origen === 'staff' || origen === 'patrocinado') {
+            if (origen === 'staff') {
               await dbPost('rpc/verificar_premium_cliente', { p_cliente: clienteData.id });
               setBloqueado(false);
               setDiasGracia(false);
@@ -279,7 +305,10 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             }
 
             const recibos = await dbGet(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`);
-            const lastValid = recibos?.find(r => r.estado === 'aprobado');
+            const approvedCivil = (recibos || []).filter(r => r.estado === 'aprobado');
+            const lastValid = approvedCivil.sort((a, b) =>
+              String(b.fecha_corte_mes || "").localeCompare(String(a.fecha_corte_mes || ""))
+            )[0];
 
             if (!lastValid) {
               if (fresh?.[0]?.plan_tipo !== 'estandar') {
@@ -324,11 +353,14 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
           }
         }
 
-        // ── LOGICA UNIFICADA PARA NUTRIÓLOGOS Y ESTUDIANTES (Ciclo rolling de 30 días + 2 de gracia + 7 días prueba desde 1er paciente) ──
+        // ── LOGICA UNIFICADA PARA NUTRIÓLOGOS Y ESTUDIANTES (Mensual 30d / Anual 365d + 2 de gracia + 7 días prueba desde 1er paciente) ──
         if (role === "nutriologo" || role === "nutriologo_estudiante") {
           const recibosNutri = await dbGet(`recibos_pago?nutriologo_id=eq.${myId}&order=created_at.desc`);
           const tienePendiente = recibosNutri?.some(r => r.estado === "pendiente");
-          const lastApproved = recibosNutri?.find(r => r.estado === "aprobado");
+          const approvedNutri = (recibosNutri || []).filter(r => r.estado === "aprobado");
+          const lastApproved = approvedNutri.sort((a, b) =>
+            String(b.fecha_corte_mes || "").localeCompare(String(a.fecha_corte_mes || ""))
+          )[0];
 
           if (tienePendiente || (!firstClientDate && !lastApproved)) {
             await updateBloqueado(false, false);
@@ -709,8 +741,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
     if (role === "nutriologo_estudiante") {
       try {
-        const cfgRows = await dbGet("configuracion_plataforma?clave=eq.tarifas").catch(() => []);
-        const rates = getRatesForCutoff(cfgRows?.[0]?.valor, new Date());
+        const cfgRows = await dbGet("configuracion_plataforma?id=eq.1").catch(() => []);
+        const rates = getRatesForCutoff(cfgRows?.[0], new Date());
         const estMax = Number(rates.estudiante_max ?? 15);
         const currentActiveCount = clientes.filter(item => item.activo !== false).length;
         if (currentActiveCount >= estMax) {
@@ -888,8 +920,8 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
     const nextActivo = !c.activo;
     if (nextActivo && role === "nutriologo_estudiante") {
       try {
-        const cfgRows = await dbGet("configuracion_plataforma?clave=eq.tarifas").catch(() => []);
-        const rates = getRatesForCutoff(cfgRows?.[0]?.valor, new Date());
+        const cfgRows = await dbGet("configuracion_plataforma?id=eq.1").catch(() => []);
+        const rates = getRatesForCutoff(cfgRows?.[0], new Date());
         const estMax = Number(rates.estudiante_max ?? 15);
         const currentActiveCount = clientes.filter(item => item.activo !== false).length;
         if (currentActiveCount >= estMax) {

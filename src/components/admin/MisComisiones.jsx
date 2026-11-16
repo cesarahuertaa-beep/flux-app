@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from"react";
 import { dbPeek, dbGet, dbPatch } from"../../lib/supabase";
 import { Banknote, CheckCircle2, Clock, Calendar, CheckSquare } from"lucide-react";
-import { getRatesForCutoff } from"../../utils/tarifas";
+import { getRatesForCutoff, getReceiptChargeMonthKey } from"../../utils/tarifas";
 import { CustomSelect } from "../ui/CustomSelect";
 
 export default function MisComisiones({ myId, setMsg }) {
@@ -70,11 +70,12 @@ export default function MisComisiones({ myId, setMsg }) {
     };
   }, [myId]);
 
-  // Meses únicos
+  // Meses únicos de cobro real
   const mesesDisponibles = useMemo(() => {
     const setMeses = new Set();
     recibos.forEach(r => {
-      if (r.fecha_corte_mes) setMeses.add(r.fecha_corte_mes.substring(0, 7));
+      const mKey = getReceiptChargeMonthKey(r);
+      if (mKey) setMeses.add(mKey);
     });
     return Array.from(setMeses).sort().reverse();
   }, [recibos]);
@@ -87,7 +88,7 @@ export default function MisComisiones({ myId, setMsg }) {
 
   const filtrados = useMemo(() => {
     if (filtroMes ==="todos") return recibos;
-    return recibos.filter(r => r.fecha_corte_mes && r.fecha_corte_mes.startsWith(filtroMes));
+    return recibos.filter(r => getReceiptChargeMonthKey(r) === filtroMes);
   }, [recibos, filtroMes]);
 
   // Buscar si hay registro de nómina para el mes actual
@@ -113,7 +114,7 @@ export default function MisComisiones({ myId, setMsg }) {
 
     const comisionesMonto = tieneComision
       ? filtrados.reduce((acc, r) => {
-          const rateForCut = getRatesForCutoff(rawCfg, r.fecha_corte_mes || r.created_at);
+          const rateForCut = getRatesForCutoff(rawCfg, r.created_at || r.fecha_corte_mes);
           const customPct = myComp?.comisionPct != null ? Number(myComp.comisionPct) : (Number(rateForCut.comision_pct) || 32);
           const pct = customPct / 100;
           return acc + Math.max(0, (Number(r.monto ?? r.monto_pagado) || 0) - (Number(r.monto_admin_premium) || 0)) * pct;

@@ -2,13 +2,13 @@
  * Utilidad compartida para leer y resolver tarifas y límites de pacientes por bloque
  * desde configuracion_plataforma[0].tarifas_config.
  *
- * Modelo por Bloques Mensuales (30 días naturales):
- * - Nutriólogo Nivel 1 (1 a tier1_max pac.): $499 MXN
- * - Nutriólogo Nivel 2 (tier1_max+1 a tier2_max pac.): $699 MXN
- * - Nutriólogo Nivel 3 (tier2_max+1 en adelante): $949 MXN
- * - Nutriólogo Estudiante (1 a estudiante_max pac.): $239 MXN
- * - Administrativo Patrocinado Extra: $50 MXN
- * - Atleta Independiente (FLUX Pro Civil): $75 MXN
+ * Modelo por Bloques (Mensual 30 días / Anual 365 días con meses de regalo):
+ * - Nutriólogo Nivel 1 (1 a tier1_max pac.): $499 MXN/mes
+ * - Nutriólogo Nivel 2 (tier1_max+1 a tier2_max pac.): $699 MXN/mes
+ * - Nutriólogo Nivel 3 (tier2_max+1 en adelante, Ilimitado): $949 MXN/mes
+ * - Nutriólogo Estudiante (1 a estudiante_max pac.): $239 MXN/mes
+ * - Atleta Independiente (FLUX Pro Civil): $75 MXN/mes
+ * - Plan Anual por defecto: paga 10 meses y recibe 12 (2 meses gratis).
  */
 
 export const DEFAULT_RATES = {
@@ -20,8 +20,9 @@ export const DEFAULT_RATES = {
   estudiante_max: 15,
   nutri_estudiante: 239,
   civil_premium: 75,
-  admin_premium: 50,
   comision_pct: 32,
+  anual_activo: true,
+  meses_anual: 10, // Meses cobrados por 12 meses de servicio (10 = 2 meses gratis)
   domiciliacion_activa: true,
   stripe_link_tier1: "",
   stripe_link_tier2: "",
@@ -34,11 +35,11 @@ export const DEFAULT_RATES = {
 };
 
 /**
- * Calcula la fecha del próximo corte sugerido en formato YYYY-MM-DD (a 30 días o día 10).
+ * Calcula la fecha del próximo corte sugerido en formato YYYY-MM-DD (a N días, por defecto 30).
  */
-export function getNextCutoffDateStr(today = new Date()) {
+export function getNextCutoffDateStr(today = new Date(), days = 30) {
   const next = new Date(today);
-  next.setDate(next.getDate() + 30);
+  next.setDate(next.getDate() + days);
   const yyyy = next.getFullYear();
   const mm = String(next.getMonth() + 1).padStart(2, "0");
   const dd = String(next.getDate()).padStart(2, "0");
@@ -57,6 +58,9 @@ function normalizeRateItem(item = {}) {
     Number(item.nutri_tier2 || 0) <= 100 &&
     Number(item.nutri_tier3 || 0) <= 100;
 
+  const rawMesesAnual = Number(item.meses_anual ?? DEFAULT_RATES.meses_anual);
+  const mesesAnual = Math.min(12, Math.max(1, isNaN(rawMesesAnual) ? DEFAULT_RATES.meses_anual : rawMesesAnual));
+
   return {
     nutri_tier1: isLegacyPerPatient
       ? DEFAULT_RATES.nutri_tier1
@@ -72,8 +76,9 @@ function normalizeRateItem(item = {}) {
     estudiante_max: Math.max(1, Number(item.estudiante_max ?? DEFAULT_RATES.estudiante_max)),
     nutri_estudiante: Number(item.nutri_estudiante ?? DEFAULT_RATES.nutri_estudiante),
     civil_premium: Number(item.civil_premium ?? DEFAULT_RATES.civil_premium),
-    admin_premium: Number(item.admin_premium ?? DEFAULT_RATES.admin_premium),
     comision_pct: Number(item.comision_pct ?? DEFAULT_RATES.comision_pct),
+    anual_activo: item.anual_activo !== undefined ? Boolean(item.anual_activo) : true,
+    meses_anual: mesesAnual,
     domiciliacion_activa: item.domiciliacion_activa !== undefined ? Boolean(item.domiciliacion_activa) : true,
     stripe_link_tier1: String(item.stripe_link_tier1 || "").trim(),
     stripe_link_tier2: String(item.stripe_link_tier2 || "").trim(),
@@ -85,6 +90,94 @@ function normalizeRateItem(item = {}) {
     effective_from: item.effective_from || "2020-01-01",
     updated_at: item.updated_at || null
   };
+}
+
+/**
+ * Calcula el precio anual aplicando los meses cobrados (por defecto 10 meses = 2 gratis).
+ */
+export function getAnnualPrice(monthlyPrice, rates = DEFAULT_RATES) {
+  const r = normalizeRateItem(rates);
+  return Math.round(Number(monthlyPrice || 0) * r.meses_anual);
+}
+
+/**
+ * Devuelve cuántos meses de regalo otorga la anualidad (por defecto 2).
+ */
+export function getFreeMonthsCount(rates = DEFAULT_RATES) {
+  const r = normalizeRateItem(rates);
+  return Math.max(0, Number((12 - r.meses_anual).toFixed(1)));
+}
+
+/**
+ * Porcentaje aproximado de ahorro anual respecto a pagar 12 mensualidades.
+ */
+export function getAnnualDiscountPct(rates = DEFAULT_RATES) {
+  const r = normalizeRateItem(rates);
+  return Math.max(0, Math.round(((12 - r.meses_anual) / 12) * 100));
+}
+
+/**
+ * Ahorro en MXN del plan anual frente a 12 meses individuales.
+ */
+export function getAnnualSavings(monthlyPrice, rates = DEFAULT_RATES) {
+  const m = Number(monthlyPrice || 0);
+  return Math.max(0, Math.round(m * 12 - getAnnualPrice(m, rates)));
+}
+
+/**
+ * Calcula la diferencia prorrateada al subir de nivel dentro de un ciclo vigente.
+ */
+export function computeProratedUpgrade({
+  currentCyclePrice = 0,
+  newCyclePrice = 0,
+  expirationDate = null,
+  cycleDays = 365,
+  minAmount = 10,
+  today = new Date(),
+} = {}) {
+  const rawDiff = Math.max(0, Number(newCyclePrice || 0) - Number(currentCyclePrice || 0));
+  if (rawDiff <= 0 || !expirationDate) {
+    return { amount: 0, remainingDays: 0, cycleDays, ratio: 0 };
+  }
+  const expDay = new Date(expirationDate);
+  expDay.setHours(0, 0, 0, 0);
+  const todayDay = new Date(today);
+  todayDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((expDay - todayDay) / 86400000);
+  const remainingDays = Math.max(1, Math.min(cycleDays, diffDays));
+  const ratio = remainingDays / cycleDays;
+  const amount = Math.max(minAmount, Math.round(rawDiff * ratio));
+  return { amount, remainingDays, cycleDays, ratio };
+}
+
+/**
+ * Determina si un recibo corresponde a un periodo 'anual' o 'mensual'.
+ */
+export function inferReceiptPeriod(receipt) {
+  if (!receipt) return "mensual";
+  if (receipt.periodo === "anual" || receipt.periodo === "mensual") {
+    return receipt.periodo;
+  }
+  if (receipt.fecha_corte_mes && receipt.created_at) {
+    const cut = new Date((receipt.fecha_corte_mes.includes("T") ? receipt.fecha_corte_mes : `${receipt.fecha_corte_mes}T12:00:00`));
+    const created = new Date(receipt.created_at);
+    const daysSpan = (cut - created) / 86400000;
+    if (daysSpan > 180) return "anual";
+  }
+  return "mensual";
+}
+
+/**
+ * Devuelve la fecha local en formato YYYY-MM desde un timestamp o fecha string (para agrupar cobros reales).
+ */
+export function getReceiptChargeMonthKey(receipt) {
+  const raw = receipt?.created_at || receipt?.fecha_corte_mes;
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw).substring(0, 7);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${yyyy}-${mm}`;
 }
 
 /**
@@ -106,7 +199,7 @@ export function buildCardCheckoutUrl(baseUrl, { userId, email } = {}) {
 
 /**
  * Opción B (Dinámica por API): Solicita a la Edge Function `stripe-checkout`
- * una sesión de cobro o del Portal de Clientes con el monto exacto calculado en servidor.
+ * una sesión de cobro (mensual, anual o upgrade prorrateado) o del Portal de Clientes.
  */
 export async function createDynamicStripeSession({
   action = "checkout",
@@ -115,10 +208,20 @@ export async function createDynamicStripeSession({
   email = "",
   isUpgrade = false,
   tier = 0,
+  billingPeriod = "monthly", // "monthly" | "annual"
 } = {}) {
   const supaUrl = import.meta.env.VITE_SUPABASE_URL;
   const supaKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const returnUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : "https://fluxsport.app";
+  let returnUrl = "https://flux-sport.com";
+  if (typeof window !== "undefined") {
+    try {
+      const parsed = new URL(window.location.href);
+      parsed.searchParams.delete("pago");
+      returnUrl = parsed.toString();
+    } catch {
+      returnUrl = window.location.href.split("?")[0];
+    }
+  }
 
   const res = await fetch(`${supaUrl}/functions/v1/stripe-checkout`, {
     method: "POST",
@@ -134,6 +237,7 @@ export async function createDynamicStripeSession({
       email,
       isUpgrade,
       tier,
+      billingPeriod,
       returnUrl,
     }),
   });
@@ -158,6 +262,9 @@ export function parseTarifasHistory(cfgRow) {
           : cfgRow.tarifas_config;
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map(normalizeRateItem);
+      }
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return [normalizeRateItem(parsed.current || parsed)];
       }
     }
   } catch (e) {
@@ -207,6 +314,7 @@ export function getRatesForCutoff(cfgRow, cutoffDateOrStr) {
 export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAULT_RATES) {
   const r = normalizeRateItem(rates);
   if (isEstudiante) {
+    const annualPrice = getAnnualPrice(r.nutri_estudiante, r);
     return {
       tier: 1,
       tierLabel: "Plan Estudiante",
@@ -214,8 +322,12 @@ export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAU
       minPatients: 1,
       maxPatients: r.estudiante_max,
       blockPrice: r.nutri_estudiante,
+      annualPrice,
+      annualSavings: getAnnualSavings(r.nutri_estudiante, r),
+      monthlyEquivalent: Math.round(annualPrice / 12),
       nextTierLabel: "Nivel 1 Profesional",
       nextTierPrice: r.nutri_tier1,
+      nextTierAnnualPrice: getAnnualPrice(r.nutri_tier1, r),
       nextTierMax: r.tier1_max,
       isOverLimit: false
     };
@@ -223,6 +335,7 @@ export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAU
 
   const t = Number(tier) || 1;
   if (t === 2) {
+    const annualPrice = getAnnualPrice(r.nutri_tier2, r);
     return {
       tier: 2,
       tierLabel: "Nivel 2",
@@ -230,14 +343,19 @@ export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAU
       minPatients: r.tier1_max + 1,
       maxPatients: r.tier2_max,
       blockPrice: r.nutri_tier2,
+      annualPrice,
+      annualSavings: getAnnualSavings(r.nutri_tier2, r),
+      monthlyEquivalent: Math.round(annualPrice / 12),
       nextTierLabel: "Nivel 3",
       nextTierPrice: r.nutri_tier3,
+      nextTierAnnualPrice: getAnnualPrice(r.nutri_tier3, r),
       nextTierMax: null,
       isOverLimit: false
     };
   }
 
   if (t === 3) {
+    const annualPrice = getAnnualPrice(r.nutri_tier3, r);
     return {
       tier: 3,
       tierLabel: "Nivel 3",
@@ -245,13 +363,18 @@ export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAU
       minPatients: r.tier2_max + 1,
       maxPatients: null,
       blockPrice: r.nutri_tier3,
+      annualPrice,
+      annualSavings: getAnnualSavings(r.nutri_tier3, r),
+      monthlyEquivalent: Math.round(annualPrice / 12),
       nextTierLabel: null,
       nextTierPrice: null,
+      nextTierAnnualPrice: null,
       nextTierMax: null,
       isOverLimit: false
     };
   }
 
+  const annualPrice = getAnnualPrice(r.nutri_tier1, r);
   return {
     tier: 1,
     tierLabel: "Nivel 1",
@@ -259,15 +382,19 @@ export function getNutriPlanByTier(tier = 1, isEstudiante = false, rates = DEFAU
     minPatients: 1,
     maxPatients: r.tier1_max,
     blockPrice: r.nutri_tier1,
+    annualPrice,
+    annualSavings: getAnnualSavings(r.nutri_tier1, r),
+    monthlyEquivalent: Math.round(annualPrice / 12),
     nextTierLabel: "Nivel 2",
     nextTierPrice: r.nutri_tier2,
+    nextTierAnnualPrice: getAnnualPrice(r.nutri_tier2, r),
     nextTierMax: r.tier2_max,
     isOverLimit: false
   };
 }
 
 /**
- * Resuelve el nivel, monto mensual del bloque y capacidad de pacientes
+ * Resuelve el nivel, monto del bloque y capacidad de pacientes
  * para un Nutriólogo (Titulado o Estudiante) según sus pacientes activos y las tarifas vigentes.
  */
 export function resolveNutriPlanByVolume(activeCount = 0, isEstudiante = false, rates = DEFAULT_RATES) {

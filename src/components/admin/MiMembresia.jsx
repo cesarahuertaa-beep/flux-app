@@ -18,7 +18,19 @@ import {
   ExternalLink,
   ArrowUpCircle
 } from "lucide-react";
-import { getRatesForCutoff, resolveNutriPlanByVolume, getNutriPlanByTier, buildCardCheckoutUrl, createDynamicStripeSession } from "../../utils/tarifas";
+import {
+  getRatesForCutoff,
+  resolveNutriPlanByVolume,
+  getNutriPlanByTier,
+  buildCardCheckoutUrl,
+  createDynamicStripeSession,
+  getAnnualPrice,
+  getAnnualSavings,
+  getAnnualDiscountPct,
+  getFreeMonthsCount,
+  computeProratedUpgrade,
+  inferReceiptPeriod,
+} from "../../utils/tarifas";
 import { isNativePlayApp } from "../../lib/playBilling";
 
 /**
@@ -47,7 +59,6 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
   const hasLoadedRef = useRef(_peekPerfil !== null || _peekCfg !== null);
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
-  const [patrocinios, setPatrocinios] = useState([]);
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [copiedConcepto, setCopiedConcepto] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("spei"); // "spei" | "card"
@@ -72,20 +83,6 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         });
       }
       if (recibos) setHistorial(recibos);
-      try {
-        const pats = await dbGet(`premium_patrocinado?patrocinador_id=eq.${profileId}&gratis=eq.false& desactivado_en=is.null&order=activo_desde.asc`.replace("& ", "&"));
-        if (pats && pats.length > 0) {
-          const ids = [...new Set(pats.map(x => x.miembro_profile_id))].join(",");
-          const nombres = await dbGet(`profiles?id=in.(${ids})&select=id,nombre`);
-          const nmap = {};
-          (nombres || []).forEach(n => { nmap[n.id] = n.nombre; });
-          setPatrocinios(pats.map(x => ({ ...x, nombre: nmap[x.miembro_profile_id] || "Administrativo" })));
-        } else {
-          setPatrocinios([]);
-        }
-      } catch (e) {
-        console.warn("premium_patrocinado:", e);
-      }
     } catch (e) {
       console.error("Error cargando perfil:", e);
     } finally {
@@ -99,7 +96,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     let timer = null;
     const onCacheUpdated = (ev) => {
       const table = ev?.detail?.table;
-      if (table && !["profiles", "clientes", "recibos_pago", "configuracion_plataforma", "premium_patrocinado", "*"].includes(table)) return;
+      if (table && !["profiles", "clientes", "recibos_pago", "configuracion_plataforma", "*"].includes(table)) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => loadData(), 250);
     };
@@ -114,19 +111,18 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   const isEstudiante = (roleProp || perfil?.role) === "nutriologo_estudiante";
   const [selectedTierOverride, setSelectedTierOverride] = useState(null);
+  const [selectedPeriodOverride, setSelectedPeriodOverride] = useState(null); // null | "monthly" | "annual"
 
-  // ── MOTOR UNIFICADO DE BLOQUES MENSUALES (30 DÍAS NATURALES + SELECCIÓN LIBRE DE NIVEL) ──
+  // ── MOTOR UNIFICADO DE BLOQUES (MENSUAL 30d / ANUAL 365d + UPGRADES PRORRATEADOS) ──
   const {
-    adminLines,
-    adminTotal,
     activeCount,
     planInfo,
     currentTier,
+    effectiveStudentPlan,
     paidTier,
+    paidPeriod,
     recommendedTier,
     minAllowedTier,
-    currentRate,
-    maxPatients,
     totalAmount,
     fechaCorteText,
     nextCutoff,
@@ -140,12 +136,14 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     firstClientDate,
     isUpgradeMidCycle,
     alreadyPaidInCycle,
-    paidTierMaxPatients
+    prorationInfo,
+    activePeriodSelection,
+    annualAvailable,
   } = useMemo(() => {
     const today = new Date();
     const pendingPayment = historial.some(r => r.estado === "pendiente");
 
-    // Filtrar pacientes del especialista (excluyendo su propio shadow client "Mi entrenamiento personal")
+    // Filtrar pacientes activos del especialista (excluyendo su propio shadow client "Mi entrenamiento personal")
     const myClients = (clientes || []).filter(
       c => c.nutriologo_id === profileId && c.objetivo !== "Mi entrenamiento personal"
     );
@@ -158,25 +156,26 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       firstClientDateObj = new Date(sorted[0].created_at);
     }
 
-    // Buscar el último corte válido (aprobado o pendiente)
-    const validReceipts = historial.filter(r => r.estado === "aprobado" || r.estado === "pendiente");
-    const lastValid = validReceipts[0] || null;
+    // Buscar el último corte APROBADO real (para no confundir renovaciones pendientes con ciclos pagados)
+    const approvedReceipts = historial
+      .filter(r => r.estado === "aprobado")
+      .sort((a, b) => {
+        const cmp = String(b.fecha_corte_mes || "").localeCompare(String(a.fecha_corte_mes || ""));
+        return cmp !== 0 ? cmp : new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+    const lastApproved = approvedReceipts[0] || null;
 
-    let targetCutoff = null;
     let expDate = null;
     let isTrialPeriod = false;
     let trialDaysRemainingCalc = null;
     let isCycleActive = false;
 
-    if (!lastValid) {
+    if (!lastApproved) {
       if (!firstClientDateObj) {
-        // 0 pacientes registrados hasta ahora: acceso de cortesía indefinido ($0 MXN)
         isTrialPeriod = true;
         isCycleActive = true;
-        targetCutoff = null;
         expDate = null;
       } else {
-        // 7 días de prueba sin costo a partir del 1er paciente (+2 días de gracia)
         const trialExp = new Date(firstClientDateObj);
         trialExp.setDate(trialExp.getDate() + 7);
         trialExp.setHours(23, 59, 59, 999);
@@ -187,9 +186,6 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           isTrialPeriod = true;
           isCycleActive = true;
           expDate = trialExp;
-          const d = new Date(trialExp);
-          d.setDate(d.getDate() + 30);
-          targetCutoff = d;
           const now0 = new Date();
           now0.setHours(0, 0, 0, 0);
           const exp0 = new Date(trialExp);
@@ -198,16 +194,13 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         } else {
           expDate = trialExp;
           isCycleActive = false;
-          const d = new Date();
-          d.setDate(d.getDate() + 30);
-          targetCutoff = d;
         }
       }
     } else {
-      const lastExpStr = lastValid.fecha_corte_mes;
+      const lastExpStr = lastApproved.fecha_corte_mes;
       let lastExp = new Date((lastExpStr.includes("T") ? lastExpStr.split("T")[0] : lastExpStr) + "T23:59:59");
-      if (lastValid.created_at) {
-        const createdAtDate = new Date(lastValid.created_at);
+      if (lastApproved.created_at) {
+        const createdAtDate = new Date(lastApproved.created_at);
         if (lastExp <= createdAtDate) {
           const paidPlus30 = new Date(createdAtDate);
           paidPlus30.setDate(paidPlus30.getDate() + 30);
@@ -218,119 +211,134 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const blockDate = new Date(lastExp);
       blockDate.setDate(blockDate.getDate() + 2);
       expDate = lastExp;
-
-      if (today <= blockDate) {
-        isCycleActive = true;
-        const d = new Date(lastExp);
-        d.setDate(d.getDate() + 30);
-        targetCutoff = d;
-      } else {
-        isCycleActive = false;
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        targetCutoff = d;
-      }
+      isCycleActive = today <= blockDate;
     }
 
-    const refDate = targetCutoff || (expDate && today >= expDate ? expDate : today);
-    const rates = getRatesForCutoff(rawCfg, refDate);
+    const baseDateForRates = isCycleActive && expDate ? expDate : today;
+    const rates = getRatesForCutoff(rawCfg, baseDateForRates);
+    const isAnnualEnabled = rates.anual_activo !== false;
 
-    // Determinar cuánto se ha pagado ya en el ciclo activo actual (para soportar Upgrades a mitad de mes)
+    // Identificar periodo y nivel ya pagados en el ciclo vigente
     let paidBaseInCurrentCycle = 0;
-    let paidAdminInCurrentCycle = 0;
-    if (isCycleActive && !isTrialPeriod && lastValid?.fecha_corte_mes) {
-      const sameCycleReceipts = validReceipts.filter(r => r.fecha_corte_mes === lastValid.fecha_corte_mes);
+    let activePaidPeriodo = "mensual";
+    let activePaidCode = null; // 0 = Estudiante, 1 = Nivel 1, 2 = Nivel 2, 3 = Nivel 3
+
+    if (isCycleActive && !isTrialPeriod && lastApproved?.fecha_corte_mes) {
+      const lastCutKey = String(lastApproved.fecha_corte_mes).split("T")[0];
+      const sameCycleReceipts = approvedReceipts.filter(
+        r => String(r.fecha_corte_mes).split("T")[0] === lastCutKey
+      );
+      activePaidPeriodo = inferReceiptPeriod(lastApproved);
+
       sameCycleReceipts.forEach(r => {
         const adm = Number(r.monto_admin_premium || 0);
         const tot = Number(r.monto ?? r.monto_pagado ?? 0);
-        paidAdminInCurrentCycle += adm;
         paidBaseInCurrentCycle += Math.max(0, tot - adm);
       });
-    }
 
-    // Si es Estudiante pero rebasa el límite de estudiante (ej. >15 pac.), evalúa el bloque profesional correspondiente
-    const effectiveStudentMode = isEstudiante && activePatientsCount <= rates.estudiante_max;
-    const volumePlan = resolveNutriPlanByVolume(activePatientsCount, effectiveStudentMode, rates);
-    const volumeRecommendedTier = volumePlan.tier;
+      const explicitTiers = sameCycleReceipts
+        .map(r => (r.tier !== null && r.tier !== undefined && r.tier !== "" ? Number(r.tier) : null))
+        .filter(t => t !== null && !isNaN(t));
 
-    // Determinar nivel pagado en el ciclo activo
-    let activePaidTier = null;
-    if (isCycleActive && !isTrialPeriod && paidBaseInCurrentCycle > 0) {
-      if (isEstudiante && paidBaseInCurrentCycle < rates.nutri_tier1) {
-        activePaidTier = 1;
-      } else if (paidBaseInCurrentCycle < rates.nutri_tier2) {
-        activePaidTier = 1;
-      } else if (paidBaseInCurrentCycle < rates.nutri_tier3) {
-        activePaidTier = 2;
-      } else {
-        activePaidTier = 3;
+      if (explicitTiers.length > 0) {
+        activePaidCode = Math.max(...explicitTiers);
+      } else if (paidBaseInCurrentCycle > 0) {
+        const mult = activePaidPeriodo === "anual" ? (rates.meses_anual || 10) : 1;
+        if (isEstudiante && paidBaseInCurrentCycle < rates.nutri_tier1 * mult * 0.9) activePaidCode = 0;
+        else if (paidBaseInCurrentCycle < rates.nutri_tier2 * mult * 0.9) activePaidCode = 1;
+        else if (paidBaseInCurrentCycle < rates.nutri_tier3 * mult * 0.9) activePaidCode = 2;
+        else activePaidCode = 3;
       }
     }
 
-    // Candado lógico de capacidad mínima según pacientes activos
+    const activePaidUiTier = activePaidCode === 0 ? 1 : activePaidCode;
+
+    // Nivel mínimo requerido por pacientes activos actuales
+    const canUseStudentPlan = isEstudiante && activePatientsCount <= rates.estudiante_max;
+    const volumePlan = resolveNutriPlanByVolume(activePatientsCount, canUseStudentPlan, rates);
+    const volumeRecommendedTier = volumePlan.tier;
     const minTierRequired = volumeRecommendedTier;
 
-    // Nivel seleccionado efectivo
     let activeSelectedTier = volumeRecommendedTier;
     if (selectedTierOverride && selectedTierOverride >= minTierRequired) {
       activeSelectedTier = selectedTierOverride;
-    } else if (activePaidTier && activePaidTier >= minTierRequired) {
-      activeSelectedTier = activePaidTier;
-    } else {
-      activeSelectedTier = volumeRecommendedTier;
+    } else if (activePaidUiTier && activePaidUiTier >= minTierRequired) {
+      activeSelectedTier = activePaidUiTier;
     }
 
-    const resolvedPlan = getNutriPlanByTier(activeSelectedTier, effectiveStudentMode && activeSelectedTier === 1, rates);
+    const usingStudentTier = canUseStudentPlan && activeSelectedTier === 1;
+    const resolvedPlan = getNutriPlanByTier(activeSelectedTier, usingStudentTier, rates);
+    const selectedPlanCode = usingStudentTier ? 0 : activeSelectedTier;
 
-    // Calcular capacidad máxima pagada actualmente en el ciclo activo
-    let paidMaxPac = resolvedPlan.maxPatients;
-    if (isCycleActive && !isTrialPeriod && paidBaseInCurrentCycle > 0) {
-      if (isEstudiante && paidBaseInCurrentCycle < rates.nutri_tier1) {
-        paidMaxPac = rates.estudiante_max;
-      } else if (paidBaseInCurrentCycle < rates.nutri_tier2) {
-        paidMaxPac = rates.tier1_max;
-      } else if (paidBaseInCurrentCycle < rates.nutri_tier3) {
-        paidMaxPac = rates.tier2_max;
-      } else {
-        paidMaxPac = null; // Nivel 3 ilimitado
-      }
-    }
-
-    // Administrativos patrocinados activos (tarifa plana por bloque de 30 días)
-    const adminRate = Number(rates.admin_premium ?? 50);
-    const adminLinesCalc = (patrocinios || []).map(s => ({
-      id: s.id,
-      nombre: s.nombre,
-      costo: adminRate,
-      activo: !s.desactivado_en
-    }));
-    const adminTotalCalc = adminLinesCalc.reduce((acc, l) => acc + l.costo, 0);
-
-    // Verificar si requiere Upgrade a mitad de ciclo (ya pagó un nivel menor pero ahora tiene más pacientes activos o eligió un nivel superior)
+    // Determinar si requiere Upgrade de nivel en su ciclo activo
     const needsMidCycleUpgrade =
       isCycleActive &&
       !isTrialPeriod &&
-      paidBaseInCurrentCycle > 0 &&
-      resolvedPlan.blockPrice > paidBaseInCurrentCycle;
+      activePaidCode !== null &&
+      selectedPlanCode > activePaidCode;
 
-    const upgradeDiff = needsMidCycleUpgrade
-      ? Math.max(0, resolvedPlan.blockPrice - paidBaseInCurrentCycle)
-      : 0;
+    // Periodo elegido en UI: durante un upgrade obligatorio de ciclo activo conserva el periodo del ciclo vigente
+    const defaultPeriodSelection =
+      isCycleActive && !isTrialPeriod && activePaidPeriodo === "anual" ? "annual" : "monthly";
+    const resolvedPeriodSelection = !isAnnualEnabled
+      ? "monthly"
+      : needsMidCycleUpgrade
+      ? (activePaidPeriodo === "anual" ? "annual" : "monthly")
+      : (selectedPeriodOverride || defaultPeriodSelection);
+    const isAnnualSelected = resolvedPeriodSelection === "annual";
+    const daysToAddForNewPeriod = isAnnualSelected ? 365 : 30;
 
-    const unpaidAdminDiff =
-      isCycleActive && !isTrialPeriod
-        ? Math.max(0, adminTotalCalc - paidAdminInCurrentCycle)
-        : adminTotalCalc;
+    // Fecha de corte si es pago nuevo / renovación anticipada
+    let targetCutoff = null;
+    if (isCycleActive && expDate) {
+      const d = new Date(expDate);
+      d.setDate(d.getDate() + daysToAddForNewPeriod);
+      targetCutoff = d;
+    } else if (isTrialPeriod && !firstClientDateObj) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + daysToAddForNewPeriod);
+      targetCutoff = d;
+    } else {
+      const d = new Date(today);
+      d.setDate(d.getDate() + daysToAddForNewPeriod);
+      targetCutoff = d;
+    }
 
-    // Si necesita Upgrade a mitad de mes, el corte del recibo de diferencia apunta a su fecha de expiración actual
+    // Cálculo de monto: Upgrade prorrateado anual vs diferencia mensual vs renovación/nuevo ciclo
+    let amountToPay = isAnnualSelected ? resolvedPlan.annualPrice : resolvedPlan.blockPrice;
+    let prorationDetails = null;
+
+    if (needsMidCycleUpgrade) {
+      if (activePaidPeriodo === "anual" && expDate) {
+        const oldAnnualPlan = getNutriPlanByTier(
+          activePaidCode === 0 ? 1 : activePaidCode,
+          activePaidCode === 0,
+          rates
+        );
+        const prorated = computeProratedUpgrade({
+          currentCyclePrice: oldAnnualPlan.annualPrice,
+          newCyclePrice: resolvedPlan.annualPrice,
+          expirationDate: expDate,
+          cycleDays: 365,
+          minAmount: 10,
+          today,
+        });
+        amountToPay = prorated.amount;
+        prorationDetails = {
+          remainingDays: prorated.remainingDays,
+          cycleDays: 365,
+          oldAnnualPrice: oldAnnualPlan.annualPrice,
+          newAnnualPrice: resolvedPlan.annualPrice,
+        };
+      } else {
+        amountToPay = Math.max(0, resolvedPlan.blockPrice - paidBaseInCurrentCycle);
+      }
+    }
+
     const effectiveCutoffForReceipt =
       needsMidCycleUpgrade && expDate
         ? expDate
-        : targetCutoff || new Date(today.getTime() + 30 * 86400000);
-
-    const amountToPay = needsMidCycleUpgrade
-      ? upgradeDiff + unpaidAdminDiff
-      : resolvedPlan.blockPrice + adminTotalCalc;
+        : targetCutoff;
 
     // Texto de días restantes
     let remainingStr = null;
@@ -352,9 +360,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const now0 = new Date();
       now0.setHours(0, 0, 0, 0);
       const days = Math.round((target0 - now0) / (1000 * 60 * 60 * 24));
-      if (days > 1) remainingStr = `Vigencia activa · Expira en ${days} días`;
-      else if (days === 1) remainingStr = "Vigencia activa · Expira mañana";
-      else if (days === 0) remainingStr = "Expira hoy";
+      const periodTag = activePaidPeriodo === "anual" ? "Plan Anual" : "Plan Mensual";
+      if (days > 1) remainingStr = `${periodTag} activo · Expira en ${days} días`;
+      else if (days === 1) remainingStr = `${periodTag} activo · Expira mañana`;
+      else if (days === 0) remainingStr = `${periodTag} · Expira hoy`;
       else if (days >= -2) remainingStr = `En días de gracia (venció hace ${Math.abs(days)} día${Math.abs(days) > 1 ? "s" : ""})`;
       else remainingStr = "Suscripción vencida · Requiere renovación";
     }
@@ -363,20 +372,22 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       ? effectiveCutoffForReceipt.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
       : "Al registrar 1er paciente";
 
-    const isPaidAndUpToDate = isCycleActive && !needsMidCycleUpgrade && (activePaidTier ? activeSelectedTier <= activePaidTier : false);
+    const isPaidAndUpToDate =
+      isCycleActive &&
+      !isTrialPeriod &&
+      !needsMidCycleUpgrade &&
+      activePaidCode !== null &&
+      selectedPlanCode <= activePaidCode;
 
     return {
-      activeClientsList: activeList,
-      adminLines: adminLinesCalc,
-      adminTotal: adminTotalCalc,
       activeCount: activePatientsCount,
       planInfo: resolvedPlan,
       currentTier: activeSelectedTier,
-      paidTier: activePaidTier,
+      effectiveStudentPlan: usingStudentTier,
+      paidTier: activePaidCode,
+      paidPeriod: activePaidPeriodo,
       recommendedTier: volumeRecommendedTier,
       minAllowedTier: minTierRequired,
-      currentRate: resolvedPlan.blockPrice,
-      maxPatients: resolvedPlan.maxPatients,
       totalAmount: amountToPay,
       fechaCorteText: strCorte,
       nextCutoff: effectiveCutoffForReceipt,
@@ -390,9 +401,17 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       firstClientDate: firstClientDateObj,
       isUpgradeMidCycle: needsMidCycleUpgrade,
       alreadyPaidInCycle: paidBaseInCurrentCycle,
-      paidTierMaxPatients: paidMaxPac
+      prorationInfo: prorationDetails,
+      activePeriodSelection: resolvedPeriodSelection,
+      annualAvailable: isAnnualEnabled,
     };
-  }, [clientes, loading, rawCfg, historial, isEstudiante, profileId, patrocinios, selectedTierOverride]);
+  }, [clientes, rawCfg, historial, isEstudiante, profileId, selectedTierOverride, selectedPeriodOverride]);
+
+  const maxPatients = planInfo?.maxPatients ?? null;
+  const isAnnualSelected = activePeriodSelection === "annual";
+  const selectedPlanCode = effectiveStudentPlan ? 0 : currentTier;
+  const freeMonths = getFreeMonthsCount(activeRates);
+  const discountPct = getAnnualDiscountPct(activeRates);
 
   const copyToClipboard = (text, type) => {
     if (!text) return;
@@ -429,7 +448,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       const reciboRes = await dbPost("recibos_pago", {
         nutriologo_id: profileId,
         monto: totalAmount,
-        monto_admin_premium: isUpgradeMidCycle ? 0 : (adminTotal || 0),
+        monto_admin_premium: 0,
+        periodo: isAnnualSelected ? "anual" : "mensual",
+        tier: selectedPlanCode,
         fecha_corte_mes: nextCutoff.toISOString().split("T")[0],
         comprobante_url: url,
         estado: "pendiente"
@@ -478,8 +499,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
 
   // Resolver link manual (opcional) o usar Opción B (API Dinámica de Stripe)
   const currentStripeLink = useMemo(() => {
-    if (!activeRates?.domiciliacion_activa) return "";
-    const rawLink = isEstudiante && currentTier === 1
+    if (!activeRates?.domiciliacion_activa || isAnnualSelected) return "";
+    const rawLink = effectiveStudentPlan
       ? activeRates.stripe_link_estudiante
       : currentTier === 1
       ? activeRates.stripe_link_tier1
@@ -487,10 +508,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       ? activeRates.stripe_link_tier2
       : activeRates.stripe_link_tier3;
     return buildCardCheckoutUrl(rawLink, { userId: profileId, email: perfil?.email });
-  }, [activeRates, isEstudiante, currentTier, profileId, perfil?.email]);
+  }, [activeRates, effectiveStudentPlan, currentTier, profileId, perfil?.email, isAnnualSelected]);
 
   const handleDynamicStripeCheckout = async () => {
-    if (currentStripeLink && !isUpgradeMidCycle && activeCount <= (activeRates?.tier3_max || 60)) {
+    if (currentStripeLink && !isUpgradeMidCycle && !isAnnualSelected) {
       window.open(currentStripeLink, "_blank", "noopener,noreferrer");
       return;
     }
@@ -502,7 +523,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         userId: profileId,
         email: perfil?.email || "",
         isUpgrade: isUpgradeMidCycle,
-        tier: currentTier,
+        tier: selectedPlanCode,
+        billingPeriod: activePeriodSelection,
       });
       window.location.href = url;
     } catch (err) {
@@ -587,11 +609,22 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           <div className="my-3 p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200 flex items-start gap-2.5 text-xs text-indigo-950">
             <ArrowUpCircle size={17} className="text-indigo-600 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">Ajuste de Nivel a mitad de ciclo</span>
-              <span>
-                Ya tienes cubiertos <strong>${alreadyPaidInCycle.toFixed(2)} MXN</strong> en tu ciclo actual. Solo pagas la diferencia de{" "}
-                <strong>${totalAmount.toFixed(2)} MXN</strong> para desbloquear el <strong>{planInfo.tierLabel} ({planInfo.rangeLabel})</strong> conservando tu fecha de corte.
+              <span className="font-bold block">
+                {prorationInfo
+                  ? "Upgrade Prorrateado (Plan Anual)"
+                  : "Ajuste de Nivel a mitad de ciclo"}
               </span>
+              {prorationInfo ? (
+                <span>
+                  Te quedan <strong>{prorationInfo.remainingDays} de {prorationInfo.cycleDays} días</strong> en tu año vigente. Solo pagas la diferencia prorrateada de{" "}
+                  <strong>${totalAmount.toFixed(2)} MXN</strong> para activar <strong>{planInfo.tierLabel} ({planInfo.rangeLabel})</strong> conservando tu misma fecha de corte anual.
+                </span>
+              ) : (
+                <span>
+                  Ya tienes cubiertos <strong>${alreadyPaidInCycle.toFixed(2)} MXN</strong> en tu ciclo actual. Solo pagas la diferencia de{" "}
+                  <strong>${totalAmount.toFixed(2)} MXN</strong> para desbloquear el <strong>{planInfo.tierLabel} ({planInfo.rangeLabel})</strong> conservando tu fecha de corte.
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -601,10 +634,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
               {isUpgradeMidCycle
-                ? "Diferencia por Upgrade"
+                ? (prorationInfo ? "Diferencia Prorrateada" : "Diferencia por Upgrade")
                 : yaPagado && !hasPendingPayment
-                ? `Tarifa ${planInfo.tierLabel}`
-                : "Total a Pagar"}
+                ? `Renovación ${isAnnualSelected ? "Anual" : "Mensual"} (${planInfo.tierLabel})`
+                : `Total a Pagar (${isAnnualSelected ? "Anual" : "Mensual"})`}
             </span>
             <span className="text-2xl font-black text-[#0B1929]">
               ${totalAmount.toFixed(2)}{" "}
@@ -634,6 +667,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   <span>
                     {isUpgradeMidCycle
                       ? "Pago con Tarjeta (Diferencia de Nivel)"
+                      : isAnnualSelected
+                      ? `Domiciliación Anual (${freeMonths} meses gratis)`
                       : "Domiciliación Automática Mensual"}
                   </span>
                 </span>
@@ -643,6 +678,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   <>
                     Paga con tarjeta la diferencia exacta de <strong>${totalAmount.toFixed(2)} MXN</strong> y tu{" "}
                     <strong>{planInfo.tierLabel}</strong> se activará al instante sin subir comprobantes.
+                  </>
+                ) : isAnnualSelected ? (
+                  <>
+                    Cubre 12 meses continuos de tu <strong>{planInfo.tierLabel}</strong> pagando solo {activeRates.meses_anual} meses ({discountPct}% de ahorro, renovable cada año). Puedes cambiar de tarjeta o cancelar cuando quieras.
                   </>
                 ) : (
                   <>
@@ -986,33 +1025,76 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
               </p>
             </div>
 
-            {/* Escala de Bloques Mensuales (Solo mostramos montos en Web para cumplir norma de tienda en Android) */}
+            {/* Selector Mensual / Anual y Escala de Bloques (Solo en Web para cumplir norma de tienda en Android) */}
+            {!isPlayApp && annualAvailable && (
+              <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="inline-grid grid-cols-2 p-1 bg-[#F1F5F9] rounded-xl border border-[#E2E8F0] w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={isUpgradeMidCycle}
+                    onClick={() => setSelectedPeriodOverride("monthly")}
+                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                      !isAnnualSelected
+                        ? "bg-white text-[#0B1929] shadow-xs"
+                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                    }`}
+                  >
+                    Mensual (30d)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isUpgradeMidCycle}
+                    onClick={() => setSelectedPeriodOverride("annual")}
+                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed ${
+                      isAnnualSelected
+                        ? "bg-white text-indigo-700 shadow-xs"
+                        : "text-[#6B7A8D] hover:text-[#0B1929]"
+                    }`}
+                  >
+                    <span>Anual (12m)</span>
+                    {freeMonths > 0 && (
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                        {freeMonths} meses gratis
+                      </span>
+                    )}
+                  </button>
+                </div>
+                {isUpgradeMidCycle && (
+                  <span className="text-[11px] text-indigo-700 font-semibold">
+                    Completa primero el ajuste de nivel de tu ciclo actual ({paidPeriod === "anual" ? "Anual" : "Mensual"}).
+                  </span>
+                )}
+              </div>
+            )}
+
             {!isPlayApp && (
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {[
                   {
                     tier: 1,
                     title: "Nivel 1",
                     range: `1 a ${activeRates.tier1_max} pac.`,
-                    price: activeRates.nutri_tier1,
+                    monthly: activeRates.nutri_tier1,
                   },
                   {
                     tier: 2,
                     title: "Nivel 2",
                     range: `${activeRates.tier1_max + 1} a ${activeRates.tier2_max} pac.`,
-                    price: activeRates.nutri_tier2,
+                    monthly: activeRates.nutri_tier2,
                   },
                   {
                     tier: 3,
                     title: "Nivel 3",
                     range: `${activeRates.tier2_max + 1}+ pac. (Ilimitado)`,
-                    price: activeRates.nutri_tier3,
+                    monthly: activeRates.nutri_tier3,
                   }
                 ].map(b => {
                   const isBlocked = b.tier < minAllowedTier;
                   const isSelected = currentTier === b.tier;
-                  const isActualPaid = paidTier === b.tier;
-                  const isRecommended = !paidTier && recommendedTier === b.tier;
+                  const isActualPaid = !effectiveStudentPlan && paidTier === b.tier;
+                  const isRecommended = (!paidTier || paidTier === 0) && recommendedTier === b.tier;
+                  const displayPrice = isAnnualSelected ? getAnnualPrice(b.monthly, activeRates) : Number(b.monthly);
+                  const equivMonthly = Math.round(displayPrice / 12);
 
                   return (
                     <div
@@ -1048,9 +1130,16 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                       </div>
                       <span className="block text-[11px] text-[#6B7A8D] mt-0.5">{b.range}</span>
                       <span className="block text-base font-black text-[#0B1929] mt-2">
-                        ${Number(b.price).toFixed(0)}{" "}
-                        <span className="text-[10px] font-semibold text-[#6B7A8D]">MXN / 30d</span>
+                        ${displayPrice.toLocaleString("es-MX")}{" "}
+                        <span className="text-[10px] font-semibold text-[#6B7A8D]">
+                          MXN / {isAnnualSelected ? "año" : "30d"}
+                        </span>
                       </span>
+                      {isAnnualSelected && (
+                        <span className="block text-[10px] font-semibold text-emerald-700 mt-0.5">
+                          ≈ ${equivMonthly}/mes · Ahorras ${getAnnualSavings(b.monthly, activeRates).toLocaleString("es-MX")}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -1064,24 +1153,20 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     Beneficio Nutriólogo Estudiante (Hasta {activeRates.estudiante_max} pacientes activos)
                   </span>
                   <span className="text-[11px] text-amber-800">
-                    Tarifa fija preferencial por 30 días naturales con acceso completo a IA, InBody/ISAK y Marca Blanca.
+                    {isAnnualSelected
+                      ? `Plan Anual con ${freeMonths} meses gratis (ahorras $${getAnnualSavings(activeRates.nutri_estudiante, activeRates).toLocaleString("es-MX")} MXN) y acceso completo a IA y Marca Blanca.`
+                      : "Tarifa fija preferencial por 30 días naturales con acceso completo a IA, InBody/ISAK y Marca Blanca."}
                   </span>
                 </div>
-                <span className="text-lg font-black text-amber-900 shrink-0 ml-3">
-                  ${Number(activeRates.nutri_estudiante).toFixed(0)} MXN
-                </span>
-              </div>
-            )}
-
-            {/* Administrativos patrocinados (Solo visible con montos en Web) */}
-            {!isPlayApp && adminLines.length > 0 && (
-              <div className="mt-4 border-t border-[#E2E8F0] pt-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">
-                    Administrativos Premium Patrocinados ({adminLines.length})
+                <div className="text-right shrink-0 ml-3">
+                  <span className="text-lg font-black text-amber-900 block">
+                    ${(isAnnualSelected
+                      ? getAnnualPrice(activeRates.nutri_estudiante, activeRates)
+                      : Number(activeRates.nutri_estudiante)
+                    ).toLocaleString("es-MX")} MXN
                   </span>
-                  <span className="text-xs font-bold text-amber-800">
-                    +${adminTotal.toFixed(2)} MXN
+                  <span className="text-[10px] font-bold text-amber-800">
+                    {isAnnualSelected ? "por año (12m)" : "por 30 días"}
                   </span>
                 </div>
               </div>
@@ -1133,6 +1218,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                             {r.fecha_corte_mes
                               ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
                               : "—"}
+                            <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                              inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                            </span>
                           </td>
                           <td className="py-3.5 px-4 text-xs whitespace-nowrap">
                             {r.comprobante_url && !r.comprobante_url.startsWith("[") ? (
@@ -1186,11 +1276,18 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                         </div>
                         <div className="flex justify-between items-center text-xs text-[#6B7A8D]">
                           <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
-                          <span>
-                            Vigencia:{" "}
-                            {r.fecha_corte_mes
-                              ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
-                              : "—"}
+                          <span className="flex items-center gap-1.5">
+                            <span>
+                              Vigencia:{" "}
+                              {r.fecha_corte_mes
+                                ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+                                : "—"}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                              inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                            </span>
                           </span>
                         </div>
                       </div>

@@ -16,7 +16,16 @@ import {
   ExternalLink,
   RefreshCw
 } from "lucide-react";
-import { getRatesForCutoff, buildCardCheckoutUrl, createDynamicStripeSession } from "../../utils/tarifas";
+import {
+  getRatesForCutoff,
+  buildCardCheckoutUrl,
+  createDynamicStripeSession,
+  getAnnualPrice,
+  getAnnualSavings,
+  getAnnualDiscountPct,
+  getFreeMonthsCount,
+  inferReceiptPeriod,
+} from "../../utils/tarifas";
 import { isNativePlayApp } from "../../lib/playBilling";
 
 /**
@@ -28,6 +37,7 @@ import { isNativePlayApp } from "../../lib/playBilling";
 export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const isPlayApp = isNativePlayApp();
   const [paymentMethod, setPaymentMethod] = useState("card");
+  const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" | "annual"
   const [stripeLoading, setStripeLoading] = useState(false);
   const _peekCfg = dbPeek("configuracion_plataforma?id=eq.1");
   const _peekRecibos = clienteData?.id ? dbPeek(`recibos_pago_civil?cliente_id=eq.${clienteData.id}&order=created_at.desc`) : null;
@@ -42,34 +52,17 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const [uploading, setUploading] = useState(false);
   const [historial, setHistorial] = useState(() => Array.isArray(_peekRecibos) ? _peekRecibos : []);
   const [origen, setOrigen] = useState(clienteData?.premium_origen || null);
-  const [patrocinador, setPatrocinador] = useState("");
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [copiedConcepto, setCopiedConcepto] = useState(false);
 
-  // Cálculos de fecha de vencimiento (Rolling 30 days)
-  const { targetCutoff, expirationDate } = useMemo(() => {
-    const today = new Date();
-    const lastValid = historial.find((r) => r.estado === "aprobado" || r.estado === "pendiente");
-
-    if (!lastValid) {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      return { targetCutoff: d, expirationDate: null };
-    }
-
-    const lastExp = new Date(lastValid.fecha_corte_mes + "T23:59:59");
-    const blockDate = new Date(lastExp);
-    blockDate.setDate(blockDate.getDate() + 2);
-
-    if (today > blockDate) {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      return { targetCutoff: d, expirationDate: lastExp };
-    } else {
-      const d = new Date(lastExp);
-      d.setDate(d.getDate() + 30);
-      return { targetCutoff: d, expirationDate: lastExp };
-    }
+  // Cálculos de fecha de vencimiento (Mensual 30d / Anual 365d)
+  const expirationDate = useMemo(() => {
+    const approved = historial
+      .filter((r) => r.estado === "aprobado" && r.fecha_corte_mes)
+      .sort((a, b) => String(b.fecha_corte_mes).localeCompare(String(a.fecha_corte_mes)));
+    if (!approved[0]) return null;
+    const rawCut = String(approved[0].fecha_corte_mes).split("T")[0];
+    return new Date(`${rawCut}T23:59:59`);
   }, [historial]);
 
   const activeRates = useMemo(() => {
@@ -77,11 +70,38 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
     return getRatesForCutoff(rawCfg, referenceDate);
   }, [rawCfg, expirationDate]);
 
-  const TARIFA = Number(activeRates.civil_premium ?? 75);
-  const cardCheckoutUrl = buildCardCheckoutUrl(activeRates.stripe_link_civil, {
-    userId: clienteData?.id,
-    email: clienteData?.email || clienteData?.correo || ""
-  });
+  const annualActive = activeRates.anual_activo !== false;
+  const effectivePeriod = annualActive && billingPeriod === "annual" ? "annual" : "monthly";
+  const isAnnual = effectivePeriod === "annual";
+  const cycleDays = isAnnual ? 365 : 30;
+
+  const targetCutoff = useMemo(() => {
+    const today = new Date();
+    if (!expirationDate) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + cycleDays);
+      return d;
+    }
+    const blockDate = new Date(expirationDate);
+    blockDate.setDate(blockDate.getDate() + 2);
+    const base = today > blockDate ? new Date(today) : new Date(expirationDate);
+    base.setDate(base.getDate() + cycleDays);
+    return base;
+  }, [expirationDate, cycleDays]);
+
+  const MONTHLY_RATE = Number(activeRates.civil_premium ?? 75);
+  const ANNUAL_RATE = getAnnualPrice(MONTHLY_RATE, activeRates);
+  const ANNUAL_SAVINGS = getAnnualSavings(MONTHLY_RATE, activeRates);
+  const FREE_MONTHS = getFreeMonthsCount(activeRates);
+  const DISCOUNT_PCT = getAnnualDiscountPct(activeRates);
+  const TARIFA = isAnnual ? ANNUAL_RATE : MONTHLY_RATE;
+
+  const cardCheckoutUrl = !isAnnual
+    ? buildCardCheckoutUrl(activeRates.stripe_link_civil, {
+        userId: clienteData?.id,
+        email: clienteData?.email || clienteData?.correo || ""
+      })
+    : "";
 
   const handleDynamicStripeCheckout = async () => {
     if (cardCheckoutUrl) {
@@ -95,6 +115,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         userType: "civil",
         userId: clienteData?.id || "",
         email: clienteData?.email || clienteData?.correo || "",
+        billingPeriod: effectivePeriod,
       });
       window.location.href = url;
     } catch (err) {
@@ -161,15 +182,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       if (recibos) setHistorial(recibos);
       try {
         const fresh = await dbGet(`clientes?id=eq.${clienteData.id}&select=premium_origen`);
-        const o = fresh?.[0]?.premium_origen || null;
-        setOrigen(o);
-        if (o === "patrocinado" && clienteData.auth_id) {
-          const pat = await dbGet(`premium_patrocinado?miembro_profile_id=eq.${clienteData.auth_id}&desactivado_en=is.null`);
-          if (pat?.[0]) {
-            const prof = await dbGet(`profiles?id=eq.${pat[0].patrocinador_id}&select=nombre,nombre_marca`);
-            setPatrocinador(prof?.[0]?.nombre_marca || prof?.[0]?.nombre || "tu nutriólogo");
-          }
-        }
+        setOrigen(fresh?.[0]?.premium_origen || null);
       } catch (e) {
         console.warn("premium_origen:", e);
       }
@@ -218,6 +231,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       const reciboRes = await dbPost("recibos_pago_civil", {
         cliente_id: clienteData.id,
         monto: TARIFA,
+        periodo: isAnnual ? "anual" : "mensual",
         fecha_corte_mes: targetCutoff.toISOString().split("T")[0],
         comprobante_url: url,
         estado: "pendiente"
@@ -275,8 +289,8 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
 
   const conceptoStr = `FLX-${clienteData?.id ? String(clienteData.id).substring(0, 6).toUpperCase() : "ATLETA"}`;
 
-  // ── CASO: Premium Incluido (Staff o Patrocinado por Nutriólogo) ──
-  if (origen === "staff" || origen === "patrocinado") {
+  // ── CASO: Premium Incluido (Staff corporativo FLUX) ──
+  if (origen === "staff") {
     return (
       <div className="w-full max-w-4xl mx-auto space-y-0 md:space-y-6 pb-28 md:pb-8 pt-0 md:pt-0">
         <div className="bg-white p-5 md:p-8 rounded-none md:rounded-3xl shadow-none md:shadow-sm border-b md:border border-[#E2E8F0]">
@@ -288,9 +302,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
               </div>
               <h2 className="text-xl font-bold text-[#0B1929]">Tu Membresía Atleta</h2>
               <p className="text-sm text-[#6B7A8D] mt-1">
-                {origen === "staff"
-                  ? "Tu cuenta Premium está 100% bonificada por ser miembro del Staff de FLUX."
-                  : `Tu cuenta Premium es cortesía de tu nutriólogo (${patrocinador || "Especialista"}).`}
+                Tu cuenta Premium está 100% bonificada por ser miembro del Staff de FLUX.
               </p>
             </div>
             <div className="bg-emerald-50 text-emerald-700 px-4 py-2.5 rounded-2xl border border-emerald-200 flex items-center gap-2 font-bold whitespace-nowrap self-start sm:self-auto">
@@ -394,16 +406,45 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
             </div>
             {!isPlayApp ? (
               <>
+                {annualActive && (
+                  <div className="grid grid-cols-2 gap-1 p-1 bg-white/10 rounded-xl border border-white/10 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setBillingPeriod("monthly")}
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        !isAnnual ? "bg-white text-[#0B1929] shadow-sm" : "text-slate-200 hover:text-white"
+                      }`}
+                    >
+                      Mensual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillingPeriod("annual")}
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        isAnnual ? "bg-white text-[#0B1929] shadow-sm" : "text-slate-200 hover:text-white"
+                      }`}
+                    >
+                      <span>Anual</span>
+                      {FREE_MONTHS > 0 && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-400 text-[#0B1929]">
+                          {FREE_MONTHS}m gratis
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-2 mb-1">
                   <span className="text-4xl md:text-5xl font-black tracking-tight text-white">
                     ${TARIFA}
                   </span>
                   <span className="text-sm font-semibold text-slate-300">
-                    MXN / mes
+                    MXN / {isAnnual ? "año" : "mes"}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mb-6">
-                  Sin contratos forzosos. Vigencia de 30 días naturales continuos.
+                  {isAnnual
+                    ? `12 meses continuos · Ahorras $${ANNUAL_SAVINGS} MXN (${DISCOUNT_PCT}% dto., equivale a $${Math.round(ANNUAL_RATE / 12)}/mes).`
+                    : "Sin contratos forzosos. Vigencia de 30 días naturales continuos."}
                 </p>
               </>
             ) : (
@@ -524,10 +565,12 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       </div>
                       <div>
                         <h3 className="text-base font-bold text-[#0B1929]">
-                          Suscripción Mensual Domiciliada
+                          {isAnnual ? "Suscripción Anual Domiciliada" : "Suscripción Mensual Domiciliada"}
                         </h3>
                         <p className="text-xs text-[#6B7A8D]">
-                          Cargo automático cada 30 días • Cancela cuando quieras
+                          {isAnnual
+                            ? `Cargo automático anual (${FREE_MONTHS} meses gratis) • Cancela cuando quieras`
+                            : "Cargo automático cada 30 días • Cancela cuando quieras"}
                         </p>
                       </div>
                     </div>
@@ -535,16 +578,18 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                     <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-[#6B7A8D] font-medium">Plan seleccionado:</span>
-                        <span className="font-bold text-[#0B1929]">Atleta Independiente PRO</span>
+                        <span className="font-bold text-[#0B1929]">Atleta Independiente PRO ({isAnnual ? "Anual" : "Mensual"})</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[#6B7A8D] font-medium">Cargo mensual recurrente:</span>
+                        <span className="text-[#6B7A8D] font-medium">{isAnnual ? "Cargo anual recurrente:" : "Cargo mensual recurrente:"}</span>
                         <span className="font-black text-[var(--brand-primary)] text-sm">
-                          ${Number(TARIFA).toFixed(2)} MXN / mes
+                          ${Number(TARIFA).toFixed(2)} MXN / {isAnnual ? "año" : "mes"}
                         </span>
                       </div>
                       <div className="pt-1.5 border-t border-slate-200/80 text-[11px] text-[#6B7A8D] leading-relaxed">
-                        Tu membresía se renueva automáticamente cada 30 días sin necesidad de subir comprobantes.
+                        {isAnnual
+                          ? `Vigencia de 365 días continuos (${FREE_MONTHS} meses de regalo). Renueva automáticamente al año sin subir comprobantes.`
+                          : "Tu membresía se renueva automáticamente cada 30 días sin necesidad de subir comprobantes."}
                       </div>
                     </div>
                   </div>
@@ -560,7 +605,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       <span>
                         {stripeLoading
                           ? "Conectando con pasarela bancaria..."
-                          : `Domiciliar Tarjeta • $${Number(TARIFA).toFixed(2)} MXN/mes`}
+                          : `Domiciliar Tarjeta • $${Number(TARIFA).toFixed(2)} MXN/${isAnnual ? "año" : "mes"}`}
                       </span>
                       <ExternalLink size={14} />
                     </button>
@@ -679,7 +724,7 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-[#E2E8F0]">
             <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Duración</span>
-            <p className="text-xs font-bold text-[#0B1929] mt-0.5">30 días continuos</p>
+            <p className="text-xs font-bold text-[#0B1929] mt-0.5">{isAnnual ? "12 meses (365 días)" : "30 días continuos"}</p>
           </div>
           <div className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-[#E2E8F0]">
             <span className="block text-[10px] font-bold text-[#6B7A8D] uppercase tracking-wider">Vencimiento</span>
@@ -731,6 +776,11 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       {r.fecha_corte_mes
                         ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
                         : "—"}
+                      <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                        inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                      </span>
                     </td>
                     <td className="py-3 px-4 font-bold text-xs text-[#0B1929] text-right whitespace-nowrap">
                       ${Number(r.monto).toFixed(2)} MXN
@@ -773,8 +823,13 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                   </div>
                   <div className="flex justify-between items-center text-[11px] text-[#6B7A8D]">
                     <span>{new Date(r.created_at).toLocaleDateString("es-MX")}</span>
-                    <span>
-                      Hasta: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"}
+                    <span className="flex items-center gap-1.5">
+                      <span>Hasta: {r.fecha_corte_mes ? new Date(r.fecha_corte_mes.includes("T") ? r.fecha_corte_mes : `${r.fecha_corte_mes}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                        inferReceiptPeriod(r) === "anual" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {inferReceiptPeriod(r) === "anual" ? "Anual" : "Mensual"}
+                      </span>
                     </span>
                   </div>
                 </div>
