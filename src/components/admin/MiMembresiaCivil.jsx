@@ -55,14 +55,20 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [copiedConcepto, setCopiedConcepto] = useState(false);
 
+  const isPremium = clienteData?.plan_tipo === "premium";
+  const hasPendingPayment = historial.some((r) => r.estado === "pendiente");
+
   // Cálculos de fecha de vencimiento (Mensual 30d / Anual 365d)
-  const expirationDate = useMemo(() => {
+  const { expirationDate, activePaidPeriodo } = useMemo(() => {
     const approved = historial
       .filter((r) => r.estado === "aprobado" && r.fecha_corte_mes)
       .sort((a, b) => String(b.fecha_corte_mes).localeCompare(String(a.fecha_corte_mes)));
-    if (!approved[0]) return null;
+    if (!approved[0]) return { expirationDate: null, activePaidPeriodo: "mensual" };
     const rawCut = String(approved[0].fecha_corte_mes).split("T")[0];
-    return new Date(`${rawCut}T23:59:59`);
+    return {
+      expirationDate: new Date(`${rawCut}T23:59:59`),
+      activePaidPeriodo: inferReceiptPeriod(approved[0]),
+    };
   }, [historial]);
 
   const activeRates = useMemo(() => {
@@ -95,6 +101,34 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
   const FREE_MONTHS = getFreeMonthsCount(activeRates);
   const DISCOUNT_PCT = getAnnualDiscountPct(activeRates);
   const TARIFA = isAnnual ? ANNUAL_RATE : MONTHLY_RATE;
+
+  const { remainingPaidDays, currentExpFormatted } = useMemo(() => {
+    if (!isPremium || !expirationDate) return { remainingPaidDays: 0, currentExpFormatted: "" };
+    const target = new Date(expirationDate);
+    target.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.max(0, Math.round((target - today) / (1000 * 60 * 60 * 24)));
+    const formatted = expirationDate.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    return { remainingPaidDays: days, currentExpFormatted: formatted };
+  }, [isPremium, expirationDate]);
+
+  const showMonthlyToAnnualNotice =
+    isPremium &&
+    Boolean(expirationDate) &&
+    activePaidPeriodo === "mensual" &&
+    isAnnual &&
+    remainingPaidDays > 0;
+
+  const nextCutoffFormatted = targetCutoff.toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const cardCheckoutUrl = !isAnnual
     ? buildCardCheckoutUrl(activeRates.stripe_link_civil, {
@@ -145,9 +179,6 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
       setStripeLoading(false);
     }
   };
-
-  const isPremium = clienteData?.plan_tipo === "premium";
-  const hasPendingPayment = historial.some((r) => r.estado === "pendiente");
 
   const diasRestantesText = useMemo(() => {
     if (!isPremium || !expirationDate) return null;
@@ -575,6 +606,22 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       </div>
                     </div>
 
+                    {showMonthlyToAnnualNotice && (
+                      <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 flex items-start gap-2 text-xs text-emerald-950">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <span className="font-bold block mb-0.5">
+                            Se respetan al 100% tus {remainingPaidDays} día{remainingPaidDays === 1 ? "" : "s"} ya pagados
+                          </span>
+                          <span>
+                            Tu mes vigente cubre hasta el <strong>{currentExpFormatted}</strong>. Los{" "}
+                            <strong>365 días anuales</strong> inician justo al término (vigencia total hasta el{" "}
+                            <strong>{nextCutoffFormatted}</strong>), cancelando tu cobro mensual anterior automáticamente hasta esa fecha.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-[#6B7A8D] font-medium">Plan seleccionado:</span>
@@ -585,6 +632,17 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                         <span className="font-black text-[var(--brand-primary)] text-sm">
                           ${Number(TARIFA).toFixed(2)} MXN / {isAnnual ? "año" : "mes"}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#6B7A8D] font-medium">Vigencia cubierta hasta:</span>
+                        <div className="text-right">
+                          <span className="font-bold text-[#0B1929]">{nextCutoffFormatted}</span>
+                          {showMonthlyToAnnualNotice && (
+                            <span className="block text-[10px] font-semibold text-emerald-700">
+                              ({remainingPaidDays}d vigentes + 365d anuales)
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="pt-1.5 border-t border-slate-200/80 text-[11px] text-[#6B7A8D] leading-relaxed">
                         {isAnnual
@@ -605,6 +663,8 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       <span>
                         {stripeLoading
                           ? "Conectando con pasarela bancaria..."
+                          : showMonthlyToAnnualNotice
+                          ? `Cambiar a Plan Anual • $${Number(TARIFA).toFixed(2)} MXN/año`
                           : `Domiciliar Tarjeta • $${Number(TARIFA).toFixed(2)} MXN/${isAnnual ? "año" : "mes"}`}
                       </span>
                       <ExternalLink size={14} />
@@ -638,7 +698,35 @@ export default function MiMembresiaCivil({ clienteData, setMsg }) {
                       </div>
                     </div>
 
+                    {showMonthlyToAnnualNotice && (
+                      <div className="mb-3 p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 flex items-start gap-2 text-xs text-emerald-950">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <span className="font-bold block mb-0.5">
+                            Se respetan al 100% tus {remainingPaidDays} día{remainingPaidDays === 1 ? "" : "s"} ya pagados
+                          </span>
+                          <span>
+                            Tu ciclo mensual vigente cubre hasta el <strong>{currentExpFormatted}</strong>. Tus{" "}
+                            <strong>365 días anuales</strong> inician justo después (hasta el{" "}
+                            <strong>{nextCutoffFormatted}</strong>; {remainingPaidDays}d vigentes + 365d anuales). No pierdes ningún día.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-2.5 text-xs">
+                      {/* Resumen rápido de vigencia */}
+                      <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex items-center justify-between gap-2">
+                        <span className="text-[#6B7A8D] font-medium">Vigencia cubierta hasta:</span>
+                        <div className="text-right">
+                          <span className="font-bold text-[var(--brand-primary)]">{nextCutoffFormatted}</span>
+                          {showMonthlyToAnnualNotice && (
+                            <span className="block text-[10px] font-semibold text-emerald-700">
+                              ({remainingPaidDays}d vigentes + 365d anuales)
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       {/* Beneficiario */}
                       <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">

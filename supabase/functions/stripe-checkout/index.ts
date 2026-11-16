@@ -212,6 +212,7 @@ serve(async (req: Request) => {
     let resolvedTier = 1;
     let customerEmail = email;
     let stripeCustomerId = "";
+    let previousSubscriptionId = "";
 
     if (userType === "civil") {
       const monthlyCivil = rates.civil_premium;
@@ -227,21 +228,23 @@ serve(async (req: Request) => {
       if (userId) {
         const { data: cl } = await supabase
           .from("clientes")
-          .select("email, stripe_customer_id")
+          .select("email, stripe_customer_id, stripe_subscription_id")
           .eq("id", userId)
           .maybeSingle();
         if (cl?.email && !customerEmail) customerEmail = cl.email;
         if (cl?.stripe_customer_id) stripeCustomerId = cl.stripe_customer_id;
+        if (cl?.stripe_subscription_id) previousSubscriptionId = cl.stripe_subscription_id;
       }
     } else {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id, role, email, stripe_customer_id")
+        .select("id, role, email, stripe_customer_id, stripe_subscription_id")
         .eq("id", userId)
         .maybeSingle();
 
       if (prof?.email && !customerEmail) customerEmail = prof.email;
       if (prof?.stripe_customer_id) stripeCustomerId = prof.stripe_customer_id;
+      if (prof?.stripe_subscription_id) previousSubscriptionId = prof.stripe_subscription_id;
       const isStudent = prof?.role === "nutriologo_estudiante";
 
       const { data: clientRows } = await supabase
@@ -394,6 +397,10 @@ serve(async (req: Request) => {
       params["subscription_data[metadata][user_type]"] = userType;
       params["subscription_data[metadata][billing_period]"] = effectivePeriod;
       params["subscription_data[metadata][tier]"] = String(resolvedTier);
+      if (previousSubscriptionId) {
+        params["metadata[previous_subscription_id]"] = previousSubscriptionId;
+        params["subscription_data[metadata][previous_subscription_id]"] = previousSubscriptionId;
+      }
     } else if (!stripeCustomerId) {
       params["customer_creation"] = "always";
     }

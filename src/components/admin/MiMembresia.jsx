@@ -139,6 +139,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     prorationInfo,
     activePeriodSelection,
     annualAvailable,
+    remainingPaidDays,
+    currentExpFormatted,
+    showMonthlyToAnnualNotice,
+    mustSwitchPeriodForCapacityUpgrade,
   } = useMemo(() => {
     const today = new Date();
     const pendingPayment = historial.some(r => r.estado === "pendiente");
@@ -258,6 +262,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     const volumePlan = resolveNutriPlanByVolume(activePatientsCount, canUseStudentPlan, rates);
     const volumeRecommendedTier = volumePlan.tier;
     const minTierRequired = volumeRecommendedTier;
+    const minRequiredCode = canUseStudentPlan ? 0 : volumeRecommendedTier;
 
     let activeSelectedTier = volumeRecommendedTier;
     if (selectedTierOverride && selectedTierOverride >= minTierRequired) {
@@ -270,22 +275,54 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
     const resolvedPlan = getNutriPlanByTier(activeSelectedTier, usingStudentTier, rates);
     const selectedPlanCode = usingStudentTier ? 0 : activeSelectedTier;
 
-    // Determinar si requiere Upgrade de nivel en su ciclo activo
-    const needsMidCycleUpgrade =
-      isCycleActive &&
-      !isTrialPeriod &&
-      activePaidCode !== null &&
-      selectedPlanCode > activePaidCode;
-
-    // Periodo elegido en UI: durante un upgrade obligatorio de ciclo activo conserva el periodo del ciclo vigente
+    // El usuario siempre puede explorar libremente Mensual / Anual sin bloquear el selector
     const defaultPeriodSelection =
       isCycleActive && !isTrialPeriod && activePaidPeriodo === "anual" ? "annual" : "monthly";
     const resolvedPeriodSelection = !isAnnualEnabled
       ? "monthly"
-      : needsMidCycleUpgrade
-      ? (activePaidPeriodo === "anual" ? "annual" : "monthly")
-      : (selectedPeriodOverride || defaultPeriodSelection);
+      : selectedPeriodOverride || defaultPeriodSelection;
     const isAnnualSelected = resolvedPeriodSelection === "annual";
+
+    // Upgrade a mitad de ciclo solo aplica si permanece dentro del mismo periodo pagado vigente
+    const isSamePeriodAsActiveCycle =
+      (activePaidPeriodo === "anual" && isAnnualSelected) ||
+      (activePaidPeriodo === "mensual" && !isAnnualSelected);
+
+    const needsMidCycleUpgrade =
+      isCycleActive &&
+      !isTrialPeriod &&
+      activePaidCode !== null &&
+      isSamePeriodAsActiveCycle &&
+      selectedPlanCode > activePaidCode;
+
+    // Si su cartera ya excede la capacidad de un plan Anual vigente y explora Mensual, debe nivelar su Anual primero
+    const mustUpgradeCapacityNow =
+      isCycleActive && !isTrialPeriod && activePaidCode !== null && minRequiredCode > activePaidCode;
+    const switchPeriodForCapacityUpgrade =
+      mustUpgradeCapacityNow && activePaidPeriodo === "anual" && !isAnnualSelected;
+
+    let remainingPaidDaysCalc = 0;
+    let currentExpFormattedStr = "";
+    if (isCycleActive && !isTrialPeriod && expDate) {
+      const now0 = new Date(today);
+      now0.setHours(0, 0, 0, 0);
+      const exp0 = new Date(expDate);
+      exp0.setHours(0, 0, 0, 0);
+      remainingPaidDaysCalc = Math.max(0, Math.round((exp0 - now0) / (1000 * 60 * 60 * 24)));
+      currentExpFormattedStr = expDate.toLocaleDateString("es-MX", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    }
+
+    const monthlyToAnnualSwitchNotice =
+      isCycleActive &&
+      !isTrialPeriod &&
+      activePaidPeriodo === "mensual" &&
+      isAnnualSelected &&
+      !needsMidCycleUpgrade &&
+      remainingPaidDaysCalc > 0;
     const daysToAddForNewPeriod = isAnnualSelected ? 365 : 30;
 
     // Fecha de corte si es pago nuevo / renovación anticipada
@@ -404,6 +441,10 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
       prorationInfo: prorationDetails,
       activePeriodSelection: resolvedPeriodSelection,
       annualAvailable: isAnnualEnabled,
+      remainingPaidDays: remainingPaidDaysCalc,
+      currentExpFormatted: currentExpFormattedStr,
+      showMonthlyToAnnualNotice: monthlyToAnnualSwitchNotice,
+      mustSwitchPeriodForCapacityUpgrade: switchPeriodForCapacityUpgrade,
     };
   }, [clientes, rawCfg, historial, isEstudiante, profileId, selectedTierOverride, selectedPeriodOverride]);
 
@@ -605,6 +646,46 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
           </div>
         )}
 
+        {mustSwitchPeriodForCapacityUpgrade && (
+          <div className="my-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-950">
+            <AlertCircle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-2 leading-relaxed">
+              <div>
+                <span className="font-bold block">Ajusta primero tu Plan Anual vigente</span>
+                <span>
+                  Tu cartera actual ({activeCount} pacientes) superó la capacidad de tu Plan Anual activo. Para nivelar tu cuenta primero aplica el ajuste prorrateado sobre tu ciclo Anual.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPeriodOverride("annual")}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] cursor-pointer transition-colors"
+              >
+                Volver a Plan Anual y ver ajuste prorrateado
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showMonthlyToAnnualNotice && (
+          <div className="my-3 p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 flex items-start gap-2.5 text-xs text-emerald-950">
+            <CheckCircle2 size={17} className="text-emerald-600 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <span className="font-bold block text-emerald-950 mb-0.5">
+                Se respetan al 100% tus {remainingPaidDays} día{remainingPaidDays === 1 ? "" : "s"} ya pagados
+              </span>
+              <span>
+                Tu ciclo mensual vigente cubre hasta el <strong>{currentExpFormatted}</strong>. Los{" "}
+                <strong>365 días de tu Plan Anual</strong> comienzan justo al finalizar ese periodo (cobertura total hasta el{" "}
+                <strong>{fechaCorteText}</strong>).{" "}
+                {paymentMethod === "card" && activeRates?.domiciliacion_activa
+                  ? "Tu cobro mensual anterior se cancelará automáticamente y tu próximo cargo anual ocurrirá hasta esa misma fecha."
+                  : "No pierdes ningún día de lo que ya pagaste."}
+              </span>
+            </div>
+          </div>
+        )}
+
         {isUpgradeMidCycle && (
           <div className="my-3 p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200 flex items-start gap-2.5 text-xs text-indigo-950">
             <ArrowUpCircle size={17} className="text-indigo-600 shrink-0 mt-0.5" />
@@ -630,11 +711,13 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
         )}
 
         {/* Resumen del importe a pagar */}
-        <div className="my-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
+        <div className="my-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between gap-3">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7A8D] block">
               {isUpgradeMidCycle
                 ? (prorationInfo ? "Diferencia Prorrateada" : "Diferencia por Upgrade")
+                : showMonthlyToAnnualNotice
+                ? `Cambio a Plan Anual (${planInfo.tierLabel})`
                 : yaPagado && !hasPendingPayment
                 ? `Renovación ${isAnnualSelected ? "Anual" : "Mensual"} (${planInfo.tierLabel})`
                 : `Total a Pagar (${isAnnualSelected ? "Anual" : "Mensual"})`}
@@ -655,6 +738,11 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <span className="text-xs font-bold text-[var(--brand-primary)]">
               {isTrial && !firstClientDate ? "Al registrar 1er paciente" : fechaCorteText}
             </span>
+            {showMonthlyToAnnualNotice && (
+              <span className="block text-[10px] font-semibold text-emerald-700 mt-0.5">
+                ({remainingPaidDays}d vigentes + 365d anuales)
+              </span>
+            )}
           </div>
         </div>
 
@@ -694,8 +782,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <button
               type="button"
               onClick={handleDynamicStripeCheckout}
-              disabled={stripeLoading}
-              className="w-full bg-[#0B1929] hover:bg-[#162942] disabled:opacity-60 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 text-sm cursor-pointer"
+              disabled={stripeLoading || mustSwitchPeriodForCapacityUpgrade}
+              className="w-full bg-[#0B1929] hover:bg-[#162942] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
               <CreditCard size={18} className="text-emerald-400" />
               <span>
@@ -703,6 +791,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   ? "Conectando con pasarela bancaria..."
                   : isUpgradeMidCycle
                   ? `Pagar Upgrade con Tarjeta • $${totalAmount.toFixed(2)} MXN`
+                  : showMonthlyToAnnualNotice
+                  ? `Cambiar a Plan Anual • $${totalAmount.toFixed(2)} MXN`
                   : `Domiciliar Tarjeta • $${totalAmount.toFixed(2)} MXN`}
               </span>
               <ExternalLink size={14} className="opacity-75" />
@@ -809,7 +899,7 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
             <div className="mt-6 pt-5 border-t border-[#F0F4FA]">
               <button
                 type="button"
-                disabled={uploading || loading}
+                disabled={uploading || loading || mustSwitchPeriodForCapacityUpgrade}
                 onClick={handleUploadClick}
                 className="w-full bg-[var(--brand-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
               >
@@ -819,6 +909,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                     ? "Subiendo Comprobante..."
                     : isUpgradeMidCycle
                     ? `Subir Comprobante de Upgrade ($${totalAmount.toFixed(2)} MXN)`
+                    : showMonthlyToAnnualNotice
+                    ? `Cambiar a Plan Anual ($${totalAmount.toFixed(2)} MXN)`
                     : yaPagado && !hasPendingPayment
                     ? "Adelantar Próxima Renovación"
                     : "Subir Comprobante de Pago"}
@@ -1031,9 +1123,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 <div className="inline-grid grid-cols-2 p-1 bg-[#F1F5F9] rounded-xl border border-[#E2E8F0] w-full sm:w-auto">
                   <button
                     type="button"
-                    disabled={isUpgradeMidCycle}
                     onClick={() => setSelectedPeriodOverride("monthly")}
-                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       !isAnnualSelected
                         ? "bg-white text-[#0B1929] shadow-xs"
                         : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -1043,9 +1134,8 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                   </button>
                   <button
                     type="button"
-                    disabled={isUpgradeMidCycle}
                     onClick={() => setSelectedPeriodOverride("annual")}
-                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed ${
+                    className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       isAnnualSelected
                         ? "bg-white text-indigo-700 shadow-xs"
                         : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -1061,7 +1151,9 @@ export default function MiMembresia({ clientes, profileId, setMsg, onPaymentUplo
                 </div>
                 {isUpgradeMidCycle && (
                   <span className="text-[11px] text-indigo-700 font-semibold">
-                    Completa primero el ajuste de nivel de tu ciclo actual ({paidPeriod === "anual" ? "Anual" : "Mensual"}).
+                    {paidPeriod === "mensual"
+                      ? "Ajuste del ciclo mensual actual (también puedes cambiar a Anual 12m)."
+                      : "Ajuste prorrateado para tu ciclo anual vigente."}
                   </span>
                 )}
               </div>

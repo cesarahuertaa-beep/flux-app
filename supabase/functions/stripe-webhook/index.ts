@@ -175,6 +175,49 @@ async function updateStripeSubscriptionPrice(
   }
 }
 
+async function cancelPreviousStripeSubscription(prevSubId: string | null, stripeKey: string) {
+  if (!prevSubId || !stripeKey) return;
+  try {
+    await fetch(`https://api.stripe.com/v1/subscriptions/${prevSubId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${stripeKey}` },
+    });
+  } catch (e) {
+    console.warn("No se pudo cancelar suscripción previa en Stripe:", e);
+  }
+}
+
+async function alignAnnualTrialEnd(
+  subId: string | null,
+  nextCutoffStr: string,
+  stripeKey: string
+) {
+  if (!subId || !nextCutoffStr || !stripeKey) return;
+  try {
+    const clean = nextCutoffStr.includes("T") ? nextCutoffStr.split("T")[0] : nextCutoffStr;
+    const targetDate = new Date(`${clean}T18:00:00Z`);
+    if (isNaN(targetDate.getTime())) return;
+    const targetTs = Math.floor(targetDate.getTime() / 1000);
+    const nowSec = Math.floor(Date.now() / 1000);
+    // Solo ajustar si hay remanente previo (>366 días) y dentro del límite máximo de Stripe (730 días)
+    if (targetTs <= nowSec + 366 * 86400 || targetTs > nowSec + 725 * 86400) return;
+
+    await fetch(`https://api.stripe.com/v1/subscriptions/${subId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: toFormUrlEncoded({
+        trial_end: targetTs,
+        proration_behavior: "none",
+      }),
+    });
+  } catch (e) {
+    console.warn("No se pudo alinear fecha de renovación anual en Stripe:", e);
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -250,14 +293,26 @@ serve(async (req: Request) => {
         if (prof?.id) notifProfileId = prof.id;
       }
 
+      let shouldNotify = eventType === "invoice.payment_failed";
       if (eventType === "customer.subscription.deleted") {
-        if (custId) {
-          await supabase.from("profiles").update({ stripe_subscription_id: null }).eq("stripe_customer_id", custId);
-          await supabase.from("clientes").update({ stripe_subscription_id: null }).eq("stripe_customer_id", custId);
+        const deletedSubId = String(obj.id || "");
+        if (deletedSubId) {
+          const { data: clearedProf } = await supabase
+            .from("profiles")
+            .update({ stripe_subscription_id: null })
+            .eq("stripe_subscription_id", deletedSubId)
+            .select("id");
+          const { data: clearedCli } = await supabase
+            .from("clientes")
+            .update({ stripe_subscription_id: null })
+            .eq("stripe_subscription_id", deletedSubId)
+            .select("auth_id");
+          // Solo notificar si se canceló la suscripción vigente actual (evita avisar cuando se reemplaza mensual -> anual)
+          shouldNotify = (clearedProf?.length || 0) > 0 || (clearedCli?.length || 0) > 0;
         }
       }
 
-      if (notifProfileId) {
+      if (shouldNotify && notifProfileId) {
         await supabase.from("notificaciones").insert({
           profile_id: notifProfileId,
           titulo:
@@ -459,19 +514,44 @@ serve(async (req: Request) => {
         throw new Error(`Error insertando recibo nutriólogo: ${insertErr.message}`);
       }
 
+      const prevSavedSubIdOnRow = profile.stripe_subscription_id || null;
+      const prevSubToCancel =
+        mergedMeta.previous_subscription_id || prevSavedSubIdOnRow || null;
+      const hadPriorRemainingPeriod = Boolean(
+        !isUpgrade &&
+          isAnnual &&
+          lastReceipt?.fecha_corte_mes &&
+          new Date(`${String(lastReceipt.fecha_corte_mes).split("T")[0]}T23:59:59`) > new Date()
+      );
+
       const profileUpdates: Record<string, any> = { bloqueado: false };
       if (customerId) profileUpdates.stripe_customer_id = customerId;
       if (subscriptionId && !isUpgrade) profileUpdates.stripe_subscription_id = subscriptionId;
       await supabase.from("profiles").update(profileUpdates).eq("id", profile.id);
 
+      // Si cambió de suscripción (ej. mensual -> anual), cancelar automáticamente la anterior
+      if (subscriptionId && !isUpgrade && prevSubToCancel && prevSubToCancel !== subscriptionId) {
+        await cancelPreviousStripeSubscription(prevSubToCancel, stripeSecretKey);
+      }
+
+      // Opción 1: alinear el cobro del Año 2 en Stripe exactamente al vencer el periodo acumulado (mes restante + 365d)
+      if (
+        subscriptionId &&
+        !isUpgrade &&
+        hadPriorRemainingPeriod &&
+        subscriptionId !== prevSavedSubIdOnRow
+      ) {
+        await alignAnnualTrialEnd(subscriptionId, nextCutoff, stripeSecretKey);
+      }
+
       // Si pagó un upgrade único teniendo suscripción activa en Stripe, actualizar tarifa de próxima renovación
       if (
         isUpgrade &&
-        profile.stripe_subscription_id &&
+        prevSavedSubIdOnRow &&
         stripeSecretKey &&
         Number(mergedMeta.target_tier_amount_mxn) > 0
       ) {
-        await updateStripeSubscriptionPrice(profile.stripe_subscription_id, stripeSecretKey, {
+        await updateStripeSubscriptionPrice(prevSavedSubIdOnRow, stripeSecretKey, {
           amountMxn: Number(mergedMeta.target_tier_amount_mxn),
           title: mergedMeta.target_plan_title || "Membresía FLUX",
           isAnnual,
@@ -490,7 +570,7 @@ serve(async (req: Request) => {
     if (referenceId) {
       const { data } = await supabase
         .from("clientes")
-        .select("id, email, plan_tipo, auth_id, stripe_customer_id")
+        .select("id, email, plan_tipo, auth_id, stripe_customer_id, stripe_subscription_id")
         .eq("id", referenceId)
         .maybeSingle();
       if (data) cliente = data;
@@ -498,7 +578,7 @@ serve(async (req: Request) => {
     if (!cliente && customerId) {
       const { data } = await supabase
         .from("clientes")
-        .select("id, email, plan_tipo, auth_id, stripe_customer_id")
+        .select("id, email, plan_tipo, auth_id, stripe_customer_id, stripe_subscription_id")
         .is("nutriologo_id", null)
         .eq("stripe_customer_id", customerId)
         .limit(1);
@@ -507,7 +587,7 @@ serve(async (req: Request) => {
     if (!cliente && customerEmail) {
       const { data } = await supabase
         .from("clientes")
-        .select("id, email, plan_tipo, auth_id, stripe_customer_id")
+        .select("id, email, plan_tipo, auth_id, stripe_customer_id, stripe_subscription_id")
         .is("nutriologo_id", null)
         .ilike("email", customerEmail)
         .limit(1);
@@ -564,6 +644,15 @@ serve(async (req: Request) => {
         throw new Error(`Error insertando recibo civil: ${civilInsertErr.message}`);
       }
 
+      const prevCivilSavedSubId = cliente.stripe_subscription_id || null;
+      const prevCivilSubToCancel =
+        mergedMeta.previous_subscription_id || prevCivilSavedSubId || null;
+      const hadCivilPriorPeriod = Boolean(
+        isAnnual &&
+          lastCivilReceipt?.fecha_corte_mes &&
+          new Date(`${String(lastCivilReceipt.fecha_corte_mes).split("T")[0]}T23:59:59`) > new Date()
+      );
+
       const clientUpdates: Record<string, any> = {
         activo: true,
         deactivated_at: null,
@@ -573,6 +662,14 @@ serve(async (req: Request) => {
       if (customerId) clientUpdates.stripe_customer_id = customerId;
       if (subscriptionId) clientUpdates.stripe_subscription_id = subscriptionId;
       await supabase.from("clientes").update(clientUpdates).eq("id", cliente.id);
+
+      if (subscriptionId && prevCivilSubToCancel && prevCivilSubToCancel !== subscriptionId) {
+        await cancelPreviousStripeSubscription(prevCivilSubToCancel, stripeSecretKey);
+      }
+
+      if (subscriptionId && hadCivilPriorPeriod && subscriptionId !== prevCivilSavedSubId) {
+        await alignAnnualTrialEnd(subscriptionId, nextCutoff, stripeSecretKey);
+      }
 
       return new Response(
         JSON.stringify({ ok: true, target: "civil", id: cliente.id, periodo: periodoDb, nextCutoff }),
