@@ -3773,45 +3773,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Sensaciones y Adherencia del Ciclo (Solo para segundas evaluaciones en adelante) */}
+                  {/* Adherencia de Entrenamiento y Observaciones del Ciclo (Solo para segundas evaluaciones en adelante) */}
                   {!isFirstEvaluationEver && (
                     <div className="pt-2 border-t border-blue-100/80 space-y-3">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-[var(--brand-primary)]" />
-                          <span>Sensaciones y adherencia del ciclo evaluado</span>
-                        </label>
-                        {adherenceSnapshot && (adherenceSnapshot.nutricion?.hasPlan || adherenceSnapshot.entrenamiento?.hasPlan) && (
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => {
-                              if (!isReadOnly && adherenceSnapshot) {
-                                const current = (form.checkin_observaciones || "").trim();
-                                const parts = [];
-                                if (adherenceSnapshot.nutricion?.hasPlan) {
-                                  parts.push(`Dieta (${adherenceSnapshot.ciclo_evaluado_nombre}): ${adherenceSnapshot.nutricion.comidas_realizadas}/${adherenceSnapshot.nutricion.comidas_total} comidas (${adherenceSnapshot.nutricion.pct_comidas}%), agua ${adherenceSnapshot.nutricion.promedio_agua_l} L/día prom. (${adherenceSnapshot.nutricion.pct_agua}%) en ${adherenceSnapshot.nutricion.dias_registrados}/${adherenceSnapshot.nutricion.dias_totales || adherenceSnapshot.nutricion.dias_registrados} días`);
-                                }
-                                if (adherenceSnapshot.entrenamiento?.hasPlan) {
-                                  parts.push(`Entreno: ${adherenceSnapshot.entrenamiento.sesiones_completadas}/${adherenceSnapshot.entrenamiento.sesiones_esperadas} sesiones (${adherenceSnapshot.entrenamiento.pct_cumplimiento}%)`);
-                                }
-                                const summary = parts.join(" | ");
-                                if (summary) {
-                                  updForm(
-                                    "checkin_observaciones",
-                                    current && !current.includes(summary) ? `${current} | ${summary}` : summary
-                                  );
-                                }
-                              }
-                            }}
-                            className="text-[11px] font-bold text-[var(--brand-primary)] hover:underline inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            <span>Auto-completar desde app</span>
-                          </button>
-                        )}
-                      </div>
-
                       {loadingAdherenceSnapshot && (
                         <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200/60 text-xs text-blue-800 flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-primary)] shrink-0" />
@@ -3833,8 +3797,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             )}
                           </div>
 
-                          {/* Tarjeta Entrenamiento (Paso 1: Hábitos y Actividad Física) */}
-                          <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2.5">
+                          <div className="pt-2.5 border-t border-[#E2E8F0]/80 space-y-2.5">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
                                 <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
@@ -3856,7 +3819,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     </span>
                                     <span className="font-bold text-[#0B1929]">{adherenceSnapshot.entrenamiento.pct_cumplimiento}%</span>
                                   </div>
-                                  <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                                  <div className="w-full h-2 rounded-full bg-white border border-[#E2E8F0]/80 overflow-hidden">
                                     <div
                                       className="h-full rounded-full bg-indigo-500 transition-all"
                                       style={{ width: `${adherenceSnapshot.entrenamiento.pct_cumplimiento}%` }}
@@ -3865,14 +3828,14 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 </div>
 
                                 {adherenceSnapshot.entrenamiento.semanas?.length > 0 && (
-                                  <div className={`pt-1.5 border-t border-gray-100 grid gap-1.5 ${
+                                  <div className={`pt-2 border-t border-[#E2E8F0]/70 grid gap-1.5 ${
                                     adherenceSnapshot.entrenamiento.semanas.length > 4
                                       ? "grid-cols-4 sm:grid-cols-8"
                                       : "grid-cols-4"
                                   }`}>
                                     {adherenceSnapshot.entrenamiento.semanas.map((w) => (
                                       <div key={w.semana} className="text-center">
-                                        <div className="h-8 bg-gray-100 rounded-md flex items-end overflow-hidden p-0.5">
+                                        <div className="h-8 bg-white border border-[#E2E8F0]/80 rounded-md flex items-end overflow-hidden p-0.5">
                                           <div
                                             className={`w-full rounded-sm ${w.pct > 0 ? "bg-indigo-400" : "bg-slate-200"}`}
                                             style={{ height: `${Math.max(8, w.pct)}%` }}
