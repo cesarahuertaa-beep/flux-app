@@ -266,6 +266,17 @@ const emptyForm = () => ({
 
 const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 
+function countActiveRoutineDays(rutinasList) {
+  if (!Array.isArray(rutinasList) || rutinasList.length === 0) return 0;
+  const uniqueDays = new Set();
+  rutinasList.forEach((r) => {
+    const parts = (r.nombre || "").split("|");
+    const dayTag = parts.length > 1 ? parts[0] : "";
+    if (dayTag && dayTag !== "S/D") uniqueDays.add(dayTag.toLowerCase());
+  });
+  return uniqueDays.size > 0 ? uniqueDays.size : rutinasList.length;
+}
+
 function buildAdherenceSnapshot({
   cicloEvaluado = null,
   nutriDiasCiclo = [],
@@ -1384,18 +1395,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       });
 
       setAdherenceSnapshot(snapshot);
-      if (snapshot?.nutricion?.dias_registrados > 0) {
+      const activeTrainingDays = countActiveRoutineDays(currentRes.rs);
+      if (activeTrainingDays > 0) {
         setForm((prev) => ({
           ...prev,
-          consumo_agua_estimado: prev.consumo_agua_estimado && !prev.consumo_agua_estimado.includes("según registro en app")
-            ? prev.consumo_agua_estimado
-            : `${snapshot.nutricion.promedio_agua_l} L/día (según registro en app)`,
-        }));
-      }
-      if (snapshot?.entrenamiento?.dias_asignados > 0) {
-        setForm((prev) => ({
-          ...prev,
-          dias_ejercicio_actual: prev.dias_ejercicio_actual || String(snapshot.entrenamiento.dias_asignados),
+          dias_ejercicio_actual: prev.dias_ejercicio_actual || String(activeTrainingDays),
         }));
       }
     } catch (err) {
@@ -1413,24 +1417,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
     base.metodo_evaluacion = isCivil ? "basico" : "basico";
 
-    // Objetivo y FAF por defecto según datos actuales del cliente o rutinas asignadas
+    // Objetivo, FAF y días actuales según datos actuales del cliente o entrenamiento activo
     const fallbackGoal = inferGoalFromText(selected?.objetivo || targetCiclo?.nombre || "");
-    let trainingDays = 0;
-    if (Array.isArray(rutinas) && rutinas.length > 0) {
-      const uDays = new Set();
-      rutinas.forEach(r => {
-        const parts = (r.nombre || "").split("|");
-        const dayTag = parts.length > 1 ? parts[0] : "";
-        if (dayTag && dayTag !== "S/D") uDays.add(dayTag.toLowerCase());
-      });
-      trainingDays = uDays.size > 0 ? uDays.size : rutinas.length;
-    }
+    const matchesLoadedCycle = !explicitCiclo || String(explicitCiclo.id) === String((cicloActivo || cicloSel)?.id || "");
+    const trainingDays = matchesLoadedCycle ? countActiveRoutineDays(rutinas) : 0;
     let calculatedFaf = null;
     if (trainingDays > 0) {
       if (trainingDays <= 1) calculatedFaf = 1.2;
       else if (trainingDays <= 3) calculatedFaf = 1.375;
       else if (trainingDays <= 5) calculatedFaf = 1.55;
       else calculatedFaf = 1.725;
+      base.dias_ejercicio_actual = String(trainingDays);
     }
     base.eval_objetivo = fallbackGoal || "recomposicion";
     base.eval_faf = String(calculatedFaf || 1.375);
@@ -1456,17 +1453,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
 
     if (latestPrev) {
-      if (trainingDays > 0) {
-        base.dias_ejercicio_actual = String(trainingDays);
-      } else if (latestPrev.dias_ejercicio_actual) {
-        base.dias_ejercicio_actual = String(latestPrev.dias_ejercicio_actual);
-      }
-      if (latestPrev.horario_ejercicio) {
-        base.horario_ejercicio = latestPrev.horario_ejercicio;
-      }
-      if (latestPrev.consumo_agua_estimado) {
-        base.consumo_agua_estimado = latestPrev.consumo_agua_estimado;
-      }
       if (latestPrev.eval_peso_objetivo) {
         base.eval_peso_objetivo = String(latestPrev.eval_peso_objetivo);
       }
@@ -1909,16 +1895,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     });
   };
 
-  const routineDaysCount = useMemo(() => {
-    if (!Array.isArray(rutinas) || rutinas.length === 0) return 0;
-    const uniqueDays = new Set();
-    rutinas.forEach(r => {
-      const parts = (r.nombre || "").split("|");
-      const dayTag = parts.length > 1 ? parts[0] : "";
-      if (dayTag && dayTag !== "S/D") uniqueDays.add(dayTag.toLowerCase());
-    });
-    return uniqueDays.size > 0 ? uniqueDays.size : rutinas.length;
-  }, [rutinas]);
+  const routineDaysCount = useMemo(() => countActiveRoutineDays(rutinas), [rutinas]);
 
   const suggestedFafFromTraining = useMemo(() => {
     const days = routineDaysCount > 0
@@ -1960,6 +1937,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const isFirstEvaluationEver = !editingId
     ? allLinkedMetricas.length === 0
     : (allLinkedMetricas.length <= 1 || String(allLinkedMetricas[allLinkedMetricas.length - 1]?.id) === String(editingId));
+
+  const prevEvalHorario = useMemo(() => {
+    const list = (allLinkedMetricas && allLinkedMetricas.length > 0) ? allLinkedMetricas : metricas;
+    if (!Array.isArray(list) || list.length === 0) return "";
+    if (!editingId) return String(list[0]?.horario_ejercicio || "").trim();
+    const idx = list.findIndex((x) => String(x?.id) === String(editingId));
+    const prev = idx >= 0 ? list[idx + 1] : null;
+    return String(prev?.horario_ejercicio || "").trim();
+  }, [allLinkedMetricas, metricas, editingId]);
 
   const saveMetrica = async () => {
     setSaving(true);
@@ -2221,8 +2207,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setShowStep5SmaeTable(false);
     setShowSmaeBoardInFollowUp(false);
     setShowFullR24hInFollowUp(false);
-    setAdherenceSnapshot(m.adherencia_snapshot || m.adherenciaSnapshot || null);
-    setLoadingAdherenceSnapshot(false);
     setInbodyOcrResult(null);
     setAnalyzingInbody(false);
     setAdherenceSnapshot(null);
@@ -3717,7 +3701,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     })}
                   </div>
 
-                  {/* Hábitos de Sueño, Agua y Actividad Física (2x2 Grid) */}
+                  {/* Hábitos de Sueño y Actividad Física (3 Cards) */}
                   <div className="pt-2 border-t border-blue-100/80 space-y-3">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-[var(--brand-primary)]" />
@@ -3726,7 +3710,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                       {/* Horas de Sueño */}
                       <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
                         <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
@@ -3743,25 +3727,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           value={form.horas_sueno || ""}
                           onChange={(e) => !isReadOnly && updForm("horas_sueno", e.target.value)}
                           placeholder="Ej. 7.5 hrs"
-                          className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
-                        />
-                      </div>
-
-                      {/* Consumo de Agua */}
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-1.5">
-                        <label className="text-xs font-bold text-[#0B1929] flex items-center gap-1.5">
-                          <Droplets className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Consumo de agua estimado</span>
-                        </label>
-                        <p className="text-[11px] text-[#6B7A8D]">
-                          Líquidos / agua natural promedio al día.
-                        </p>
-                        <input
-                          type="text"
-                          readOnly={isReadOnly}
-                          value={form.consumo_agua_estimado || ""}
-                          onChange={(e) => !isReadOnly && updForm("consumo_agua_estimado", e.target.value)}
-                          placeholder="Ej. 2 a 2.5 L al día"
                           className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
@@ -3801,7 +3766,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           readOnly={isReadOnly}
                           value={form.horario_ejercicio || ""}
                           onChange={(e) => !isReadOnly && updForm("horario_ejercicio", e.target.value)}
-                          placeholder="Ej. Mañanas (7:00 AM), Tardes (6:00 PM)..."
+                          placeholder={prevEvalHorario ? `En la última consulta se comentó: ${prevEvalHorario}` : ""}
                           className={`w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#0B1929] shadow-2xs ${isReadOnly ? "cursor-default text-gray-700" : "focus:outline-none focus:border-[var(--brand-primary)]"}`}
                         />
                       </div>
