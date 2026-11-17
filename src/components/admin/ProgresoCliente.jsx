@@ -6284,55 +6284,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             </div>
                           )}
 
-                          {/* Base de Sustento: Copiar de IA o Restaurar Matemático */}
-                          <div className="space-y-2 pt-2 border-t border-amber-200/70">
-                            {aiAuditResult && (
-                              <div className="bg-white/90 border border-indigo-200 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
-                                <div className="text-[11px] text-[#334155] leading-tight min-w-0">
-                                  <div className="flex items-center gap-1 font-bold text-indigo-900">
-                                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span>Prescripción IA disponible:</span>
-                                    {aiAuditResult.badgeMotivo && (
-                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800">
-                                        {aiAuditResult.badgeMotivo}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[#64748B] text-[10px] mt-0.5">
-                                    {aiAuditResult.targetKcal} kcal · {aiAuditResult.proteinG}g P · {aiAuditResult.carbsG}g C · {aiAuditResult.fatsG}g G
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={isReadOnly}
-                                  onClick={handleCopyFromAi}
-                                  className="py-1 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-                                >
-                                  <Sparkles className="w-3 h-3" />
-                                  <span>Copiar de IA</span>
-                                </button>
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
-                              <button
-                                type="button"
-                                disabled={isReadOnly}
-                                onClick={handleCopyFromMath}
-                                className="font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                                <span>Restablecer cálculo matemático ({liveSmartMacros?.targetKcal} kcal)</span>
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isReadOnly}
-                                onClick={() => !isReadOnly && setPrescriptionMode("matematico")}
-                                className="font-semibold text-[#6B7A8D] hover:text-[#0B1929] hover:underline cursor-pointer"
-                              >
-                                Salir de manual
-                              </button>
-                            </div>
+                          {/* Base de Sustento: Restaurar Matemático */}
+                          <div className="pt-2 border-t border-amber-200/70 flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                            <button
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={handleCopyFromMath}
+                              className="font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Restablecer cálculo matemático ({liveSmartMacros?.matematico?.targetKcal || liveSmartMacros?.targetKcal} kcal)</span>
+                            </button>
                           </div>
                         </div>
                       )}
