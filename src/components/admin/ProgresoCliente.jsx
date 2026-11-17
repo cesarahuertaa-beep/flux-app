@@ -658,7 +658,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     fatsG: ""
   });
   const [manualSimMode, setManualSimMode] = useState("g_kg"); // "g_kg" | "pct"
-  const [gKgDraft, setGKgDraft] = useState({ prot: null, fat: null });
+  const [gKgDraft, setGKgDraft] = useState({ prot: null, fat: null, goalPct: null, goalSign: null });
   const [patientStepsHistory, setPatientStepsHistory] = useState({});
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [isAuditingAi, setIsAuditingAi] = useState(false);
@@ -6062,44 +6062,97 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             </div>
                           </div>
 
-                          {/* Presets Rápidos de Objetivo Calórico */}
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-[#475569]">
-                                Ajuste rápido de Kcal (sobre GET {activePrescription.get} kcal):
-                              </span>
-                              <span className="font-bold text-amber-700 font-['Rajdhani'] text-xs">
-                                {activePrescription.goalPct > 0 ? `+${activePrescription.goalPct}%` : `${activePrescription.goalPct}%`}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                              {[
-                                { label: "-20% Déficit", pct: -20 },
-                                { label: "-15% Déficit", pct: -15 },
-                                { label: "-10% Déficit", pct: -10 },
-                                { label: "0% Mant.", pct: 0 },
-                                { label: "+10% Superávit", pct: 10 },
-                                { label: "+15% Superávit", pct: 15 },
-                              ].map((preset) => {
-                                const isCurrent = Number(activePrescription.goalPct) === preset.pct;
-                                return (
-                                  <button
-                                    key={preset.pct}
-                                    type="button"
-                                    disabled={isReadOnly}
-                                    onClick={() => handleSetGoalPreset(preset.pct)}
-                                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all border text-center cursor-pointer disabled:opacity-50 ${
-                                      isCurrent
-                                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                                        : "bg-white/80 border-amber-200/80 text-[#334155] hover:bg-amber-100/60"
-                                    }`}
-                                  >
-                                    {preset.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
+                          {/* Campo abierto de porcentaje sobre GET (- / + %) */}
+                          {(() => {
+                            const curGoalPct = Number(activePrescription.goalPct) || 0;
+                            const activeSign = gKgDraft.goalSign || (curGoalPct > 0 ? "+" : "−");
+                            const absPctVal =
+                              gKgDraft.goalPct !== null && gKgDraft.goalPct !== undefined
+                                ? gKgDraft.goalPct
+                                : Math.abs(curGoalPct);
+                            return (
+                              <div className="bg-white/90 border border-amber-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap shadow-2xs">
+                                <div className="min-w-0">
+                                  <span className="block text-[11px] font-bold text-[#0B1929]">
+                                    Ajuste porcentual (sobre GET {activePrescription.get} kcal)
+                                  </span>
+                                  <span className="text-[10px] text-[#6B7A8D]">
+                                    {curGoalPct < 0
+                                      ? `Déficit (${curGoalPct}%) → ${activePrescription.targetKcal} kcal`
+                                      : curGoalPct > 0
+                                      ? `Superávit (+${curGoalPct}%) → ${activePrescription.targetKcal} kcal`
+                                      : `Mantenimiento (0%) → ${activePrescription.targetKcal} kcal`}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className="inline-flex bg-amber-100/70 p-0.5 rounded-lg border border-amber-200/80">
+                                    <button
+                                      type="button"
+                                      disabled={isReadOnly}
+                                      onClick={() => {
+                                        setGKgDraft((d) => ({ ...d, goalSign: "−" }));
+                                        const n = parseFloat(absPctVal);
+                                        if (!isNaN(n) && n > 0) handleSetGoalPreset(-Math.abs(n));
+                                      }}
+                                      title="Déficit (−%)"
+                                      className={`px-2 py-0.5 rounded-md text-xs font-black transition-all cursor-pointer ${
+                                        activeSign === "−"
+                                          ? "bg-amber-600 text-white shadow-2xs"
+                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                      }`}
+                                    >
+                                      −
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isReadOnly}
+                                      onClick={() => {
+                                        setGKgDraft((d) => ({ ...d, goalSign: "+" }));
+                                        const n = parseFloat(absPctVal);
+                                        if (!isNaN(n) && n > 0) handleSetGoalPreset(Math.abs(n));
+                                      }}
+                                      title="Superávit (+%)"
+                                      className={`px-2 py-0.5 rounded-md text-xs font-black transition-all cursor-pointer ${
+                                        activeSign === "+"
+                                          ? "bg-emerald-600 text-white shadow-2xs"
+                                          : "text-[#6B7A8D] hover:text-[#0B1929]"
+                                      }`}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 bg-[#F8FAFC] border border-amber-300 rounded-lg px-2 py-1">
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      max="60"
+                                      disabled={isReadOnly}
+                                      value={absPctVal}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        let nextSign = activeSign;
+                                        if (raw.startsWith("-")) nextSign = "−";
+                                        else if (raw.startsWith("+")) nextSign = "+";
+                                        const cleanRaw = raw.replace(/^[+-]/, "");
+                                        setGKgDraft((d) => ({ ...d, goalPct: cleanRaw, goalSign: nextSign }));
+                                        const num = parseFloat(cleanRaw);
+                                        if (!isNaN(num) && num >= 0 && num <= 70) {
+                                          handleSetGoalPreset(num === 0 ? 0 : nextSign === "+" ? num : -num);
+                                        }
+                                      }}
+                                      onBlur={() => setGKgDraft((d) => ({ ...d, goalPct: null }))}
+                                      className="w-12 text-center text-xs font-black text-[#0B1929] bg-transparent focus:outline-none"
+                                    />
+                                    <span className="text-xs font-extrabold text-amber-800">%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Controles Dinámicos según modo g_kg vs pct */}
                           {manualSimMode === "g_kg" ? (
