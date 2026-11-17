@@ -84,7 +84,7 @@ const FIELDS_CLINICOS = [
   { key: "presion_arterial", label: "Presión arterial", type: "text", placeholder: "120/80" },
 ];
 
-export function getGroupsForMethod(metodo, sexo = "M") {
+export function getGroupsForMethod(metodo, sexo = "M", hasDefinedSexo = true) {
   const s = normalizeSexo(sexo);
 
   if (metodo === "inbody") {
@@ -137,7 +137,15 @@ export function getGroupsForMethod(metodo, sexo = "M") {
   }
 
   if (metodo === "plicometria_jp3") {
-    const jp3Fields = s === "M"
+    const jp3Fields = !hasDefinedSexo
+      ? [
+          { key: "pliegue_pectoral", label: "Pectoral (mm · H)", type: "number", step: "0.1" },
+          { key: "pliegue_abdominal", label: "Abdominal (mm · H)", type: "number", step: "0.1" },
+          { key: "pliegue_triceps", label: "Tricipital (mm · M)", type: "number", step: "0.1" },
+          { key: "pliegue_suprailiaco", label: "Suprailíaco (mm · M)", type: "number", step: "0.1" },
+          { key: "pliegue_muslo", label: "Muslo anterior (mm)", type: "number", step: "0.1" },
+        ]
+      : s === "M"
       ? [
           { key: "pliegue_pectoral", label: "Pectoral (mm)", type: "number", step: "0.1" },
           { key: "pliegue_abdominal", label: "Abdominal (mm)", type: "number", step: "0.1" },
@@ -153,7 +161,7 @@ export function getGroupsForMethod(metodo, sexo = "M") {
         ...FIELDS_BASICAS,
         ...FIELDS_CIRCUNFERENCIAS_BASE,
       ]},
-      { label: `3 Pliegues Jackson-Pollock (${s === "M" ? "Hombre" : "Mujer"})`, icon: <Target className="w-4 h-4" />, fields: jp3Fields },
+      { label: "3 Pliegues Jackson-Pollock (mm)", icon: <Target className="w-4 h-4" />, fields: jp3Fields },
       { label: "Perímetros Adicionales (Opcional)", icon: <Ruler className="w-4 h-4" />, fields: [
         { key: "brazo_relajado", label: "Brazo relajado (cm)", type: "number", step: "0.1" },
         { key: "brazo_contraido", label: "Brazo contraído (cm)", type: "number", step: "0.1" },
@@ -209,14 +217,14 @@ export function getGroupsForMethod(metodo, sexo = "M") {
   return [
     { label: "Básicas", icon: <Scale className="w-4 h-4" />, fields: FIELDS_BASICAS },
     { label: "6 Pliegues ISAK (mm)", icon: <Target className="w-4 h-4" />, fields: [
-      { key: "pliegue_triceps", label: "Tríceps", type: "number", step: "0.1" },
-      { key: "pliegue_subescapular", label: "Subescapular", type: "number", step: "0.1" },
-      { key: "pliegue_suprailiaco", label: "Suprailíaco", type: "number", step: "0.1" },
-      { key: "pliegue_abdominal", label: "Abdominal", type: "number", step: "0.1" },
-      { key: "pliegue_muslo", label: "Muslo", type: "number", step: "0.1" },
-      { key: "pliegue_pantorrilla", label: "Pantorrilla", type: "number", step: "0.1" },
-      { key: "pliegue_biceps", label: "Bíceps (Opcional)", type: "number", step: "0.1" },
-      { key: "pliegue_pectoral", label: "Pectoral (Opcional)", type: "number", step: "0.1" },
+      { key: "pliegue_triceps", label: "Tricipital (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_subescapular", label: "Subescapular (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_suprailiaco", label: "Suprailíaco (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_abdominal", label: "Abdominal (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_muslo", label: "Muslo anterior (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_pantorrilla", label: "Pantorrilla medial (mm)", type: "number", step: "0.1" },
+      { key: "pliegue_biceps", label: "Bicipital (mm · Opcional)", type: "number", step: "0.1" },
+      { key: "pliegue_pectoral", label: "Pectoral (mm · Opcional)", type: "number", step: "0.1" },
     ]},
     { label: "Circunferencias (cm)", icon: <Ruler className="w-4 h-4" />, fields: FIELDS_CIRCUNFERENCIAS_COMPLETAS },
     { label: "Diámetros Óseos · Rocha / Heath-Carter", icon: <Activity className="w-4 h-4" />, fields: FIELDS_DIAMETROS },
@@ -1727,6 +1735,21 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setPreviewUrls(prev => prev.filter((_,i) => i !== idx));
   };
 
+  const hasDefinedSexo = Boolean(
+    selected?.genero ||
+      selected?.sexo ||
+      clinicalRec?.anamnesis?.sexo ||
+      clinicalRec?.anamnesis?.genero ||
+      form?.sexo
+  );
+  const hasDefinedEdad = Boolean(
+    selected?.fecha_nacimiento ||
+      clinicalRec?.anamnesis?.fecha_nacimiento ||
+      selected?.edad ||
+      clinicalRec?.anamnesis?.edad ||
+      form?.edad
+  );
+
   const liveCalculations = useMemo(
     () => calculateBodyComposition(form, evalSexo, evalEdad),
     [form, evalSexo, evalEdad]
@@ -1746,12 +1769,17 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       edad: evalEdad,
     };
     return generateSmartMacroPrescription({
-      cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
+      cliente: {
+        ...selected,
+        genero: evalSexo === "F" ? "Femenino" : "Masculino",
+        edad: evalEdad,
+        hasDefinedSexo,
+      },
       metrica: enrichedDraft,
       clinicalRec,
       ciclo: currentCiclo,
     });
-  }, [form, liveCalculations, selected, evalSexo, evalEdad, clinicalRec, currentCiclo]);
+  }, [form, liveCalculations, selected, evalSexo, evalEdad, hasDefinedSexo, clinicalRec, currentCiclo]);
 
   const activePrescription = useMemo(() => {
     if (!liveSmartMacros) return null;
@@ -3607,7 +3635,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         const effectiveMethod = isCivil
           ? (form.metodo_evaluacion === "inbody" ? "inbody" : "basico")
           : form.metodo_evaluacion;
-        const activeGroups = getGroupsForMethod(effectiveMethod, evalSexo);
+        const activeGroups = getGroupsForMethod(effectiveMethod, evalSexo, hasDefinedSexo);
         const hasLiveCalc = Boolean(
           liveCalculations.imc ||
           liveCalculations.grasa_pct ||
@@ -4627,15 +4655,33 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       </div>
                     </div>
 
-                    {/* Marcador de Edad en la esquina superior derecha del contenedor del Paso 5 */}
+                    {/* Marcador de Sexo y Edad detectados del expediente */}
                     <div
                       className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2.5 sm:px-3 py-1.5 shrink-0 select-none shadow-2xs"
-                      title="Edad demográfica calculada a partir de la fecha de nacimiento del paciente"
+                      title="Sexo y edad demográfica tomados del perfil/expediente del paciente para discretizar pliegues y ecuaciones"
                     >
-                      <span className="text-xs font-bold text-[#6B7A8D]">Edad</span>
+                      <span className="text-xs font-bold text-[#0B1929]">
+                        {hasDefinedSexo ? (evalSexo === "F" ? "Mujer" : "Hombre") : "Sexo s/d"}
+                      </span>
+                      <span className="text-xs text-[#CBD5E1]">·</span>
                       <span className="text-xs font-bold text-[#0B1929]">{evalEdad} {evalEdad === 1 ? "año" : "años"}</span>
                     </div>
                   </div>
+
+                  {(!hasDefinedSexo || !hasDefinedEdad) && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span className="leading-snug">
+                        <strong>Expediente incompleto:</strong> No se ha definido{" "}
+                        {!hasDefinedSexo && !hasDefinedEdad
+                          ? "el sexo ni la fecha de nacimiento"
+                          : !hasDefinedSexo
+                          ? "el sexo"
+                          : "la fecha de nacimiento"}{" "}
+                        del paciente en su Expediente Clínico. Regístralo en su expediente para discretizar pliegues y constantes por edad/sexo con exactitud.
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-3.5 pt-1 border-t border-[#F0F4FA]">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -5305,7 +5351,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 Ecuación y datos tomados en vivo
                               </div>
                               <div className="text-[10.5px] font-mono text-[#475569] leading-snug break-words">
-                                {liveSmartMacros.activeFormulaInfo?.equationText}
+                                {liveSmartMacros.tmbEquationText || liveSmartMacros.activeFormulaInfo?.equationText}
                               </div>
                               {liveSmartMacros.tmbSubstituted && (
                                 <div className="pt-1 border-t border-[#E2E8F0] text-[11px] font-bold text-[#0B1929] leading-snug">

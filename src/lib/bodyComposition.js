@@ -1100,6 +1100,7 @@ export function getTmbCalculationDetails({
   estatura = 0,
   edad = 25,
   sexo = "M",
+  hasDefinedSexo = true,
   mlg = 0,
   biaBmr = 0,
 }) {
@@ -1107,40 +1108,72 @@ export function getTmbCalculationDetails({
   const h = parseFloat(estatura) || 0;
   const e = parseFloat(edad) || 25;
   const s = normalizeSexo(sexo);
+  const sexTag = s === "M" ? "Hombre" : "Mujer";
   const ffm = parseFloat(mlg) || 0;
   const bmrDirect = parseFloat(biaBmr) || 0;
+  const baseInfo = getTmbFormulaInfo(formula);
 
   if (formula === "bia" && bmrDirect > 0) {
     const tmb = Math.round(bmrDirect);
-    return { tmb, substitutedEquation: `Valor directo del equipo InBody/BIA = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: baseInfo.equationText,
+      substitutedEquation: `Valor directo del equipo InBody/BIA = ${tmb} kcal`,
+    };
   }
   if (formula === "katch" && ffm > 0) {
     const tmb = Math.round(370 + 21.6 * ffm);
-    return { tmb, substitutedEquation: `370 + (21.6 × ${ffm} kg MLG) = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: "370 + (21.6 × MLG)",
+      substitutedEquation: `370 + (21.6 × ${ffm} kg MLG) = ${tmb} kcal`,
+    };
   }
   if (formula === "cunningham" && ffm > 0) {
     const tmb = Math.round(500 + 22 * ffm);
-    return { tmb, substitutedEquation: `500 + (22 × ${ffm} kg MLG) = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: "500 + (22 × MLG)",
+      substitutedEquation: `500 + (22 × ${ffm} kg MLG) = ${tmb} kcal`,
+    };
   }
   if (formula === "tinsley_mlg" && ffm > 0) {
     const tmb = Math.round(25.9 * ffm + 284);
-    return { tmb, substitutedEquation: `(25.9 × ${ffm} kg MLG) + 284 = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: "(25.9 × MLG) + 284",
+      substitutedEquation: `(25.9 × ${ffm} kg MLG) + 284 = ${tmb} kcal`,
+    };
   }
   if (formula === "tinsley_peso" && p > 0) {
     const tmb = Math.round(24.8 * p + 10);
-    return { tmb, substitutedEquation: `(24.8 × ${p} kg) + 10 = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: "(24.8 × Peso) + 10",
+      substitutedEquation: `(24.8 × ${p} kg) + 10 = ${tmb} kcal`,
+    };
   }
   if ((formula === "ten_haaf_mlg" || formula === "ten_haaf") && ffm > 0) {
     const tmb = Math.round(22.77 * ffm + 484.25);
-    return { tmb, substitutedEquation: `(22.77 × ${ffm} kg MLG) + 484.25 = ${tmb} kcal` };
+    return {
+      tmb,
+      discretizedEquation: "(22.77 × MLG) + 484.25",
+      substitutedEquation: `(22.77 × ${ffm} kg MLG) + 484.25 = ${tmb} kcal`,
+    };
   }
   if ((formula === "ten_haaf_peso" || formula === "ten_haaf") && p > 0 && h > 0) {
     const hM = Number((h / 100).toFixed(2));
     const sexBit = s === "M" ? 1 : 0;
     const tmb = Math.round(11.936 * p + 587.728 * (h / 100) - 8.129 * e + 191.027 * sexBit + 29.28);
+    const discretizedEquation = hasDefinedSexo
+      ? s === "M"
+        ? `(11.936 × Peso) + (587.728 × Estatura_m) − (8.129 × Edad) + 191.027 + 29.28 [${sexTag}]`
+        : `(11.936 × Peso) + (587.728 × Estatura_m) − (8.129 × Edad) + 29.28 [${sexTag}]`
+      : baseInfo.equationText;
     return {
       tmb,
-      substitutedEquation: `(11.936×${p}) + (587.728×${hM}m) − (8.129×${e}) + ${sexBit ? "191.027" : "0"} + 29.28 = ${tmb} kcal`,
+      discretizedEquation,
+      substitutedEquation: `(11.936×${p}) + (587.728×${hM}m) − (8.129×${e}) + ${sexBit ? "191.027 + " : ""}29.28 = ${tmb} kcal`,
     };
   }
   if (formula === "valencia" && p > 0) {
@@ -1157,16 +1190,27 @@ export function getTmbCalculationDetails({
       else { slope = 10.98; intercept = 580; rangeLbl = "≥60 años"; }
     }
     const tmb = Math.round(slope * p + intercept);
+    const discretizedEquation = hasDefinedSexo
+      ? `(${slope} × Peso) + ${intercept} [${sexTag} · ${rangeLbl}]`
+      : baseInfo.equationText;
     return {
       tmb,
-      substitutedEquation: `(${slope} × ${p} kg) + ${intercept} = ${tmb} kcal [${s === "M" ? "H" : "M"}, ${e} años → rango ${rangeLbl}]`,
+      discretizedEquation,
+      substitutedEquation: `(${slope} × ${p} kg) + ${intercept} = ${tmb} kcal [${sexTag}, ${e} años]`,
     };
   }
   if (formula === "owen" && p > 0) {
     const intercept = s === "M" ? 879 : 795;
     const slope = s === "M" ? 10.2 : 7.18;
     const tmb = Math.round(intercept + slope * p);
-    return { tmb, substitutedEquation: `${intercept} + (${slope} × ${p} kg) = ${tmb} kcal [${s === "M" ? "H" : "M"}]` };
+    const discretizedEquation = hasDefinedSexo
+      ? `${intercept} + (${slope} × Peso) [${sexTag}]`
+      : baseInfo.equationText;
+    return {
+      tmb,
+      discretizedEquation,
+      substitutedEquation: `${intercept} + (${slope} × ${p} kg) = ${tmb} kcal`,
+    };
   }
   if (formula === "fao" && p > 0) {
     let slope = 15.0;
@@ -1189,13 +1233,35 @@ export function getTmbCalculationDetails({
     }
     const tmb = Math.round(slope * p + intercept);
     const signStr = intercept >= 0 ? `+ ${intercept}` : `− ${Math.abs(intercept)}`;
+    const discretizedEquation = hasDefinedSexo
+      ? `(${slope} × Peso) ${signStr} [${sexTag} · ${rangeLbl}]`
+      : baseInfo.equationText;
     return {
       tmb,
-      substitutedEquation: `(${slope} × ${p} kg) ${signStr} = ${tmb} kcal [${s === "M" ? "H" : "M"}, ${e} años → rango ${rangeLbl}]`,
+      discretizedEquation,
+      substitutedEquation: `(${slope} × ${p} kg) ${signStr} = ${tmb} kcal [${sexTag}, ${e} años]`,
     };
   }
 
-  if (p <= 0 || h <= 0) return { tmb: 0, substitutedEquation: "Ingresa peso y estatura para calcular." };
+  const getFallbackDiscretized = () => {
+    if (!hasDefinedSexo) return baseInfo.equationText;
+    if (formula === "harris") {
+      return s === "M"
+        ? `88.362 + (13.397 × Peso) + (4.799 × Estatura) − (5.677 × Edad) [${sexTag}]`
+        : `447.593 + (9.247 × Peso) + (3.098 × Estatura) − (4.33 × Edad) [${sexTag}]`;
+    }
+    return s === "M"
+      ? `(10 × Peso) + (6.25 × Estatura) − (5 × Edad) + 5 [${sexTag}]`
+      : `(10 × Peso) + (6.25 × Estatura) − (5 × Edad) − 161 [${sexTag}]`;
+  };
+
+  if (p <= 0 || h <= 0) {
+    return {
+      tmb: 0,
+      discretizedEquation: getFallbackDiscretized(),
+      substitutedEquation: "Ingresa peso y estatura para calcular.",
+    };
+  }
 
   if (formula === "harris") {
     // Ecuación de Harris-Benedict revisada por Roza y Shizgal (1984)
@@ -1208,7 +1274,11 @@ export function getTmbCalculationDetails({
       s === "M"
         ? `88.362 + (13.397×${p}) + (4.799×${h}) − (5.677×${e}) = ${tmb} kcal`
         : `447.593 + (9.247×${p}) + (3.098×${h}) − (4.33×${e}) = ${tmb} kcal`;
-    return { tmb, substitutedEquation };
+    return {
+      tmb,
+      discretizedEquation: getFallbackDiscretized(),
+      substitutedEquation,
+    };
   }
 
   // Default: Mifflin-St Jeor (1990)
@@ -1220,6 +1290,7 @@ export function getTmbCalculationDetails({
   const tail = s === "M" ? "+ 5" : "− 161";
   return {
     tmb,
+    discretizedEquation: getFallbackDiscretized(),
     substitutedEquation: `(10×${p}) + (6.25×${h}) − (5×${e}) ${tail} = ${tmb} kcal`,
   };
 }
@@ -1451,14 +1522,18 @@ export function generateSmartMacroPrescription({
   const enriched = metrica ? enrichMetrica(metrica) : null;
   const enrichedPrev = prevMetrica ? enrichMetrica(prevMetrica) : null;
 
-  const sexo = normalizeSexo(
+  const rawSexoSource =
     cliente?.genero ||
-      cliente?.sexo ||
-      anamnesis?.sexo ||
-      anamnesis?.genero ||
-      enriched?.sexo ||
-      "M"
-  );
+    cliente?.sexo ||
+    anamnesis?.sexo ||
+    anamnesis?.genero ||
+    enriched?.sexo ||
+    "";
+  const hasDefinedSexo =
+    typeof cliente?.hasDefinedSexo === "boolean"
+      ? cliente.hasDefinedSexo
+      : Boolean(String(rawSexoSource).trim());
+  const sexo = normalizeSexo(rawSexoSource || "M");
   const edad = calcEdadFromBirthdate(
     cliente?.fecha_nacimiento || anamnesis?.fecha_nacimiento,
     Number(enriched?.edad) || Number(cliente?.edad) || Number(anamnesis?.edad) || 25
@@ -1569,6 +1644,7 @@ export function generateSmartMacroPrescription({
     estatura,
     edad,
     sexo,
+    hasDefinedSexo,
     mlg,
     biaBmr,
   });
@@ -1798,7 +1874,9 @@ export function generateSmartMacroPrescription({
     recommendationReason: recommended.reason,
     manualComparisonNote,
     formulaFallbackWarning,
+    tmbEquationText: tmbDetails.discretizedEquation || activeFormulaInfo?.equationText || "",
     tmbSubstituted: tmbDetails.substitutedEquation,
+    hasDefinedSexo,
     compositionDiagnostics: compDiagnostics,
     hasHighFatAdjustedProtein: Boolean(hasHighFat && peso > 0),
     faf: fafInfo.value,
