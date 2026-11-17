@@ -173,3 +173,28 @@ export const compressImageIfNeeded = async (file, maxDimension = 1920, quality =
   });
 };
 
+/**
+ * Determina qué módulos de atleta (Nutrición / Entrenamiento) están activos según el ciclo vigente.
+ * Cuando todavía no existe ningún plan creado (cicloActivo === null), ambos permanecen ocultos.
+ */
+export const getCycleServices = (cicloActivo, fallbackServicios = null) => {
+  if (!cicloActivo) {
+    return { hasPlan: false, nutricion: false, entrenamiento: false };
+  }
+  const parts = String(cicloActivo.nombre || "").split("|");
+  const servicesList = parts[2] ? parts[2].split(",") : null;
+  if (servicesList) {
+    return {
+      hasPlan: true,
+      nutricion: servicesList.includes("nutri"),
+      entrenamiento: servicesList.includes("entreno"),
+    };
+  }
+  return {
+    hasPlan: true,
+    nutricion: fallbackServicios?.nutricion !== false,
+    entrenamiento: fallbackServicios?.entrenamiento !== false,
+  };
+};
+
+

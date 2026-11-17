@@ -19,6 +19,7 @@ import { calcEdadFromBirthdate } from "../lib/bodyComposition";
 import { CachedImage } from "../lib/mediaCache";
 import { checkAndCleanOrphanedEmail, deletePatientAccount } from "../lib/authRoles";
 import { getRatesForCutoff } from "../utils/tarifas";
+import { getCycleServices } from "../utils/helpers";
 
 const lazyRetry = (importer) =>
   lazy(() =>
@@ -253,6 +254,67 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
       setCivilClientState(prev => ({ ...(prev || {}), ...clienteData }));
     }
   }, [clienteData]);
+
+  const personalAthleteClient = isCivil ? (civilClientState || clienteData) : myShadowClient;
+  const personalAthleteId = personalAthleteClient?.id || null;
+
+  const [personalActiveCycle, setPersonalActiveCycle] = useState(() => {
+    if (!personalAthleteId) return null;
+    const list = dbPeek(`ciclos?cliente_id=eq.${personalAthleteId}&order=created_at.desc`);
+    if (Array.isArray(list)) return list.find(c => c.activo) || list[0] || null;
+    const act = dbPeek(`ciclos?cliente_id=eq.${personalAthleteId}&activo=eq.true&limit=1`);
+    return Array.isArray(act) && act.length > 0 ? act[0] : null;
+  });
+  const [personalCycleLoaded, setPersonalCycleLoaded] = useState(() => {
+    if (!personalAthleteId) return false;
+    return (
+      dbPeek(`ciclos?cliente_id=eq.${personalAthleteId}&order=created_at.desc`) !== null ||
+      dbPeek(`ciclos?cliente_id=eq.${personalAthleteId}&activo=eq.true&limit=1`) !== null
+    );
+  });
+
+  const loadPersonalCycle = useCallback(async ({ forceFresh = false } = {}) => {
+    if (!personalAthleteId || role === "administrativo") {
+      if (role === "administrativo") setPersonalCycleLoaded(true);
+      return;
+    }
+    try {
+      const fetcher = forceFresh ? dbGetFresh : dbGet;
+      const rows = await fetcher(`ciclos?cliente_id=eq.${personalAthleteId}&order=created_at.desc`);
+      const active = Array.isArray(rows) ? (rows.find(c => c.activo) || rows[0] || null) : null;
+      setPersonalActiveCycle(active);
+    } catch {
+      // Conservar último estado conocido ante fallas transitorias de red
+    } finally {
+      setPersonalCycleLoaded(true);
+    }
+  }, [personalAthleteId, role]);
+
+  useEffect(() => {
+    if (!personalAthleteId) return undefined;
+    loadPersonalCycle();
+    let timer = null;
+    const onPlanOrCacheUpdate = (ev) => {
+      const t = ev?.detail?.table;
+      if (t && t !== "ciclos" && t !== "*") return;
+      const targetClient = ev?.detail?.clienteId;
+      if (targetClient && String(targetClient) !== String(personalAthleteId)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadPersonalCycle({ forceFresh: ev?.type === "flux:plan-updated" }), 150);
+    };
+    window.addEventListener("flux:plan-updated", onPlanOrCacheUpdate);
+    window.addEventListener("flux:cache-updated", onPlanOrCacheUpdate);
+    window.addEventListener("flux:synced", onPlanOrCacheUpdate);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("flux:plan-updated", onPlanOrCacheUpdate);
+      window.removeEventListener("flux:cache-updated", onPlanOrCacheUpdate);
+      window.removeEventListener("flux:synced", onPlanOrCacheUpdate);
+    };
+  }, [personalAthleteId, loadPersonalCycle]);
+
+  const personalClinicalRec = personalAthleteId ? peekClinicalRecord(personalAthleteId) : null;
+  const personalServices = getCycleServices(personalActiveCycle, personalClinicalRec?.servicios_activos);
 
   const [bloqueado, setBloqueado] = useState(false);
   const [diasGracia, setDiasGracia] = useState(false); // true = días 11-12, mostrar alerta
@@ -1211,15 +1273,20 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
 
   const SIDEBAR_ITEMS = isCivil ? [
     { id:"mi_plan",         label:"Mi Plan",       icon: <Activity size={18} strokeWidth={1.5} /> },
-    { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-    { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+    ...(personalServices.nutricion ? [{ id:"nutricion",     label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
+    ...(personalServices.entrenamiento ? [{ id:"entrenamiento", label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> }] : []),
     { id:"pasos",           label:"Pasos",         icon: <Footprints size={18} strokeWidth={1.5} /> },
     { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> },
     { id:"membresia",       label:"Membresía",     icon: <CreditCard size={18} strokeWidth={1.5} /> },
   ]
   : role ==="staff"
     ? [
-        ...STAFF_ALL_CATALOG_ITEMS.filter(item => staffModules.includes(item.id)),
+        ...STAFF_ALL_CATALOG_ITEMS.filter(item => {
+          if (!staffModules.includes(item.id)) return false;
+          if (item.id === "nutricion") return personalServices.nutricion;
+          if (item.id === "entrenamiento") return personalServices.entrenamiento;
+          return true;
+        }),
         { id:"comisiones", label:"Mis Comisiones", icon: <Banknote size={18} strokeWidth={1.5} /> }
       ]
     : role ==="administrativo"
@@ -1242,11 +1309,25 @@ export default function Admin({ role, isSuperadmin, profileId, onLogout, onModoA
             { id:"pagos", label:"Control de Ingresos", icon: <Banknote size={18} strokeWidth={1.5} /> }
           ] : []),
           { id:"mi_entrenamiento", label:"Mi Plan", icon: <Activity size={18} strokeWidth={1.5} /> },
-          { id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> },
-          { id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> },
+          ...(personalServices.nutricion ? [{ id:"nutricion",       label:"Nutrición",     icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
+          ...(personalServices.entrenamiento ? [{ id:"entrenamiento",   label:"Entrenamiento", icon: <Dumbbell size={18} strokeWidth={1.5} /> }] : []),
           { id:"pasos",           label:"Pasos",         icon: <Footprints size={18} strokeWidth={1.5} /> },
           { id:"progreso_atleta", label:"Progreso",      icon: <Camera size={18} strokeWidth={1.5} /> }
         ];
+
+  const staffHasMiPlan = isCivil || role !== "staff" || staffModules.includes("mi_entrenamiento");
+  const canShowPersonalNutri = personalServices.nutricion && (isCivil || role !== "staff" || staffModules.includes("nutricion"));
+  const canShowPersonalEntreno = personalServices.entrenamiento && (isCivil || role !== "staff" || staffModules.includes("entrenamiento"));
+
+  useEffect(() => {
+    if (!personalCycleLoaded || role === "administrativo") return;
+    const fallbackTab = staffHasMiPlan ? (isCivil ? "mi_plan" : "mi_entrenamiento") : "progreso_atleta";
+    if (tab === "nutricion" && !canShowPersonalNutri) {
+      setTab(canShowPersonalEntreno ? "entrenamiento" : fallbackTab);
+    } else if (tab === "entrenamiento" && !canShowPersonalEntreno) {
+      setTab(canShowPersonalNutri ? "nutricion" : fallbackTab);
+    }
+  }, [tab, personalCycleLoaded, canShowPersonalNutri, canShowPersonalEntreno, staffHasMiPlan, isCivil, role]);
 
   const handlePaymentUploaded = async () => {
     setBloqueado(false);

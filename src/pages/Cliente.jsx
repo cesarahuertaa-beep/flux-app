@@ -4,7 +4,7 @@ import { dbPeek, dbGet, dbGetFresh, dbUpsert, getPendingMutations } from "../lib
 import { useBackButton } from "../lib/backButtonHandler";
 import { getAll } from "../lib/offlineQueue";
 import { useBrand } from "../components/BrandContext";
-import { getCurrentCycleWeekInfo } from "../utils/helpers";
+import { getCurrentCycleWeekInfo, getCycleServices } from "../utils/helpers";
 import BloqueadoPaciente from "../components/BloqueadoPaciente";
 import { UtensilsCrossed, Dumbbell, User, CalendarDays, Camera, ShoppingBag, MapPin, Trophy, Activity, ClipboardList, X, Footprints } from "lucide-react";
 import { enrichMetrica } from "../lib/bodyComposition";
@@ -125,8 +125,11 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     return () => clearTimeout(t);
   }, []);
 
+  const _peekCiclosAll = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&order=created_at.desc`) : null;
   const _peekCiclos = cliente?.id ? dbPeek(`ciclos?cliente_id=eq.${cliente.id}&activo=eq.true&limit=1`) : null;
-  const _peekCiclo = Array.isArray(_peekCiclos) && _peekCiclos.length ? _peekCiclos[0] : null;
+  const _peekCiclo = Array.isArray(_peekCiclosAll)
+    ? (_peekCiclosAll.find(c => c.activo) || _peekCiclosAll[0] || null)
+    : (Array.isArray(_peekCiclos) && _peekCiclos.length ? _peekCiclos[0] : null);
   const _peekCicloFilter = _peekCiclo ? `ciclo_id=eq.${_peekCiclo.id}` : `ciclo_id=is.null`;
   const _peekNs = cliente?.id ? dbPeek(`nutricion?cliente_id=eq.${cliente.id}&${_peekCicloFilter}`) : null;
   const _peekNutri = Array.isArray(_peekNs) && _peekNs.length ? _peekNs[0] : null;
@@ -171,6 +174,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
   const [loading, setLoading] = useState(() => !(_peekCiclos !== null || _peekRs !== null || _peekNs !== null));
   const hasLoadedRef = useRef(_peekCiclos !== null || _peekRs !== null || _peekNs !== null);
   const [cicloActivo, setCicloActivo] = useState(() => _peekCiclo);
+  const [cicloLoaded, setCicloLoaded] = useState(() => _peekCiclosAll !== null || _peekCiclos !== null);
   const [syncStatus, setSyncStatus] = useState("synced");
   const [nutriologoBloqueado, setNutriologoBloqueado] = useState(false);
   const [ultimoPeso, setUltimoPeso] = useState(() => {
@@ -230,6 +234,7 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
 
       const ciclo = (cs || []).find(c => c.activo) || (cs || [])[0] || null;
       setCicloActivo(ciclo);
+      setCicloLoaded(true);
 
       const metList = Array.isArray(met) ? met : [];
       const latestWithPeso = metList.find((m) => parseFloat(m?.peso) > 0);
@@ -466,14 +471,10 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     // Ocultar pestaña de citas si es usuario civil (no tiene nutriólogo)
   const isActuallyCivil = cliente?.nutriologo_id === null;
 
-  const cycleParts = String(cicloActivo?.nombre || "").split("|");
-  const cycleServicesList = cycleParts[2] ? cycleParts[2].split(",") : null;
-  const hasNutriService = cycleServicesList
-    ? cycleServicesList.includes("nutri")
-    : (isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.nutricion !== false));
-  const hasEntrenamientoService = cycleServicesList
-    ? cycleServicesList.includes("entreno")
-    : (isActuallyCivil || isAtletaMode || isEmbedded || (clinicalRec?.servicios_activos?.entrenamiento !== false));
+  const { nutricion: hasNutriService, entrenamiento: hasEntrenamientoService } = getCycleServices(
+    cicloActivo,
+    clinicalRec?.servicios_activos
+  );
 
   const SIDEBAR_ITEMS = [
     ...(hasNutriService ? [{ id:"nutricion",label:"Nutrición",       icon: <UtensilsCrossed size={18} strokeWidth={1.5} /> }] : []),
@@ -485,14 +486,15 @@ export default function ClienteView({ session, onLogout, isAtletaMode, onBackToA
     ] : [])
   ];
 
-  // Si el servicio activo desactiva la pestaña actual, redirigir a una pestaña activa
+  // Si aún no hay plan o el servicio activo desactiva la pestaña actual, redirigir a una pestaña activa
   useEffect(() => {
+    if (!cicloLoaded) return;
     if (tab === "nutricion" && !hasNutriService) {
       setTab(hasEntrenamientoService ? "deporte" : "progreso");
     } else if (tab === "deporte" && !hasEntrenamientoService) {
       setTab(hasNutriService ? "nutricion" : "progreso");
     }
-  }, [tab, hasNutriService, hasEntrenamientoService]);
+  }, [tab, hasNutriService, hasEntrenamientoService, cicloLoaded]);
 
   // Cálculo de semana actual en zona horaria local del dispositivo (sin desfase UTC)
   const startStr = cicloActivo?.fecha_inicio || cicloActivo?.created_at || (rutinas.length > 0 ? rutinas[0].created_at : (nutri?.updated_at || null));

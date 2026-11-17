@@ -247,8 +247,9 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
         <nav 
           ref={navRef}
           onScroll={checkScroll}
-          className="flex items-stretch overflow-x-auto scroll-hide w-full relative z-20"
+          className="overflow-x-auto scroll-hide w-full relative z-20"
         >
+        <div className="flex items-stretch justify-center min-w-full w-max">
         {nav.map(({ id, label, icon }, index) => {
           const isActive = active === id;
           const isMid = index === Math.ceil(nav.length / 2);
@@ -259,7 +260,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
               {isMid && (
                 <button
                   onClick={() => setActive("perfil")}
-                  className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
+                  className={`flex-1 min-w-[72px] max-w-[88px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isPerfilActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
                 >
                   <span className="block h-0.5 w-5 rounded-full mb-1 transition-all" style={{ background: isPerfilActive ?"var(--brand-primary)" :"transparent" }} />
                   <span className={`transition-transform ${isPerfilActive ?"scale-110" :"scale-100"}`}>
@@ -274,7 +275,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
                 onClick={() => {
                   setActive(id);
                 }}
-                className={`flex-1 min-w-[72px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
+                className={`flex-1 min-w-[72px] max-w-[88px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all ${isActive ?"text-[var(--brand-primary)]" :"text-[#9BA5B0]"}`}
               >
                 {/* Indicador activo encima del ícono */}
                 <span
@@ -291,6 +292,7 @@ export function AppLayout({ children, nav, active, setActive, session, userAvata
             </React.Fragment>
           );
         })}
+        </div>
       </nav>
       </div>
 
