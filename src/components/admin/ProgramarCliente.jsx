@@ -1648,6 +1648,16 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     setShowPlanModal(true);
   };
 
+  useEffect(() => {
+    const onRequestCreatePlan = (ev) => {
+      const targetId = ev?.detail?.clienteId;
+      if (targetId && selected?.id && String(targetId) !== String(selected.id)) return;
+      openCreatePlan();
+    };
+    window.addEventListener("flux:request-create-plan", onRequestCreatePlan);
+    return () => window.removeEventListener("flux:request-create-plan", onRequestCreatePlan);
+  }, [selected?.id, ciclos, clinicalRec]);
+
   const openEditPlan = async (ciclo) => {
     setPlanModalMode("edit");
     setEditingCycle(ciclo);
@@ -4994,7 +5004,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
     {subtab === "progreso" && (
       <Suspense fallback={<ListSkeleton rows={4} />}>
         <ProgresoCliente
-          key={`eval_${selected?.id || "sel"}_${cicloSel?.id || "act"}`}
+          key={`eval_${selected?.id || "sel"}`}
           selected={selected}
           setMsg={setMsg}
           isMiPlan={isMiPlan}
@@ -5003,6 +5013,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
           initialRutinas={rutinas}
           initialNutriDias={dias}
           isReadOnly={isReadOnly}
+          onOpenCreatePlan={openCreatePlan}
         />
       </Suspense>
     )}
@@ -5012,7 +5023,7 @@ export function ProgramarCliente({ clientes, selected, setSelected, onBackToList
 
       {/* ── Modal Inteligente de Plan (Crear y Editar) ── */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-[100] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[130] bg-[#0B1929]/45 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-none md:rounded-2xl w-full md:max-w-lg h-full max-h-full md:h-auto md:max-h-[90vh] shadow-xl border-0 md:border md:border-[#E2E8F0] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[#E2E8F0] bg-white modal-safe-header">

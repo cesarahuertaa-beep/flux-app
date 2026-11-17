@@ -564,7 +564,7 @@ function buildAdherenceSnapshot({
   };
 }
 
-export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, initialNutriDias, initialRutinas, isReadOnly: propReadOnly }) {
+export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo, initialNutriDias, initialRutinas, isReadOnly: propReadOnly, onOpenCreatePlan }) {
   const isCivil = localStorage.getItem("flux_role") === "civil";
   const isFreemium = isCivil && selected?.plan_tipo !== "premium";
   const _peekMetricas = selected?.id ? dbPeek(`metricas_progreso?cliente_id=eq.${selected.id}&order=fecha.desc`) : null;
@@ -1487,15 +1487,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       let cicloEvaluado = targetCicloObj;
       let chosenRes = currentRes;
 
-      // Si el ciclo actual recién se creó (0 actividad) y existe un ciclo previo, evaluamos el ciclo inmediato anterior
+      // Si el ciclo actual recién se creó (0 actividad) y existe un ciclo previo, evaluamos el ciclo inmediato anterior con datos
       if (!currHasNutriActivity && !currHasEntrenoActivity) {
         const allCiclos = await dbGetFresh(`ciclos?cliente_id=eq.${selected.id}&order=created_at.desc`).catch(() => ciclos || []);
         const list = Array.isArray(allCiclos) && allCiclos.length > 0 ? allCiclos : (ciclos || []);
-        const prevCiclo = list.find((c) => String(c.id) !== String(targetCicloObj?.id));
-        if (prevCiclo) {
-          const prevRes = await fetchCicloResources(prevCiclo);
-          cicloEvaluado = prevCiclo;
-          chosenRes = prevRes;
+        const prevCandidates = list.filter((c) => String(c.id) !== String(targetCicloObj?.id));
+        for (const cand of prevCandidates) {
+          const candRes = await fetchCicloResources(cand);
+          if (candRes.ds.length > 0 || candRes.rs.length > 0) {
+            cicloEvaluado = cand;
+            chosenRes = candRes;
+            break;
+          }
+          if (!cicloEvaluado || String(cicloEvaluado.id) === String(targetCicloObj?.id)) {
+            cicloEvaluado = cand;
+            chosenRes = candRes;
+          }
         }
       }
 
@@ -1578,9 +1585,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     }
 
     if (latestPrev) {
-      if (latestPrev.eval_peso_objetivo) {
-        base.eval_peso_objetivo = String(latestPrev.eval_peso_objetivo);
-      }
       if (latestPrev.eval_meta_pasos) {
         base.eval_meta_pasos = String(latestPrev.eval_meta_pasos);
       }
@@ -1610,13 +1614,66 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     setInbodyOcrResult(null);
     setAnalyzingInbody(false);
     setShowModal(true);
-  }, [isCivil, cicloActivo, cicloSel, selected?.objetivo, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, clinicalRec, rutinas]);
+  }, [isCivil, cicloActivo, cicloSel, selected?.objetivo, selected?.genero, selected?.sexo, selected?.fecha_nacimiento, clinicalRec, rutinas, allLinkedMetricas, metricas, cycleInfo.semanas, fetchFreshAdherenceSnapshot, selected?.id]);
 
+  const showModalRef = useRef(false);
+  useEffect(() => {
+    showModalRef.current = showModal;
+  }, [showModal]);
+
+  const handleTriggerCreatePlan = useCallback(() => {
+    if (typeof onOpenCreatePlan === "function") {
+      onOpenCreatePlan();
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("flux:request-create-plan", { detail: { clienteId: selected?.id } })
+      );
+    }
+  }, [onOpenCreatePlan, selected?.id]);
+
+  const lastOpenEventTsRef = useRef(0);
   useEffect(() => {
     const handleOpen = (ev) => {
       const explicitCiclo = ev?.detail?.ciclo;
       const targetClienteId = ev?.detail?.clienteId || explicitCiclo?.cliente_id;
       if (targetClienteId && selected?.id && String(targetClienteId) !== String(selected.id)) return;
+
+      const now = Date.now();
+      if (now - lastOpenEventTsRef.current < 250) return;
+      lastOpenEventTsRef.current = now;
+
+      // Si el modal de evaluación YA está abierto (ej. el nutriólogo creó un Nuevo Plan desde el Paso 5),
+      // conservamos el 100% de los datos capturados y vinculamos esta evaluación como 1ª evaluación del nuevo plan.
+      if (showModalRef.current && explicitCiclo?.id) {
+        setCiclos((prev) => [
+          explicitCiclo,
+          ...(Array.isArray(prev) ? prev : [])
+            .filter((c) => String(c.id) !== String(explicitCiclo.id))
+            .map((c) => ({ ...c, activo: false })),
+        ]);
+        setCicloSel(explicitCiclo);
+        const parts = String(explicitCiclo.nombre || "").split("|");
+        const newWeeks = Math.max(1, parseInt(parts[1], 10) || 4);
+        const newEnfoque = (parts[4] || "").trim();
+        setForm((prev) => ({
+          ...prev,
+          ciclo_id: explicitCiclo.id,
+          eval_semanas_objetivo: String(newWeeks),
+          ...(newEnfoque ? { eval_objetivo: inferGoalFromText(newEnfoque) } : {}),
+        }));
+        if (setMsg) {
+          setMsg(
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Nuevo plan vinculado · Los datos capturados pasaron a la 1ª evaluación del nuevo plan</span>
+            </div>
+          );
+        }
+        return;
+      }
+
       openNewEvaluation(explicitCiclo);
     };
     window.addEventListener("flux:open-new-evaluation", handleOpen);
@@ -1625,7 +1682,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       window.removeEventListener("flux:open-new-evaluation", handleOpen);
       window.removeEventListener("flux:open-checkin", handleOpen);
     };
-  }, [openNewEvaluation, selected?.id]);
+  }, [openNewEvaluation, selected?.id, setMsg]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -2211,18 +2268,212 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
     });
   }, [patientStepsStats, suggestedFafFromTraining]);
 
+  const evalCiclo = useMemo(() => {
+    if (form.ciclo_id && Array.isArray(ciclos) && ciclos.length > 0) {
+      const found = ciclos.find((c) => String(c.id) === String(form.ciclo_id));
+      if (found) return found;
+    }
+    return currentCiclo || null;
+  }, [form.ciclo_id, ciclos, currentCiclo]);
+
+  const planTimeStatus = useMemo(() => {
+    if (!evalCiclo) {
+      return {
+        hasPlan: false,
+        isExpired: true,
+        remainingWeeks: 0,
+        totalWeeks: 0,
+        elapsedWeeks: 0,
+        planTitle: "Sin plan activo",
+        badgeText: "Sin plan",
+        statusText: "No hay un plan activo configurado",
+        endDateLabel: "",
+      };
+    }
+    const parts = String(evalCiclo.nombre || "").split("|");
+    const planTitle = (parts[0] || "Plan actual").trim();
+    const totalWeeks = Math.max(1, parseInt(parts[1], 10) || 4);
+    const totalDays = Math.max(1, parseInt(parts[3], 10) || totalWeeks * 7);
+    const startNoon = parseLocalDateNoon(evalCiclo.fecha_inicio);
+    const evalNoon =
+      parseLocalDateNoon(form.fecha) ||
+      parseLocalDateNoon(new Date().toISOString().split("T")[0]);
+
+    if (!startNoon || !evalNoon) {
+      return {
+        hasPlan: true,
+        isExpired: false,
+        remainingWeeks: totalWeeks,
+        totalWeeks,
+        elapsedWeeks: 0,
+        planTitle,
+        badgeText: `Plan de ${totalWeeks} sem`,
+        statusText: `${totalWeeks} ${totalWeeks === 1 ? "semana" : "semanas"} del plan activo`,
+        endDateLabel: "",
+      };
+    }
+
+    const endNoon = new Date(startNoon.getTime());
+    endNoon.setDate(endNoon.getDate() + totalDays - 1);
+    const endDateLabel = endNoon.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "short",
+    });
+
+    const elapsedDays = Math.floor((evalNoon.getTime() - startNoon.getTime()) / 86400000);
+
+    // Si la evaluación ocurre antes o al inicio del plan (primeros 2 días)
+    if (elapsedDays <= 2) {
+      return {
+        hasPlan: true,
+        isExpired: false,
+        remainingWeeks: totalWeeks,
+        totalWeeks,
+        elapsedWeeks: 0,
+        planTitle,
+        badgeText: `Vence ${endDateLabel}`,
+        statusText: `Plan completo (${totalWeeks} sem · vence ${endDateLabel})`,
+        endDateLabel,
+      };
+    }
+
+    const remainingDays = totalDays - elapsedDays;
+    const elapsedWeeks = Math.min(totalWeeks, Math.round(elapsedDays / 7));
+    const remainingWeeks = Math.max(0, totalWeeks - elapsedWeeks);
+
+    if (remainingDays <= 2 || remainingWeeks <= 0 || (!editingId && evalCiclo.activo === false)) {
+      return {
+        hasPlan: true,
+        isExpired: true,
+        remainingWeeks: 0,
+        totalWeeks,
+        elapsedWeeks: totalWeeks,
+        planTitle,
+        badgeText: `0 de ${totalWeeks} sem`,
+        statusText: `Plan concluido (venció ${endDateLabel})`,
+        endDateLabel,
+      };
+    }
+
+    return {
+      hasPlan: true,
+      isExpired: false,
+      remainingWeeks,
+      totalWeeks,
+      elapsedWeeks,
+      planTitle,
+      badgeText:
+        remainingWeeks < totalWeeks
+          ? `Restan de ${totalWeeks} sem · Fin ${endDateLabel}`
+          : `Vence ${endDateLabel}`,
+      statusText:
+        remainingWeeks < totalWeeks
+          ? `Restan ${remainingWeeks} de ${totalWeeks} sem (vence ${endDateLabel})`
+          : `Plan completo (${totalWeeks} sem · vence ${endDateLabel})`,
+      endDateLabel,
+    };
+  }, [evalCiclo, form.fecha, editingId]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    const targetW = planTimeStatus.remainingWeeks > 0 ? String(planTimeStatus.remainingWeeks) : "0";
+    if (String(form.eval_semanas_objetivo || "") !== targetW) {
+      setForm((prev) => ({ ...prev, eval_semanas_objetivo: targetW }));
+    }
+  }, [showModal, planTimeStatus.remainingWeeks, form.eval_semanas_objetivo]);
+
+  const effectivePlanWeeks =
+    planTimeStatus.remainingWeeks > 0
+      ? planTimeStatus.remainingWeeks
+      : parseFloat(form.eval_semanas_objetivo) || cycleInfo.semanas || 4;
+
+  const weightGoalPlaceholder = useMemo(() => {
+    const curPeso = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
+    if (curPeso <= 0) {
+      return "Captura el peso en Paso 4 para ver recomendación";
+    }
+    if (planTimeStatus.isExpired || planTimeStatus.remainingWeeks <= 0) {
+      return "Genera un nuevo plan para proyectar en semanas";
+    }
+    const w = planTimeStatus.remainingWeeks;
+    const currentGoalId = form.eval_objetivo || liveSmartMacros?.goalId || "cut_15";
+    if (String(currentGoalId).startsWith("bulk")) {
+      const low = (curPeso * (1 + 0.0025 * w)).toFixed(1);
+      const high = (curPeso * (1 + 0.005 * w)).toFixed(1);
+      return `Se recomienda: ${low}–${high} kg considerando el plazo de ${w} sem`;
+    }
+    if (currentGoalId === "maint") {
+      return `Se recomienda: ${curPeso.toFixed(1)} kg considerando el plazo de ${w} sem`;
+    }
+    const low = (curPeso * (1 - 0.01 * w)).toFixed(1);
+    const high = (curPeso * (1 - 0.005 * w)).toFixed(1);
+    return `Se recomienda: ${low}–${high} kg considerando el plazo de ${w} sem`;
+  }, [form.peso, selected?.peso, planTimeStatus.isExpired, planTimeStatus.remainingWeeks, form.eval_objetivo, liveSmartMacros?.goalId]);
+
   const liveWeightGoalPlan = useMemo(() => {
     const curPeso = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
     const goalPeso = parseFloat(form.eval_peso_objetivo) || 0;
-    const weeks = parseFloat(form.eval_semanas_objetivo) || cycleInfo.semanas || 4;
-    if (curPeso <= 0 || goalPeso <= 0) return null;
+    if (curPeso <= 0 || goalPeso <= 0 || effectivePlanWeeks <= 0) return null;
     return evaluateWeightGoalPlan({
       peso: curPeso,
       pesoObjetivo: goalPeso,
-      semanas: weeks,
+      semanas: effectivePlanWeeks,
       get: liveSmartMacros?.get || 0,
     });
-  }, [form.peso, selected?.peso, form.eval_peso_objetivo, form.eval_semanas_objetivo, cycleInfo.semanas, liveSmartMacros?.get]);
+  }, [form.peso, selected?.peso, form.eval_peso_objetivo, effectivePlanWeeks, liveSmartMacros?.get]);
+
+  const recommendedCycleGoalId = useMemo(() => {
+    if (liveWeightGoalPlan?.recommendedGoalId) {
+      return liveWeightGoalPlan.recommendedGoalId;
+    }
+    const curPeso = parseFloat(form.peso) || parseFloat(selected?.peso) || 0;
+    const est = parseFloat(form.estatura) || parseFloat(liveSmartMacros?.estatura) || 0;
+    const grasa = parseFloat(liveCalculations?.grasa_pct) || parseFloat(form.grasa_pct) || 0;
+    const imc = curPeso > 0 && est > 0 ? curPeso / Math.pow(est / 100, 2) : 0;
+    const w = effectivePlanWeeks;
+
+    if (curPeso > 0 && w > 0) {
+      const highAdiposity =
+        grasa > 0
+          ? (evalSexo === "M" && grasa >= 25) || (evalSexo === "F" && grasa >= 32)
+          : imc >= 27;
+      if (highAdiposity) {
+        return w <= 3 ? "cut_20" : "cut_15";
+      }
+      if (imc > 0 && imc < 19) {
+        return "bulk_10";
+      }
+      if (
+        grasa > 0 &&
+        ((evalSexo === "M" && grasa >= 12 && grasa < 18) ||
+          (evalSexo === "F" && grasa >= 20 && grasa < 26))
+      ) {
+        return "cut_10";
+      }
+    }
+    const cycleEnfoque = String(evalCiclo?.nombre || "").split("|")[4] || "";
+    return (
+      inferGoalFromText(
+        cycleEnfoque ||
+          clinicalRec?.anamnesis?.objetivo_principal ||
+          selected?.objetivo ||
+          ""
+      ) || "cut_15"
+    );
+  }, [
+    liveWeightGoalPlan?.recommendedGoalId,
+    form.peso,
+    selected?.peso,
+    form.estatura,
+    liveSmartMacros?.estatura,
+    liveCalculations?.grasa_pct,
+    form.grasa_pct,
+    effectivePlanWeeks,
+    evalSexo,
+    evalCiclo?.nombre,
+    clinicalRec?.anamnesis?.objetivo_principal,
+    selected?.objetivo,
+  ]);
 
   const isFirstEvaluationEver = !editingId
     ? allLinkedMetricas.length === 0
@@ -5067,7 +5318,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Meta Ponderada (Peso Objetivo, Plazo y Meta Diaria de Pasos NEAT) */}
+                  {/* Meta Ponderada (Peso Objetivo, Plazo Ligado al Plan y Meta Diaria de Pasos NEAT) */}
                   <div className="pt-1 space-y-2.5">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <div>
@@ -5082,25 +5333,64 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           disabled={isReadOnly}
                           value={form.eval_peso_objetivo || ""}
                           onChange={(e) => updForm("eval_peso_objetivo", e.target.value)}
-                          placeholder={form.peso ? `Ej. ${form.peso} kg` : "Ej. 68.0"}
-                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
+                          placeholder={weightGoalPlaceholder}
+                          title={weightGoalPlaceholder}
+                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder:text-[10.5px] placeholder:font-medium placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-[#6B7A8D] mb-1">
-                          Plazo Estimado (semanas)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="1"
-                          max="52"
-                          disabled={isReadOnly}
-                          value={form.eval_semanas_objetivo || ""}
-                          onChange={(e) => updForm("eval_semanas_objetivo", e.target.value)}
-                          placeholder={String(cycleInfo.semanas || 4)}
-                          className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1929] placeholder-[#94A3B8] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-colors"
-                        />
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <label className="block text-[11px] font-bold text-[#6B7A8D] truncate">
+                            Plazo Estimado (semanas)
+                          </label>
+                          {!isReadOnly && !planTimeStatus.isExpired && (
+                            <button
+                              type="button"
+                              onClick={handleTriggerCreatePlan}
+                              title="Iniciar un nuevo plan y pasar esta evaluación al nuevo ciclo"
+                              className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline cursor-pointer shrink-0"
+                            >
+                              + Nuevo plan
+                            </button>
+                          )}
+                        </div>
+                        {planTimeStatus.isExpired ? (
+                          <div className="w-full bg-amber-50/80 border border-amber-300 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 min-h-[34px]">
+                            <div className="min-w-0">
+                              <span className="block text-[11px] font-extrabold text-amber-900 leading-tight truncate">
+                                0 sem restantes
+                              </span>
+                              <span className="block text-[9.5px] text-amber-700 font-medium leading-tight truncate">
+                                {planTimeStatus.hasPlan ? "Plan actual concluido" : "Sin plan activo"}
+                              </span>
+                            </div>
+                            {!isReadOnly && (
+                              <button
+                                type="button"
+                                onClick={handleTriggerCreatePlan}
+                                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-primary)] text-white text-[10.5px] font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Generar Nuevo Plan</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            title={`${planTimeStatus.planTitle} · ${planTimeStatus.statusText}`}
+                            className="w-full bg-[#F1F5F9]/80 border border-[#CBD5E1] rounded-xl px-3 py-2 flex items-center justify-between gap-2 min-h-[34px] select-none"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Calendar className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
+                              <span className="text-xs font-extrabold text-[#0B1929] truncate">
+                                {planTimeStatus.remainingWeeks} {planTimeStatus.remainingWeeks === 1 ? "semana" : "semanas"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white text-[#475569] border border-[#E2E8F0] truncate shrink-0">
+                              {planTimeStatus.badgeText}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-[#6B7A8D] mb-1 flex items-center gap-1">
@@ -5164,12 +5454,24 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   {/* Objetivo de la Etapa */}
                   <div className="pt-1">
-                    <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
-                      Objetivo Nutricional de este Ciclo
-                    </label>
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                      <label className="block text-xs font-bold text-[#6B7A8D]">
+                        Objetivo Nutricional de este Ciclo
+                      </label>
+                      {recommendedCycleGoalId && (() => {
+                        const recPreset = getGoalPresetInfo(recommendedCycleGoalId);
+                        if (!recPreset) return null;
+                        return (
+                          <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                            Sugerido ({effectivePlanWeeks} sem): <strong>{recPreset.title} ({recPreset.pct > 0 ? `+${recPreset.pct}%` : `${recPreset.pct}%`})</strong>
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {GOAL_PRESETS.map((g) => {
                         const isSelected = (form.eval_objetivo || liveSmartMacros.goalId) === g.id;
+                        const isRecommended = recommendedCycleGoalId === g.id;
                         return (
                           <button
                             key={g.id}
@@ -5181,14 +5483,23 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             } ${
                               isSelected
                                 ? "bg-[var(--brand-primary)]/10 border-[var(--brand-primary)] text-[#0B1929] shadow-2xs"
+                                : isRecommended
+                                ? "bg-emerald-50/40 border-emerald-300 text-[#0B1929] hover:border-emerald-400"
                                 : "bg-[#F8FAFC] border-[#E2E8F0] text-[#6B7A8D] hover:border-gray-300"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-1">
-                              <span className={`text-xs font-bold ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
-                                {g.title}
-                              </span>
-                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`text-xs font-bold truncate ${isSelected ? "text-[var(--brand-primary)]" : "text-[#0B1929]"}`}>
+                                  {g.title}
+                                </span>
+                                {isRecommended && (
+                                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider shrink-0">
+                                    Recomendado
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shrink-0 ${
                                 isSelected
                                   ? "bg-[var(--brand-primary)] text-white"
                                   : "bg-white border border-[#E2E8F0] text-[#6B7A8D]"
@@ -5205,40 +5516,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                     </div>
                   </div>
 
-                  {/* Factor de Actividad Física (FAF) Proyectado conectado a Entrenamiento */}
+                  {/* Factor de Actividad Física (FAF) Proyectado */}
                   <div className="pt-2 border-t border-[#F0F4FA]">
-                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                      <label className="block text-xs font-bold text-[#6B7A8D]">
-                        Factor de Actividad Física (FAF) Proyectado
-                      </label>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {suggestedFafFromTraining.days > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-[var(--brand-primary)] border border-blue-200/60">
-                            <Dumbbell className="w-3 h-3" />
-                            <span>Entrenamiento: {suggestedFafFromTraining.label} (FAF {suggestedFafFromTraining.value})</span>
-                          </span>
-                        )}
-                        {neatFafSuggestion ? (
-                          <button
-                            type="button"
-                            disabled={isReadOnly}
-                            onClick={() => !isReadOnly && updForm("eval_faf", String(neatFafSuggestion.suggested.value))}
-                            title="Aplicar FAF combinado con pasos medidos en los últimos 7 días"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer disabled:cursor-default"
-                          >
-                            <Footprints className="w-3 h-3" />
-                            <span>
-                              NEAT 7d: {patientStepsStats.avg.toLocaleString()} pasos/d ({neatFafSuggestion.stepsLevel.label}) → FAF sugerido {neatFafSuggestion.suggested.value}
-                            </span>
-                          </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-[#F8FAFC] text-[#6B7A8D] border border-[#E2E8F0]">
-                            <Footprints className="w-3 h-3 text-[#94A3B8]" />
-                            <span>NEAT sin pasos sincronizados · Meta {(Number(form.eval_meta_pasos) || DEFAULT_STEP_GOAL).toLocaleString()} pasos/d</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <label className="block text-xs font-bold text-[#6B7A8D] mb-1.5">
+                      Factor de Actividad Física (FAF) Proyectado
+                    </label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {ACTIVITY_FACTORS.map((f) => {
                         const currentFafNum = Number(form.eval_faf) || liveSmartMacros.faf;
