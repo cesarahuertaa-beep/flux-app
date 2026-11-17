@@ -5739,72 +5739,48 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-blue-700 uppercase">Proteína</div>
                           {prescriptionMode === "manual" ? (
-                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                            <div className="flex items-center justify-center gap-0.5 bg-white border border-blue-300 rounded-lg py-0.5 px-1.5 my-1 mx-auto w-full max-w-[4.75rem]">
                               <input
                                 type="number"
                                 disabled={isReadOnly}
                                 value={manualMacros.proteinG}
                                 onChange={(e) => setManualMacros((p) => ({ ...p, proteinG: e.target.value }))}
-                                placeholder="g"
-                                className="w-14 text-center text-xs font-black text-blue-900 bg-white border border-blue-300 rounded py-0.5 px-1 focus:outline-none"
+                                placeholder="0"
+                                className="w-full text-center text-xs font-black text-blue-900 bg-transparent focus:outline-none"
                               />
-                              <span className="text-[10px] font-bold text-blue-700">g</span>
+                              <span className="text-[10px] font-bold text-blue-700 shrink-0">g</span>
                             </div>
                           ) : (
                             <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
                               {activePrescription.proteinG}g
                             </div>
                           )}
-                          {prescriptionMode === "manual" && (parseFloat(form.peso) || parseFloat(selected?.peso)) > 0 ? (
-                            <div className="flex items-center justify-center gap-1 mt-0.5">
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0.5"
-                                max="4.5"
-                                disabled={isReadOnly}
-                                value={gKgDraft.prot ?? activePrescription.protGKg}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  setGKgDraft((d) => ({ ...d, prot: raw }));
-                                  const num = parseFloat(raw);
-                                  if (!isNaN(num) && num > 0) handleAdjustProtGKg(num);
-                                }}
-                                onBlur={() => setGKgDraft((d) => ({ ...d, prot: null }))}
-                                className="w-11 text-center text-[10px] font-bold text-blue-900 bg-white border border-blue-200 rounded py-0.5 px-0.5 focus:outline-none"
-                              />
-                              <span className="text-[10px] text-blue-700 font-semibold">
-                                g/kg · {activePrescription.proteinPct}%
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-blue-700 font-semibold truncate">
-                              {activePrescription.protGKg} g/kg · {activePrescription.proteinPct}%
-                            </div>
-                          )}
+                          <div className="text-[10px] text-blue-700 font-semibold whitespace-nowrap truncate">
+                            {activePrescription.protGKg} g/kg · {activePrescription.proteinPct}%
+                          </div>
                         </div>
 
                         {/* Carbos */}
                         <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-emerald-700 uppercase">Carbos</div>
                           {prescriptionMode === "manual" ? (
-                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                            <div className="flex items-center justify-center gap-0.5 bg-white border border-emerald-300 rounded-lg py-0.5 px-1.5 my-1 mx-auto w-full max-w-[4.75rem]">
                               <input
                                 type="number"
                                 disabled={isReadOnly}
                                 value={manualMacros.carbsG}
                                 onChange={(e) => setManualMacros((p) => ({ ...p, carbsG: e.target.value }))}
-                                placeholder="g"
-                                className="w-14 text-center text-xs font-black text-emerald-900 bg-white border border-emerald-300 rounded py-0.5 px-1 focus:outline-none"
+                                placeholder="0"
+                                className="w-full text-center text-xs font-black text-emerald-900 bg-transparent focus:outline-none"
                               />
-                              <span className="text-[10px] font-bold text-emerald-700">g</span>
+                              <span className="text-[10px] font-bold text-emerald-700 shrink-0">g</span>
                             </div>
                           ) : (
                             <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
                               {activePrescription.carbsG}g
                             </div>
                           )}
-                          <div className="text-[10px] text-emerald-700 font-semibold truncate">
+                          <div className="text-[10px] text-emerald-700 font-semibold whitespace-nowrap truncate">
                             {activePrescription.carbGKg} g/kg · {activePrescription.carbsPct}%
                           </div>
                         </div>
@@ -5813,49 +5789,25 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                           <div className="text-[10px] font-bold text-amber-700 uppercase">Grasas</div>
                           {prescriptionMode === "manual" ? (
-                            <div className="flex items-center justify-center gap-0.5 my-0.5">
+                            <div className="flex items-center justify-center gap-0.5 bg-white border border-amber-300 rounded-lg py-0.5 px-1.5 my-1 mx-auto w-full max-w-[4.75rem]">
                               <input
                                 type="number"
                                 disabled={isReadOnly}
                                 value={manualMacros.fatsG}
                                 onChange={(e) => setManualMacros((p) => ({ ...p, fatsG: e.target.value }))}
-                                placeholder="g"
-                                className="w-14 text-center text-xs font-black text-amber-900 bg-white border border-amber-300 rounded py-0.5 px-1 focus:outline-none"
+                                placeholder="0"
+                                className="w-full text-center text-xs font-black text-amber-900 bg-transparent focus:outline-none"
                               />
-                              <span className="text-[10px] font-bold text-amber-700">g</span>
+                              <span className="text-[10px] font-bold text-amber-700 shrink-0">g</span>
                             </div>
                           ) : (
                             <div className="text-base font-black text-[#0B1929] font-['Rajdhani']">
                               {activePrescription.fatsG}g
                             </div>
                           )}
-                          {prescriptionMode === "manual" && (parseFloat(form.peso) || parseFloat(selected?.peso)) > 0 ? (
-                            <div className="flex items-center justify-center gap-1 mt-0.5">
-                              <input
-                                type="number"
-                                step="0.05"
-                                min="0.3"
-                                max="3.0"
-                                disabled={isReadOnly}
-                                value={gKgDraft.fat ?? activePrescription.fatGKg}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  setGKgDraft((d) => ({ ...d, fat: raw }));
-                                  const num = parseFloat(raw);
-                                  if (!isNaN(num) && num > 0) handleAdjustFatGKg(num);
-                                }}
-                                onBlur={() => setGKgDraft((d) => ({ ...d, fat: null }))}
-                                className="w-11 text-center text-[10px] font-bold text-amber-900 bg-white border border-amber-200 rounded py-0.5 px-0.5 focus:outline-none"
-                              />
-                              <span className="text-[10px] text-amber-700 font-semibold">
-                                g/kg · {activePrescription.fatsPct}%
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-amber-700 font-semibold truncate">
-                              {activePrescription.fatGKg} g/kg · {activePrescription.fatsPct}%
-                            </div>
-                          )}
+                          <div className="text-[10px] text-amber-700 font-semibold whitespace-nowrap truncate">
+                            {activePrescription.fatGKg} g/kg · {activePrescription.fatsPct}%
+                          </div>
                         </div>
                       </div>
 
@@ -6022,25 +5974,22 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                       {/* Bloque de Prescripción Dinámica / Simulador (Modo Manual) */}
                       {prescriptionMode === "manual" && (
-                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl p-4 space-y-3.5 shadow-xs">
-                          {/* Cabecera del Simulador Inline */}
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-1.5">
-                              <SlidersHorizontal className="w-4 h-4 text-amber-600" />
-                              <span className="text-xs font-bold text-[#0B1929]">
-                                Simulador & Ajustes Manuales
-                              </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200/60">
-                                Ajuste Fino
+                        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/30 border border-amber-200/80 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                          {/* Cabecera del Simulador Inline en una sola línea sin la píldora Ajuste Fino */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <SlidersHorizontal className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="text-xs font-bold text-[#0B1929] truncate">
+                                Simulador Manual
                               </span>
                             </div>
 
                             {/* Switcher: g/kg vs % */}
-                            <div className="flex bg-amber-100/60 p-0.5 rounded-lg border border-amber-200/70">
+                            <div className="flex bg-amber-100/60 p-0.5 rounded-lg border border-amber-200/70 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setManualSimMode("g_kg")}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                                   manualSimMode === "g_kg"
                                     ? "bg-white text-amber-900 shadow-2xs"
                                     : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -6051,7 +6000,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               <button
                                 type="button"
                                 onClick={() => setManualSimMode("pct")}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                                   manualSimMode === "pct"
                                     ? "bg-white text-amber-900 shadow-2xs"
                                     : "text-[#6B7A8D] hover:text-[#0B1929]"
@@ -6062,7 +6011,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             </div>
                           </div>
 
-                          {/* Campo abierto de porcentaje sobre GET (- / + %) */}
+                          {/* Campo abierto de porcentaje sobre GET (- / + %) en una sola fila compacta */}
                           {(() => {
                             const curGoalPct = Number(activePrescription.goalPct) || 0;
                             const activeSign = gKgDraft.goalSign || (curGoalPct > 0 ? "+" : "−");
@@ -6071,12 +6020,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 ? gKgDraft.goalPct
                                 : Math.abs(curGoalPct);
                             return (
-                              <div className="bg-white/90 border border-amber-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap shadow-2xs">
+                              <div className="bg-white/90 border border-amber-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-2xs">
                                 <div className="min-w-0">
-                                  <span className="block text-[11px] font-bold text-[#0B1929]">
-                                    Ajuste porcentual (sobre GET {activePrescription.get} kcal)
+                                  <span className="block text-[11px] font-bold text-[#0B1929] truncate">
+                                    Ajuste sobre GET ({activePrescription.get} kcal)
                                   </span>
-                                  <span className="text-[10px] text-[#6B7A8D]">
+                                  <span className="block text-[10px] font-semibold text-[#6B7A8D] truncate">
                                     {curGoalPct < 0
                                       ? `Déficit (${curGoalPct}%) → ${activePrescription.targetKcal} kcal`
                                       : curGoalPct > 0
@@ -6123,7 +6072,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     </button>
                                   </div>
 
-                                  <div className="flex items-center gap-1 bg-[#F8FAFC] border border-amber-300 rounded-lg px-2 py-1">
+                                  <div className="flex items-center gap-0.5 bg-[#F8FAFC] border border-amber-300 rounded-lg px-2 py-0.5">
                                     <input
                                       type="number"
                                       step="1"
@@ -6145,9 +6094,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                         }
                                       }}
                                       onBlur={() => setGKgDraft((d) => ({ ...d, goalPct: null }))}
-                                      className="w-12 text-center text-xs font-black text-[#0B1929] bg-transparent focus:outline-none"
+                                      className="w-9 text-center text-xs font-black text-[#0B1929] bg-transparent focus:outline-none"
                                     />
-                                    <span className="text-xs font-extrabold text-amber-800">%</span>
+                                    <span className="text-[11px] font-extrabold text-amber-800">%</span>
                                   </div>
                                 </div>
                               </div>
@@ -6156,104 +6105,122 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                           {/* Controles Dinámicos según modo g_kg vs pct */}
                           {manualSimMode === "g_kg" ? (
-                            <div className="space-y-3 pt-1">
+                            <div className="space-y-2.5">
                               {/* Slider Proteína g/kg */}
-                              <div className="bg-white/90 border border-blue-200/80 rounded-xl p-3 space-y-1.5 shadow-2xs">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-bold text-blue-900">
-                                    Proteína (g / kg peso)
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black text-blue-700 font-['Rajdhani']">
-                                      {activePrescription.protGKg} g/kg
-                                    </span>
-                                    <span className="text-[10px] text-[#6B7A8D]">
-                                      ({activePrescription.proteinG}g · {activePrescription.proteinPct}%)
-                                    </span>
-                                    <div className="flex items-center gap-0.5 ml-1">
-                                      <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => handleAdjustProtGKg(Math.max(1.0, Number((activePrescription.protGKg - 0.1).toFixed(1))))}
-                                        className="w-5 h-5 rounded bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
-                                      >
-                                        -
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => handleAdjustProtGKg(Math.min(3.5, Number((activePrescription.protGKg + 0.1).toFixed(1))))}
-                                        className="w-5 h-5 rounded bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
-                                      >
-                                        +
-                                      </button>
+                              {(() => {
+                                const protVal = Math.min(3.5, Math.max(1.0, Number(activePrescription.protGKg) || 2.0));
+                                const protFillPct = Math.round(((protVal - 1.0) / (3.5 - 1.0)) * 100);
+                                return (
+                                  <div className="bg-white/90 border border-blue-200/80 rounded-xl px-3 py-2.5 space-y-2 shadow-2xs">
+                                    <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-xs font-bold text-blue-900">Proteína</span>
+                                        <span className="text-[10.5px] font-semibold text-[#64748B]">
+                                          {activePrescription.proteinG}g · {activePrescription.proteinPct}%
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-xs font-black text-blue-700 font-['Rajdhani']">
+                                          {activePrescription.protGKg} g/kg
+                                        </span>
+                                        <div className="flex items-center gap-0.5">
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly}
+                                            onClick={() => handleAdjustProtGKg(Math.max(1.0, Number((activePrescription.protGKg - 0.1).toFixed(1))))}
+                                            className="w-5 h-5 rounded-md bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
+                                          >
+                                            −
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly}
+                                            onClick={() => handleAdjustProtGKg(Math.min(3.5, Number((activePrescription.protGKg + 0.1).toFixed(1))))}
+                                            className="w-5 h-5 rounded-md bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 hover:bg-blue-100 flex items-center justify-center cursor-pointer"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
                                     </div>
+                                    <input
+                                      type="range"
+                                      min="1.0"
+                                      max="3.5"
+                                      step="0.1"
+                                      disabled={isReadOnly}
+                                      value={protVal}
+                                      onChange={(e) => handleAdjustProtGKg(Number(e.target.value))}
+                                      style={{
+                                        background: `linear-gradient(to right, #2563EB 0%, #2563EB ${protFillPct}%, #DBEAFE ${protFillPct}%, #DBEAFE 100%)`,
+                                      }}
+                                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-600 [&::-webkit-slider-thumb]:shadow-sm"
+                                    />
                                   </div>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="3.5"
-                                  step="0.1"
-                                  disabled={isReadOnly}
-                                  value={activePrescription.protGKg || 2.0}
-                                  onChange={(e) => handleAdjustProtGKg(Number(e.target.value))}
-                                  className="w-full accent-blue-600 cursor-pointer"
-                                />
-                              </div>
+                                );
+                              })()}
 
                               {/* Slider Grasas g/kg */}
-                              <div className="bg-white/90 border border-amber-200/80 rounded-xl p-3 space-y-1.5 shadow-2xs">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-bold text-amber-900">
-                                    Grasas (g / kg peso)
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black text-amber-700 font-['Rajdhani']">
-                                      {activePrescription.fatGKg} g/kg
-                                    </span>
-                                    <span className="text-[10px] text-[#6B7A8D]">
-                                      ({activePrescription.fatsG}g · {activePrescription.fatsPct}%)
-                                    </span>
-                                    <div className="flex items-center gap-0.5 ml-1">
-                                      <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => handleAdjustFatGKg(Math.max(0.5, Number((activePrescription.fatGKg - 0.05).toFixed(2))))}
-                                        className="w-5 h-5 rounded bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
-                                      >
-                                        -
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => handleAdjustFatGKg(Math.min(2.0, Number((activePrescription.fatGKg + 0.05).toFixed(2))))}
-                                        className="w-5 h-5 rounded bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
-                                      >
-                                        +
-                                      </button>
+                              {(() => {
+                                const fatVal = Math.min(2.0, Math.max(0.5, Number(activePrescription.fatGKg) || 0.9));
+                                const fatFillPct = Math.round(((fatVal - 0.5) / (2.0 - 0.5)) * 100);
+                                return (
+                                  <div className="bg-white/90 border border-amber-200/80 rounded-xl px-3 py-2.5 space-y-2 shadow-2xs">
+                                    <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-xs font-bold text-amber-900">Grasas</span>
+                                        <span className="text-[10.5px] font-semibold text-[#64748B]">
+                                          {activePrescription.fatsG}g · {activePrescription.fatsPct}%
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-xs font-black text-amber-700 font-['Rajdhani']">
+                                          {activePrescription.fatGKg} g/kg
+                                        </span>
+                                        <div className="flex items-center gap-0.5">
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly}
+                                            onClick={() => handleAdjustFatGKg(Math.max(0.5, Number((activePrescription.fatGKg - 0.05).toFixed(2))))}
+                                            className="w-5 h-5 rounded-md bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
+                                          >
+                                            −
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={isReadOnly}
+                                            onClick={() => handleAdjustFatGKg(Math.min(2.0, Number((activePrescription.fatGKg + 0.05).toFixed(2))))}
+                                            className="w-5 h-5 rounded-md bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 flex items-center justify-center cursor-pointer"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
                                     </div>
+                                    <input
+                                      type="range"
+                                      min="0.5"
+                                      max="2.0"
+                                      step="0.05"
+                                      disabled={isReadOnly}
+                                      value={fatVal}
+                                      onChange={(e) => handleAdjustFatGKg(Number(e.target.value))}
+                                      style={{
+                                        background: `linear-gradient(to right, #D97706 0%, #D97706 ${fatFillPct}%, #FEF3C7 ${fatFillPct}%, #FEF3C7 100%)`,
+                                      }}
+                                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-amber-600 [&::-webkit-slider-thumb]:shadow-sm"
+                                    />
                                   </div>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="0.5"
-                                  max="2.0"
-                                  step="0.05"
-                                  disabled={isReadOnly}
-                                  value={activePrescription.fatGKg || 0.9}
-                                  onChange={(e) => handleAdjustFatGKg(Number(e.target.value))}
-                                  className="w-full accent-amber-500 cursor-pointer"
-                                />
-                              </div>
+                                );
+                              })()}
 
                               {/* Carbohidratos: Balance Residual */}
-                              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2">
-                                <div className="text-[11px] text-emerald-950">
-                                  <strong className="block font-bold">Carbohidratos de balance:</strong>
-                                  <span className="text-[#475569]">Cuadran las calorías restantes de la meta</span>
+                              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                                <div className="text-[11px] text-emerald-950 min-w-0">
+                                  <strong className="block font-bold truncate">Carbohidratos de balance</strong>
+                                  <span className="text-[10px] text-[#475569] block truncate">Cuadran las calorías restantes</span>
                                 </div>
-                                <div className="text-right shrink-0">
+                                <div className="text-right shrink-0 whitespace-nowrap">
                                   <div className="text-xs font-black text-emerald-800 font-['Rajdhani']">
                                     {activePrescription.carbsG}g ({activePrescription.carbGKg} g/kg)
                                   </div>
@@ -6265,62 +6232,89 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             </div>
                           ) : (
                             /* Modo Porcentual (%) */
-                            <div className="space-y-2.5 pt-1">
+                            <div className="space-y-2.5">
                               <div className="grid grid-cols-3 gap-2">
-                                <div className="bg-white/90 border border-blue-200 rounded-xl p-2.5 text-center">
-                                  <div className="text-[10px] font-bold text-blue-700 uppercase mb-1">
-                                    % Proteína
-                                  </div>
-                                  <div className="text-sm font-black text-blue-900 font-['Rajdhani']">
-                                    {activePrescription.proteinPct}%
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="15"
-                                    max="50"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    value={activePrescription.proteinPct || 30}
-                                    onChange={(e) => handleAdjustPct("p", Number(e.target.value))}
-                                    className="w-full accent-blue-600 mt-1 cursor-pointer"
-                                  />
-                                </div>
-                                <div className="bg-white/90 border border-emerald-200 rounded-xl p-2.5 text-center">
-                                  <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1">
-                                    % Carbos
-                                  </div>
-                                  <div className="text-sm font-black text-emerald-900 font-['Rajdhani']">
-                                    {activePrescription.carbsPct}%
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="10"
-                                    max="70"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    value={activePrescription.carbsPct || 45}
-                                    onChange={(e) => handleAdjustPct("c", Number(e.target.value))}
-                                    className="w-full accent-emerald-600 mt-1 cursor-pointer"
-                                  />
-                                </div>
-                                <div className="bg-white/90 border border-amber-200 rounded-xl p-2.5 text-center">
-                                  <div className="text-[10px] font-bold text-amber-700 uppercase mb-1">
-                                    % Grasas
-                                  </div>
-                                  <div className="text-sm font-black text-amber-900 font-['Rajdhani']">
-                                    {activePrescription.fatsPct}%
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="15"
-                                    max="50"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    value={activePrescription.fatsPct || 25}
-                                    onChange={(e) => handleAdjustPct("f", Number(e.target.value))}
-                                    className="w-full accent-amber-500 mt-1 cursor-pointer"
-                                  />
-                                </div>
+                                {(() => {
+                                  const pPct = Math.min(50, Math.max(15, Number(activePrescription.proteinPct) || 30));
+                                  const pFill = Math.round(((pPct - 15) / (50 - 15)) * 100);
+                                  return (
+                                    <div className="bg-white/90 border border-blue-200 rounded-xl p-2.5 text-center space-y-1.5">
+                                      <div className="text-[10px] font-bold text-blue-700 uppercase">
+                                        % Proteína
+                                      </div>
+                                      <div className="text-sm font-black text-blue-900 font-['Rajdhani']">
+                                        {activePrescription.proteinPct}%
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min="15"
+                                        max="50"
+                                        step="1"
+                                        disabled={isReadOnly}
+                                        value={pPct}
+                                        onChange={(e) => handleAdjustPct("p", Number(e.target.value))}
+                                        style={{
+                                          background: `linear-gradient(to right, #2563EB 0%, #2563EB ${pFill}%, #DBEAFE ${pFill}%, #DBEAFE 100%)`,
+                                        }}
+                                        className="w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-600 [&::-webkit-slider-thumb]:shadow-sm"
+                                      />
+                                    </div>
+                                  );
+                                })()}
+                                {(() => {
+                                  const cPct = Math.min(70, Math.max(10, Number(activePrescription.carbsPct) || 45));
+                                  const cFill = Math.round(((cPct - 10) / (70 - 10)) * 100);
+                                  return (
+                                    <div className="bg-white/90 border border-emerald-200 rounded-xl p-2.5 text-center space-y-1.5">
+                                      <div className="text-[10px] font-bold text-emerald-700 uppercase">
+                                        % Carbos
+                                      </div>
+                                      <div className="text-sm font-black text-emerald-900 font-['Rajdhani']">
+                                        {activePrescription.carbsPct}%
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min="10"
+                                        max="70"
+                                        step="1"
+                                        disabled={isReadOnly}
+                                        value={cPct}
+                                        onChange={(e) => handleAdjustPct("c", Number(e.target.value))}
+                                        style={{
+                                          background: `linear-gradient(to right, #059669 0%, #059669 ${cFill}%, #D1FAE5 ${cFill}%, #D1FAE5 100%)`,
+                                        }}
+                                        className="w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-emerald-600 [&::-webkit-slider-thumb]:shadow-sm"
+                                      />
+                                    </div>
+                                  );
+                                })()}
+                                {(() => {
+                                  const fPct = Math.min(50, Math.max(15, Number(activePrescription.fatsPct) || 25));
+                                  const fFill = Math.round(((fPct - 15) / (50 - 15)) * 100);
+                                  return (
+                                    <div className="bg-white/90 border border-amber-200 rounded-xl p-2.5 text-center space-y-1.5">
+                                      <div className="text-[10px] font-bold text-amber-700 uppercase">
+                                        % Grasas
+                                      </div>
+                                      <div className="text-sm font-black text-amber-900 font-['Rajdhani']">
+                                        {activePrescription.fatsPct}%
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min="15"
+                                        max="50"
+                                        step="1"
+                                        disabled={isReadOnly}
+                                        value={fPct}
+                                        onChange={(e) => handleAdjustPct("f", Number(e.target.value))}
+                                        style={{
+                                          background: `linear-gradient(to right, #D97706 0%, #D97706 ${fFill}%, #FEF3C7 ${fFill}%, #FEF3C7 100%)`,
+                                        }}
+                                        className="w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-amber-600 [&::-webkit-slider-thumb]:shadow-sm"
+                                      />
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="flex items-center justify-between text-[11px] px-1">
                                 <span className="text-[#6B7A8D]">Suma de porcentajes:</span>
