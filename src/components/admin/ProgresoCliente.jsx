@@ -1926,33 +1926,165 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
       if (form.pantorrilla) circArr.push(`Pantorrilla: ${form.pantorrilla} cm`);
       const circStr = circArr.join(", ");
 
+      // Diametros óseos (cm)
+      const diamArr = [];
+      if (form.diametro_muneca) diamArr.push(`Muñeca: ${form.diametro_muneca} cm`);
+      if (form.diametro_codo) diamArr.push(`Codo: ${form.diametro_codo} cm`);
+      if (form.diametro_rodilla) diamArr.push(`Rodilla: ${form.diametro_rodilla} cm`);
+      const diamStr = diamArr.join(", ");
+
+      // Gustos por grupo SMAE (Paso 2)
+      const smaePrefList = [];
+      const smaeAvoidList = [];
+      if (form.smae_gustos && typeof form.smae_gustos === "object") {
+        Object.entries(form.smae_gustos).forEach(([gId, pref]) => {
+          const grp = SMAE_GROUPS.find((g) => g.id === gId);
+          const lbl = grp ? grp.shortLabel || grp.label : gId;
+          if (pref === "favorito" || pref === "prefiere") smaePrefList.push(lbl);
+          else if (pref === "evitar" || pref === "no_gusta") smaeAvoidList.push(lbl);
+        });
+      }
+      const smaeGustosStr = [
+        smaePrefList.length > 0 ? `Grupos preferidos: ${smaePrefList.join(", ")}` : "",
+        smaeAvoidList.length > 0 ? `Grupos a evitar: ${smaeAvoidList.join(", ")}` : "",
+      ].filter(Boolean).join(" | ");
+
+      // Evolución contra evaluación previa (si es seguimiento)
+      const evalList = (allLinkedMetricas && allLinkedMetricas.length > 0) ? allLinkedMetricas : metricas;
+      const prevEval = !editingId
+        ? (evalList[0] || null)
+        : (() => {
+            const idx = evalList.findIndex((x) => String(x?.id) === String(editingId));
+            return idx >= 0 ? (evalList[idx + 1] || null) : null;
+          })();
+
+      const curPesoNum = parseFloat(form.peso || selected?.peso) || 0;
+      const curGrasaNum = parseFloat(liveCalculations.grasa_pct || form.grasa_pct) || 0;
+      const curMlgNum = parseFloat(liveCalculations.masa_libre_grasa) || 0;
+      const curCinturaNum = parseFloat(form.cintura) || 0;
+
+      const evolucionPrevia = (!isFirstEvaluationEver && prevEval) ? {
+        fechaPrevia: prevEval.fecha || "",
+        pesoPrevio: prevEval.peso || "",
+        deltaPeso: (curPesoNum > 0 && parseFloat(prevEval.peso) > 0)
+          ? (curPesoNum - parseFloat(prevEval.peso)).toFixed(2)
+          : null,
+        grasaPrevia: prevEval.grasa_pct || "",
+        deltaGrasa: (curGrasaNum > 0 && parseFloat(prevEval.grasa_pct) > 0)
+          ? (curGrasaNum - parseFloat(prevEval.grasa_pct)).toFixed(1)
+          : null,
+        mlgPrevia: prevEval.masa_libre_grasa || "",
+        deltaMlg: (curMlgNum > 0 && parseFloat(prevEval.masa_libre_grasa) > 0)
+          ? (curMlgNum - parseFloat(prevEval.masa_libre_grasa)).toFixed(2)
+          : null,
+        cinturaPrevia: prevEval.cintura || "",
+        deltaCintura: (curCinturaNum > 0 && parseFloat(prevEval.cintura) > 0)
+          ? (curCinturaNum - parseFloat(prevEval.cintura)).toFixed(1)
+          : null,
+        kcalPrevias: prevEval.prescribed_macros?.targetKcal || prevEval.ai_audit_result?.targetKcal || "",
+      } : null;
+
+      // Adherencia real medida en la app (Seguimiento)
+      const entSnap = adherenceSnapshot?.entrenamiento;
+      const nutSnap = adherenceSnapshot?.nutricion;
+      const adherenciaEntrenoStr = entSnap?.tiene_plan
+        ? `Cumplimiento global: ${entSnap.cumplimiento_pct ?? 0}% (${entSnap.semanas_cumplidas || 0}/${entSnap.semanas_evaluadas || 0} semanas; días asignados: ${(entSnap.dias_asignados || []).join(", ") || "N/A"})${
+            Array.isArray(entSnap.por_semana) && entSnap.por_semana.length > 0
+              ? ` · Desglose semanal: ${entSnap.por_semana.map((w) => `S${w.semana}: ${w.pct}%`).join(", ")}`
+              : ""
+          }`
+        : "";
+      const adherenciaNutriStr = nutSnap?.tiene_plan
+        ? `Comidas cumplidas: ${nutSnap.comidas_pct ?? 0}% (${
+            Array.isArray(nutSnap.por_semana) && nutSnap.por_semana.length > 0
+              ? nutSnap.por_semana.map((w) => `S${w.semana}: ${w.comidas_pct}%`).join(", ")
+              : "sin desglose"
+          }) | Hidratación: ${nutSnap.agua_pct ?? 0}% (promedio ${((nutSnap.agua_promedio_ml || 0) / 1000).toFixed(1)} L/día de ${((nutSnap.agua_meta_ml || 0) / 1000).toFixed(1)} L meta${
+            Array.isArray(nutSnap.por_semana) && nutSnap.por_semana.length > 0
+              ? `; por semana: ${nutSnap.por_semana.map((w) => `S${w.semana}: ${w.agua_pct ?? 0}% (${((w.agua_promedio_ml || 0) / 1000).toFixed(1)}L)`).join(", ")}`
+              : ""
+          })`
+        : "";
+
       const res = await auditMacroPrescriptionWithAi({
         cliente: { ...selected, genero: evalSexo === "F" ? "Femenino" : "Masculino", edad: evalEdad },
         anamnesis: clinicalRec?.anamnesis || {},
         metrica: {
           ...form,
           ...liveCalculations,
+          es_seguimiento: !isFirstEvaluationEver,
+          tipo_consulta: isFirstEvaluationEver ? "1ª Evaluación Inicial" : "Evaluación de Seguimiento",
+          evolucion_previa: evolucionPrevia,
           peso: form.peso || selected?.peso || "",
           estatura: form.estatura || selected?.estatura || "",
+          imc: liveCalculations.imc || form.imc || "",
+          imc_clasificacion: liveCalculations.imc_info?.label || "",
           grasa_pct: liveCalculations.grasa_pct || form.grasa_pct || "",
+          masa_grasa_kg: liveCalculations.calc_masa_grasa || form.calc_masa_grasa || "",
           masa_libre_grasa: liveCalculations.masa_libre_grasa || "",
-          masa_muscular_kg: liveCalculations.masa_muscular_kg || form.calc_masa_muscular || "",
+          masa_muscular_kg: liveCalculations.calc_masa_muscular || form.calc_masa_muscular || form.inbody_smm || "",
+          masa_osea_kg: liveCalculations.calc_masa_osea || form.calc_masa_osea || form.inbody_mineral_oseo || "",
+          masa_residual_kg: liveCalculations.calc_masa_residual || form.calc_masa_residual || "",
+          icc: liveCalculations.icc || form.icc || "",
+          icc_riesgo: liveCalculations.icc_info?.label || "",
+          ice: liveCalculations.ice || "",
+          somatotipo_str:
+            liveCalculations.somatotipo_endo && liveCalculations.somatotipo_meso && liveCalculations.somatotipo_ecto
+              ? `Endomorfo ${liveCalculations.somatotipo_endo} · Mesomorfo ${liveCalculations.somatotipo_meso} · Ectomorfo ${liveCalculations.somatotipo_ecto}`
+              : "",
           pliegues_str: plieguesStr,
+          sum_pliegues: liveCalculations.sum_pliegues || "",
           circunferencias_str: circStr,
+          diametros_str: diamStr,
           inbody_bmr: form.inbody_bmr || "",
+          inbody_grasa_visceral: form.inbody_grasa_visceral || "",
+          inbody_tbw: form.inbody_tbw || "",
+          inbody_proteina: form.inbody_proteina || "",
+          inbody_score: form.inbody_score || "",
+          glucosa: form.glucosa || "",
+          presion_arterial: form.presion_arterial || "",
+          notas_clinicas: form.notas || "",
           metodo_label: getMetodoLabel(form.metodo_evaluacion),
           sexo: evalSexo,
           edad: evalEdad,
         },
-        r24h: liveSmartMacros.r24h || {},
+        r24h: {
+          desayuno: form.r24h_desayuno || liveSmartMacros.contextoClinico?.r24h?.desayuno || "",
+          colacion_m: form.r24h_colacion_m || liveSmartMacros.contextoClinico?.r24h?.colacion_m || "",
+          comida: form.r24h_comida || liveSmartMacros.contextoClinico?.r24h?.comida || "",
+          colacion_v: form.r24h_colacion_v || liveSmartMacros.contextoClinico?.r24h?.colacion_v || "",
+          cena: form.r24h_cena || liveSmartMacros.contextoClinico?.r24h?.cena || "",
+          picoteos: form.r24h_picoteos || liveSmartMacros.contextoClinico?.r24h?.picoteos || "",
+        },
         habitos: {
           ...(liveSmartMacros.contextoClinico?.habitos || {}),
+          horas_sueno: form.horas_sueno || liveSmartMacros.contextoClinico?.habitos?.horas_sueno || "7.5",
           dias_ejercicio_actuales: form.dias_ejercicio_actual || liveSmartMacros.contextoClinico?.habitos?.dias_ejercicio_actuales || "0",
+          horario_ejercicio: form.horario_ejercicio || prevEvalHorario || "No especificado",
+          checkin_energia: form.checkin_energia || 4,
+          checkin_saciedad: form.checkin_saciedad || 4,
+          checkin_digestion: form.checkin_digestion || 4,
+          checkin_descanso: form.checkin_descanso || 4,
+          nivel_estres: form.nivel_estres || 3,
+          checkin_observaciones: form.checkin_observaciones || "",
+          checkin_ajustes: form.checkin_ajustes || "",
+          adherencia_entrenamiento: adherenciaEntrenoStr,
+          adherencia_nutricion: adherenciaNutriStr,
           faf_proyectado_etapa: liveSmartMacros.fafInfo?.label || "Moderado (3 a 5 días/semana)",
           faf_notas: form.eval_faf_notas || "",
+          pasos_promedio_7d: patientStepsStats?.avg || 0,
+          meta_pasos_diarios: form.eval_meta_pasos || DEFAULT_STEP_GOAL,
+          plan_meta_peso: liveWeightGoalPlan
+            ? `Meta: ${form.eval_peso_objetivo} kg en ${form.eval_semanas_objetivo || 4} semanas (${liveWeightGoalPlan.message})`
+            : "",
         },
         calcMatematico: {
           formulaLabel: liveSmartMacros.formulaLabel,
+          formulaShort: liveSmartMacros.formulaShort,
+          formulaMode: liveSmartMacros.formulaMode,
+          tmbSubstituted: liveSmartMacros.tmbSubstituted,
+          recommendationReason: liveSmartMacros.recommendationReason,
+          manualComparisonNote: liveSmartMacros.manualComparisonNote,
           tmb: liveSmartMacros.matematico?.tmb || liveSmartMacros.tmb,
           get: liveSmartMacros.matematico?.get || liveSmartMacros.get,
           faf: liveSmartMacros.faf || liveSmartMacros.matematico?.faf || 1.55,
@@ -1966,8 +2098,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           fatsG: liveSmartMacros.matematico?.fatsG || liveSmartMacros.fatsG,
           fatGKg: liveSmartMacros.matematico?.fatGKg || liveSmartMacros.fatGKg,
         },
-        preferencias: form.preferencias_alimentos || liveSmartMacros.preferencias || "",
-        aversiones: form.aversiones_alimentos || liveSmartMacros.aversiones || "",
+        preferencias: [
+          form.preferencias_alimentos || liveSmartMacros.contextoClinico?.preferencias || clinicalRec?.anamnesis?.preferencias_alimentos || "",
+          smaeGustosStr,
+        ].filter(Boolean).join(" · "),
+        aversiones: form.aversiones_alimentos || liveSmartMacros.contextoClinico?.aversiones || clinicalRec?.anamnesis?.aversiones_alimentos || "",
       });
 
       setAiAuditResult(res);
@@ -5280,18 +5415,42 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                           aria-expanded={showFormulaPopover}
                           title="Clic para ver ecuación, criterio clínico y cambiar fórmula TMB"
                           className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                            liveSmartMacros.formulaFallbackWarning
+                            prescriptionMode === "ia"
+                              ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 shadow-2xs"
+                              : prescriptionMode === "manual"
+                              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+                              : liveSmartMacros.formulaFallbackWarning
                               ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
                               : liveSmartMacros.formulaMode === "manual"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                               : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
                           }`}
                         >
-                          <Info className="w-3 h-3 shrink-0" />
-                          <span>{liveSmartMacros.formulaShort}</span>
-                          <span className="opacity-70 font-semibold">
-                            · {liveSmartMacros.formulaMode === "manual" ? "Manual" : "Auto"}
-                          </span>
+                          {prescriptionMode === "ia" ? (
+                            <>
+                              <Sparkles className="w-3 h-3 shrink-0" />
+                              <span>Auditado IA</span>
+                              <span className="opacity-80 font-semibold">
+                                · Base {liveSmartMacros.formulaShort}
+                              </span>
+                            </>
+                          ) : prescriptionMode === "manual" ? (
+                            <>
+                              <Edit2 className="w-3 h-3 shrink-0" />
+                              <span>Manual</span>
+                              <span className="opacity-75 font-semibold">
+                                · Base {liveSmartMacros.formulaShort}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Info className="w-3 h-3 shrink-0" />
+                              <span>{liveSmartMacros.formulaShort}</span>
+                              <span className="opacity-70 font-semibold">
+                                · {liveSmartMacros.formulaMode === "manual" ? "Manual" : "Auto"}
+                              </span>
+                            </>
+                          )}
                         </button>
 
                         {showFormulaPopover && (
@@ -5700,8 +5859,62 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </div>
                       </div>
 
-                      {/* Bloque de Auditoría Clínica con FLUX IA (Genuina, bajo demanda) */}
-                      {prescriptionMode !== "manual" && (
+                      {/* Bloque de Sustento de la Ecuación Activa (Solo en Modo Matemático cuando no está auditando con IA) */}
+                      {prescriptionMode === "matematico" && !isAuditingAi && (
+                        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Calculator className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span className="text-xs font-bold text-[#0B1929] truncate">
+                                {liveSmartMacros.activeFormulaInfo?.label || liveSmartMacros.formulaLabel}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                                liveSmartMacros.formulaMode === "manual"
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200/70"
+                                  : "bg-indigo-100 text-indigo-700 border border-indigo-200/70"
+                              }`}
+                            >
+                              {liveSmartMacros.formulaMode === "manual"
+                                ? "Selección Manual"
+                                : `Auto · ${getMetodoLabel(form.metodo_evaluacion)}`}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-[#334155] leading-relaxed">
+                            {liveSmartMacros.formulaMode === "manual" && liveSmartMacros.manualComparisonNote
+                              ? liveSmartMacros.manualComparisonNote
+                              : liveSmartMacros.recommendationReason}
+                          </p>
+
+                          {liveSmartMacros.tmbSubstituted && (
+                            <div className="pt-2 border-t border-[#E2E8F0] flex flex-col gap-0.5 text-[10.5px] font-mono text-[#475569]">
+                              <div className="font-bold text-[#0B1929] font-sans">
+                                TMB: {liveSmartMacros.tmbSubstituted}
+                              </div>
+                              {liveSmartMacros.matematico?.get > 0 && (
+                                <div className="font-semibold text-indigo-700 font-sans">
+                                  GET = {liveSmartMacros.matematico.tmb} × {liveSmartMacros.faf} (FAF) = {liveSmartMacros.matematico.get} kcal/día
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {aiAuditError && (
+                            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2 mt-1">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <strong className="block font-semibold">Servicio de IA:</strong>
+                                <p className="text-[11px] leading-relaxed text-amber-800">{aiAuditError}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Bloque de Auditoría Clínica con FLUX IA (Solo visible cuando está activo Auditado IA o cargando) */}
+                      {(prescriptionMode === "ia" || isAuditingAi) && (
                         <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100 rounded-xl p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5">
@@ -5710,13 +5923,9 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 Auditoría Clínica con FLUX IA
                               </span>
                             </div>
-                            {aiAuditResult?.badgeMotivo ? (
+                            {aiAuditResult?.badgeMotivo && !isAuditingAi ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200/60">
                                 {aiAuditResult.badgeMotivo}
-                              </span>
-                            ) : !isAuditingAi ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                                Bajo Demanda
                               </span>
                             ) : null}
                           </div>
@@ -5726,7 +5935,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                             <div className="p-3 rounded-lg bg-white/90 border border-indigo-100 flex items-center gap-2.5 text-xs text-indigo-900 shadow-xs">
                               <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
                               <span className="font-medium">
-                                FLUX IA está analizando el expediente médico, R24H y antropometría...
+                                FLUX IA está auditando expediente, check-in, adherencia, R24H y antropometría...
                               </span>
                             </div>
                           )}
@@ -5739,24 +5948,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                 <strong className="block font-semibold">Servicio de IA:</strong>
                                 <p className="text-[11px] leading-relaxed text-amber-800">{aiAuditError}</p>
                               </div>
-                            </div>
-                          )}
-
-                          {/* Estado Inicial: Botón para detonar la auditoría */}
-                          {!aiAuditResult && !isAuditingAi && (
-                            <div className="space-y-2">
-                              <p className="text-[11px] text-[#475569] leading-relaxed">
-                                Contrasta el cálculo matemático estándar con el expediente clínico, las comidas del R24H y los hábitos del check-in mediante FLUX IA para obtener una recomendación adaptada a la realidad del paciente.
-                              </p>
-                              <button
-                                type="button"
-                                disabled={isReadOnly || !liveSmartMacros?.hasEnoughData}
-                                onClick={handleAuditMacrosWithAi}
-                                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-[var(--brand-primary)] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                              >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span>Auditar Prescripción con FLUX IA</span>
-                              </button>
                             </div>
                           )}
 
@@ -5799,22 +5990,10 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                               {/* Controles de Acción */}
                               <div className="pt-1.5 border-t border-indigo-100/70 flex items-center justify-between gap-2 flex-wrap">
-                                {prescriptionMode === "ia" ? (
-                                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    Prescripción de la IA activa ({aiAuditResult.targetKcal} kcal)
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={isReadOnly}
-                                    onClick={() => !isReadOnly && setPrescriptionMode("ia")}
-                                    className="py-1.5 px-3 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <Sparkles className="w-3 h-3" />
-                                    <span>Aplicar prescripción de la IA ({aiAuditResult.targetKcal} kcal)</span>
-                                  </button>
-                                )}
+                                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  Prescripción IA activa ({aiAuditResult.targetKcal} kcal · Base {liveSmartMacros.formulaShort})
+                                </span>
 
                                 <button
                                   type="button"

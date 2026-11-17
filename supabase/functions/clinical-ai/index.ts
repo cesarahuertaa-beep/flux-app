@@ -108,91 +108,100 @@ serve(async (req) => {
       const habitos = body.habitos || {};
       const calcMat = body.calcMatematico || {};
 
+      const evo = metrica?.evolucion_previa || null;
+      const evoBlock = evo
+        ? `\n- Evolución desde consulta previa (${evo.fechaPrevia || "anterior"}):` +
+          `${evo.pesoPrevio ? ` Peso ${evo.pesoPrevio}→${metrica.peso} kg (${Number(evo.deltaPeso) > 0 ? `+${evo.deltaPeso}` : evo.deltaPeso} kg)` : ""}` +
+          `${evo.grasaPrevia && metrica.grasa_pct ? ` | % Grasa ${evo.grasaPrevia}%→${metrica.grasa_pct}% (${Number(evo.deltaGrasa) > 0 ? `+${evo.deltaGrasa}` : evo.deltaGrasa}%)` : ""}` +
+          `${evo.mlgPrevia && metrica.masa_libre_grasa ? ` | MLG ${evo.mlgPrevia}→${metrica.masa_libre_grasa} kg (${Number(evo.deltaMlg) > 0 ? `+${evo.deltaMlg}` : evo.deltaMlg} kg)` : ""}` +
+          `${evo.cinturaPrevia && metrica.cintura ? ` | Cintura ${evo.cinturaPrevia}→${metrica.cintura} cm (${Number(evo.deltaCintura) > 0 ? `+${evo.deltaCintura}` : evo.deltaCintura} cm)` : ""}` +
+          `${evo.kcalPrevias ? ` | Prescripción previa: ${evo.kcalPrevias} kcal` : ""}`
+        : "";
+
       const promptAudit = `Eres un médico y nutriólogo clínico deportivo de élite en FLUX.
-Tu tarea es AUDITAR CON RIGOR CLÍNICO Y PRECISIÓN LA PRESCRIPCIÓN ENERGÉTICA Y DE MACRONUTRIENTES para un paciente real.
+Tu tarea es AUDITAR CON RIGOR CLÍNICO Y PRECISIÓN LA PRESCRIPCIÓN ENERGÉTICA Y DE MACRONUTRIENTES para un paciente real, integrando su Expediente Clínico y los 5 Pasos de su Evaluación.
 
 ═══════════════════════════════════════════════════════════
-1. EXPEDIENTE MÉDICO CLÍNICO (Atemporal / Antecedentes)
+1. EXPEDIENTE MÉDICO CLÍNICO Y CONTEXTO DE CONSULTA
 ═══════════════════════════════════════════════════════════
+- Tipo de evaluación: ${metrica.tipo_consulta || (metrica.es_seguimiento ? "Evaluación de Seguimiento" : "1ª Evaluación Inicial")}${evoBlock}
 - Paciente: ${cliente.nombre || "Paciente"} (${isFemenino(cliente?.genero || cliente?.sexo || metrica?.sexo || anamnesis?.sexo) ? "Femenino" : "Masculino"}, ${cliente.edad || metrica.edad || "25"} años)
 - Patologías y diagnósticos: ${anamnesis.patologias || "Ninguna reportada"}
+- Síntomas gastrointestinales (GI): ${anamnesis.sintomas_gi || "Ninguno reportado"}
 - Alergias e intolerancias alimentarias: ${anamnesis.alergias_intolerancias || "Ninguna"}
 - Medicación y suplementación: ${anamnesis.medicacion_suplementos || "Ninguna"}
-- Antecedentes familiares y lesiones: ${anamnesis.antecedentes_familiares || "Ninguno"} / ${anamnesis.cirugias_lesiones || "Ninguna"}
+- Antecedentes familiares y lesiones/cirugías: ${anamnesis.antecedentes_heredofamiliares || anamnesis.antecedentes_familiares || "Ninguno"} / ${anamnesis.cirugias_lesiones || "Ninguna"}
+- Salud hormonal y ciclo menstrual: ${anamnesis.salud_hormonal_ciclo || "No especificada / No aplica"}
+- Historial de peso y dietas previas: ${anamnesis.historial_dietas_peso || "No especificado"}
+- Ocupación y actividad laboral: ${anamnesis.ocupacion_actividad || "No especificada"}
+- Alcohol / Tabaco: ${anamnesis.consumo_alcohol_tabaco || "No reportado"}
 
 ═══════════════════════════════════════════════════════════
-2. PASO 1: CHECK-IN Y SENSACIONES ACTUALES DEL PACIENTE
+2. PASO 1: HÁBITOS DE VIDA, CHECK-IN Y ADHERENCIA DE ENTRENAMIENTO
 ═══════════════════════════════════════════════════════════
-- Nivel de energía diaria: ${habitos.checkin_energia || 3}/5
-- Control de saciedad / apetito: ${habitos.checkin_saciedad || 3}/5 (1 = mucha hambre/antojos incontrolables, 5 = plenamente saciado)
-- Calidad de digestión: ${habitos.checkin_digestion || 3}/5 (1 = malestares frecuentes, inflamación o reflujo, 5 = óptima)
-- Calidad y horas de sueño: ${habitos.horas_sueno || 7} horas
+- Horas de sueño promedio por noche: ${habitos.horas_sueno || 7.5} hrs (Calidad de descanso en check-in: ${habitos.checkin_descanso || 4}/5)
+- Promedio semanal de entrenamiento actual/previo: ${habitos.dias_ejercicio_actuales || habitos.actividad_previa || "0"} días/semana
+- Hora de entrenamiento diaria: ${habitos.horario_ejercicio || "No especificada"}
+- Nivel de energía diaria: ${habitos.checkin_energia || 4}/5
+- Control de saciedad / apetito: ${habitos.checkin_saciedad || 4}/5 (1 = hambre/ansiedad intensa, 5 = plenamente saciado)
+- Calidad de digestión: ${habitos.checkin_digestion || 4}/5 (1 = inflamación/reflujo/malestar frecuente, 5 = óptima)
 - Nivel de estrés: ${habitos.nivel_estres || 3}/5
-- Consumo de agua diario estimado: ${habitos.consumo_agua || "No especificado"}
-- ACTIVIDAD FÍSICA PREVIA / ACTUAL: ${habitos.dias_ejercicio_actuales || habitos.actividad_previa || "0"} días por semana (Punto de partida del paciente).
+${habitos.adherencia_entrenamiento ? `- Histórico de adherencia al entrenamiento en la app: ${habitos.adherencia_entrenamiento}\n` : ""}${habitos.checkin_observaciones ? `- Justificación de faltas / desviaciones de entreno o sensaciones: "${habitos.checkin_observaciones}"\n` : ""}
+═══════════════════════════════════════════════════════════
+3. PASO 2: PREFERENCIAS, AVERSIONES Y GRUPOS SMAE
+═══════════════════════════════════════════════════════════
+- Alimentos y grupos preferidos: ${body.preferencias || "No especificados"}
+- Alimentos a evitar (aversiones personales): ${body.aversiones || "No especificados"}
 
 ═══════════════════════════════════════════════════════════
-3. PASO 2: PREFERENCIAS ALIMENTARIAS PARA ESTA ETAPA
+4. PASO 3: NUTRICIÓN E HIDRATACIÓN (${metrica.es_seguimiento ? "ADHERENCIA DEL CICLO Y R24H" : "RECORDATORIO DE 24 HORAS - R24H"})
 ═══════════════════════════════════════════════════════════
-- Alimentos e ingredientes favoritos: ${body.preferencias || "No especificados"}
-- Alimentos o comidas que prefiere evitar (aversiones personales): ${body.aversiones || "No especificados"}
-
-═══════════════════════════════════════════════════════════
-4. PASO 3: RECORDATORIO DE 24 HORAS (R24H) - LO QUE COME HOY
-═══════════════════════════════════════════════════════════
-- Desayuno: ${r24h.desayuno || "No reportado"}
+${habitos.adherencia_nutricion ? `- Histórico de adherencia nutricional e hídrica en la app: ${habitos.adherencia_nutricion}\n` : ""}${habitos.checkin_ajustes ? `- Desviaciones frecuentes o cambios fuera del menú reportados: "${habitos.checkin_ajustes}"\n` : ""}- Desayuno habitual: ${r24h.desayuno || "No reportado"}
 - Colación matutina: ${r24h.colacion_m || "No reportada"}
 - Comida principal: ${r24h.comida || "No reportada"}
 - Colación vespertina: ${r24h.colacion_v || "No reportada"}
-- Cena: ${r24h.cena || "No reportada"}
+- Cena habitual: ${r24h.cena || "No reportada"}
 - Bebidas habituales y picoteos: ${r24h.picoteos || "No reportados"}
 
 ═══════════════════════════════════════════════════════════
-5. PASO 4: ENFOQUE Y PLANIFICACIÓN PARA ESTE NUEVO CICLO
+5. PASO 4: ANTROPOMETRÍA, COMPOSICIÓN CORPORAL Y CLÍNICOS
 ═══════════════════════════════════════════════════════════
-- Objetivo fijado para este ciclo: ${calcMat.goalTitle || "Déficit / Recomposición"} (${calcMat.goalPct || 0}%)
-- ACTIVIDAD FÍSICA PROGRAMADA EN ESTE CICLO: ${habitos.faf_proyectado_etapa || "Moderado (3 a 5 días/semana)"} (Factor FAF ${calcMat.faf || 1.55}).
-  *NOTA CLÍNICA VITAL:* El paciente parte de su actividad previa (${habitos.dias_ejercicio_actuales || "0"} días), pero el plan acordado es cumplir con ${habitos.faf_proyectado_etapa || "3 a 5 días"}. Evalúa si el déficit debe ser conservador o escalonado para no abrumar al paciente en esta transición.
-
-═══════════════════════════════════════════════════════════
-6. PASO 5: PROTOCOLO ANTROPOMÉTRICO Y COMPOSICIÓN CORPORAL
-═══════════════════════════════════════════════════════════
-- Protocolo utilizado: ${metrica.metodo_label || metrica.metodo_evaluacion || "Plicometría / Antropometría"}
-- Peso: ${metrica.peso} kg | Estatura: ${metrica.estatura} cm | IMC: ${metrica.imc || "Normal"}
-- % Grasa Corporal: ${metrica.grasa_pct ? `${metrica.grasa_pct}% (${metrica.masa_grasa_kg || "N/A"} kg de grasa)` : "No medido"}
+- Protocolo utilizado: ${metrica.metodo_label || metrica.metodo_evaluacion || "Antropometría"}
+- Peso: ${metrica.peso} kg | Estatura: ${metrica.estatura || "N/A"} cm | IMC: ${metrica.imc || "N/A"}${metrica.imc_clasificacion ? ` (${metrica.imc_clasificacion})` : ""}
+- % Grasa Corporal: ${metrica.grasa_pct ? `${metrica.grasa_pct}%${metrica.masa_grasa_kg ? ` (${metrica.masa_grasa_kg} kg de masa grasa)` : ""}` : "No medido"}
 - Masa Libre de Grasa (MLG): ${metrica.masa_libre_grasa ? `${metrica.masa_libre_grasa} kg` : "No medida"}
-- Masa Muscular esquelética: ${metrica.masa_muscular_kg ? `${metrica.masa_muscular_kg} kg` : "No medida"}
-${metrica.pliegues_str ? `- Pliegues cutáneos (mm): ${metrica.pliegues_str}` : ""}
-${metrica.circunferencias_str ? `- Circunferencias (cm): ${metrica.circunferencias_str}` : ""}
-${metrica.inbody_bmr ? `- BMR InBody BIA directo: ${metrica.inbody_bmr} kcal` : ""}
-
+- Masa Muscular Esquelética: ${metrica.masa_muscular_kg ? `${metrica.masa_muscular_kg} kg` : "No medida"}${metrica.masa_osea_kg ? ` | Masa Ósea: ${metrica.masa_osea_kg} kg` : ""}
+${metrica.icc ? `- ICC (Cintura/Cadera): ${metrica.icc}${metrica.icc_riesgo ? ` (${metrica.icc_riesgo})` : ""}${metrica.ice ? ` | ICE (Cintura/Estatura): ${metrica.ice}` : ""}\n` : ""}${metrica.somatotipo_str ? `- Somatotipo Heath-Carter: ${metrica.somatotipo_str}\n` : ""}${metrica.pliegues_str ? `- Pliegues cutáneos (mm): ${metrica.pliegues_str}${metrica.sum_pliegues ? ` (Σ = ${metrica.sum_pliegues} mm)` : ""}\n` : ""}${metrica.circunferencias_str ? `- Perímetros corporales (cm): ${metrica.circunferencias_str}\n` : ""}${metrica.inbody_bmr ? `- Bioimpedancia InBody: TMB directa ${metrica.inbody_bmr} kcal${metrica.inbody_grasa_visceral ? ` | Grasa visceral nivel ${metrica.inbody_grasa_visceral}` : ""}${metrica.inbody_tbw ? ` | Agua corporal ${metrica.inbody_tbw} L` : ""}\n` : ""}${metrica.glucosa || metrica.presion_arterial ? `- Biomarcadores clínicos: ${metrica.glucosa ? `Glucosa ${metrica.glucosa} mg/dL` : ""} ${metrica.presion_arterial ? `Presión arterial ${metrica.presion_arterial}` : ""}\n` : ""}${metrica.notas_clinicas ? `- Notas clínicas de la medición: "${metrica.notas_clinicas}"\n` : ""}
 ═══════════════════════════════════════════════════════════
-7. CÁLCULO MATEMÁTICO BASE DE FLUX (FÓRMULA ${calcMat.formulaLabel || "Katch-McArdle"})
+6. PASO 5: ENFOQUE DEL CICLO, ACTIVIDAD Y CÁLCULO MATEMÁTICO BASE
 ═══════════════════════════════════════════════════════════
+- Objetivo fijado para este ciclo: ${calcMat.goalTitle || "Déficit / Recomposición"} (${calcMat.goalPct > 0 ? `+${calcMat.goalPct}%` : `${calcMat.goalPct || 0}%`})
+${habitos.plan_meta_peso ? `- Meta específica de peso y plazo: ${habitos.plan_meta_peso}\n` : ""}- Factor de Actividad Física (FAF) proyectado: ${habitos.faf_proyectado_etapa || "Moderado"} (FAF ×${calcMat.faf || 1.55})
+${habitos.pasos_promedio_7d > 0 ? `- NEAT / Pasos medidos (últimos 7 días): ${habitos.pasos_promedio_7d} pasos/día (Meta: ${habitos.meta_pasos_diarios || 8000} pasos/día)\n` : ""}${habitos.faf_notas ? `- Notas de actividad física y disponibilidad: "${habitos.faf_notas}"\n` : ""}- Ecuación TMB activa: ${calcMat.formulaLabel || "Katch-McArdle"} (${calcMat.formulaMode === "manual" ? "Elegida manualmente por el nutriólogo" : "Recomendación automática"}${calcMat.tmbSubstituted ? ` → ${calcMat.tmbSubstituted}` : ""})
 - Tasa Metabólica Basal (TMB): ${calcMat.tmb} kcal/día
-- Gasto Energético Total de MANTENIMIENTO (GET con FAF ${calcMat.faf || 1.55}): ${calcMat.get} kcal/día
-- META DE ETAPA PROPUESTA POR LA FÓRMULA: ${calcMat.targetKcal} kcal/día (${calcMat.goalPct}% respecto al mantenimiento)
-- Distribución matemática base: Proteína ${calcMat.proteinG}g (${calcMat.protGKg} g/kg), Grasas ${calcMat.fatsG}g (${calcMat.fatGKg} g/kg), Carbohidratos ${calcMat.carbsG}g (${calcMat.carbGKg || "N/A"} g/kg).
+- Gasto Energético Total de Mantenimiento (GET): ${calcMat.get} kcal/día
+- META DE ETAPA PROPUESTA POR LA FÓRMULA: ${calcMat.targetKcal} kcal/día (${calcMat.goalPct}% respecto al GET)
+- Distribución matemática base: Proteína ${calcMat.proteinG}g (${calcMat.protGKg} g/kg), Carbohidratos ${calcMat.carbsG}g (${calcMat.carbGKg || "N/A"} g/kg), Grasas ${calcMat.fatsG}g (${calcMat.fatGKg} g/kg).
 
 ═══════════════════════════════════════════════════════════
-INSTRUCCIONES CLÍNICAS CRÍTICAS PARA TU AUDITORÍA:
+REGLAS CLÍNICAS ESTRICTAS PARA TU AUDITORÍA (PROHIBIDO INVENTAR O REDONDEAR AL AZAR):
 ═══════════════════════════════════════════════════════════
-1. CONTRASTA DIRECTAMENTE CONTRA LA META DE ETAPA (${calcMat.targetKcal} kcal), NO CONTRA EL MANTENIMIENTO (${calcMat.get} kcal):
-   - Recuerda: el nutriólogo NO le va a recetar ${calcMat.get} kcal; la meta calculada para este ciclo ya contempla el objetivo y es de ${calcMat.targetKcal} kcal.
-   - En tu explicación, debes comparar explícitamente tu sugerencia calórica contra esos ${calcMat.targetKcal} kcal (ejemplo: "La fórmula propone ${calcMat.targetKcal} kcal (${calcMat.goalPct}% respecto a su GET de ${calcMat.get}), pero sugiero ajustar a [X] kcal (un recorte de [Y] kcal adicionales respecto a la fórmula) debido a...").
-2. EVALÚA LA TRANSICIÓN DE ACTIVIDAD (PASO 1 VS PASO 4):
-   - El paciente viene de ${habitos.dias_ejercicio_actuales || "0"} días de actividad previa, pero el plan proyectado es ${habitos.faf_proyectado_etapa || "3 a 5 días"}.
-   - Analiza si el gasto de ${calcMat.get} kcal se cumplirá de inmediato o si es prudente modular las calorías considerando que la adaptación al ejercicio toma tiempo.
-3. ADAPTA LOS MACROS A SU METABOLISMO Y PATOLOGÍAS:
-   - Si tiene sobrepeso/obesidad, dosifica la proteína preferentemente sobre la masa magra (${metrica.masa_libre_grasa || "peso"}) para no sobreestimar la carga proteica, o entre 1.6 y 2.2 g/kg según el caso.
-   - Si hay hipertensión o dislipidemia, limita sodios y grasas saturadas de embutidos o alimentos procesados reportados en su R24H.
-   - Si hay intolerancias (ej. lácteos), ajusta el menú eliminando o sustituyendo esos alimentos.
-4. COHERENCIA MATEMÁTICA ESTRICTA:
-   - La suma de tus macros debe coincidir exactamente con las calorías que recomiendes:
-     (targetKcal = proteinG * 4 + carbsG * 4 + fatsG * 9).
-   - protGKg debe ser exactamente: Math.round((proteinG / ${metrica.peso || 70}) * 100) / 100.
-   - fatGKg debe ser exactamente: Math.round((fatsG / ${metrica.peso || 70}) * 100) / 100.
-   - carbGKg debe ser exactamente: Math.round((carbsG / ${metrica.peso || 70}) * 100) / 100.
+1. PROHIBIDO HACER AJUSTES COSMÉTICOS DE ±1 A ±25 KCAL POR SIMPLE REDONDEO:
+   - NUNCA cambies de ${calcMat.targetKcal} kcal a un número casi idéntico (ej. restar o sumar 1, 5 o 10 kcal) solo por redondear.
+   - Si tras auditar todos los datos clínicos la meta calórica matemática (${calcMat.targetKcal} kcal) es fisiológicamente adecuada, MANTÉN EXACTAMENTE targetKcal = ${calcMat.targetKcal} (o ajústala al múltiplo de 4/9 más cercano por cuadre exacto de gramos) y enfoca tu valor clínico en optimizar el reparto de macronutrientes (g/kg de proteína, carbohidratos y grasas) y la estrategia práctica.
+   - Si existe una razón clínica de peso para modificar las calorías respecto a ${calcMat.targetKcal} kcal, haz un AJUSTE CLÍNICO REAL Y SIGNIFICATIVO (entre 100 y 350 kcal de diferencia) explicando con datos exactos del paciente por qué lo haces:
+     a) Alerta de % de grasa extremadamente bajo (<6% en hombres o <13% en mujeres): un déficit del -15% o -20% compromete masa muscular y eje hormonal; atenúa el déficit hacia mantenimiento o recomposición ligera.
+     b) Baja saciedad/ansiedad (1–2/5), alto estrés (4–5/5), mal sueño (<6 h) o baja adherencia previa al menú (<70% en seguimiento): un recorte agresivo provocará abandono; modula el déficit y eleva proteína/fibra.
+     c) Transición de actividad (viene de ${habitos.dias_ejercicio_actuales || 0} días/sem a FAF ${calcMat.faf}): evalúa si el gasto proyectado es realista desde la semana 1.
+     d) Evolución en seguimiento: si con las calorías previas perdió/ganó demasiado rápido o se estancó con buena adherencia (>85%), ajusta en consecuencia.
+2. CONTRASTA SIEMPRE CONTRA LA META DE ETAPA (${calcMat.targetKcal} kcal), NO CONTRA EL GET (${calcMat.get} kcal):
+   - En "analisisClinico", menciona datos reales capturados del paciente (su % de grasa/MLG, su adherencia o evolución si es seguimiento, su saciedad/energía/sueño/horario de entreno y hallazgos de su expediente/R24H).
+3. DOSIFICACIÓN PRECISA DE MACRONUTRIENTES Y COHERENCIA QUÍMICA:
+   - Dosifica proteína (1.6 a 2.4 g/kg según masa magra, objetivo y saciedad), grasas (0.7 a 1.2 g/kg cuidando salud hormonal y perfil lipídico) y carbohidratos según carga glucémica, entrenamiento (horario: ${habitos.horario_ejercicio || "habitual"}) y sensibilidad metabólica/glucosa.
+   - La suma calórica de tus gramos recomendados DEBE ser exacta: targetKcal = (proteinG * 4) + (carbsG * 4) + (fatsG * 9).
+   - protGKg = Math.round((proteinG / ${metrica.peso || 70}) * 100) / 100.
+   - carbGKg = Math.round((carbsG / ${metrica.peso || 70}) * 100) / 100.
+   - fatGKg = Math.round((fatsG / ${metrica.peso || 70}) * 100) / 100.
 
 Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exacta:
 {
@@ -203,10 +212,10 @@ Debes responder ÚNICAMENTE con un JSON válido con la siguiente estructura exac
   "carbGKg": number,
   "fatsG": number,
   "fatGKg": number,
-  "badgeMotivo": "string breve (máx 30 caracteres, ej: Déficit Escalonado o Ajuste Metabólico)",
-  "analisisClinico": "string con el criterio clínico razonado de especialista (2 a 3 oraciones, contrastando claramente contra la meta matemática de ${calcMat.targetKcal} kcal)",
-  "ajustesSugeridos": ["ajuste clínico 1", "ajuste clínico 2", "ajuste clínico 3"],
-  "estrategiaMenu": "string con sugerencias directas y prácticas de menú integrando sus favoritos y reemplazando los malos hábitos de su R24H"
+  "badgeMotivo": "string breve (máx 30 caracteres, ej: Meta Validada · Ajuste Macros o Déficit Escalonado)",
+  "analisisClinico": "string con el criterio clínico razonado de especialista (2 a 4 oraciones citando datos reales del paciente y contrastando contra la meta matemática de ${calcMat.targetKcal} kcal)",
+  "ajustesSugeridos": ["ajuste clínico concreto 1 basado en sus datos", "ajuste clínico concreto 2", "ajuste clínico concreto 3"],
+  "estrategiaMenu": "string con directrices prácticas para su menú integrando sus alimentos/grupos preferidos, horario de entreno (${habitos.horario_ejercicio || "habitual"}), hidratación y corrección de su R24H o desviaciones"
 }`;
 
       for (const model of CANDIDATE_MODELS) {
