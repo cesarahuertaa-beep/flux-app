@@ -5637,35 +5637,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       {/* Bloque de Sustento y Comparador Integrado de Ecuaciones TMB (Debajo de los Macros, sin taparlos jamás) */}
                       {(prescriptionMode === "matematico" || showFormulaPopover) && !isAuditingAi && (
                         <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 space-y-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <Calculator className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                              <span className="text-xs font-extrabold text-[#0B1929] truncate">
-                                {liveSmartMacros.activeFormulaInfo?.label || liveSmartMacros.formulaLabel}
-                              </span>
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
-                                  liveSmartMacros.formulaMode === "manual"
-                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200/70"
-                                    : "bg-indigo-100 text-indigo-700 border border-indigo-200/70"
-                                }`}
-                              >
-                                {liveSmartMacros.formulaMode === "manual" ? "Manual" : "Auto"}
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setShowFormulaPopover((v) => !v)}
-                              className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
-                            >
-                              <span>{showFormulaPopover ? "Ocultar fórmulas" : "Cambiar fórmula"}</span>
-                              <ChevronDown
-                                className={`w-3 h-3 transition-transform duration-150 ${
-                                  showFormulaPopover ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Calculator className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span className="text-xs font-extrabold text-[#0B1929]">
+                              {liveSmartMacros.activeFormulaInfo?.label || liveSmartMacros.formulaLabel}
+                            </span>
                           </div>
 
                           {liveSmartMacros.formulaFallbackWarning && (
