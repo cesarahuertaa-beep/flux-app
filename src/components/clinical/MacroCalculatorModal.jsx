@@ -318,23 +318,32 @@ export default function MacroCalculatorModal({
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 {TMB_FORMULAS.map((f) => {
-                  const disabled = f.requiresMLG && (!mlg || Number(mlg) <= 0);
+                  const missingMlg = f.requiresMLG && (!mlg || Number(mlg) <= 0);
+                  const missingHeight = f.requiresHeight && (!estatura || Number(estatura) <= 0);
+                  const disabled = missingMlg || missingHeight;
                   const active = formula === f.id;
                   return (
                     <button
                       key={f.id}
                       type="button"
                       disabled={disabled}
+                      title={
+                        missingMlg
+                          ? "Requiere Masa Libre de Grasa (MLG)"
+                          : missingHeight
+                          ? "Requiere Estatura (cm)"
+                          : f.populationText || f.label
+                      }
                       onClick={() => setFormula(f.id)}
-                      className={`px-2.5 py-2 rounded-xl text-xs font-bold border text-left transition-colors cursor-pointer ${
+                      className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border text-left transition-colors truncate ${
                         active
-                          ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
+                          ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] cursor-pointer"
                           : disabled
                           ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
-                          : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100"
+                          : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0] hover:bg-gray-100 cursor-pointer"
                       }`}
                     >
-                      {f.label}
+                      {f.shortLabel || f.label}
                     </button>
                   );
                 })}
@@ -342,7 +351,7 @@ export default function MacroCalculatorModal({
                   <button
                     type="button"
                     onClick={() => setFormula("bia")}
-                    className={`col-span-2 px-2.5 py-2 rounded-xl text-xs font-bold border text-left transition-colors cursor-pointer ${
+                    className={`col-span-2 px-2 py-1.5 rounded-xl text-[11px] font-bold border text-left transition-colors cursor-pointer ${
                       formula === "bia"
                         ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]"
                         : "bg-[#F8FAFC] text-[#0B1929] border-[#E2E8F0]"

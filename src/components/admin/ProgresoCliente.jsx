@@ -652,7 +652,6 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
   const [loadingAdherenceSnapshot, setLoadingAdherenceSnapshot] = useState(false);
   const [showFormulaPopover, setShowFormulaPopover] = useState(false);
   const formulaPopoverRef = useRef(null);
-  const formulaHoverTimerRef = useRef(null);
 
   useEffect(() => {
     if (!showFormulaPopover) return;
@@ -1869,7 +1868,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
           pliegues_str: plieguesStr,
           circunferencias_str: circStr,
           inbody_bmr: form.inbody_bmr || "",
-          metodo_label: form.metodo_evaluacion === "durnin" ? "Durnin-Womersley (4 Pliegues)" : form.metodo_evaluacion === "inbody" ? "Bioimpedancia Eléctrica (InBody)" : "Plicometría ISAK (6 Pliegues)",
+          metodo_label: getMetodoLabel(form.metodo_evaluacion),
           sexo: evalSexo,
           edad: evalEdad,
         },
@@ -2331,6 +2330,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
         metodo = "manual";
       } else if (m.pliegue_biceps && m.pliegue_triceps && !m.pliegue_abdominal) {
         metodo = "plicometria_dw4";
+      } else if (m.pliegue_triceps && m.pliegue_subescapular && m.pliegue_suprailiaco && m.pliegue_abdominal && !m.pliegue_muslo && !m.pliegue_pantorrilla) {
+        metodo = "plicometria_faulkner";
       } else if (m.pliegue_pectoral || m.pliegue_abdominal || m.pliegue_muslo || m.pliegue_suprailiaco || m.pliegue_triceps) {
         metodo = "plicometria_jp3";
       } else {
@@ -5168,20 +5169,12 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                       <div
                         ref={formulaPopoverRef}
                         className="relative"
-                        onMouseEnter={() => {
-                          if (formulaHoverTimerRef.current) clearTimeout(formulaHoverTimerRef.current);
-                          setShowFormulaPopover(true);
-                        }}
-                        onMouseLeave={() => {
-                          if (formulaHoverTimerRef.current) clearTimeout(formulaHoverTimerRef.current);
-                          formulaHoverTimerRef.current = setTimeout(() => setShowFormulaPopover(false), 180);
-                        }}
                       >
                         <button
                           type="button"
                           onClick={() => setShowFormulaPopover((v) => !v)}
                           aria-expanded={showFormulaPopover}
-                          title="Ver ecuación, criterios clínicos y cambiar fórmula TMB"
+                          title="Clic para ver ecuación, criterio clínico y cambiar fórmula TMB"
                           className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                             liveSmartMacros.formulaFallbackWarning
                               ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
@@ -5198,7 +5191,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                         </button>
 
                         {showFormulaPopover && (
-                          <div className="absolute right-0 top-full mt-2 w-[min(92vw,24rem)] bg-white border border-indigo-200 rounded-2xl shadow-xl p-3.5 z-40 text-left space-y-3 max-h-[75vh] overflow-y-auto">
+                          <div className="absolute right-0 top-full mt-2 w-[min(92vw,23rem)] bg-white border border-indigo-200 rounded-2xl shadow-xl p-3.5 z-40 text-left space-y-3 max-h-[75vh] overflow-y-auto">
                             {/* Título y cierre */}
                             <div className="flex items-start justify-between gap-2 pb-2 border-b border-[#F0F4FA]">
                               <div className="min-w-0">
@@ -5263,7 +5256,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               )}
                               {liveSmartMacros.hasHighFatAdjustedProtein && (
                                 <div className="text-[10px] text-[#6B7A8D] pt-0.5 leading-snug">
-                                  * Proteína/grasa base ajustada con Peso Ajustado (IMC/grasa elevada) para no sobrestimar g/kg.
+                                  * Proteína/grasa base ajustada con Peso Ajustado (adiposidad elevada) para no sobrestimar g/kg.
                                 </div>
                               )}
                             </div>
@@ -5279,7 +5272,11 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                               <button
                                 type="button"
                                 disabled={isReadOnly}
-                                onClick={() => !isReadOnly && updForm("eval_tmb_formula", "auto")}
+                                onClick={() => {
+                                  if (isReadOnly) return;
+                                  updForm("eval_tmb_formula", "auto");
+                                  if (prescriptionMode !== "matematico") setPrescriptionMode("matematico");
+                                }}
                                 className={`w-full text-left px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors flex items-center justify-between gap-2 ${
                                   isReadOnly ? "cursor-default" : "cursor-pointer"
                                 } ${
@@ -5307,7 +5304,8 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                     {grp.items.map((f) => {
                                       const missingMlg = f.requiresMLG && !(liveSmartMacros.mlg > 0);
                                       const missingBia = f.requiresInBody && !(liveSmartMacros.biaBmr > 0);
-                                      const unavailable = missingMlg || missingBia;
+                                      const missingHeight = f.requiresHeight && !(liveSmartMacros.estatura > 0);
+                                      const unavailable = missingMlg || missingBia || missingHeight;
                                       const isSelected = (form.eval_tmb_formula || "auto") === f.id;
                                       return (
                                         <button
@@ -5319,9 +5317,15 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                               ? "Requiere método Bioimpedancia con TMB Basal capturado"
                                               : missingMlg
                                               ? "Requiere % de grasa / MLG completo en Paso 4"
+                                              : missingHeight
+                                              ? "Requiere ingresar estatura en Paso 4"
                                               : f.populationText
                                           }
-                                          onClick={() => !isReadOnly && !unavailable && updForm("eval_tmb_formula", f.id)}
+                                          onClick={() => {
+                                            if (isReadOnly || unavailable) return;
+                                            updForm("eval_tmb_formula", f.id);
+                                            if (prescriptionMode !== "matematico") setPrescriptionMode("matematico");
+                                          }}
                                           className={`px-2 py-1.5 rounded-lg text-[10.5px] font-bold border text-left transition-colors ${
                                             unavailable
                                               ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
@@ -5338,7 +5342,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
                                           </div>
                                           {unavailable && (
                                             <div className="text-[9px] font-medium text-gray-400 truncate">
-                                              {missingBia ? "Requiere TMB BIA" : "Requiere MLG"}
+                                              {missingBia ? "Requiere TMB BIA" : missingMlg ? "Requiere MLG" : "Requiere Estatura"}
                                             </div>
                                           )}
                                         </button>
@@ -5434,7 +5438,7 @@ export function ProgresoCliente({ selected, setMsg, isMiPlan, mode, cicloActivo,
 
                   {!activePrescription?.hasEnoughData ? (
                     <div className="text-center py-6 text-xs text-[#6B7A8D]">
-                      Ingresa el peso corporal en las mediciones para calcular la prescripción energética de esta etapa.
+                      Ingresa el peso y la estatura en las mediciones para calcular la prescripción energética de esta etapa.
                     </div>
                   ) : (
                     <div className="space-y-3">

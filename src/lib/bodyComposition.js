@@ -820,6 +820,7 @@ export const BIA_FORMULA_INFO = {
   shortLabel: "InBody BMR",
   group: "composicion",
   requiresMLG: false,
+  requiresHeight: false,
   requiresInBody: true,
   equationText: "TMB = TMB Basal (kcal) reportado por el equipo de bioimpedancia",
   populationText: "Evaluaciones realizadas con analizador BIA / InBody (usa la medición directa del ticket).",
@@ -832,6 +833,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Mifflin-St Jeor",
     group: "clinicas",
     requiresMLG: false,
+    requiresHeight: true,
     requiresInBody: false,
     equationText: "H: (10×P) + (6.25×E) − (5×Edad) + 5 · M: (10×P) + (6.25×E) − (5×Edad) − 161",
     populationText: "Adultos en general (normopeso, sobrepeso y obesidad). Estándar clínico de la AND.",
@@ -842,6 +844,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Valencia (MX)",
     group: "clinicas",
     requiresMLG: false,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "H: 13.37/13.08/14.21×P + 747/693/429 · M: 11.02/10.92/10.98×P + 679/677/580 (según edad)",
     populationText: "Población adulta mexicana (calibrada por calorimetría indirecta; evita sobreestimación).",
@@ -852,6 +855,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Harris-Benedict",
     group: "clinicas",
     requiresMLG: false,
+    requiresHeight: true,
     requiresInBody: false,
     equationText: "H: 88.362 + 13.397×P + 4.799×E − 5.677×Edad · M: 447.593 + 9.247×P + 3.098×E − 4.33×Edad",
     populationText: "Referencia clínica tradicional y hospitalaria en adultos (Roza & Shizgal).",
@@ -862,6 +866,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Owen",
     group: "clinicas",
     requiresMLG: false,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "H: 879 + (10.2 × Peso) · M: 795 + (7.18 × Peso)",
     populationText: "Adultos sedentarios o con obesidad marcada (estimación conservadora basada en peso).",
@@ -872,6 +877,7 @@ export const TMB_FORMULAS = [
     shortLabel: "FAO / OMS",
     group: "clinicas",
     requiresMLG: false,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "Ecuaciones segmentadas por peso, sexo y rango etario (<3, 3-10, 10-18, 18-30, 30-60, >60)",
     populationText: "Población pediátrica y adolescentes (<18 años) o referencia epidemiológica global.",
@@ -882,6 +888,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Katch-McArdle",
     group: "composicion",
     requiresMLG: true,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "370 + (21.6 × MLG)",
     populationText: "Adultos normopeso o fitness con % grasa y Masa Libre de Grasa (MLG) confiables.",
@@ -892,6 +899,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Cunningham",
     group: "composicion",
     requiresMLG: true,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "500 + (22 × MLG)",
     populationText: "Deportistas y atletas con alta masa muscular y bajo % de grasa corporal.",
@@ -902,6 +910,7 @@ export const TMB_FORMULAS = [
     shortLabel: "Tinsley (MLG)",
     group: "composicion",
     requiresMLG: true,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "(25.9 × MLG) + 284",
     populationText: "Atletas de fuerza, hipertrofia y físico-constructivismo con MLG medida.",
@@ -912,24 +921,38 @@ export const TMB_FORMULAS = [
     shortLabel: "Tinsley (Peso)",
     group: "composicion",
     requiresMLG: false,
+    requiresHeight: false,
     requiresInBody: false,
     equationText: "(24.8 × Peso) + 10",
     populationText: "Atletas de fuerza / entrenados con pesas cuando no se dispone de MLG fiable.",
   },
   {
-    id: "ten_haaf",
-    label: "Ten Haaf & Weijs (2014)",
-    shortLabel: "Ten Haaf & Weijs",
+    id: "ten_haaf_mlg",
+    label: "Ten Haaf & Weijs (2014 · MLG)",
+    shortLabel: "Ten Haaf (MLG)",
+    group: "composicion",
+    requiresMLG: true,
+    requiresHeight: false,
+    requiresInBody: false,
+    equationText: "(22.77 × MLG) + 484.25",
+    populationText: "Deportistas recreativos o competitivos (18–35 años) con MLG medida.",
+  },
+  {
+    id: "ten_haaf_peso",
+    label: "Ten Haaf & Weijs (2014 · Peso)",
+    shortLabel: "Ten Haaf (Peso)",
     group: "composicion",
     requiresMLG: false,
+    requiresHeight: true,
     requiresInBody: false,
-    equationText: "Con MLG: (22.77×MLG) + 484.25 · Sin MLG: 11.936×P + 587.728×E(m) − 8.129×Edad + 191.027×Sexo + 29.28",
-    populationText: "Deportistas recreativos o competitivos (18–35 años) con alto volumen semanal.",
+    equationText: "11.936×P + 587.728×E(m) − 8.129×Edad + 191.027×Sexo(H=1,M=0) + 29.28",
+    populationText: "Deportistas recreativos o competitivos (18–35 años) usando peso y estatura.",
   },
 ];
 
 export function getTmbFormulaInfo(id) {
   if (id === "bia") return BIA_FORMULA_INFO;
+  if (id === "ten_haaf") return TMB_FORMULAS.find((f) => f.id === "ten_haaf_mlg") || TMB_FORMULAS[0];
   return TMB_FORMULAS.find((f) => f.id === id) || TMB_FORMULAS[0];
 }
 
@@ -1107,20 +1130,18 @@ export function getTmbCalculationDetails({
     const tmb = Math.round(24.8 * p + 10);
     return { tmb, substitutedEquation: `(24.8 × ${p} kg) + 10 = ${tmb} kcal` };
   }
-  if (formula === "ten_haaf") {
-    if (ffm > 0) {
-      const tmb = Math.round(22.77 * ffm + 484.25);
-      return { tmb, substitutedEquation: `(22.77 × ${ffm} kg MLG) + 484.25 = ${tmb} kcal` };
-    }
-    if (p > 0 && h > 0) {
-      const hM = Number((h / 100).toFixed(2));
-      const sexBit = s === "M" ? 1 : 0;
-      const tmb = Math.round(11.936 * p + 587.728 * (h / 100) - 8.129 * e + 191.027 * sexBit + 29.28);
-      return {
-        tmb,
-        substitutedEquation: `(11.936×${p}) + (587.728×${hM}m) − (8.129×${e}) + ${sexBit ? "191.027" : "0"} + 29.28 = ${tmb} kcal`,
-      };
-    }
+  if ((formula === "ten_haaf_mlg" || formula === "ten_haaf") && ffm > 0) {
+    const tmb = Math.round(22.77 * ffm + 484.25);
+    return { tmb, substitutedEquation: `(22.77 × ${ffm} kg MLG) + 484.25 = ${tmb} kcal` };
+  }
+  if ((formula === "ten_haaf_peso" || formula === "ten_haaf") && p > 0 && h > 0) {
+    const hM = Number((h / 100).toFixed(2));
+    const sexBit = s === "M" ? 1 : 0;
+    const tmb = Math.round(11.936 * p + 587.728 * (h / 100) - 8.129 * e + 191.027 * sexBit + 29.28);
+    return {
+      tmb,
+      substitutedEquation: `(11.936×${p}) + (587.728×${hM}m) − (8.129×${e}) + ${sexBit ? "191.027" : "0"} + 29.28 = ${tmb} kcal`,
+    };
   }
   if (formula === "valencia" && p > 0) {
     let slope = 13.08;
@@ -1210,6 +1231,7 @@ export function recommendTMBFormula({
   metodo = "basico",
   edad = 25,
   sexo = "M",
+  estatura = 0,
   imc = 0,
   grasaPct = 0,
   mlg = 0,
@@ -1221,12 +1243,14 @@ export function recommendTMBFormula({
   const s = normalizeSexo(sexo);
   const protoLabel = getMetodoLabel(metodo);
   const isObesityOrHighFat =
-    imc >= 30 || (s === "M" && grasaPct >= 30) || (s === "F" && grasaPct >= 38);
+    grasaPct > 0
+      ? (s === "M" && grasaPct >= 30) || (s === "F" && grasaPct >= 38)
+      : imc >= 30;
   const isAthletic =
     mlg > 0 &&
     (fafVal >= 1.725 || Number(diasEjercicio) >= 5) &&
-    ((s === "M" && grasaPct > 0 && grasaPct <= 18) ||
-      (s === "F" && grasaPct > 0 && grasaPct <= 25));
+    ((s === "M" && grasaPct > 0 && grasaPct <= 16) ||
+      (s === "F" && grasaPct > 0 && grasaPct <= 23));
 
   if (edad > 0 && edad < 18) {
     return {
@@ -1246,12 +1270,12 @@ export function recommendTMBFormula({
       if (isObesityOrHighFat) {
         return {
           formula: "mifflin",
-          reason: `Bioimpedancia sin TMB Basal del ticket y con adiposidad elevada (${imc ? `IMC ${imc.toFixed(1)}` : `${grasaPct}% grasa`}): se recomienda Mifflin-St Jeor para evitar sesgos de hidratación/MLG. Puedes cambiar a Katch-McArdle en el selector.`,
+          reason: `Bioimpedancia sin TMB Basal del ticket y con adiposidad elevada (${grasaPct > 0 ? `${grasaPct}% grasa` : `IMC ${imc.toFixed(1)}`}): se recomienda Mifflin-St Jeor para evitar sesgos de hidratación/MLG. Puedes cambiar a Katch-McArdle en el selector.`,
         };
       }
       return {
         formula: "katch",
-        reason: `Bioimpedancia con MLG calculada (${mlg} kg) sin TMB Basal capturado: se recomienda Katch-McArdle sobre masa magra.`,
+        reason: `Bioimpedancia con MLG calculada (${mlg} kg) sin TMB Basal capturado: se recomienda Katch-McArdle sobre masa magra${isAthletic ? " (o Cunningham / Tinsley MLG si es atleta de fuerza)" : ""}.`,
       };
     }
     return {
@@ -1279,13 +1303,13 @@ export function recommendTMBFormula({
     if (isObesityOrHighFat) {
       return {
         formula: "mifflin",
-        reason: `Protocolo ${protoLabel} completo (MLG ${mlg} kg), pero con ${imc >= 30 ? `IMC ${imc.toFixed(1)}` : `${grasaPct}% grasa`} los pliegues pierden reproducibilidad; clínicamente se recomienda Mifflin-St Jeor (puedes optar por Katch-McArdle u Owen en el selector).`,
+        reason: `Protocolo ${protoLabel} completo (MLG ${mlg} kg), pero con ${grasaPct}% de grasa los pliegues pierden reproducibilidad; clínicamente se recomienda Mifflin-St Jeor (puedes optar por Katch-McArdle u Owen en el selector).`,
       };
     }
     if (isAthletic) {
       return {
-        formula: "cunningham",
-        reason: `Protocolo ${protoLabel} completo (MLG ${mlg} kg, ${grasaPct}% grasa) en paciente con alta carga de entrenamiento: se recomienda Cunningham (o Tinsley MLG para fuerza).`,
+        formula: "katch",
+        reason: `Protocolo ${protoLabel} completo (${grasaPct}% grasa → ${mlg} kg MLG): se recomienda Katch-McArdle como base. Por su perfil atlético y carga de entreno, también puedes elegir Cunningham o Tinsley (MLG) abajo.`,
       };
     }
     return {
@@ -1303,6 +1327,13 @@ export function recommendTMBFormula({
     return {
       formula: "katch",
       reason: `Método Básico con MLG estimada (${mlg} kg mediante ${src}) en paciente activo sin obesidad: se recomienda Katch-McArdle (o Mifflin-St Jeor si prefieres peso/talla).`,
+    };
+  }
+
+  if (!(estatura > 0)) {
+    return {
+      formula: "mifflin",
+      reason: "Ingresa la estatura en el Paso 4 para calcular Mifflin-St Jeor (o selecciona abajo una ecuación de solo peso como Valencia, Owen o FAO/OMS).",
     };
   }
 
@@ -1431,8 +1462,7 @@ export function generateSmartMacroPrescription({
     parseFloat(cliente?.estatura) ||
     parseFloat(anamnesis?.estatura) ||
     0;
-  const estaturaEstimada = rawEstatura <= 0;
-  const estatura = rawEstatura > 0 ? rawEstatura : sexo === "F" ? 162 : 172;
+  const estatura = rawEstatura > 0 ? rawEstatura : 0;
 
   const mlg = parseFloat(enriched?.masa_libre_grasa) || 0;
   const grasaPct = parseFloat(enriched?.grasa_pct) || 0;
@@ -1458,6 +1488,7 @@ export function generateSmartMacroPrescription({
     metodo: metodoEval,
     edad,
     sexo,
+    estatura,
     imc,
     grasaPct,
     mlg,
@@ -1478,6 +1509,10 @@ export function generateSmartMacroPrescription({
       formulaFallbackWarning = `Elegiste ${reqInfo.shortLabel}, pero requiere método Bioimpedancia con TMB Basal capturado; usando temporalmente ${getTmbFormulaInfo(recommended.formula).shortLabel}.`;
     } else if (reqInfo?.requiresMLG && !(mlg > 0)) {
       formulaFallbackWarning = `Elegiste ${reqInfo.shortLabel}, pero requiere % grasa / MLG completo; usando temporalmente ${getTmbFormulaInfo(recommended.formula).shortLabel}.`;
+    } else if (reqInfo?.requiresHeight && !(estatura > 0)) {
+      formulaFallbackWarning = `Elegiste ${reqInfo.shortLabel}, pero requiere ingresar la estatura del paciente en el Paso 4.`;
+      formula = reqInfo.id;
+      formulaMode = "manual";
     } else if (reqInfo) {
       formula = reqInfo.id;
       formulaMode = "manual";
@@ -1487,7 +1522,7 @@ export function generateSmartMacroPrescription({
   const activeFormulaInfo = getTmbFormulaInfo(formula);
   const recommendedFormulaInfo = getTmbFormulaInfo(recommended.formula);
   const formulaLabel =
-    formula === "katch" || formula === "cunningham" || formula === "tinsley_mlg"
+    formula === "katch" || formula === "cunningham" || formula === "tinsley_mlg" || formula === "ten_haaf_mlg"
       ? `${activeFormulaInfo.shortLabel} (${mlg} kg MLG)`
       : activeFormulaInfo.label;
   const tmbDetails = getTmbCalculationDetails({
@@ -1515,16 +1550,16 @@ export function generateSmartMacroPrescription({
   // 4. CÁLCULO MATEMÁTICO PURO (ESTÁNDAR CLÍNICO ESTRICTO)
   // Basado en TMB teórica × FAF × Preset de objetivo, ajustado por composición corporal (Peso Ajustado en obesidad)
   const hasHighFat =
-    (sexo === "M" && grasaPct >= 28) ||
-    (sexo === "F" && grasaPct >= 35) ||
-    imc >= 30;
+    grasaPct > 0
+      ? (sexo === "M" && grasaPct >= 28) || (sexo === "F" && grasaPct >= 35)
+      : imc >= 30;
 
   let baseProtGKg = goalInfo.pct < 0 ? 1.8 : goalInfo.pct > 0 ? 1.9 : 1.5;
   let baseFatGKg = goalInfo.pct < 0 ? 0.85 : 0.9;
 
   if (hasHighFat && peso > 0) {
     // En obesidad o adiposidad elevada se evita sobrestimar g/kg sobre peso total usando Peso Ajustado (Devine + 0.25)
-    const idealWeight = (sexo === "F" ? 45.5 : 50) + 0.91 * Math.max(0, estatura - 152.4);
+    const idealWeight = estatura > 0 ? (sexo === "F" ? 45.5 : 50) + 0.91 * Math.max(0, estatura - 152.4) : 0;
     const adjustedWeight = idealWeight > 0 && peso > idealWeight
       ? idealWeight + 0.25 * (peso - idealWeight)
       : peso * 0.85;
